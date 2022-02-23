@@ -316,7 +316,7 @@ namespace MemoryScan {
 		return FindSignatureNativeW(szModuleName, szSignature, unIgnoredByte);
 	}
 #else
-	void* FindSignatureNative(const char* const szModuleName, const char* const szSignature) {
+	void* FindSignatureNative(const char* const szModuleName, const char* const szSignature, const unsigned char unIgnoredByte) {
 		return FindSignatureNativeA(szModuleName, szSignature, unIgnoredByte);
 	}
 #endif
