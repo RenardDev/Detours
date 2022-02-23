@@ -261,224 +261,6 @@ namespace MemoryScan {
 	/// </summary>
 	void* FindSignature(const char* szModuleName, const char* szSignature);
 #endif
-
-	// ----------------------------------------------------------------
-	// FindData (Native)
-	// ----------------------------------------------------------------
-
-	/// <summary>
-	/// Finding for data without SIMD by address and size.
-	/// </summary>
-	void* FindDataNative(void* pAddress, size_t unSize, void* pData, size_t unDataSize);
-
-	/// <summary>
-	/// Finding for data without SIMD by module handle.
-	/// </summary>
-	void* FindDataNative(HMODULE hModule, void* pData, size_t unDataSize);
-
-	/// <summary>
-	/// Finding for data without SIMD by module name.
-	/// </summary>
-	void* FindDataNativeA(const char* szModuleName, void* pData, size_t unDataSize);
-
-	/// <summary>
-	/// Finding for data without SIMD by module name.
-	/// </summary>
-	void* FindDataNativeW(const wchar_t* szModuleName, void* pData, size_t unDataSize);
-
-#ifdef UNICODE
-	/// <summary>
-	/// Finding for data without SIMD by module name.
-	/// </summary>
-	void* FindDataNative(const wchar_t* szModuleName, void* pData, size_t unDataSize);
-#else
-	/// <summary>
-	/// Finding for data without SIMD by module name.
-	/// </summary>
-	void* FindDataNative(const char* szModuleName, void* pData, size_t unDataSize);
-#endif
-
-#if defined(_M_IX86) || defined(_M_X64)
-	// ----------------------------------------------------------------
-	// FindData (SSE2)
-	// ----------------------------------------------------------------
-
-	/// <summary>
-	/// Finding for data with SIMD (SSE2) by address and size.
-	/// </summary>
-	void* FindDataSSE2(void* pAddress, size_t unSize, const char* szSignature);
-
-	/// <summary>
-	/// Finding for data with SIMD (SSE2) by module handle.
-	/// </summary>
-	void* FindDataSSE2(HMODULE hModule, const char* szSignature);
-
-	/// <summary>
-	/// Finding for data with SIMD (SSE2) by module name.
-	/// </summary>
-	void* FindDataSSE2A(const char* szModuleName, const char* szSignature);
-
-	/// <summary>
-	/// Finding for data with SIMD (SSE2) by module name.
-	/// </summary>
-	void* FindSignatureSSE2W(const wchar_t* szModuleName, const char* szSignature);
-
-#ifdef UNICODE
-	/// <summary>
-	/// Finding for a signature with SIMD (SSE2) by module name.
-	/// </summary>
-	void* FindSignatureSSE2(const wchar_t* szModuleName, const char* szSignature);
-#else
-	/// <summary>
-	/// Finding for a signature with SIMD (SSE2) by module name.
-	/// </summary>
-	void* FindSignatureSSE2(const char* szModuleName, const char* szSignature);
-#endif
-
-	// ----------------------------------------------------------------
-	// FindSignature (AVX2)
-	// ----------------------------------------------------------------
-
-	/// <summary>
-	/// Finding for a signature with SIMD (AVX2) by address and size.
-	/// </summary>
-	void* FindSignatureAVX2(void* pAddress, size_t unSize, const char* szSignature);
-
-	/// <summary>
-	/// Finding for a signature with SIMD (AVX2) by module handle.
-	/// </summary>
-	void* FindSignatureAVX2(HMODULE hModule, const char* szSignature);
-
-	/// <summary>
-	/// Finding for a signature with SIMD (AVX2) by module name.
-	/// </summary>
-	void* FindSignatureAVX2A(const char* szModuleName, const char* szSignature);
-
-	/// <summary>
-	/// Finding for a signature with SIMD (AVX2) by module name.
-	/// </summary>
-	void* FindSignatureAVX2W(const wchar_t* szModuleName, const char* szSignature);
-
-#ifdef UNICODE
-	/// <summary>
-	/// Finding for a signature with SIMD (AVX2) by module name.
-	/// </summary>
-	void* FindSignatureAVX2(const wchar_t* szModuleName, const char* szSignature);
-#else
-	/// <summary>
-	/// Finding for a signature with SIMD (AVX2) by module name.
-	/// </summary>
-	void* FindSignatureAVX2(const char* szModuleName, const char* szSignature);
-#endif
-
-	// ----------------------------------------------------------------
-	// FindSignature (AVX512)
-	// ----------------------------------------------------------------
-
-	/// <summary>
-	/// Finding for a signature with SIMD (AVX512) by address and size.
-	/// </summary>
-	void* FindSignatureAVX512(void* pAddress, size_t unSize, const char* szSignature);
-
-	/// <summary>
-	/// Finding for a signature with SIMD (AVX512) by module handle.
-	/// </summary>
-	void* FindSignatureAVX512(HMODULE hModule, const char* szSignature);
-
-	/// <summary>
-	/// Finding for a signature with SIMD (AVX512) by module name.
-	/// </summary>
-	void* FindSignatureAVX512A(const char* szModuleName, const char* szSignature);
-
-	/// <summary>
-	/// Finding for a signature with SIMD (AVX512) by module name.
-	/// </summary>
-	void* FindSignatureAVX512W(const wchar_t* szModuleName, const char* szSignature);
-
-#ifdef UNICODE
-	/// <summary>
-	/// Finding for a signature with SIMD (AVX512) by module name.
-	/// </summary>
-	void* FindSignatureAVX512(const wchar_t* szModuleName, const char* szSignature);
-#else
-	/// <summary>
-	/// Finding for a signature with SIMD (AVX512) by module name.
-	/// </summary>
-	void* FindSignatureAVX512(const char* szModuleName, const char* szSignature);
-#endif
-#endif // _M_IX86 || _M_X64
-
-	// ----------------------------------------------------------------
-	// FindSignature (Auto)
-	// ----------------------------------------------------------------
-
-	/// <summary>
-	/// Finding for a signature by address and size.
-	/// </summary>
-	void* FindSignature(void* pAddress, size_t unSize, const char* szSignature);
-
-	/// <summary>
-	/// Finding for a signature by module handle.
-	/// </summary>
-	void* FindSignature(HMODULE hModule, const char* szSignature);
-
-	/// <summary>
-	/// Finding for a signature by module name.
-	/// </summary>
-	void* FindSignatureA(const char* szModuleName, const char* szSignature);
-
-	/// <summary>
-	/// Finding for a signature by module name.
-	/// </summary>
-	void* FindSignatureW(const wchar_t* szModuleName, const char* szSignature);
-
-#ifdef UNICODE
-	/// <summary>
-	/// Finding for a signature by module name.
-	/// </summary>
-	void* FindSignature(const wchar_t* szModuleName, const char* szSignature);
-#else
-	/// <summary>
-	/// Finding for a signature by module name.
-	/// </summary>
-	void* FindSignature(const char* szModuleName, const char* szSignature);
-#endif
-
-	// ----------------------------------------------------------------
-	// FindRTTI
-	// ----------------------------------------------------------------
-
-	/// <summary>
-	/// Find RTTI by address and size.
-	/// </summary>
-	void* FindRTTI(void* pAddress, size_t unSize, const char* szRTTI);
-
-	/// <summary>
-	/// Find RTTI by module handle.
-	/// </summary>
-	void* FindRTTI(HMODULE hModule, const char* szRTTI);
-
-	/// <summary>
-	/// Find RTTI by module name.
-	/// </summary>
-	void* FindRTTIA(const char* szModuleName, const char* szRTTI);
-
-	/// <summary>
-	/// Find RTTI by module name.
-	/// </summary>
-	void* FindRTTIW(const wchar_t* szModuleName, const char* szRTTI);
-
-#ifdef UNICODE
-	/// <summary>
-	/// Find RTTI by module name.
-	/// </summary>
-	void* FindRTTI(const wchar_t* szModuleName, const char* szRTTI);
-#else
-	/// <summary>
-	/// Find RTTI by module name.
-	/// </summary>
-	void* FindRTTI(const char* szModuleName, const char* szRTTI);
-#endif
 }
 
 // ----------------------------------------------------------------
@@ -486,7 +268,7 @@ namespace MemoryScan {
 // ----------------------------------------------------------------
 namespace MemoryProtection {
 	// ----------------------------------------------------------------
-	// Flags MemoryProtection
+	// MemoryProtectionFlags
 	// ----------------------------------------------------------------
 
 	enum MemoryProtectionFlags : unsigned char {
@@ -507,7 +289,7 @@ namespace MemoryProtection {
 		SmartMemoryProtection(void* pAddress, size_t unSize);
 		~SmartMemoryProtection();
 	public:
-		bool ChangeProtection(MemoryProtectionFlags unFlags = MEMORYPROTECTION_READONLY);
+		bool ChangeProtection(unsigned char unFlags = MEMORYPROTECTION_READONLY);
 		bool RestoreProtection();
 	public:
 		void* GetAddress();
@@ -526,7 +308,7 @@ namespace MemoryProtection {
 	/// <summary>
 	/// A simple change in memory protection.
 	/// </summary>
-	bool ChangeMemoryProtection(void* pAddress, size_t unSize, MemoryProtectionFlags unFlags = MEMORYPROTECTION_READONLY);
+	bool ChangeMemoryProtection(void* pAddress, size_t unSize, unsigned char unFlags = MEMORYPROTECTION_READONLY);
 
 	/// <summary>
 	/// A simple change in memory protection.

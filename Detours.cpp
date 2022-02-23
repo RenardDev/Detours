@@ -142,6 +142,10 @@ namespace MemoryUtils {
 		}
 
 		const size_t unSize = strnlen_s(szData, DETOURS_MAX_STRSIZE) / 2;
+		if (!unSize) {
+			return false;
+		}
+
 		for (size_t i = 0; i < unSize; ++i) {
 			const unsigned char unHigh = *szData++;
 			const unsigned char unLow = *szData++;
@@ -161,6 +165,10 @@ namespace MemoryUtils {
 		}
 
 		const size_t unSize = wcsnlen_s(szData, DETOURS_MAX_STRSIZE) / 2;
+		if (!unSize) {
+			return false;
+		}
+
 		for (size_t i = 0; i < unSize; ++i) {
 			const unsigned char unHigh = static_cast<unsigned char>(*szData++);
 			const unsigned char unLow = static_cast<unsigned char>(*szData++);
@@ -203,10 +211,14 @@ namespace MemoryScan {
 			return nullptr;
 		}
 
+		const size_t unSignatureLength = strnlen_s(reinterpret_cast<const char*>(szSignature), DETOURS_MAX_STRSIZE);
+		if (!unSignatureLength) {
+			return nullptr;
+		}
+
 		unsigned char* pBegin = reinterpret_cast<unsigned char*>(pAddress);
 		const unsigned char* pEnd = pBegin + unSize;
 
-		const size_t unSignatureLength = strnlen_s(reinterpret_cast<const char*>(szSignature), DETOURS_MAX_STRSIZE);
 		for (; pBegin < pEnd; ++pBegin) {
 			size_t unNextStart = 0;
 			size_t unResult = 0;
@@ -800,7 +812,7 @@ namespace MemoryProtection {
 		VirtualProtect(m_pAddress, m_unSize, m_unOriginalProtection, &unProtection);
 	}
 
-	bool SmartMemoryProtection::ChangeProtection(MemoryProtectionFlags unFlags) {
+	bool SmartMemoryProtection::ChangeProtection(unsigned char unFlags) {
 		if (!m_pAddress) {
 			return false;
 		}
@@ -862,7 +874,7 @@ namespace MemoryProtection {
 
 	static std::vector<std::unique_ptr<SmartMemoryProtection>> g_vecSmartMemoryProtections;
 
-	bool ChangeMemoryProtection(void* pAddress, size_t unSize, MemoryProtectionFlags unFlags) {
+	bool ChangeMemoryProtection(void* pAddress, size_t unSize, unsigned char unFlags) {
 		if (!pAddress) {
 			return false;
 		}
