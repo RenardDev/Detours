@@ -34,12 +34,12 @@ namespace MemoryUtils {
 	/// <summary>
 	/// Encode the data array to a hexadecimal string.
 	/// </summary>
-	bool EncodeToHexA(unsigned char* pData, const size_t unSize, char* szData, const bool bUseUpperCase = true);
+	bool EncodeToHexA(const unsigned char* const pData, const size_t unSize, char* const szData, const bool bUseUpperCase = true);
 
 	/// <summary>
 	/// Encode the data array to a hexadecimal string.
 	/// </summary>
-	bool EncodeToHexW(unsigned char* pData, const size_t unSize, wchar_t* szData, const bool bUseUpperCase = true);
+	bool EncodeToHexW(const unsigned char* const pData, const size_t unSize, wchar_t* const szData, const bool bUseUpperCase = true);
 
 #ifdef UNICODE
 	/// <summary>
@@ -56,23 +56,23 @@ namespace MemoryUtils {
 	/// <summary>
 	/// Decoding a hexadecimal string into an array of data.
 	/// </summary>
-	bool DecodeFromHexA(const char* szData, unsigned char* pData);
+	bool DecodeFromHexA(const char* szData, unsigned char* const pData);
 
 	/// <summary>
 	/// Decoding a hexadecimal string into an array of data.
 	/// </summary>
-	bool DecodeFromHexW(const wchar_t* szData, unsigned char* pData);
+	bool DecodeFromHexW(const wchar_t* szData, unsigned char* const pData);
 
 #ifdef UNICODE
 	/// <summary>
 	/// Decoding a hexadecimal string into an array of data.
 	/// </summary>
-	bool DecodeFromHex(const wchar_t* szData, unsigned char* pData);
+	bool DecodeFromHex(const wchar_t* szData, unsigned char* const pData);
 #else
 	/// <summary>
 	/// Decoding a hexadecimal string into an array of data.
 	/// </summary>
-	bool DecodeFromHex(const char* szData, unsigned char* pData);
+	bool DecodeFromHex(const char* szData, unsigned char* const pData);
 #endif
 }
 
@@ -289,7 +289,7 @@ namespace MemoryProtection {
 		SmartMemoryProtection(void* pAddress, size_t unSize);
 		~SmartMemoryProtection();
 	public:
-		bool ChangeProtection(unsigned char unFlags = MEMORYPROTECTION_READONLY);
+		bool ChangeProtection(unsigned char unFlag = MEMORYPROTECTION_READONLY);
 		bool RestoreProtection();
 	public:
 		void* GetAddress();
@@ -308,7 +308,7 @@ namespace MemoryProtection {
 	/// <summary>
 	/// A simple change in memory protection.
 	/// </summary>
-	bool ChangeMemoryProtection(void* pAddress, size_t unSize, unsigned char unFlags = MEMORYPROTECTION_READONLY);
+	bool ChangeMemoryProtection(void* pAddress, size_t unSize, unsigned char unFlag = MEMORYPROTECTION_READONLY);
 
 	/// <summary>
 	/// A simple change in memory protection.

@@ -78,7 +78,7 @@ namespace MemoryUtils {
 		0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF
 	};
 
-	bool EncodeToHexA(unsigned char* pData, const size_t unSize, char* szData, const bool bUseUpperCase) {
+	bool EncodeToHexA(const unsigned char* const pData, const size_t unSize, char* szData, const bool bUseUpperCase) {
 		if (!pData) {
 			return false;
 		}
@@ -93,14 +93,14 @@ namespace MemoryUtils {
 
 		for (size_t i = 0; i < unSize; ++i) {
 			const unsigned char unSymbol = pData[i];
-			*szData++ = nHexTable[bUseUpperCase][unSymbol >> 4];
-			*szData++ = nHexTable[bUseUpperCase][unSymbol & 0xF];
+			*(szData++) = nHexTable[bUseUpperCase][unSymbol >> 4];
+			*(szData++) = nHexTable[bUseUpperCase][unSymbol & 0xF];
 		}
 
 		return true;
 	}
 
-	bool EncodeToHexW(unsigned char* pData, const size_t unSize, wchar_t* szData, const bool bUseUpperCase) {
+	bool EncodeToHexW(const unsigned char* const pData, const size_t unSize, wchar_t* szData, const bool bUseUpperCase) {
 		if (!pData) {
 			return false;
 		}
@@ -115,24 +115,24 @@ namespace MemoryUtils {
 
 		for (size_t i = 0; i < unSize; ++i) {
 			const unsigned char unSymbol = pData[i];
-			*szData++ = static_cast<wchar_t>(nHexTable[bUseUpperCase][unSymbol >> 4]);
-			*szData++ = static_cast<wchar_t>(nHexTable[bUseUpperCase][unSymbol & 0xF]);
+			*(szData++) = static_cast<wchar_t>(nHexTable[bUseUpperCase][unSymbol >> 4]);
+			*(szData++) = static_cast<wchar_t>(nHexTable[bUseUpperCase][unSymbol & 0xF]);
 		}
 
 		return true;
 	}
 
 #ifdef UNICODE
-	bool EncodeToHex(unsigned char* pData, const size_t unSize, wchar_t* szData, const bool bUseUpperCase) {
+	bool EncodeToHex(const unsigned char* const pData, const size_t unSize, wchar_t* szData, const bool bUseUpperCase) {
 		return EncodeToHexW(pData, unSize, szData, bUseUpperCase);
 	}
 #else
-	bool EncodeToHex(unsigned char* pData, const size_t unSize, char* szData, const bool bUseUpperCase) {
+	bool EncodeToHex(const unsigned char* const pData, const size_t unSize, char* szData, const bool bUseUpperCase) {
 		return EncodeToHexA(pData, unSize, szData, bUseUpperCase);
 	}
 #endif
 
-	bool DecodeFromHexA(const char* szData, unsigned char* pData) {
+	bool DecodeFromHexA(const char* szData, unsigned char* const pData) {
 		if (!szData) {
 			return false;
 		}
@@ -155,7 +155,7 @@ namespace MemoryUtils {
 		return true;
 	}
 
-	bool DecodeFromHexW(const wchar_t* szData, unsigned char* pData) {
+	bool DecodeFromHexW(const wchar_t* szData, unsigned char* const pData) {
 		if (!szData) {
 			return false;
 		}
@@ -179,11 +179,11 @@ namespace MemoryUtils {
 	}
 
 #ifdef UNICODE
-	bool DecodeFromHex(const wchar_t* szData, unsigned char* pData) {
+	bool DecodeFromHex(const wchar_t* szData, unsigned char* const pData) {
 		return DecodeFromHexW(szData, pData);
 	}
 #else
-	bool DecodeFromHex(const char* szData, unsigned char* pData) {
+	bool DecodeFromHex(const char* szData, unsigned char* const pData) {
 		return DecodeFromHexA(szData, pData);
 	}
 #endif
