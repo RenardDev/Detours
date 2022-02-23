@@ -838,6 +838,665 @@ namespace MemoryScan {
 		return FindSignatureA(szModuleName, szSignature);
 	}
 #endif
+
+	// ----------------------------------------------------------------
+	// FindData (Native)
+	// ----------------------------------------------------------------
+
+	void* FindDataNative(void* const pAddress, const size_t unSize, const unsigned char* const pData, const size_t unDataSize) {
+		if (!pAddress) {
+			return nullptr;
+		}
+
+		if (!unSize) {
+			return nullptr;
+		}
+
+		if (!pData) {
+			return nullptr;
+		}
+
+		if (!unDataSize) {
+			return nullptr;
+		}
+
+		if (unSize <= unDataSize) {
+			return nullptr;
+		}
+
+		unsigned char* pBegin = reinterpret_cast<unsigned char*>(pAddress);
+		const void* const pEnd = pBegin + unSize;
+		for (; pBegin < pEnd; ++pBegin) {
+			size_t unNextStart = 0;
+			size_t unResult = 0;
+			bool bSuccess = true;
+
+			for (size_t j = 0; j < unDataSize; ++j) {
+				const unsigned char unSymbol = pBegin[j];
+				if (unSymbol == reinterpret_cast<const unsigned char*>(pData)[0]) {
+					unNextStart = j;
+				}
+
+				if (unSymbol != reinterpret_cast<const unsigned char*>(pData)[j]) {
+					unResult = unNextStart;
+					bSuccess = false;
+					break;
+				}
+			}
+
+			if (bSuccess) {
+				return pBegin;
+			} else {
+				pBegin += unResult;
+			}
+		}
+
+		return nullptr;
+	}
+
+	void* FindDataNative(const HMODULE hModule, const unsigned char* const pData, const size_t unDataSize) {
+		if (!hModule) {
+			return nullptr;
+		}
+
+		if (!pData) {
+			return nullptr;
+		}
+
+		if (!unDataSize) {
+			return nullptr;
+		}
+
+		MODULEINFO modinf;
+		if (!GetModuleInformation(HANDLE(-1), hModule, &modinf, sizeof(MODULEINFO))) {
+			return nullptr;
+		}
+
+		return FindDataNative(reinterpret_cast<void*>(modinf.lpBaseOfDll), modinf.SizeOfImage, pData, unDataSize);
+	}
+
+	void* FindDataNativeA(const char* const szModuleName, const unsigned char* const pData, const size_t unDataSize) {
+		if (!szModuleName) {
+			return nullptr;
+		}
+
+		if (!pData) {
+			return nullptr;
+		}
+
+		if (!unDataSize) {
+			return nullptr;
+		}
+
+		const HMODULE hMod = GetModuleHandleA(szModuleName);
+		if (!hMod) {
+			return nullptr;
+		}
+
+		return FindDataNative(hMod, pData, unDataSize);
+	}
+
+	void* FindDataNativeW(const wchar_t* const szModuleName, const unsigned char* const pData, const size_t unDataSize) {
+		if (!szModuleName) {
+			return nullptr;
+		}
+
+		if (!pData) {
+			return nullptr;
+		}
+
+		if (!unDataSize) {
+			return nullptr;
+		}
+
+		const HMODULE hMod = GetModuleHandleW(szModuleName);
+		if (!hMod) {
+			return nullptr;
+		}
+
+		return FindDataNative(hMod, pData, unDataSize);
+	}
+
+#ifdef UNICODE
+	void* FindDataNative(const wchar_t* const szModuleName, const unsigned char* const pData, const size_t unDataSize) {
+		return FindDataNativeW(szModuleName, pData, unDataSize);
+	}
+#else
+	void* FindDataNative(const char* const szModuleName, const unsigned char* const pData, const size_t unDataSize) {
+		return FindDataNativeA(szModuleName, pData, unDataSize);
+	}
+#endif
+
+#if defined(_M_IX86) || defined(_M_X64)
+	// ----------------------------------------------------------------
+	// FindData (SSE2)
+	// ----------------------------------------------------------------
+
+	void* FindDataSSE2(void* const pAddress, const size_t unSize, const unsigned char* const pData, const size_t unDataSize) {
+		if (!pAddress) {
+			return nullptr;
+		}
+
+		if (!unSize) {
+			return nullptr;
+		}
+
+		if (!pData) {
+			return nullptr;
+		}
+
+		if (!unDataSize) {
+			return nullptr;
+		}
+
+		if (unSize <= unDataSize) {
+			return nullptr;
+		}
+
+		const size_t unSignaturesCount = static_cast<size_t>(ceil(static_cast<float>(unDataSize) / 16.f));
+
+		unsigned int pSignatures[32];
+		memset(pSignatures, 0, sizeof(pSignatures));
+		for (size_t i = 0; i < unSignaturesCount; ++i) {
+			for (size_t j = 0; j <= unDataSize - 1; ++j) {
+				pSignatures[i] |= 1 << j;
+			}
+		}
+
+		unsigned char* pBegin = reinterpret_cast<unsigned char*>(pAddress);
+		const void* const pEnd = pBegin + unSize;
+		const __m128i xmm0 = _mm_loadu_si128(reinterpret_cast<const __m128i*>(pData));
+		for (; pBegin < pEnd; _mm_prefetch(reinterpret_cast<const char*>(++pBegin + 64), _MM_HINT_NTA)) {
+			if (pData[0] == pBegin[0]) {
+				if ((_mm_movemask_epi8(_mm_cmpeq_epi8(xmm0, _mm_loadu_si128(reinterpret_cast<const __m128i*>(pBegin)))) & pSignatures[0]) == pSignatures[0]) {
+					for (size_t i = 1; i < unSignaturesCount; ++i) {
+						if ((_mm_movemask_epi8(_mm_cmpeq_epi8(_mm_loadu_si128(reinterpret_cast<const __m128i*>(pBegin + i * 16)), _mm_loadu_si128(reinterpret_cast<const __m128i*>(pData + i * 16)))) & pSignatures[i]) == pSignatures[i]) {
+							if ((i + 1) == unSignaturesCount) {
+								return pBegin;
+							}
+						}
+					}
+					return pBegin;
+				}
+			}
+		}
+
+		return nullptr;
+	}
+
+	void* FindDataSSE2(const HMODULE hModule, const unsigned char* const pData, const size_t unDataSize) {
+		if (!hModule) {
+			return nullptr;
+		}
+
+		if (!pData) {
+			return nullptr;
+		}
+
+		if (!unDataSize) {
+			return nullptr;
+		}
+
+		MODULEINFO modinf;
+		if (!GetModuleInformation(HANDLE(-1), hModule, &modinf, sizeof(MODULEINFO))) {
+			return nullptr;
+		}
+
+		return FindDataSSE2(reinterpret_cast<void*>(modinf.lpBaseOfDll), modinf.SizeOfImage, pData, unDataSize);
+	}
+
+	void* FindDataSSE2A(const char* const szModuleName, const unsigned char* const pData, const size_t unDataSize) {
+		if (!szModuleName) {
+			return nullptr;
+		}
+
+		if (!pData) {
+			return nullptr;
+		}
+
+		if (!unDataSize) {
+			return nullptr;
+		}
+
+		const HMODULE hMod = GetModuleHandleA(szModuleName);
+		if (!hMod) {
+			return nullptr;
+		}
+
+		return FindDataSSE2(hMod, pData, unDataSize);
+	}
+
+	void* FindDataSSE2W(const wchar_t* const szModuleName, const unsigned char* const pData, const size_t unDataSize) {
+		if (!szModuleName) {
+			return nullptr;
+		}
+
+		if (!pData) {
+			return nullptr;
+		}
+
+		if (!unDataSize) {
+			return nullptr;
+		}
+
+		const HMODULE hMod = GetModuleHandleW(szModuleName);
+		if (!hMod) {
+			return nullptr;
+		}
+
+		return FindDataSSE2(hMod, pData, unDataSize);
+	}
+
+#ifdef UNICODE
+	void* FindDataSSE2(const wchar_t* const szModuleName, const unsigned char* const pData, const size_t unDataSize) {
+		return FindDataSSE2W(szModuleName, pData, unDataSize);
+	}
+#else
+	void* FindDataSSE2(const char* const szModuleName, const unsigned char* const pData, const size_t unDataSize) {
+		return FindDataSSE2A(szModuleName, pData, unDataSize);
+	}
+#endif
+
+	// ----------------------------------------------------------------
+	// FindData (AVX2)
+	// ----------------------------------------------------------------
+
+	void* FindDataAVX2(void* const pAddress, const size_t unSize, const unsigned char* const pData, const size_t unDataSize) {
+		if (!pAddress) {
+			return nullptr;
+		}
+
+		if (!unSize) {
+			return nullptr;
+		}
+
+		if (!pData) {
+			return nullptr;
+		}
+
+		if (!unDataSize) {
+			return nullptr;
+		}
+
+		if (unSize <= unDataSize) {
+			return nullptr;
+		}
+
+		const size_t unSignaturesCount = static_cast<size_t>(ceil(static_cast<float>(unDataSize) / 32.f));
+
+		unsigned int pSignatures[64];
+		memset(pSignatures, 0, sizeof(pSignatures));
+		for (size_t i = 0; i < unSignaturesCount; ++i) {
+			for (size_t j = 0; j <= unDataSize - 1; ++j) {
+				pSignatures[i] |= 1 << j;
+			}
+		}
+
+		unsigned char* pBegin = reinterpret_cast<unsigned char*>(pAddress);
+		const void* const pEnd = pBegin + unSize;
+		const __m256i ymm0 = _mm256_loadu_si256(reinterpret_cast<const __m256i*>(pData));
+		for (; pBegin < pEnd; _mm_prefetch(reinterpret_cast<const char*>(++pBegin + 128), _MM_HINT_NTA)) {
+			if (reinterpret_cast<const unsigned char*>(pData)[0] == pBegin[0]) {
+				if ((_mm256_movemask_epi8(_mm256_cmpeq_epi8(ymm0, _mm256_loadu_si256(reinterpret_cast<const __m256i*>(pBegin)))) & pSignatures[0]) == pSignatures[0]) {
+					for (size_t i = 1; i < unSignaturesCount; ++i) {
+						if ((_mm256_movemask_epi8(_mm256_cmpeq_epi8(_mm256_loadu_si256(reinterpret_cast<const __m256i*>(pBegin + i * 32)), _mm256_loadu_si256(reinterpret_cast<const __m256i*>(pData + i * 32)))) & pSignatures[i]) == pSignatures[i]) {
+							if ((i + 1) == unSignaturesCount) {
+								return pBegin;
+							}
+						}
+					}
+					return pBegin;
+				}
+			}
+		}
+
+		return nullptr;
+	}
+
+	void* FindDataAVX2(const HMODULE hModule, const unsigned char* const pData, const size_t unDataSize) {
+		if (!hModule) {
+			return nullptr;
+		}
+
+		if (!pData) {
+			return nullptr;
+		}
+
+		if (!unDataSize) {
+			return nullptr;
+		}
+
+		MODULEINFO modinf;
+		if (!GetModuleInformation(HANDLE(-1), hModule, &modinf, sizeof(MODULEINFO))) {
+			return nullptr;
+		}
+
+		return FindDataAVX2(reinterpret_cast<void*>(modinf.lpBaseOfDll), modinf.SizeOfImage, pData, unDataSize);
+	}
+
+	void* FindDataAVX2A(const char* const szModuleName, const unsigned char* const pData, const size_t unDataSize) {
+		if (!szModuleName) {
+			return nullptr;
+		}
+
+		if (!pData) {
+			return nullptr;
+		}
+
+		if (!unDataSize) {
+			return nullptr;
+		}
+
+		const HMODULE hMod = GetModuleHandleA(szModuleName);
+		if (!hMod) {
+			return nullptr;
+		}
+
+		return FindDataAVX2(hMod, pData, unDataSize);
+	}
+
+	void* FindDataAVX2W(const wchar_t* const szModuleName, const unsigned char* const pData, const size_t unDataSize) {
+		if (!szModuleName) {
+			return nullptr;
+		}
+
+		if (!pData) {
+			return nullptr;
+		}
+
+		if (!unDataSize) {
+			return nullptr;
+		}
+
+		const HMODULE hMod = GetModuleHandleW(szModuleName);
+		if (!hMod) {
+			return nullptr;
+		}
+
+		return FindDataAVX2(hMod, pData, unDataSize);
+	}
+
+#ifdef UNICODE
+	void* FindDataAVX2(const wchar_t* const szModuleName, const unsigned char* const pData, const size_t unDataSize) {
+		return FindDataAVX2W(szModuleName, pData, unDataSize);
+	}
+#else
+	void* FindDataAVX2(const char* const szModuleName, const unsigned char* const pData, const size_t unDataSize) {
+		return FindDataAVX2A(szModuleName, pData, unDataSize);
+	}
+#endif
+
+	// ----------------------------------------------------------------
+	// FindData (AVX512)
+	// ----------------------------------------------------------------
+
+	void* FindDataAVX512(void* const pAddress, const size_t unSize, const unsigned char* const pData, const size_t unDataSize) {
+		if (!pAddress) {
+			return nullptr;
+		}
+
+		if (!unSize) {
+			return nullptr;
+		}
+
+		if (!pData) {
+			return nullptr;
+		}
+
+		if (!unDataSize) {
+			return nullptr;
+		}
+
+		const size_t unSignaturesCount = static_cast<size_t>(ceil(static_cast<float>(unDataSize) / 64.f));
+
+		unsigned int pSignatures[128];
+		memset(pSignatures, 0, sizeof(pSignatures));
+		for (size_t i = 0; i < unSignaturesCount; ++i) {
+			for (size_t j = 0; j <= unDataSize - 1; ++j) {
+				pSignatures[i] |= 1 << j;
+			}
+		}
+
+		unsigned char* pBegin = reinterpret_cast<unsigned char*>(pAddress);
+		const void* const pEnd = pBegin + unSize;
+		const __m512i zmm0 = _mm512_loadu_si512(reinterpret_cast<const __m512i*>(pData));
+		for (; pBegin < pEnd; _mm_prefetch(reinterpret_cast<const char*>(++pBegin + 256), _MM_HINT_NTA)) {
+			if (reinterpret_cast<const unsigned char*>(pData)[0] == pBegin[0]) {
+				if ((_mm512_cmpeq_epi8_mask(zmm0, _mm512_loadu_si512(reinterpret_cast<const __m512i*>(pBegin))) & pSignatures[0]) == pSignatures[0]) {
+					for (size_t i = 1; i < unSignaturesCount; ++i) {
+						if ((_mm512_cmpeq_epi8_mask(_mm512_loadu_si512(reinterpret_cast<const __m512i*>(pBegin + i * 64)), _mm512_loadu_si512(reinterpret_cast<const __m512i*>(pData + i * 64))) & pSignatures[i]) == pSignatures[i]) {
+							if ((i + 1) == unSignaturesCount) {
+								return pBegin;
+							}
+						}
+					}
+					return pBegin;
+				}
+			}
+		}
+
+		return nullptr;
+	}
+
+	void* FindDataAVX512(const HMODULE hModule, const unsigned char* const pData, const size_t unDataSize) {
+		if (!hModule) {
+			return nullptr;
+		}
+
+		if (!pData) {
+			return nullptr;
+		}
+
+		if (!unDataSize) {
+			return nullptr;
+		}
+
+		MODULEINFO modinf;
+		if (!GetModuleInformation(HANDLE(-1), hModule, &modinf, sizeof(MODULEINFO))) {
+			return nullptr;
+		}
+
+		return FindDataAVX512(reinterpret_cast<void*>(modinf.lpBaseOfDll), modinf.SizeOfImage, pData, unDataSize);
+	}
+
+	void* FindDataAVX512A(const char* const szModuleName, const unsigned char* const pData, const size_t unDataSize) {
+		if (!szModuleName) {
+			return nullptr;
+		}
+
+		if (!pData) {
+			return nullptr;
+		}
+
+		if (!unDataSize) {
+			return nullptr;
+		}
+
+		const HMODULE hMod = GetModuleHandleA(szModuleName);
+		if (!hMod) {
+			return nullptr;
+		}
+
+		return FindDataAVX512(hMod, pData, unDataSize);
+	}
+
+	void* FindDataAVX512W(const wchar_t* const szModuleName, const unsigned char* const pData, const size_t unDataSize) {
+		if (!szModuleName) {
+			return nullptr;
+		}
+
+		if (!pData) {
+			return nullptr;
+		}
+
+		if (!unDataSize) {
+			return nullptr;
+		}
+
+		const HMODULE hMod = GetModuleHandleW(szModuleName);
+		if (!hMod) {
+			return nullptr;
+		}
+
+		return FindDataAVX512(hMod, pData, unDataSize);
+	}
+
+#ifdef UNICODE
+	void* FindDataAVX512(const wchar_t* const szModuleName, const unsigned char* const pData, const size_t unDataSize) {
+		return FindDataAVX512W(szModuleName, pData, unDataSize);
+	}
+#else
+	void* FindDataAVX512(const char* const szModuleName, const unsigned char* const pData, const size_t unDataSize) {
+		return FindDataAVX512A(szModuleName, pData, unDataSize);
+	}
+#endif
+#endif // _M_IX86 || _M_X64
+
+	// ----------------------------------------------------------------
+	// FindData (Auto)
+	// ----------------------------------------------------------------
+
+	void* FindData(void* const pAddress, const size_t unSize, const unsigned char* const pData, const size_t unDataSize) {
+#if defined(_M_IX86) || defined(_M_X64)
+		if (!g_bIsCheckedFeatures) {
+			g_bIsCheckedFeatures = true;
+
+			int nCPUInf[4];
+			__cpuid(nCPUInf, 0x00000000);
+			const int nIDs = nCPUInf[0];
+			if (nIDs >= 0x00000001) {
+				__cpuid(nCPUInf, 0x00000001);
+				g_bIsAvailableFeatureSSE2 = (nCPUInf[3] & (1 << 26)) != 0;
+				if (nIDs >= 0x00000007) {
+					__cpuid(nCPUInf, 0x00000007);
+					g_bIsAvailableFeatureAVX2 = (nCPUInf[1] & (1 << 5)) != 0;
+					g_bIsAvailableFeatureAVX512BW = (nCPUInf[1] & (1 << 30)) != 0;
+				}
+			}
+		}
+
+		if (g_bIsAvailableFeatureAVX512BW) {
+			return FindDataAVX512(pAddress, unSize, pData, unDataSize);
+		} else if (g_bIsAvailableFeatureAVX2) {
+			return FindDataAVX2(pAddress, unSize, pData, unDataSize);
+		} else if (g_bIsAvailableFeatureSSE2) {
+			return FindDataSSE2(pAddress, unSize, pData, unDataSize);
+		} else {
+#endif // _M_IX86 || _M_X64
+			return FindDataNative(pAddress, unSize, pData, unDataSize);
+#if defined(_M_IX86) || defined(_M_X64)
+		}
+#endif // _M_IX86 || _M_X64
+	}
+
+	void* FindData(const HMODULE hModule, const unsigned char* const pData, const size_t unDataSize) {
+#if defined(_M_IX86) || defined(_M_X64)
+		if (!g_bIsCheckedFeatures) {
+			g_bIsCheckedFeatures = true;
+
+			int nCPUInf[4];
+			__cpuid(nCPUInf, 0x00000000);
+			const int nIDs = nCPUInf[0];
+			if (nIDs >= 0x00000001) {
+				__cpuid(nCPUInf, 0x00000001);
+				g_bIsAvailableFeatureSSE2 = (nCPUInf[3] & (1 << 26)) != 0;
+				if (nIDs >= 0x00000007) {
+					__cpuid(nCPUInf, 0x00000007);
+					g_bIsAvailableFeatureAVX2 = (nCPUInf[1] & (1 << 5)) != 0;
+					g_bIsAvailableFeatureAVX512BW = (nCPUInf[1] & (1 << 30)) != 0;
+				}
+			}
+		}
+
+		if (g_bIsAvailableFeatureAVX512BW) {
+			return FindDataAVX512(hModule, pData, unDataSize);
+		} else if (g_bIsAvailableFeatureAVX2) {
+			return FindDataAVX2(hModule, pData, unDataSize);
+		} else if (g_bIsAvailableFeatureSSE2) {
+			return FindDataSSE2(hModule, pData, unDataSize);
+		} else {
+#endif // _M_IX86 || _M_X64
+			return FindDataNative(hModule, pData, unDataSize);
+#if defined(_M_IX86) | defined(_M_X64)
+		}
+#endif // _M_IX86 || _M_X64
+	}
+
+	void* FindDataA(const char* const szModuleName, const unsigned char* const pData, const size_t unDataSize) {
+#if defined(_M_IX86) || defined(_M_X64)
+		if (!g_bIsCheckedFeatures) {
+			g_bIsCheckedFeatures = true;
+
+			int nCPUInf[4];
+			__cpuid(nCPUInf, 0x00000000);
+			const int nIDs = nCPUInf[0];
+			if (nIDs >= 0x00000001) {
+				__cpuid(nCPUInf, 0x00000001);
+				g_bIsAvailableFeatureSSE2 = (nCPUInf[3] & (1 << 26)) != 0;
+				if (nIDs >= 0x00000007) {
+					__cpuid(nCPUInf, 0x00000007);
+					g_bIsAvailableFeatureAVX2 = (nCPUInf[1] & (1 << 5)) != 0;
+					g_bIsAvailableFeatureAVX512BW = (nCPUInf[1] & (1 << 30)) != 0;
+				}
+			}
+		}
+
+		if (g_bIsAvailableFeatureAVX512BW) {
+			return FindDataAVX512A(szModuleName, pData, unDataSize);
+		} else if (g_bIsAvailableFeatureAVX2) {
+			return FindDataAVX2A(szModuleName, pData, unDataSize);
+		} else if (g_bIsAvailableFeatureSSE2) {
+			return FindDataSSE2A(szModuleName, pData, unDataSize);
+		} else {
+#endif // _M_IX86 || _M_X64
+			return FindDataNativeA(szModuleName, pData, unDataSize);
+#if defined(_M_IX86) || defined(_M_X64)
+		}
+#endif // _M_IX86 || _M_X64
+	}
+
+	void* FindDataW(const wchar_t* const szModuleName, const unsigned char* const pData, const size_t unDataSize) {
+#if defined(_M_IX86) | defined(_M_X64)
+		if (!g_bIsCheckedFeatures) {
+			g_bIsCheckedFeatures = true;
+
+			int nCPUInf[4];
+			__cpuid(nCPUInf, 0x00000000);
+			const int nIDs = nCPUInf[0];
+			if (nIDs >= 0x00000001) {
+				__cpuid(nCPUInf, 0x00000001);
+				g_bIsAvailableFeatureSSE2 = (nCPUInf[3] & (1 << 26)) != 0;
+				if (nIDs >= 0x00000007) {
+					__cpuid(nCPUInf, 0x00000007);
+					g_bIsAvailableFeatureAVX2 = (nCPUInf[1] & (1 << 5)) != 0;
+					g_bIsAvailableFeatureAVX512BW = (nCPUInf[1] & (1 << 30)) != 0;
+				}
+			}
+		}
+
+		if (g_bIsAvailableFeatureAVX512BW) {
+			return FindDataAVX512W(szModuleName, pData, unDataSize);
+		} else if (g_bIsAvailableFeatureAVX2) {
+			return FindDataAVX2W(szModuleName, pData, unDataSize);
+		} else if (g_bIsAvailableFeatureSSE2) {
+			return FindDataSSE2W(szModuleName, pData, unDataSize);
+		} else {
+#endif // _M_IX86 || _M_X64
+			return FindDataNativeW(szModuleName, pData, unDataSize);
+#if defined(_M_IX86) | defined(_M_X64)
+		}
+#endif // _M_IX86 || _M_X64
+	}
+
+#ifdef UNICODE
+	void* FindData(const wchar_t* const szModuleName, const unsigned char* const pData, const size_t unDataSize) {
+		return FindDataW(szModuleName, pData, unDataSize);
+	}
+#else
+	void* FindData(const char* const szModuleName, const unsigned char* const pData, const size_t unDataSize) {
+		return FindDataA(szModuleName, pData, unDataSize);
+	}
+#endif
 }
 
 // ----------------------------------------------------------------
@@ -986,6 +1645,12 @@ namespace MemoryProtection {
 }
 
 int _tmain() {
+
+	printf("FindDataNative = %08X\n", (UINT)MemoryScan::FindDataNativeA("ntdll.dll", (unsigned char*)"DbgPrint", 8));
+	printf("FindDataSSE2 = %08X\n", (UINT)MemoryScan::FindDataSSE2A("ntdll.dll", (unsigned char*)"DbgPrint", 8));
+	printf("FindDataAVX2 = %08X\n", (UINT)MemoryScan::FindDataAVX2A("ntdll.dll", (unsigned char*)"DbgPrint", 8));
+	printf("FindDataAVX512 = %08X\n", (UINT)MemoryScan::FindDataAVX512A("ntdll.dll", (unsigned char*)"DbgPrint", 8));
+
 	_tprintf_s(_T("[ OK ]\n"));
 	return 0;
 }

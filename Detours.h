@@ -243,7 +243,7 @@ namespace MemoryScan {
 	/// <summary>
 	/// Finding for a signature by module name.
 	/// </summary>
-	void* FindSignatureA(const char* const szModuleName, const char* const  szSignature);
+	void* FindSignatureA(const char* const szModuleName, const char* const szSignature);
 
 	/// <summary>
 	/// Finding for a signature by module name.
@@ -260,6 +260,188 @@ namespace MemoryScan {
 	/// Finding for a signature by module name.
 	/// </summary>
 	void* FindSignature(const char* const szModuleName, const char* const szSignature);
+#endif
+
+	// ----------------------------------------------------------------
+	// FindData (Native)
+	// ----------------------------------------------------------------
+
+	/// <summary>
+	/// Finding for data without SIMD by address and size.
+	/// </summary>
+	void* FindDataNative(void* const pAddress, const size_t unSize, const unsigned char* const pData, const size_t unDataSize);
+
+	/// <summary>
+	/// Finding for a signature without SIMD by module handle.
+	/// </summary>
+	void* FindDataNative(const HMODULE hModule, const unsigned char* const pData, const size_t unDataSize);
+
+	/// <summary>
+	/// Finding for data without SIMD by module name.
+	/// </summary>
+	void* FindDataNativeA(const char* const szModuleName, const unsigned char* const pData, const size_t unDataSize);
+
+	/// <summary>
+	/// Finding for data without SIMD by module name.
+	/// </summary>
+	void* FindDataNativeW(const wchar_t* const szModuleName, const unsigned char* const pData, const size_t unDataSize);
+
+#ifdef UNICODE
+	/// <summary>
+	/// Finding for data without SIMD by module name.
+	/// </summary>
+	void* FindDataNative(const wchar_t* const szModuleName, const unsigned char* const pData, const size_t unDataSize);
+#else
+	/// <summary>
+	/// Finding for data without SIMD by module name.
+	/// </summary>
+	void* FindDataNative(const char* const szModuleName, const unsigned char* const pData, const size_t unDataSize);
+#endif
+
+#if defined(_M_IX86) || defined(_M_X64)
+	// ----------------------------------------------------------------
+	// FindData (SSE2)
+	// ----------------------------------------------------------------
+
+	/// <summary>
+	/// Finding for data with SIMD (SSE2) by address and size.
+	/// </summary>
+	void* FindDataSSE2(void* const pAddress, const size_t unSize, const unsigned char* const pData, const size_t unDataSize);
+
+	/// <summary>
+	/// Finding for data with SIMD (SSE2) by module handle.
+	/// </summary>
+	void* FindDataSSE2(const HMODULE hModule, const unsigned char* const pData, const size_t unDataSize);
+
+	/// <summary>
+	/// Finding for data with SIMD (SSE2) by module name.
+	/// </summary>
+	void* FindDataSSE2A(const char* const szModuleName, const unsigned char* const pData, const size_t unDataSize);
+
+	/// <summary>
+	/// Finding for data with SIMD (SSE2) by module name.
+	/// </summary>
+	void* FindDataSSE2W(const wchar_t* const szModuleName, const unsigned char* const pData, const size_t unDataSize);
+
+#ifdef UNICODE
+	/// <summary>
+	/// Finding for data with SIMD (SSE2) by module name.
+	/// </summary>
+	void* FindDataSSE2(const wchar_t* const szModuleName, const unsigned char* const pData, const size_t unDataSize);
+#else
+	/// <summary>
+	/// Finding for data with SIMD (SSE2) by module name.
+	/// </summary>
+	void* FindDataSSE2(const char* const szModuleName, const unsigned char* const pData, const size_t unDataSize);
+#endif
+
+	// ----------------------------------------------------------------
+	// FindData (AVX2)
+	// ----------------------------------------------------------------
+
+	/// <summary>
+	/// Finding for data with SIMD (AVX2) by address and size.
+	/// </summary>
+	void* FindDataAVX2(void* const pAddress, const size_t unSize, const unsigned char* const pData, const size_t unDataSize);
+
+	/// <summary>
+	/// Finding for data with SIMD (AVX2) by module handle.
+	/// </summary>
+	void* FindDataAVX2(const HMODULE hModule, const unsigned char* const pData, const size_t unDataSize);
+
+	/// <summary>
+	/// Finding for data with SIMD (AVX2) by module name.
+	/// </summary>
+	void* FindDataAVX2A(const char* const szModuleName, const unsigned char* const pData, const size_t unDataSize);
+
+	/// <summary>
+	/// Finding for data with SIMD (AVX2) by module name.
+	/// </summary>
+	void* FindDataAVX2W(const wchar_t* const szModuleName, const unsigned char* const pData, const size_t unDataSize);
+
+#ifdef UNICODE
+	/// <summary>
+	/// Finding for data with SIMD (AVX2) by module name.
+	/// </summary>
+	void* FindDataAVX2(const wchar_t* const szModuleName, const unsigned char* const pData, const size_t unDataSize);
+#else
+	/// <summary>
+	/// Finding for data with SIMD (AVX2) by module name.
+	/// </summary>
+	void* FindDataAVX2(const char* const szModuleName, const unsigned char* const pData, const size_t unDataSize);
+#endif
+
+	// ----------------------------------------------------------------
+	// FindData (AVX512)
+	// ----------------------------------------------------------------
+
+	/// <summary>
+	/// Finding for data with SIMD (AVX512) by address and size.
+	/// </summary>
+	void* FindDataAVX512(void* const pAddress, const size_t unSize, const unsigned char* const pData, const size_t unDataSize);
+
+	/// <summary>
+	/// Finding for data with SIMD (AVX512) by module handle.
+	/// </summary>
+	void* FindDataAVX512(const HMODULE hModule, const unsigned char* const pData, const size_t unDataSize);
+
+	/// <summary>
+	/// Finding for data with SIMD (AVX512) by module name.
+	/// </summary>
+	void* FindDataAVX512A(const char* const szModuleName, const unsigned char* const pData, const size_t unDataSize);
+
+	/// <summary>
+	/// Finding for data with SIMD (AVX512) by module name.
+	/// </summary>
+	void* FindDataAVX512W(const wchar_t* const szModuleName, const unsigned char* const pData, const size_t unDataSize);
+
+#ifdef UNICODE
+	/// <summary>
+	/// Finding for data with SIMD (AVX512) by module name.
+	/// </summary>
+	void* FindDataAVX512(const wchar_t* const szModuleName, const unsigned char* const pData, const size_t unDataSize);
+#else
+	/// <summary>
+	/// Finding for data with SIMD (AVX512) by module name.
+	/// </summary>
+	void* FindDataAVX512(const char* const szModuleName, const unsigned char* const pData, const size_t unDataSize);
+#endif
+#endif // _M_IX86 || _M_X64
+
+	// ----------------------------------------------------------------
+	// FindData (Auto)
+	// ----------------------------------------------------------------
+
+	/// <summary>
+	/// Finding for data by address and size.
+	/// </summary>
+	void* FindData(void* const pAddress, const size_t unSize, const unsigned char* const pData, const size_t unDataSize);
+
+	/// <summary>
+	/// Finding for data by module handle.
+	/// </summary>
+	void* FindData(const HMODULE hModule, const unsigned char* const pData, const size_t unDataSize);
+
+	/// <summary>
+	/// Finding for data by module name.
+	/// </summary>
+	void* FindDataA(const char* const szModuleName, const unsigned char* const pData, const size_t unDataSize);
+
+	/// <summary>
+	/// Finding for data by module name.
+	/// </summary>
+	void* FindDataW(const wchar_t* const szModuleName, const unsigned char* const pData, const size_t unDataSize);
+
+#ifdef UNICODE
+	/// <summary>
+	/// Finding for data by module name.
+	/// </summary>
+	void* FindData(const wchar_t* const szModuleName, const unsigned char* const pData, const size_t unDataSize);
+#else
+	/// <summary>
+	/// Finding for data by module name.
+	/// </summary>
+	void* FindData(const char* const szModuleName, const unsigned char* const pData, const size_t unDataSize);
 #endif
 }
 
