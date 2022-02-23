@@ -204,7 +204,7 @@ namespace MemoryScan {
 	// FindSignature (Native)
 	// ----------------------------------------------------------------
 
-	void* FindSignatureNative(void* const pAddress, const size_t unSize, const char* const szSignature) {
+	void* FindSignatureNative(void* const pAddress, const size_t unSize, const char* const szSignature, const unsigned char unIgnoredByte) {
 		if (!pAddress) {
 			return nullptr;
 		}
@@ -234,7 +234,7 @@ namespace MemoryScan {
 			bool bSuccess = true;
 
 			for (size_t j = 0; j < unSignatureLength; ++j) {
-				if (reinterpret_cast<const unsigned char*>(szSignature)[j] == 0x2A) {
+				if (reinterpret_cast<const unsigned char*>(szSignature)[j] == unIgnoredByte) {
 					continue;
 				}
 
@@ -260,7 +260,7 @@ namespace MemoryScan {
 		return nullptr;
 	}
 
-	void* FindSignatureNative(const HMODULE hModule, const char* const szSignature) {
+	void* FindSignatureNative(const HMODULE hModule, const char* const szSignature, const unsigned char unIgnoredByte) {
 		if (!hModule) {
 			return nullptr;
 		}
@@ -274,10 +274,10 @@ namespace MemoryScan {
 			return nullptr;
 		}
 
-		return FindSignatureNative(reinterpret_cast<void*>(modinf.lpBaseOfDll), modinf.SizeOfImage, szSignature);
+		return FindSignatureNative(reinterpret_cast<void*>(modinf.lpBaseOfDll), modinf.SizeOfImage, szSignature, unIgnoredByte);
 	}
 
-	void* FindSignatureNativeA(const char* const szModuleName, const char* const szSignature) {
+	void* FindSignatureNativeA(const char* const szModuleName, const char* const szSignature, const unsigned char unIgnoredByte) {
 		if (!szModuleName) {
 			return nullptr;
 		}
@@ -291,10 +291,10 @@ namespace MemoryScan {
 			return nullptr;
 		}
 
-		return FindSignatureNative(hMod, szSignature);
+		return FindSignatureNative(hMod, szSignature, unIgnoredByte);
 	}
 
-	void* FindSignatureNativeW(const wchar_t* const szModuleName, const char* const szSignature) {
+	void* FindSignatureNativeW(const wchar_t* const szModuleName, const char* const szSignature, const unsigned char unIgnoredByte) {
 		if (!szModuleName) {
 			return nullptr;
 		}
@@ -308,16 +308,16 @@ namespace MemoryScan {
 			return nullptr;
 		}
 
-		return FindSignatureNative(hMod, szSignature);
+		return FindSignatureNative(hMod, szSignature, unIgnoredByte);
 	}
 
 #ifdef UNICODE
-	void* FindSignatureNative(const wchar_t* const szModuleName, const char* const szSignature) {
-		return FindSignatureNativeW(szModuleName, szSignature);
+	void* FindSignatureNative(const wchar_t* const szModuleName, const char* const szSignature, const unsigned char unIgnoredByte) {
+		return FindSignatureNativeW(szModuleName, szSignature, unIgnoredByte);
 	}
 #else
 	void* FindSignatureNative(const char* const szModuleName, const char* const szSignature) {
-		return FindSignatureNativeA(szModuleName, szSignature);
+		return FindSignatureNativeA(szModuleName, szSignature, unIgnoredByte);
 	}
 #endif
 
@@ -326,7 +326,7 @@ namespace MemoryScan {
 	// FindSignature (SSE2)
 	// ----------------------------------------------------------------
 
-	void* FindSignatureSSE2(void* const pAddress, const size_t unSize, const char* const szSignature) {
+	void* FindSignatureSSE2(void* const pAddress, const size_t unSize, const char* const szSignature, const unsigned char unIgnoredByte) {
 		if (!pAddress) {
 			return nullptr;
 		}
@@ -355,7 +355,7 @@ namespace MemoryScan {
 		memset(pSignatures, 0, sizeof(pSignatures));
 		for (size_t i = 0; i < unSignaturesCount; ++i) {
 			for (char j = static_cast<char>(strnlen(reinterpret_cast<const char*>(szSignature) + i * 16, 16)) - 1; j >= 0; --j) {
-				if (reinterpret_cast<const unsigned char*>(szSignature)[i * 16 + j] != 0x2A) {
+				if (reinterpret_cast<const unsigned char*>(szSignature)[i * 16 + j] != unIgnoredByte) {
 					pSignatures[i] |= 1 << j;
 				}
 			}
@@ -382,7 +382,7 @@ namespace MemoryScan {
 		return nullptr;
 	}
 
-	void* FindSignatureSSE2(const HMODULE hModule, const char* const szSignature) {
+	void* FindSignatureSSE2(const HMODULE hModule, const char* const szSignature, const unsigned char unIgnoredByte) {
 		if (!hModule) {
 			return nullptr;
 		}
@@ -396,10 +396,10 @@ namespace MemoryScan {
 			return nullptr;
 		}
 
-		return FindSignatureSSE2(reinterpret_cast<void*>(modinf.lpBaseOfDll), modinf.SizeOfImage, szSignature);
+		return FindSignatureSSE2(reinterpret_cast<void*>(modinf.lpBaseOfDll), modinf.SizeOfImage, szSignature, unIgnoredByte);
 	}
 
-	void* FindSignatureSSE2A(const char* const szModuleName, const char* const szSignature) {
+	void* FindSignatureSSE2A(const char* const szModuleName, const char* const szSignature, const unsigned char unIgnoredByte) {
 		if (!szModuleName) {
 			return nullptr;
 		}
@@ -413,10 +413,10 @@ namespace MemoryScan {
 			return nullptr;
 		}
 
-		return FindSignatureSSE2(hMod, szSignature);
+		return FindSignatureSSE2(hMod, szSignature, unIgnoredByte);
 	}
 
-	void* FindSignatureSSE2W(const wchar_t* const szModuleName, const char* const szSignature) {
+	void* FindSignatureSSE2W(const wchar_t* const szModuleName, const char* const szSignature, const unsigned char unIgnoredByte) {
 		if (!szModuleName) {
 			return nullptr;
 		}
@@ -430,16 +430,16 @@ namespace MemoryScan {
 			return nullptr;
 		}
 
-		return FindSignatureSSE2(hMod, szSignature);
+		return FindSignatureSSE2(hMod, szSignature, unIgnoredByte);
 	}
 
 #ifdef UNICODE
-	void* FindSignatureSSE2(const wchar_t* const szModuleName, const char* const szSignature) {
-		return FindSignatureSSE2W(szModuleName, szSignature);
+	void* FindSignatureSSE2(const wchar_t* const szModuleName, const char* const szSignature, const unsigned char unIgnoredByte) {
+		return FindSignatureSSE2W(szModuleName, szSignature, unIgnoredByte);
 	}
 #else
-	void* FindSignatureSSE2(const char* const szModuleName, const char* const szSignature) {
-		return FindSignatureSSE2A(szModuleName, szSignature);
+	void* FindSignatureSSE2(const char* const szModuleName, const char* const szSignature, const unsigned char unIgnoredByte) {
+		return FindSignatureSSE2A(szModuleName, szSignature, unIgnoredByte);
 	}
 #endif
 
@@ -447,7 +447,7 @@ namespace MemoryScan {
 	// FindSignature (AVX2)
 	// ----------------------------------------------------------------
 
-	void* FindSignatureAVX2(void* const pAddress, const size_t unSize, const char* const szSignature) {
+	void* FindSignatureAVX2(void* const pAddress, const size_t unSize, const char* const szSignature, const unsigned char unIgnoredByte) {
 		if (!pAddress) {
 			return nullptr;
 		}
@@ -476,7 +476,7 @@ namespace MemoryScan {
 		memset(pSignatures, 0, sizeof(pSignatures));
 		for (size_t i = 0; i < unSignaturesCount; ++i) {
 			for (char j = static_cast<char>(strnlen(reinterpret_cast<const char*>(szSignature) + i * 32, 32)) - 1; j >= 0; --j) {
-				if (reinterpret_cast<const unsigned char*>(szSignature)[i * 32 + j] != 0x2A) {
+				if (reinterpret_cast<const unsigned char*>(szSignature)[i * 32 + j] != unIgnoredByte) {
 					pSignatures[i] |= 1 << j;
 				}
 			}
@@ -503,7 +503,7 @@ namespace MemoryScan {
 		return nullptr;
 	}
 
-	void* FindSignatureAVX2(const HMODULE hModule, const char* const szSignature) {
+	void* FindSignatureAVX2(const HMODULE hModule, const char* const szSignature, const unsigned char unIgnoredByte) {
 		if (!hModule) {
 			return nullptr;
 		}
@@ -517,10 +517,10 @@ namespace MemoryScan {
 			return nullptr;
 		}
 
-		return FindSignatureAVX2(reinterpret_cast<void*>(modinf.lpBaseOfDll), modinf.SizeOfImage, szSignature);
+		return FindSignatureAVX2(reinterpret_cast<void*>(modinf.lpBaseOfDll), modinf.SizeOfImage, szSignature, unIgnoredByte);
 	}
 
-	void* FindSignatureAVX2A(const char* const szModuleName, const char* const szSignature) {
+	void* FindSignatureAVX2A(const char* const szModuleName, const char* const szSignature, const unsigned char unIgnoredByte) {
 		if (!szModuleName) {
 			return nullptr;
 		}
@@ -534,10 +534,10 @@ namespace MemoryScan {
 			return nullptr;
 		}
 
-		return FindSignatureAVX2(hMod, szSignature);
+		return FindSignatureAVX2(hMod, szSignature, unIgnoredByte);
 	}
 
-	void* FindSignatureAVX2W(const wchar_t* const szModuleName, const char* const szSignature) {
+	void* FindSignatureAVX2W(const wchar_t* const szModuleName, const char* const szSignature, const unsigned char unIgnoredByte) {
 		if (!szModuleName) {
 			return nullptr;
 		}
@@ -551,16 +551,16 @@ namespace MemoryScan {
 			return nullptr;
 		}
 
-		return FindSignatureAVX2(hMod, szSignature);
+		return FindSignatureAVX2(hMod, szSignature, unIgnoredByte);
 	}
 
 #ifdef UNICODE
-	void* FindSignatureAVX2(const wchar_t* const szModuleName, const char* const szSignature) {
-		return FindSignatureAVX2W(szModuleName, szSignature);
+	void* FindSignatureAVX2(const wchar_t* const szModuleName, const char* const szSignature, const unsigned char unIgnoredByte) {
+		return FindSignatureAVX2W(szModuleName, szSignature, unIgnoredByte);
 	}
 #else
-	void* FindSignatureAVX2(const char* const szModuleName, const char* const szSignature) {
-		return FindSignatureAVX2A(szModuleName, szSignature);
+	void* FindSignatureAVX2(const char* const szModuleName, const char* const szSignature, const unsigned char unIgnoredByte) {
+		return FindSignatureAVX2A(szModuleName, szSignature, unIgnoredByte);
 	}
 #endif
 
@@ -568,7 +568,7 @@ namespace MemoryScan {
 	// FindSignature (AVX512)
 	// ----------------------------------------------------------------
 
-	void* FindSignatureAVX512(void* const pAddress, const size_t unSize, const char* const szSignature) {
+	void* FindSignatureAVX512(void* const pAddress, const size_t unSize, const char* const szSignature, const unsigned char unIgnoredByte) {
 		if (!pAddress) {
 			return nullptr;
 		}
@@ -597,7 +597,7 @@ namespace MemoryScan {
 		memset(pSignatures, 0, sizeof(pSignatures));
 		for (size_t i = 0; i < unSignaturesCount; ++i) {
 			for (char j = static_cast<char>(strnlen(reinterpret_cast<const char*>(szSignature) + i * 64, 64)) - 1; j >= 0; --j) {
-				if (reinterpret_cast<const unsigned char*>(szSignature)[i * 64 + j] != 0x2A) {
+				if (reinterpret_cast<const unsigned char*>(szSignature)[i * 64 + j] != unIgnoredByte) {
 					pSignatures[i] |= 1 << j;
 				}
 			}
@@ -624,7 +624,7 @@ namespace MemoryScan {
 		return nullptr;
 	}
 
-	void* FindSignatureAVX512(const HMODULE hModule, const char* const szSignature) {
+	void* FindSignatureAVX512(const HMODULE hModule, const char* const szSignature, const unsigned char unIgnoredByte) {
 		if (!hModule) {
 			return nullptr;
 		}
@@ -638,10 +638,10 @@ namespace MemoryScan {
 			return nullptr;
 		}
 
-		return FindSignatureAVX512(reinterpret_cast<void*>(modinf.lpBaseOfDll), modinf.SizeOfImage, szSignature);
+		return FindSignatureAVX512(reinterpret_cast<void*>(modinf.lpBaseOfDll), modinf.SizeOfImage, szSignature, unIgnoredByte);
 	}
 
-	void* FindSignatureAVX512A(const char* const szModuleName, const char* const szSignature) {
+	void* FindSignatureAVX512A(const char* const szModuleName, const char* const szSignature, const unsigned char unIgnoredByte) {
 		if (!szModuleName) {
 			return nullptr;
 		}
@@ -655,10 +655,10 @@ namespace MemoryScan {
 			return nullptr;
 		}
 
-		return FindSignatureAVX512(hMod, szSignature);
+		return FindSignatureAVX512(hMod, szSignature, unIgnoredByte);
 	}
 
-	void* FindSignatureAVX512W(const wchar_t* const szModuleName, const char* const szSignature) {
+	void* FindSignatureAVX512W(const wchar_t* const szModuleName, const char* const szSignature, const unsigned char unIgnoredByte) {
 		if (!szModuleName) {
 			return nullptr;
 		}
@@ -672,16 +672,16 @@ namespace MemoryScan {
 			return nullptr;
 		}
 
-		return FindSignatureAVX512(hMod, szSignature);
+		return FindSignatureAVX512(hMod, szSignature, unIgnoredByte);
 	}
 
 #ifdef UNICODE
-	void* FindSignatureAVX512(const wchar_t* const szModuleName, const char* const szSignature) {
-		return FindSignatureAVX512W(szModuleName, szSignature);
+	void* FindSignatureAVX512(const wchar_t* const szModuleName, const char* const szSignature, const unsigned char unIgnoredByte) {
+		return FindSignatureAVX512W(szModuleName, szSignature, unIgnoredByte);
 	}
 #else
-	void* FindSignatureAVX512(const char* const szModuleName, const char* const szSignature) {
-		return FindSignatureAVX512A(szModuleName, szSignature);
+	void* FindSignatureAVX512(const char* const szModuleName, const char* const szSignature, const unsigned char unIgnoredByte) {
+		return FindSignatureAVX512A(szModuleName, szSignature, unIgnoredByte);
 	}
 #endif
 #endif // _M_IX86 || _M_X64
@@ -697,7 +697,7 @@ namespace MemoryScan {
 	static bool g_bIsAvailableFeatureAVX512BW = false;
 #endif // _M_IX86 || _M_X64
 
-	void* FindSignature(void* const pAddress, const size_t unSize, const char* const szSignature) {
+	void* FindSignature(void* const pAddress, const size_t unSize, const char* const szSignature, const unsigned char unIgnoredByte) {
 #if defined(_M_IX86) || defined(_M_X64)
 		if (!g_bIsCheckedFeatures) {
 			g_bIsCheckedFeatures = true;
@@ -717,20 +717,20 @@ namespace MemoryScan {
 		}
 
 		if (g_bIsAvailableFeatureAVX512BW) {
-			return FindSignatureAVX512(pAddress, unSize, szSignature);
+			return FindSignatureAVX512(pAddress, unSize, szSignature, unIgnoredByte);
 		} else if (g_bIsAvailableFeatureAVX2) {
-			return FindSignatureAVX2(pAddress, unSize, szSignature);
+			return FindSignatureAVX2(pAddress, unSize, szSignature, unIgnoredByte);
 		} else if (g_bIsAvailableFeatureSSE2) {
-			return FindSignatureSSE2(pAddress, unSize, szSignature);
+			return FindSignatureSSE2(pAddress, unSize, szSignature, unIgnoredByte);
 		} else {
 #endif // _M_IX86 || _M_X64
-			return FindSignatureNative(pAddress, unSize, szSignature);
+			return FindSignatureNative(pAddress, unSize, szSignature, unIgnoredByte);
 #if defined(_M_IX86) || defined(_M_X64)
 		}
 #endif // _M_IX86 || _M_X64
 	}
 
-	void* FindSignature(const HMODULE hModule, const char* const szSignature) {
+	void* FindSignature(const HMODULE hModule, const char* const szSignature, const unsigned char unIgnoredByte) {
 #if defined(_M_IX86) || defined(_M_X64)
 		if (!g_bIsCheckedFeatures) {
 			g_bIsCheckedFeatures = true;
@@ -750,20 +750,20 @@ namespace MemoryScan {
 		}
 
 		if (g_bIsAvailableFeatureAVX512BW) {
-			return FindSignatureAVX512(hModule, szSignature);
+			return FindSignatureAVX512(hModule, szSignature, unIgnoredByte);
 		} else if (g_bIsAvailableFeatureAVX2) {
-			return FindSignatureAVX2(hModule, szSignature);
+			return FindSignatureAVX2(hModule, szSignature, unIgnoredByte);
 		} else if (g_bIsAvailableFeatureSSE2) {
-			return FindSignatureSSE2(hModule, szSignature);
+			return FindSignatureSSE2(hModule, szSignature, unIgnoredByte);
 		} else {
 #endif // _M_IX86 || _M_X64
-			return FindSignatureNative(hModule, szSignature);
+			return FindSignatureNative(hModule, szSignature, unIgnoredByte);
 #if defined(_M_IX86) | defined(_M_X64)
 		}
 #endif // _M_IX86 || _M_X64
 	}
 
-	void* FindSignatureA(const char* const szModuleName, const char* const szSignature) {
+	void* FindSignatureA(const char* const szModuleName, const char* const szSignature, const unsigned char unIgnoredByte) {
 #if defined(_M_IX86) || defined(_M_X64)
 		if (!g_bIsCheckedFeatures) {
 			g_bIsCheckedFeatures = true;
@@ -783,20 +783,20 @@ namespace MemoryScan {
 		}
 
 		if (g_bIsAvailableFeatureAVX512BW) {
-			return FindSignatureAVX512A(szModuleName, szSignature);
+			return FindSignatureAVX512A(szModuleName, szSignature, unIgnoredByte);
 		} else if (g_bIsAvailableFeatureAVX2) {
-			return FindSignatureAVX2A(szModuleName, szSignature);
+			return FindSignatureAVX2A(szModuleName, szSignature, unIgnoredByte);
 		} else if (g_bIsAvailableFeatureSSE2) {
-			return FindSignatureSSE2A(szModuleName, szSignature);
+			return FindSignatureSSE2A(szModuleName, szSignature, unIgnoredByte);
 		} else {
 #endif // _M_IX86 || _M_X64
-			return FindSignatureNativeA(szModuleName, szSignature);
+			return FindSignatureNativeA(szModuleName, szSignature, unIgnoredByte);
 #if defined(_M_IX86) || defined(_M_X64)
 		}
 #endif // _M_IX86 || _M_X64
 	}
 
-	void* FindSignatureW(const wchar_t* const szModuleName, const char* const szSignature) {
+	void* FindSignatureW(const wchar_t* const szModuleName, const char* const szSignature, const unsigned char unIgnoredByte) {
 #if defined(_M_IX86) | defined(_M_X64)
 		if (!g_bIsCheckedFeatures) {
 			g_bIsCheckedFeatures = true;
@@ -816,26 +816,26 @@ namespace MemoryScan {
 		}
 
 		if (g_bIsAvailableFeatureAVX512BW) {
-			return FindSignatureAVX512W(szModuleName, szSignature);
+			return FindSignatureAVX512W(szModuleName, szSignature, unIgnoredByte);
 		} else if (g_bIsAvailableFeatureAVX2) {
-			return FindSignatureAVX2W(szModuleName, szSignature);
+			return FindSignatureAVX2W(szModuleName, szSignature, unIgnoredByte);
 		} else if (g_bIsAvailableFeatureSSE2) {
-			return FindSignatureSSE2W(szModuleName, szSignature);
+			return FindSignatureSSE2W(szModuleName, szSignature, unIgnoredByte);
 		} else {
 #endif // _M_IX86 || _M_X64
-			return FindSignatureNativeW(szModuleName, szSignature);
+			return FindSignatureNativeW(szModuleName, szSignature, unIgnoredByte);
 #if defined(_M_IX86) | defined(_M_X64)
 		}
 #endif // _M_IX86 || _M_X64
 	}
 
 #ifdef UNICODE
-	void* FindSignature(const wchar_t* const szModuleName, const char* const szSignature) {
-		return FindSignatureW(szModuleName, szSignature);
+	void* FindSignature(const wchar_t* const szModuleName, const char* const szSignature, const unsigned char unIgnoredByte) {
+		return FindSignatureW(szModuleName, szSignature, unIgnoredByte);
 	}
 #else
-	void* FindSignature(const char* const szModuleName, const char* const szSignature) {
-		return FindSignatureA(szModuleName, szSignature);
+	void* FindSignature(const char* const szModuleName, const char* const szSignature, const unsigned char unIgnoredByte) {
+		return FindSignatureA(szModuleName, szSignature, unIgnoredByte);
 	}
 #endif
 
@@ -1573,6 +1573,7 @@ namespace MemoryScan {
 					continue;
 				}
 #endif
+
 				void* pLocation = pReference - sizeof(int) * 3;
 				char* pMeta = reinterpret_cast<char*>(FindData(pAddress, unNewSize, reinterpret_cast<unsigned char*>(&pLocation), sizeof(void*)));
 				if (!pMeta) {
@@ -1801,35 +1802,7 @@ namespace MemoryInstructions {
 	// ----------------------------------------------------------------
 }
 
-class Lol {
-	virtual int __cdecl IsTrue(int A) { return A; }
-	virtual int __cdecl IsFalse(int A) { return -A; }
-};
-
-extern "C" __declspec(dllexport) Lol* g_pLol = nullptr;
-
 int _tmain() {
-
-	g_pLol = new Lol();
-
-	typedef int(__cdecl* fnIsTrue)(void* ecx, int A);
-	typedef int(__cdecl* fnIsFalse)(void* ecx, int A);
-
-	void** pVTable = reinterpret_cast<void**>(MemoryScan::FindRTTIA("Detours.exe", ".?AVLol@@"));
-	if (!pVTable) {
-		return 0;
-	}
-
-	printf("FindRTTI = %08X\n", (UINT)pVTable);
-
-	fnIsTrue IsTrue = reinterpret_cast<fnIsTrue>(pVTable[0]);
-
-	printf("IsTrue(1) = %d\n", (int)IsTrue(0, 1));
-
-	fnIsFalse IsFalse = reinterpret_cast<fnIsFalse>(pVTable[1]);
-
-	printf("IsFalse(0) = %d\n", (int)IsFalse(0, 0));
-
 	_tprintf_s(_T("[ OK ]\n"));
 	return 0;
 }

@@ -87,33 +87,33 @@ namespace MemoryScan {
 	/// <summary>
 	/// Finding for a signature without SIMD by address and size.
 	/// </summary>
-	void* FindSignatureNative(void* const pAddress, const size_t unSize, const char* const szSignature);
+	void* FindSignatureNative(void* const pAddress, const size_t unSize, const char* const szSignature, const unsigned char unIgnoredByte = 0x2A);
 
 	/// <summary>
 	/// Finding for a signature without SIMD by module handle.
 	/// </summary>
-	void* FindSignatureNative(const HMODULE hModule, const char* const szSignature);
+	void* FindSignatureNative(const HMODULE hModule, const char* const szSignature, const unsigned char unIgnoredByte = 0x2A);
 
 	/// <summary>
 	/// Finding for a signature without SIMD by module name.
 	/// </summary>
-	void* FindSignatureNativeA(const char* const szModuleName, const char* const szSignature);
+	void* FindSignatureNativeA(const char* const szModuleName, const char* const szSignature, const unsigned char unIgnoredByte = 0x2A);
 
 	/// <summary>
 	/// Finding for a signature without SIMD by module name.
 	/// </summary>
-	void* FindSignatureNativeW(const wchar_t* const szModuleName, const char* const szSignature);
+	void* FindSignatureNativeW(const wchar_t* const szModuleName, const char* const szSignature, const unsigned char unIgnoredByte = 0x2A);
 
 #ifdef UNICODE
 	/// <summary>
 	/// Finding for a signature without SIMD by module name.
 	/// </summary>
-	void* FindSignatureNative(const wchar_t* const szModuleName, const char* const szSignature);
+	void* FindSignatureNative(const wchar_t* const szModuleName, const char* const szSignature, const unsigned char unIgnoredByte = 0x2A);
 #else
 	/// <summary>
 	/// Finding for a signature without SIMD by module name.
 	/// </summary>
-	void* FindSignatureNative(const char* const szModuleName, const char* const szSignature);
+	void* FindSignatureNative(const char* const szModuleName, const char* const szSignature, const unsigned char unIgnoredByte = 0x2A);
 #endif
 
 #if defined(_M_IX86) || defined(_M_X64)
@@ -124,33 +124,33 @@ namespace MemoryScan {
 	/// <summary>
 	/// Finding for a signature with SIMD (SSE2) by address and size.
 	/// </summary>
-	void* FindSignatureSSE2(void* const pAddress, const size_t unSize, const char* const szSignature);
+	void* FindSignatureSSE2(void* const pAddress, const size_t unSize, const char* const szSignature, const unsigned char unIgnoredByte = 0x2A);
 
 	/// <summary>
 	/// Finding for a signature with SIMD (SSE2) by module handle.
 	/// </summary>
-	void* FindSignatureSSE2(const HMODULE hModule, const char* const szSignature);
+	void* FindSignatureSSE2(const HMODULE hModule, const char* const szSignature, const unsigned char unIgnoredByte = 0x2A);
 
 	/// <summary>
 	/// Finding for a signature with SIMD (SSE2) by module name.
 	/// </summary>
-	void* FindSignatureSSE2A(const char* const szModuleName, const char* const szSignature);
+	void* FindSignatureSSE2A(const char* const szModuleName, const char* const szSignature, const unsigned char unIgnoredByte = 0x2A);
 
 	/// <summary>
 	/// Finding for a signature with SIMD (SSE2) by module name.
 	/// </summary>
-	void* FindSignatureSSE2W(const wchar_t* const szModuleName, const char* const szSignature);
+	void* FindSignatureSSE2W(const wchar_t* const szModuleName, const char* const szSignature, const unsigned char unIgnoredByte = 0x2A);
 
 #ifdef UNICODE
 	/// <summary>
 	/// Finding for a signature with SIMD (SSE2) by module name.
 	/// </summary>
-	void* FindSignatureSSE2(const wchar_t* const szModuleName, const char* const szSignature);
+	void* FindSignatureSSE2(const wchar_t* const szModuleName, const char* const szSignature, const unsigned char unIgnoredByte = 0x2A);
 #else
 	/// <summary>
 	/// Finding for a signature with SIMD (SSE2) by module name.
 	/// </summary>
-	void* FindSignatureSSE2(const char* const szModuleName, const char* const szSignature);
+	void* FindSignatureSSE2(const char* const szModuleName, const char* const szSignature, const unsigned char unIgnoredByte = 0x2A);
 #endif
 
 	// ----------------------------------------------------------------
@@ -160,33 +160,33 @@ namespace MemoryScan {
 	/// <summary>
 	/// Finding for a signature with SIMD (AVX2) by address and size.
 	/// </summary>
-	void* FindSignatureAVX2(void* const pAddress, const size_t unSize, const char* const szSignature);
+	void* FindSignatureAVX2(void* const pAddress, const size_t unSize, const char* const szSignature, const unsigned char unIgnoredByte = 0x2A);
 
 	/// <summary>
 	/// Finding for a signature with SIMD (AVX2) by module handle.
 	/// </summary>
-	void* FindSignatureAVX2(const HMODULE hModule, const char* const szSignature);
+	void* FindSignatureAVX2(const HMODULE hModule, const char* const szSignature, const unsigned char unIgnoredByte = 0x2A);
 
 	/// <summary>
 	/// Finding for a signature with SIMD (AVX2) by module name.
 	/// </summary>
-	void* FindSignatureAVX2A(const char* const szModuleName, const char* const szSignature);
+	void* FindSignatureAVX2A(const char* const szModuleName, const char* const szSignature, const unsigned char unIgnoredByte = 0x2A);
 
 	/// <summary>
 	/// Finding for a signature with SIMD (AVX2) by module name.
 	/// </summary>
-	void* FindSignatureAVX2W(const wchar_t* const szModuleName, const char* const szSignature);
+	void* FindSignatureAVX2W(const wchar_t* const szModuleName, const char* const szSignature, const unsigned char unIgnoredByte = 0x2A);
 
 #ifdef UNICODE
 	/// <summary>
 	/// Finding for a signature with SIMD (AVX2) by module name.
 	/// </summary>
-	void* FindSignatureAVX2(const wchar_t* const szModuleName, const char* const szSignature);
+	void* FindSignatureAVX2(const wchar_t* const szModuleName, const char* const szSignature, const unsigned char unIgnoredByte = 0x2A);
 #else
 	/// <summary>
 	/// Finding for a signature with SIMD (AVX2) by module name.
 	/// </summary>
-	void* FindSignatureAVX2(const char* const szModuleName, const char* const szSignature);
+	void* FindSignatureAVX2(const char* const szModuleName, const char* const szSignature, const unsigned char unIgnoredByte = 0x2A);
 #endif
 
 	// ----------------------------------------------------------------
@@ -196,33 +196,33 @@ namespace MemoryScan {
 	/// <summary>
 	/// Finding for a signature with SIMD (AVX512) by address and size.
 	/// </summary>
-	void* FindSignatureAVX512(void* const pAddress, const size_t unSize, const char* const szSignature);
+	void* FindSignatureAVX512(void* const pAddress, const size_t unSize, const char* const szSignature, const unsigned char unIgnoredByte = 0x2A);
 
 	/// <summary>
 	/// Finding for a signature with SIMD (AVX512) by module handle.
 	/// </summary>
-	void* FindSignatureAVX512(const HMODULE hModule, const char* const szSignature);
+	void* FindSignatureAVX512(const HMODULE hModule, const char* const szSignature, const unsigned char unIgnoredByte = 0x2A);
 
 	/// <summary>
 	/// Finding for a signature with SIMD (AVX512) by module name.
 	/// </summary>
-	void* FindSignatureAVX512A(const char* const szModuleName, const char* const szSignature);
+	void* FindSignatureAVX512A(const char* const szModuleName, const char* const szSignature, const unsigned char unIgnoredByte = 0x2A);
 
 	/// <summary>
 	/// Finding for a signature with SIMD (AVX512) by module name.
 	/// </summary>
-	void* FindSignatureAVX512W(const wchar_t* const szModuleName, const char* const szSignature);
+	void* FindSignatureAVX512W(const wchar_t* const szModuleName, const char* const szSignature, const unsigned char unIgnoredByte = 0x2A);
 
 #ifdef UNICODE
 	/// <summary>
 	/// Finding for a signature with SIMD (AVX512) by module name.
 	/// </summary>
-	void* FindSignatureAVX512(const wchar_t* const szModuleName, const char* const szSignature);
+	void* FindSignatureAVX512(const wchar_t* const szModuleName, const char* const szSignature, const unsigned char unIgnoredByte = 0x2A);
 #else
 	/// <summary>
 	/// Finding for a signature with SIMD (AVX512) by module name.
 	/// </summary>
-	void* FindSignatureAVX512(const char* const szModuleName, const char* const szSignature);
+	void* FindSignatureAVX512(const char* const szModuleName, const char* const szSignature, const unsigned char unIgnoredByte = 0x2A);
 #endif
 #endif // _M_IX86 || _M_X64
 
@@ -233,33 +233,33 @@ namespace MemoryScan {
 	/// <summary>
 	/// Finding for a signature by address and size.
 	/// </summary>
-	void* FindSignature(void* const pAddress, const size_t unSize, const char* const szSignature);
+	void* FindSignature(void* const pAddress, const size_t unSize, const char* const szSignature, const unsigned char unIgnoredByte = 0x2A);
 
 	/// <summary>
 	/// Finding for a signature by module handle.
 	/// </summary>
-	void* FindSignature(const HMODULE hModule, const char* const szSignature);
+	void* FindSignature(const HMODULE hModule, const char* const szSignature, const unsigned char unIgnoredByte = 0x2A);
 
 	/// <summary>
 	/// Finding for a signature by module name.
 	/// </summary>
-	void* FindSignatureA(const char* const szModuleName, const char* const szSignature);
+	void* FindSignatureA(const char* const szModuleName, const char* const szSignature, const unsigned char unIgnoredByte = 0x2A);
 
 	/// <summary>
 	/// Finding for a signature by module name.
 	/// </summary>
-	void* FindSignatureW(const wchar_t* const szModuleName, const char* const szSignature);
+	void* FindSignatureW(const wchar_t* const szModuleName, const char* const szSignature, const unsigned char unIgnoredByte = 0x2A);
 
 #ifdef UNICODE
 	/// <summary>
 	/// Finding for a signature by module name.
 	/// </summary>
-	void* FindSignature(const wchar_t* const szModuleName, const char* const szSignature);
+	void* FindSignature(const wchar_t* const szModuleName, const char* const szSignature, const unsigned char unIgnoredByte = 0x2A);
 #else
 	/// <summary>
 	/// Finding for a signature by module name.
 	/// </summary>
-	void* FindSignature(const char* const szModuleName, const char* const szSignature);
+	void* FindSignature(const char* const szModuleName, const char* const szSignature, const unsigned char unIgnoredByte = 0x2A);
 #endif
 
 	// ----------------------------------------------------------------
