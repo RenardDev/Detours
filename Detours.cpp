@@ -149,7 +149,7 @@ namespace MemoryUtils {
 			return false;
 		}
 
-		for (size_t i = 0; i < unHexSize; ++i) {
+		for (size_t i = 0; i < unHexSize / 2; ++i) {
 			const unsigned char unHigh = *(szHex++);
 			const unsigned char unLow = *(szHex++);
 			pData[i] = unHexTableUpper[unHigh] | unHexTableLower[unLow];
@@ -175,7 +175,7 @@ namespace MemoryUtils {
 			return false;
 		}
 
-		for (size_t i = 0; i < unHexSize; ++i) {
+		for (size_t i = 0; i < unHexSize / 2; ++i) {
 			const unsigned char unHigh = static_cast<unsigned char>(*(szHex++));
 			const unsigned char unLow = static_cast<unsigned char>(*(szHex++));
 			pData[i] = unHexTableUpper[unHigh] | unHexTableLower[unLow];
@@ -1497,6 +1497,158 @@ namespace MemoryScan {
 		return FindDataA(szModuleName, pData, unDataSize);
 	}
 #endif
+
+	// ----------------------------------------------------------------
+	// FindRTTI
+	// ----------------------------------------------------------------
+
+	void* FindRTTI(void* const pAddress, const size_t unSize, const char* const szRTTI) {
+		if (!pAddress) {
+			return nullptr;
+		}
+
+		if (!unSize) {
+			return nullptr;
+		}
+
+		if (!szRTTI) {
+			return nullptr;
+		}
+
+		const size_t unDataSize = strnlen_s(szRTTI, DETOURS_MAX_STRSIZE);
+		if (!unDataSize) {
+			return nullptr;
+		}
+
+		if (unSize <= unDataSize) {
+			return nullptr;
+		}
+
+		void* pType = FindData(pAddress, unSize, reinterpret_cast<const unsigned char* const>(szRTTI), unDataSize);
+		if (!pType) {
+			return nullptr;
+		}
+
+		void* pLastReference = pAddress;
+		const void* const pEnd = reinterpret_cast<char*>(pLastReference) + unSize;
+
+		while (pType != nullptr) {
+			size_t unNewSize = reinterpret_cast<size_t>(reinterpret_cast<const char*>(pEnd) - reinterpret_cast<size_t>(pLastReference));
+			if (!unNewSize) {
+				unNewSize = unSize;
+			}
+
+			while (pLastReference < pEnd) {
+#ifdef _M_X64
+				unsigned long long unTypeOffset = reinterpret_cast<unsigned long long>(reinterpret_cast<char*>(pType) - sizeof(void*) * 2 - reinterpret_cast<unsigned long long>(pAddress));
+				char* pReference = reinterpret_cast<char*>(FindData(pLastReference, unNewSize, reinterpret_cast<unsigned char*>(&unTypeOffset), sizeof(int)));
+#elif _M_IX86
+				void* pTypeDescriptor = reinterpret_cast<char*>(pType) - sizeof(void*) * 2;
+				char* pReference = reinterpret_cast<char*>(FindData(pLastReference, unNewSize, reinterpret_cast<unsigned char*>(&pTypeDescriptor), sizeof(void*)));
+#endif
+
+				if (!pReference) {
+					pLastReference = reinterpret_cast<char*>(pLastReference) + sizeof(void*);
+					break;
+				}
+
+#ifdef _M_X64
+				if (!(*(reinterpret_cast<unsigned int*>(pReference)))) {
+					pLastReference = pReference + sizeof(void*);
+					continue;
+				}
+
+				if (!(*(reinterpret_cast<unsigned int*>(pReference + sizeof(int))))) {
+					pLastReference = pReference + sizeof(void*);
+					continue;
+				}
+#elif _M_IX86
+				if ((*(reinterpret_cast<unsigned int*>(pReference))) >= reinterpret_cast<unsigned int>(pAddress)) {
+					pLastReference = pReference + sizeof(void*);
+					continue;
+				}
+
+				if ((*(reinterpret_cast<unsigned int*>(pReference + sizeof(int)))) >= reinterpret_cast<unsigned int>(pAddress)) {
+					pLastReference = pReference + sizeof(void*);
+					continue;
+				}
+#endif
+				void* pLocation = pReference - sizeof(int) * 3;
+				char* pMeta = reinterpret_cast<char*>(FindData(pAddress, unNewSize, reinterpret_cast<unsigned char*>(&pLocation), sizeof(void*)));
+				if (!pMeta) {
+					pLastReference = pReference + sizeof(void*);
+					continue;
+				}
+
+				return reinterpret_cast<void*>(pMeta + sizeof(void*));
+			}
+
+			pType = FindData(pLastReference, unNewSize, reinterpret_cast<const unsigned char*>(szRTTI), unDataSize);
+		}
+
+		return nullptr;
+	}
+
+	void* FindRTTI(const HMODULE hModule, const char* const szRTTI) {
+		if (!hModule) {
+			return nullptr;
+		}
+
+		if (!szRTTI) {
+			return nullptr;
+		}
+
+		MODULEINFO modinf;
+		if (!GetModuleInformation(HANDLE(-1), hModule, &modinf, sizeof(MODULEINFO))) {
+			return nullptr;
+		}
+
+		return FindRTTI(reinterpret_cast<void*>(modinf.lpBaseOfDll), modinf.SizeOfImage, szRTTI);
+	}
+
+	void* FindRTTIA(const char* const szModuleName, const char* const szRTTI) {
+		if (!szModuleName) {
+			return nullptr;
+		}
+
+		if (!szRTTI) {
+			return nullptr;
+		}
+
+		const HMODULE hMod = GetModuleHandleA(szModuleName);
+		if (!hMod) {
+			return nullptr;
+		}
+
+		return FindRTTI(hMod, szRTTI);
+	}
+
+	void* FindRTTIW(const wchar_t* const szModuleName, const char* const szRTTI) {
+		if (!szModuleName) {
+			return nullptr;
+		}
+
+		if (!szRTTI) {
+			return nullptr;
+		}
+
+		const HMODULE hMod = GetModuleHandleW(szModuleName);
+		if (!hMod) {
+			return nullptr;
+		}
+
+		return FindRTTI(hMod, szRTTI);
+	}
+
+#ifdef UNICODE
+	void* FindRTTI(const wchar_t* const szModuleName, const char* const szRTTI) {
+		return FindRTTIW(szModuleName, szRTTI);
+	}
+#else
+	void* FindRTTI(const char* const szModuleName, const char* const szRTTI) {
+		return FindRTTIA(szModuleName, szRTTI);
+	}
+#endif
 }
 
 // ----------------------------------------------------------------
@@ -1504,7 +1656,7 @@ namespace MemoryScan {
 // ----------------------------------------------------------------
 namespace MemoryProtection {
 	// ----------------------------------------------------------------
-	// Smart Memory Protect
+	// Smart Memory Protection
 	// ----------------------------------------------------------------
 
 	SmartMemoryProtection::SmartMemoryProtection(void* const pAddress, const size_t unSize) {
@@ -1595,15 +1747,11 @@ namespace MemoryProtection {
 		return m_unSize;
 	}
 
-	DWORD SmartMemoryProtection::GetOriginalProtection() {
-		return m_unOriginalProtection;
-	}
-
 	// ----------------------------------------------------------------
-	// Manual MemoryProtect
+	// Manual Memory Protection
 	// ----------------------------------------------------------------
 
-	static std::vector<std::unique_ptr<SmartMemoryProtection>> g_vecSmartMemoryProtections;
+	static std::vector<std::unique_ptr<SmartMemoryProtection>> g_vecManualMemoryProtections;
 
 	bool ChangeMemoryProtection(void* const pAddress, const size_t unSize, const unsigned char unFlags) {
 		if (!pAddress) {
@@ -1623,7 +1771,7 @@ namespace MemoryProtection {
 			return false;
 		}
 
-		g_vecSmartMemoryProtections.push_back(std::move(memSMP));
+		g_vecManualMemoryProtections.push_back(std::move(memSMP));
 
 		return true;
 	}
@@ -1633,9 +1781,9 @@ namespace MemoryProtection {
 			return false;
 		}
 
-		for (std::vector<std::unique_ptr<SmartMemoryProtection>>::iterator it = g_vecSmartMemoryProtections.begin(); it != g_vecSmartMemoryProtections.end(); ++it) {
+		for (std::vector<std::unique_ptr<SmartMemoryProtection>>::iterator it = g_vecManualMemoryProtections.begin(); it != g_vecManualMemoryProtections.end(); ++it) {
 			if (pAddress == (*it)->GetAddress()) {
-				g_vecSmartMemoryProtections.erase(it);
+				g_vecManualMemoryProtections.erase(it);
 				return true;
 			}
 		}
@@ -1644,12 +1792,43 @@ namespace MemoryProtection {
 	}
 }
 
+// ----------------------------------------------------------------
+// MemoryInstructions
+// ----------------------------------------------------------------
+namespace MemoryInstructions {
+	// ----------------------------------------------------------------
+	// MemoryInstructions
+	// ----------------------------------------------------------------
+}
+
+class Lol {
+	virtual int __cdecl IsTrue(int A) { return A; }
+	virtual int __cdecl IsFalse(int A) { return -A; }
+};
+
+extern "C" __declspec(dllexport) Lol* g_pLol = nullptr;
+
 int _tmain() {
 
-	printf("FindDataNative = %08X\n", (UINT)MemoryScan::FindDataNativeA("ntdll.dll", (unsigned char*)"DbgPrint", 8));
-	printf("FindDataSSE2 = %08X\n", (UINT)MemoryScan::FindDataSSE2A("ntdll.dll", (unsigned char*)"DbgPrint", 8));
-	printf("FindDataAVX2 = %08X\n", (UINT)MemoryScan::FindDataAVX2A("ntdll.dll", (unsigned char*)"DbgPrint", 8));
-	printf("FindDataAVX512 = %08X\n", (UINT)MemoryScan::FindDataAVX512A("ntdll.dll", (unsigned char*)"DbgPrint", 8));
+	g_pLol = new Lol();
+
+	typedef int(__cdecl* fnIsTrue)(void* ecx, int A);
+	typedef int(__cdecl* fnIsFalse)(void* ecx, int A);
+
+	void** pVTable = reinterpret_cast<void**>(MemoryScan::FindRTTIA("Detours.exe", ".?AVLol@@"));
+	if (!pVTable) {
+		return 0;
+	}
+
+	printf("FindRTTI = %08X\n", (UINT)pVTable);
+
+	fnIsTrue IsTrue = reinterpret_cast<fnIsTrue>(pVTable[0]);
+
+	printf("IsTrue(1) = %d\n", (int)IsTrue(0, 1));
+
+	fnIsFalse IsFalse = reinterpret_cast<fnIsFalse>(pVTable[1]);
+
+	printf("IsFalse(0) = %d\n", (int)IsFalse(0, 0));
 
 	_tprintf_s(_T("[ OK ]\n"));
 	return 0;

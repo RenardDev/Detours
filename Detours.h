@@ -11,7 +11,7 @@
 
 // General definitions
 #ifndef DETOURS_MAX_STRSIZE
-#define DETOURS_MAX_STRSIZE 0x1000000 // 16 MiB
+#define DETOURS_MAX_STRSIZE 0x1000 // 4 KiB
 #endif // !DETOURS_MAX_SIZE
 
 // Cheking platform
@@ -443,6 +443,42 @@ namespace MemoryScan {
 	/// </summary>
 	void* FindData(const char* const szModuleName, const unsigned char* const pData, const size_t unDataSize);
 #endif
+
+	// ----------------------------------------------------------------
+	// FindRTTI
+	// ----------------------------------------------------------------
+
+	/// <summary>
+	/// Finding for RTTI by address and size.
+	/// </summary>
+	void* FindRTTI(void* const pAddress, const size_t unSize, const char* const szRTTI);
+
+	/// <summary>
+	/// Finding for RTTI by module handle.
+	/// </summary>
+	void* FindRTTI(const HMODULE hModule, const char* const szRTTI);
+
+	/// <summary>
+	/// Finding for RTTI by module name.
+	/// </summary>
+	void* FindRTTIA(const char* const szModuleName, const char* const szRTTI);
+
+	/// <summary>
+	/// Finding for RTTI by module name.
+	/// </summary>
+	void* FindRTTIW(const wchar_t* const szModuleName, const char* const szRTTI);
+
+#ifdef UNICODE
+	/// <summary>
+	/// Finding for RTTI by module name.
+	/// </summary>
+	void* FindRTTI(const wchar_t* const szModuleName, const char* const szRTTI);
+#else
+	/// <summary>
+	/// Finding for RTTI by module name.
+	/// </summary>
+	void* FindRTTI(const char* const szModuleName, const char* const szRTTI);
+#endif
 }
 
 // ----------------------------------------------------------------
@@ -450,7 +486,7 @@ namespace MemoryScan {
 // ----------------------------------------------------------------
 namespace MemoryProtection {
 	// ----------------------------------------------------------------
-	// MemoryProtectionFlags
+	// Memory Protection Flags
 	// ----------------------------------------------------------------
 
 	enum MemoryProtectionFlags : unsigned char {
@@ -476,7 +512,6 @@ namespace MemoryProtection {
 	public:
 		void* GetAddress();
 		size_t GetSize();
-		DWORD GetOriginalProtection();
 	private:
 		void* m_pAddress;
 		size_t m_unSize;
@@ -484,7 +519,7 @@ namespace MemoryProtection {
 	};
 
 	// ----------------------------------------------------------------
-	// MemoryProtect
+	// Manual Memory Protection
 	// ----------------------------------------------------------------
 
 	/// <summary>
