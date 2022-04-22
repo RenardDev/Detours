@@ -41,5 +41,5 @@ jobs:
     - uses: actions/upload-artifact@v3
       with:
         name: artifact
-        path: ${{env.SOLUTION_FILE_PATH}}\${{env.BUILD_CONFIGURATION}}
+        path: ${{env.SOLUTION_FILE_PATH}}/${{env.BUILD_CONFIGURATION}}
         if-no-files-found: error
