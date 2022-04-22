@@ -48,14 +48,16 @@ jobs:
       uses: actions/upload-artifact@v3
       with:
         name: artifact32
-        working-directory: ${{env.SOLUTION_FILE_PATH}}
-        path: ${{env.SOLUTION_FILE_PATH}}\${{env.BUILD_CONFIGURATION}}
+        path: |
+          ${{env.SOLUTION_FILE_PATH}}\${{env.BUILD_CONFIGURATION}}\*.exe
+          ${{env.SOLUTION_FILE_PATH}}\${{env.BUILD_CONFIGURATION}}\*.pdb
         if-no-files-found: error
 
     - name: Artifact x64
       uses: actions/upload-artifact@v3
       with:
         name: artifact64
-        working-directory: ${{env.SOLUTION_FILE_PATH}}
-        path: ${{env.SOLUTION_FILE_PATH}}\x64\${{env.BUILD_CONFIGURATION}}
+        path: |
+          ${{env.SOLUTION_FILE_PATH}}\x64\${{env.BUILD_CONFIGURATION}}\*.exe
+          ${{env.SOLUTION_FILE_PATH}}\x64\${{env.BUILD_CONFIGURATION}}\*.pdb
         if-no-files-found: error
