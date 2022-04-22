@@ -1634,7 +1634,7 @@ namespace MemoryScan {
 	// FindRTTI
 	// ----------------------------------------------------------------
 
-	const void* const FindRTTI(const void* const pAddress, const size_t unSize, const char* const szRTTI) {
+	static const void* const _FindRTTI(const void* const pAddress, const size_t unSize, const char* const szRTTI) {
 		if (!pAddress) {
 			return nullptr;
 		}
@@ -1803,6 +1803,11 @@ namespace MemoryScan {
 		}
 
 		return nullptr;
+	}
+
+	// This fixes a bug with the IDE...
+	const void* const FindRTTI(const void* const pAddress, const size_t unSize, const char* const szRTTI) {
+		return _FindRTTI(pAddress, unSize, szRTTI);
 	}
 
 	const void* const FindRTTI(const HMODULE hModule, const char* const szRTTI) {
