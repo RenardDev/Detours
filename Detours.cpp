@@ -154,14 +154,9 @@ namespace Detours {
 			for (size_t i = 0; i < unDecodeBytes * 2; i += 2) {
 				const unsigned char unHigh = unHexTableUpper[static_cast<unsigned char>(szHex[i])];
 				const unsigned char unLow = unHexTableLower[static_cast<unsigned char>(szHex[i + 1])];
-				if ((unHigh > 0xF0) || (unLow > 0xF)) {
+				if ((unHigh == 0xFF) || (unLow == 0xFF)) {
 					return false;
 				}
-			}
-
-			for (size_t i = 0; i < unDecodeBytes * 2; i += 2) {
-				const unsigned char unHigh = unHexTableUpper[static_cast<unsigned char>(szHex[i])];
-				const unsigned char unLow = unHexTableLower[static_cast<unsigned char>(szHex[i + 1])];
 				pData[i / 2] = unHigh | unLow;
 			}
 
@@ -184,14 +179,9 @@ namespace Detours {
 			for (size_t i = 0; i < unDecodeBytes * 2; i += 2) {
 				const unsigned char unHigh = unHexTableUpper[static_cast<unsigned char>(szHex[i])];
 				const unsigned char unLow = unHexTableLower[static_cast<unsigned char>(szHex[i + 1])];
-				if ((unHigh > 0xF0) || (unLow > 0xF)) {
+				if ((unHigh == 0xFF) || (unLow == 0xFF)) {
 					return false;
 				}
-			}
-
-			for (size_t i = 0; i < unDecodeBytes * 2; i += 2) {
-				const unsigned char unHigh = unHexTableUpper[static_cast<unsigned char>(szHex[i])];
-				const unsigned char unLow = unHexTableLower[static_cast<unsigned char>(szHex[i + 1])];
 				pData[i / 2] = unHigh | unLow;
 			}
 
@@ -275,15 +265,13 @@ namespace Detours {
 			const unsigned char* const pData = reinterpret_cast<const unsigned char* const>(pAddress);
 			const unsigned char* const pSignature = reinterpret_cast<const unsigned char* const>(szSignature);
 
-			const size_t unDataBytes = unSize - unSignatureLength;
-			for (size_t unIndex = 0; unIndex < unDataBytes; ++unIndex) {
+			for (size_t unIndex = 0; unIndex < unSize; ++unIndex) {
 				size_t unSignatureIndex = 0;
 				for (; unSignatureIndex < unSignatureLength; ++unSignatureIndex) {
 					const unsigned char unSignatureByte = pSignature[unSignatureIndex];
 					if (unSignatureByte == unIgnoredByte) {
 						continue;
 					} else if (pData[unIndex + unSignatureIndex] != unSignatureByte) {
-						unIndex += unSignatureIndex;
 						break;
 					}
 				}
@@ -377,15 +365,14 @@ namespace Detours {
 				return nullptr;
 			}
 
-			if (unSize <= unSignatureLength) {
+			if (unSize < unSignatureLength) {
 				return nullptr;
 			}
 
 			const unsigned char* const pData = reinterpret_cast<const unsigned char* const>(pAddress);
 			const unsigned char* const pSignature = reinterpret_cast<const unsigned char* const>(szSignature);
 
-			const size_t unDataBytes = unSize - unSignatureLength;
-			const size_t unDataBytesCycles = static_cast<size_t>(ceil(static_cast<double>(unDataBytes) / 16.0)) - 1;
+			const size_t unDataBytesCycles = static_cast<size_t>(floor(static_cast<double>(unSize) / 16.0));
 			for (size_t unCycle = 0; unCycle < unDataBytesCycles; ++unCycle) {
 				unsigned __int16 unFound = 0xFFFFui16;
 				for (size_t unSignatureIndex = 0; (unSignatureIndex < unSignatureLength) && (unFound != 0); ++unSignatureIndex) {
@@ -406,9 +393,12 @@ namespace Detours {
 				}
 			}
 
-			const size_t unDataBytesLeft = unDataBytes - unDataBytesCycles * 16;
+			const size_t unDataBytesLeft = unSize - unDataBytesCycles * 16;
 			if (unDataBytesLeft) {
-				return FindSignatureNative(pData + unSize - unDataBytesLeft - unSignatureLength, unDataBytesLeft + unSignatureLength, szSignature);
+				if (unDataBytesLeft < unSignatureLength) {
+					return FindSignatureNative(pData + unSize - unDataBytesLeft - unSignatureLength, unDataBytesLeft + unSignatureLength, szSignature);
+				}
+				return FindSignatureNative(pData + unSize - unDataBytesLeft, unDataBytesLeft, szSignature);
 			}
 
 			return nullptr;
@@ -496,15 +486,14 @@ namespace Detours {
 				return nullptr;
 			}
 
-			if (unSize <= unSignatureLength) {
+			if (unSize < unSignatureLength) {
 				return nullptr;
 			}
 
 			const unsigned char* const pData = reinterpret_cast<const unsigned char* const>(pAddress);
 			const unsigned char* const pSignature = reinterpret_cast<const unsigned char* const>(szSignature);
 
-			const size_t unDataBytes = unSize - unSignatureLength;
-			const size_t unDataBytesCycles = static_cast<size_t>(ceil(static_cast<double>(unDataBytes) / 32.0)) - 1;
+			const size_t unDataBytesCycles = static_cast<size_t>(floor(static_cast<double>(unSize) / 32.0));
 			for (size_t unCycle = 0; unCycle < unDataBytesCycles; ++unCycle) {
 				unsigned __int32 unFound = 0xFFFFFFFFui32;
 				for (size_t unSignatureIndex = 0; (unSignatureIndex < unSignatureLength) && (unFound != 0); ++unSignatureIndex) {
@@ -528,9 +517,12 @@ namespace Detours {
 				}
 			}
 
-			const size_t unDataBytesLeft = unDataBytes - unDataBytesCycles * 32;
+			const size_t unDataBytesLeft = unSize - unDataBytesCycles * 32;
 			if (unDataBytesLeft) {
-				return FindSignatureNative(pData + unSize - unDataBytesLeft - unSignatureLength, unDataBytesLeft + unSignatureLength, szSignature);
+				if (unDataBytesLeft < unSignatureLength) {
+					return FindSignatureSSE2(pData + unSize - unDataBytesLeft - unSignatureLength, unDataBytesLeft + unSignatureLength, szSignature);
+				}
+				return FindSignatureSSE2(pData + unSize - unDataBytesLeft, unDataBytesLeft, szSignature);
 			}
 
 			return nullptr;
@@ -618,15 +610,14 @@ namespace Detours {
 				return nullptr;
 			}
 
-			if (unSize <= unSignatureLength) {
+			if (unSize < unSignatureLength) {
 				return nullptr;
 			}
 
 			const unsigned char* const pData = reinterpret_cast<const unsigned char* const>(pAddress);
 			const unsigned char* const pSignature = reinterpret_cast<const unsigned char* const>(szSignature);
 
-			const size_t unDataBytes = unSize - unSignatureLength;
-			const size_t unDataBytesCycles = static_cast<size_t>(ceil(static_cast<double>(unDataBytes) / 32.0)) - 1;
+			const size_t unDataBytesCycles = static_cast<size_t>(floor(static_cast<double>(unSize) / 32.0));
 			for (size_t unCycle = 0; unCycle < unDataBytesCycles; ++unCycle) {
 				unsigned __int32 unFound = 0xFFFFFFFFui32;
 				for (size_t unSignatureIndex = 0; (unSignatureIndex < unSignatureLength) && (unFound != 0); ++unSignatureIndex) {
@@ -647,9 +638,12 @@ namespace Detours {
 				}
 			}
 
-			const size_t unDataBytesLeft = unDataBytes - unDataBytesCycles * 32;
+			const size_t unDataBytesLeft = unSize - unDataBytesCycles * 32;
 			if (unDataBytesLeft) {
-				return FindSignatureNative(pData + unSize - unDataBytesLeft - unSignatureLength, unDataBytesLeft + unSignatureLength, szSignature);
+				if (unDataBytesLeft < unSignatureLength) {
+					return FindSignatureAVX(pData + unSize - unDataBytesLeft - unSignatureLength, unDataBytesLeft + unSignatureLength, szSignature);
+				}
+				return FindSignatureAVX(pData + unSize - unDataBytesLeft, unDataBytesLeft, szSignature);
 			}
 
 			return nullptr;
@@ -737,15 +731,14 @@ namespace Detours {
 				return nullptr;
 			}
 
-			if (unSize <= unSignatureLength) {
+			if (unSize < unSignatureLength) {
 				return nullptr;
 			}
 
 			const unsigned char* const pData = reinterpret_cast<const unsigned char* const>(pAddress);
 			const unsigned char* const pSignature = reinterpret_cast<const unsigned char* const>(szSignature);
 
-			const size_t unDataBytes = unSize - unSignatureLength;
-			const size_t unDataBytesCycles = static_cast<size_t>(ceil(static_cast<double>(unDataBytes) / 64.0)) - 1;
+			const size_t unDataBytesCycles = static_cast<size_t>(floor(static_cast<double>(unSize) / 64.0));
 			for (size_t unCycle = 0; unCycle < unDataBytesCycles; ++unCycle) {
 				unsigned __int64 unFound = 0xFFFFFFFFFFFFFFFFui64;
 				for (size_t unSignatureIndex = 0; (unSignatureIndex < unSignatureLength) && (unFound != 0); ++unSignatureIndex) {
@@ -764,9 +757,12 @@ namespace Detours {
 				}
 			}
 
-			const size_t unDataBytesLeft = unDataBytes - unDataBytesCycles * 64;
+			const size_t unDataBytesLeft = unSize - unDataBytesCycles * 64;
 			if (unDataBytesLeft) {
-				return FindSignatureNative(pData + unSize - unDataBytesLeft - unSignatureLength, unDataBytesLeft + unSignatureLength, szSignature);
+				if (unDataBytesLeft < unSignatureLength) {
+					return FindSignatureAVX2(pData + unSize - unDataBytesLeft - unSignatureLength, unDataBytesLeft + unSignatureLength, szSignature);
+				}
+				return FindSignatureAVX2(pData + unSize - unDataBytesLeft, unDataBytesLeft, szSignature);
 			}
 
 			return nullptr;
@@ -955,18 +951,16 @@ namespace Detours {
 				return nullptr;
 			}
 
-			if (unSize <= unDataSize) {
+			if (unSize < unDataSize) {
 				return nullptr;
 			}
 
 			const unsigned char* const pSourceData = reinterpret_cast<const unsigned char* const>(pAddress);
 
-			const size_t unDataBytes = unSize - unDataSize;
-			for (size_t unIndex = 0; unIndex < unDataBytes; ++unIndex) {
+			for (size_t unIndex = 0; unIndex < unSize; ++unIndex) {
 				size_t unDataIndex = 0;
 				for (; unDataIndex < unDataSize; ++unDataIndex) {
 					if (pSourceData[unIndex + unDataIndex] != pData[unDataIndex]) {
-						unIndex += unDataIndex;
 						break;
 					}
 				}
@@ -1071,30 +1065,34 @@ namespace Detours {
 				return nullptr;
 			}
 
-			if (unSize <= unDataSize) {
+			if (unSize < unDataSize) {
 				return nullptr;
 			}
 
 			const unsigned char* const pSourceData = reinterpret_cast<const unsigned char* const>(pAddress);
 
-			const size_t unDataBytes = unSize - unDataSize;
-			const size_t unDataBytesCycles = static_cast<size_t>(ceil(static_cast<double>(unDataBytes) / 16.0)) - 1;
+			const size_t unDataBytesCycles = static_cast<size_t>(floor(static_cast<double>(unSize) / 16.0));
 			for (size_t unCycle = 0; unCycle < unDataBytesCycles; ++unCycle) {
 				unsigned __int16 unFound = 0xFFFFui16;
 				for (size_t unDataIndex = 0; (unDataIndex < unDataSize) && (unFound != 0); ++unDataIndex) {
 					const __m128i xmm1 = _mm_loadu_si128(reinterpret_cast<const __m128i*>(pSourceData + unCycle * 16 + unDataIndex));
 					const __m128i xmm2 = _mm_set1_epi8(static_cast<char>(pData[unDataIndex]));
+
 					const __m128i xmm3 = _mm_cmpeq_epi8(xmm1, xmm2);
+
 					unFound &= _mm_movemask_epi8(xmm3);
 				}
 				if (unFound != 0) {
-					return pSourceData + unCycle * 16 + __bsf32(unFound);
+					return pSourceData + unCycle * 16 + __bsf16(unFound);
 				}
 			}
 
-			const size_t unDataBytesLeft = unDataBytes - unDataBytesCycles * 16;
+			const size_t unDataBytesLeft = unSize - unDataBytesCycles * 16;
 			if (unDataBytesLeft) {
-				return FindDataNative(pSourceData + unSize - unDataBytesLeft - unDataSize, unDataBytesLeft + unDataSize, pData, unDataSize);
+				if (unDataBytesLeft < unDataSize) {
+					return FindDataNative(pSourceData + unSize - unDataBytesLeft - unDataSize, unDataBytesLeft + unDataSize, pData, unDataSize);
+				}
+				return FindDataNative(pSourceData + unSize - unDataBytesLeft, unDataBytesLeft, pData, unDataSize);
 			}
 
 			return nullptr;
@@ -1193,14 +1191,13 @@ namespace Detours {
 				return nullptr;
 			}
 
-			if (unSize <= unDataSize) {
+			if (unSize < unDataSize) {
 				return nullptr;
 			}
 
 			const unsigned char* const pSourceData = reinterpret_cast<const unsigned char* const>(pAddress);
 
-			const size_t unDataBytes = unSize - unDataSize;
-			const size_t unDataBytesCycles = static_cast<size_t>(ceil(static_cast<double>(unDataBytes) / 32.0)) - 1;
+			const size_t unDataBytesCycles = static_cast<size_t>(floor(static_cast<double>(unSize) / 32.0));
 			for (size_t unCycle = 0; unCycle < unDataBytesCycles; ++unCycle) {
 				unsigned __int32 unFound = 0xFFFFFFFFui32;
 				for (size_t unDataIndex = 0; (unDataIndex < unDataSize) && (unFound != 0); ++unDataIndex) {
@@ -1219,9 +1216,12 @@ namespace Detours {
 				}
 			}
 
-			const size_t unDataBytesLeft = unDataBytes - unDataBytesCycles * 32;
+			const size_t unDataBytesLeft = unSize - unDataBytesCycles * 32;
 			if (unDataBytesLeft) {
-				return FindDataNative(pSourceData + unSize - unDataBytesLeft - unDataSize, unDataBytesLeft + unDataSize, pData, unDataSize);
+				if (unDataBytesLeft < unDataSize) {
+					return FindDataSSE2(pSourceData + unSize - unDataBytesLeft - unDataSize, unDataBytesLeft + unDataSize, pData, unDataSize);
+				}
+				return FindDataSSE2(pSourceData + unSize - unDataBytesLeft, unDataBytesLeft, pData, unDataSize);
 			}
 
 			return nullptr;
@@ -1320,14 +1320,13 @@ namespace Detours {
 				return nullptr;
 			}
 
-			if (unSize <= unDataSize) {
+			if (unSize < unDataSize) {
 				return nullptr;
 			}
 
 			const unsigned char* const pSourceData = reinterpret_cast<const unsigned char* const>(pAddress);
 
-			const size_t unDataBytes = unSize - unDataSize;
-			const size_t unDataBytesCycles = static_cast<size_t>(ceil(static_cast<double>(unDataBytes) / 32.0)) - 1;
+			const size_t unDataBytesCycles = static_cast<size_t>(floor(static_cast<double>(unSize) / 32.0));
 			for (size_t unCycle = 0; unCycle < unDataBytesCycles; ++unCycle) {
 				unsigned __int32 unFound = 0xFFFFFFFFui32;
 				for (size_t unDataIndex = 0; (unDataIndex < unDataSize) && (unFound != 0); ++unDataIndex) {
@@ -1343,9 +1342,12 @@ namespace Detours {
 				}
 			}
 
-			const size_t unDataBytesLeft = unDataBytes - unDataBytesCycles * 32;
+			const size_t unDataBytesLeft = unSize - unDataBytesCycles * 32;
 			if (unDataBytesLeft) {
-				return FindDataNative(pSourceData + unSize - unDataBytesLeft - unDataSize, unDataBytesLeft + unDataSize, pData, unDataSize);
+				if (unDataBytesLeft < unDataSize) {
+					return FindDataAVX(pSourceData + unSize - unDataBytesLeft - unDataSize, unDataBytesLeft + unDataSize, pData, unDataSize);
+				}
+				return FindDataAVX(pSourceData + unSize - unDataBytesLeft, unDataBytesLeft, pData, unDataSize);
 			}
 
 			return nullptr;
@@ -1444,14 +1446,13 @@ namespace Detours {
 				return nullptr;
 			}
 
-			if (unSize <= unDataSize) {
+			if (unSize < unDataSize) {
 				return nullptr;
 			}
 
 			const unsigned char* const pSourceData = reinterpret_cast<const unsigned char* const>(pAddress);
 
-			const size_t unDataBytes = unSize - unDataSize;
-			const size_t unDataBytesCycles = static_cast<size_t>(ceil(static_cast<double>(unDataBytes) / 64.0)) - 1;
+			const size_t unDataBytesCycles = static_cast<size_t>(floor(static_cast<double>(unSize) / 64.0));
 			for (size_t unCycle = 0; unCycle < unDataBytesCycles; ++unCycle) {
 				unsigned __int64 unFound = 0xFFFFFFFFFFFFFFFFui64;
 				for (size_t unDataIndex = 0; (unDataIndex < unDataSize) && (unFound != 0); ++unDataIndex) {
@@ -1465,9 +1466,12 @@ namespace Detours {
 				}
 			}
 
-			const size_t unDataBytesLeft = unDataBytes - unDataBytesCycles * 64;
+			const size_t unDataBytesLeft = unSize - unDataBytesCycles * 64;
 			if (unDataBytesLeft) {
-				return FindDataNative(pSourceData + unSize - unDataBytesLeft - unDataSize, unDataBytesLeft + unDataSize, pData, unDataSize);
+				if (unDataBytesLeft < unDataSize) {
+					return FindDataAVX2(pSourceData + unSize - unDataBytesLeft - unDataSize, unDataBytesLeft + unDataSize, pData, unDataSize);
+				}
+				return FindDataAVX2(pSourceData + unSize - unDataBytesLeft, unDataBytesLeft, pData, unDataSize);
 			}
 
 			return nullptr;
@@ -1934,7 +1938,7 @@ namespace Detours {
 			}
 
 			DWORD unProtection = 0;
-			VirtualProtect(const_cast<LPVOID>(m_pAddress), m_unSize, m_unOriginalProtection, &unProtection);
+			VirtualProtect(const_cast<void* const>(m_pAddress), m_unSize, m_unOriginalProtection, &unProtection);
 		}
 
 		bool SmartMemoryProtection::ChangeProtection(const unsigned char unFlags) {
@@ -1948,11 +1952,12 @@ namespace Detours {
 
 			DWORD unProtection = 0;
 			if (unFlags == MEMORYPROTECTION_READWRITE) {
-				if (!VirtualProtect(const_cast<LPVOID>(m_pAddress), m_unSize, PAGE_READWRITE, &unProtection)) {
+				if (!VirtualProtect(const_cast<void* const>(m_pAddress), m_unSize, PAGE_READWRITE, &unProtection)) {
 					return false;
 				}
-			} else if (unFlags == MEMORYPROTECTION_READWRITE_EXECUTE) {
-				if (!VirtualProtect(const_cast<LPVOID>(m_pAddress), m_unSize, PAGE_EXECUTE_READWRITE, &unProtection)) {
+			}
+			else if (unFlags == MEMORYPROTECTION_READWRITE_EXECUTE) {
+				if (!VirtualProtect(const_cast<void* const>(m_pAddress), m_unSize, PAGE_EXECUTE_READWRITE, &unProtection)) {
 					return false;
 				}
 			}
@@ -1970,7 +1975,7 @@ namespace Detours {
 			}
 
 			DWORD unProtection = 0;
-			if (!VirtualProtect(const_cast<LPVOID>(m_pAddress), m_unSize, m_unOriginalProtection, &unProtection)) {
+			if (!VirtualProtect(const_cast<void* const>(m_pAddress), m_unSize, m_unOriginalProtection, &unProtection)) {
 				return false;
 			}
 

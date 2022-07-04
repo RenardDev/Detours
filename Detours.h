@@ -988,6 +988,18 @@ namespace Detours {
 		/// <param name='pAddress'>Memory address.</param>
 		bool RestoreMemoryProtection(const void* const pAddress);
 	}
+
+	// ----------------------------------------------------------------
+	// Hook
+	// ----------------------------------------------------------------
+	// TODO:
+	//  1. Import Hook
+	//  2. Export Hook
+	//  3. Inline Hook
+	/*
+	namespace Hook {
+	}
+	*/
 }
 
 #endif // !_DETOURS_H_
