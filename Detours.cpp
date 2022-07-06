@@ -1904,10 +1904,10 @@ namespace Detours {
 	namespace Memory {
 
 		// ----------------------------------------------------------------
-		// Smart Memory Protection
+		// Smart Protection
 		// ----------------------------------------------------------------
 
-		SmartMemoryProtection::SmartMemoryProtection(const void* const pAddress, const size_t unSize) : m_pAddress(pAddress), m_unSize(unSize) {
+		SmartProtection::SmartProtection(const void* const pAddress, const size_t unSize) : m_pAddress(pAddress), m_unSize(unSize) {
 			m_unOriginalProtection = 0;
 
 			if (!pAddress) {
@@ -1928,7 +1928,7 @@ namespace Detours {
 			m_unOriginalProtection = mbi.Protect;
 		}
 
-		SmartMemoryProtection::~SmartMemoryProtection() {
+		SmartProtection::~SmartProtection() {
 			if (!m_pAddress) {
 				return;
 			}
@@ -1941,7 +1941,7 @@ namespace Detours {
 			VirtualProtect(const_cast<void* const>(m_pAddress), m_unSize, m_unOriginalProtection, &unProtection);
 		}
 
-		bool SmartMemoryProtection::ChangeProtection(const unsigned char unFlags) {
+		bool SmartProtection::ChangeProtection(const DWORD unNewProtection) {
 			if (!m_pAddress) {
 				return false;
 			}
@@ -1951,21 +1951,14 @@ namespace Detours {
 			}
 
 			DWORD unProtection = 0;
-			if (unFlags == MEMORYPROTECTION_READWRITE) {
-				if (!VirtualProtect(const_cast<void* const>(m_pAddress), m_unSize, PAGE_READWRITE, &unProtection)) {
-					return false;
-				}
-			}
-			else if (unFlags == MEMORYPROTECTION_READWRITE_EXECUTE) {
-				if (!VirtualProtect(const_cast<void* const>(m_pAddress), m_unSize, PAGE_EXECUTE_READWRITE, &unProtection)) {
-					return false;
-				}
+			if (!VirtualProtect(const_cast<void* const>(m_pAddress), m_unSize, unNewProtection, &unProtection)) {
+				return false;
 			}
 
 			return true;
 		}
 
-		bool SmartMemoryProtection::RestoreProtection() {
+		bool SmartProtection::RestoreProtection() {
 			if (!m_pAddress) {
 				return false;
 			}
@@ -1982,21 +1975,25 @@ namespace Detours {
 			return true;
 		}
 
-		const void* const SmartMemoryProtection::GetAddress() {
+		const void* const SmartProtection::GetAddress() {
 			return m_pAddress;
 		}
 
-		const size_t SmartMemoryProtection::GetSize() {
+		const size_t SmartProtection::GetSize() {
 			return m_unSize;
 		}
 
+		DWORD SmartProtection::GetOriginalProtection() {
+			return m_unOriginalProtection;
+		}
+
 		// ----------------------------------------------------------------
-		// Manual Memory Protection
+		// Manual Protection
 		// ----------------------------------------------------------------
 
-		static std::vector<std::unique_ptr<SmartMemoryProtection>> g_vecManualMemoryProtections;
+		static std::vector<std::unique_ptr<SmartProtection>> g_vecManualProtections;
 
-		bool ChangeMemoryProtection(const void* const pAddress, const size_t unSize, const unsigned char unFlags) {
+		bool ChangeProtection(const void* const pAddress, const size_t unSize, const DWORD unNewProtection) {
 			if (!pAddress) {
 				return false;
 			}
@@ -2005,30 +2002,337 @@ namespace Detours {
 				return false;
 			}
 
-			auto pSMP = std::make_unique<SmartMemoryProtection>(pAddress, unSize);
-			if (!pSMP) {
+			auto pMemory = std::make_unique<SmartProtection>(pAddress, unSize);
+			if (!pMemory) {
 				return false;
 			}
 
-			if (!pSMP->ChangeProtection(unFlags)) {
+			if (!pMemory->ChangeProtection(unNewProtection)) {
 				return false;
 			}
 
-			g_vecManualMemoryProtections.push_back(std::move(pSMP));
+			g_vecManualProtections.push_back(std::move(pMemory));
 			return true;
 		}
 
-		bool RestoreMemoryProtection(const void* const pAddress) {
+		bool RestoreProtection(const void* const pAddress) {
 			if (!pAddress) {
 				return false;
 			}
 
-			for (auto it = g_vecManualMemoryProtections.begin(); it != g_vecManualMemoryProtections.end(); ++it) {
+			for (auto it = g_vecManualProtections.begin(); it != g_vecManualProtections.end(); ++it) {
 				if (pAddress != (*it)->GetAddress()) {
 					continue;
 				}
 
-				g_vecManualMemoryProtections.erase(it);
+				g_vecManualProtections.erase(it);
+				return true;
+			}
+
+			return false;
+		}
+	}
+
+	// ----------------------------------------------------------------
+	// Hook
+	// ----------------------------------------------------------------
+	namespace Hook {
+
+		// ----------------------------------------------------------------
+		// Smart Import Hook
+		// ----------------------------------------------------------------
+
+		SmartImportHook::SmartImportHook(const HMODULE hModule, const char* const szImportName, const char* const szImportModuleName) {
+			m_pAddress = nullptr;
+			m_pOriginalAddress = nullptr;
+			m_pHookAddress = nullptr;
+
+			if (!hModule) {
+				return;
+			}
+
+			if (!szImportName) {
+				return;
+			}
+
+			const PIMAGE_DOS_HEADER pDH = reinterpret_cast<PIMAGE_DOS_HEADER>(hModule);
+			const PIMAGE_NT_HEADERS pNTHs = reinterpret_cast<PIMAGE_NT_HEADERS>(reinterpret_cast<char*>(hModule) + pDH->e_lfanew);
+			const PIMAGE_OPTIONAL_HEADER pOH = &(pNTHs->OptionalHeader);
+
+			const PIMAGE_DATA_DIRECTORY pImportDD = &(pOH->DataDirectory[IMAGE_DIRECTORY_ENTRY_IMPORT]);
+			const PIMAGE_IMPORT_DESCRIPTOR pImportDesc = reinterpret_cast<PIMAGE_IMPORT_DESCRIPTOR>(reinterpret_cast<char*>(hModule) + pImportDD->VirtualAddress);
+			for (size_t i = 0; pImportDesc[i].Name != 0; ++i) {
+				if (szImportModuleName) {
+					if (strncmp(reinterpret_cast<char*>(hModule) + pImportDesc[i].Name, szImportModuleName, 0x100) != 0) {
+						continue;
+					}
+				}
+
+				const PIMAGE_THUNK_DATA pThunkDataImportNameTable = reinterpret_cast<PIMAGE_THUNK_DATA>(reinterpret_cast<char*>(hModule) + pImportDesc[i].OriginalFirstThunk);
+				const PIMAGE_THUNK_DATA pThunkDataImportAddressTable = reinterpret_cast<PIMAGE_THUNK_DATA>(reinterpret_cast<char*>(hModule) + pImportDesc[i].FirstThunk);
+				for (size_t j = 0; pThunkDataImportNameTable[j].u1.AddressOfData != 0; ++j) {
+					if (pThunkDataImportNameTable[j].u1.Ordinal & IMAGE_ORDINAL_FLAG) {
+						continue;
+					} else {
+						const PIMAGE_IMPORT_BY_NAME pImportByName = reinterpret_cast<PIMAGE_IMPORT_BY_NAME>(reinterpret_cast<char*>(hModule) + pThunkDataImportNameTable[j].u1.AddressOfData);
+						if (strncmp(pImportByName->Name, szImportName, 0x7FF) == 0) {
+							m_pAddress = reinterpret_cast<const void**>(&(pThunkDataImportAddressTable[j].u1.Function));
+							m_pOriginalAddress = *m_pAddress;
+						}
+					}
+				}
+			}
+		}
+
+		SmartImportHook::~SmartImportHook() {
+			UnHook();
+		}
+
+		bool SmartImportHook::Hook(const void* const pHookAddress) {
+			if (!m_pAddress) {
+				return false;
+			}
+
+			if (*m_pAddress != m_pOriginalAddress) {
+				return false;
+			}
+
+			Detours::Memory::SmartProtection Memory(m_pAddress, sizeof(void*));
+			if (Memory.ChangeProtection(PAGE_READWRITE)) {
+				*m_pAddress = pHookAddress;
+				m_pHookAddress = pHookAddress;
+				return true;
+			}
+
+			return false;
+		}
+
+		bool SmartImportHook::UnHook() {
+			if (!m_pAddress) {
+				return false;
+			}
+
+			if (*m_pAddress == m_pOriginalAddress) {
+				return false;
+			}
+
+			Detours::Memory::SmartProtection Memory(m_pAddress, sizeof(void*));
+			if (Memory.ChangeProtection(PAGE_READWRITE)) {
+				*m_pAddress = m_pOriginalAddress;
+				m_pHookAddress = nullptr;
+				return true;
+			}
+
+			return false;
+		}
+
+		const void* SmartImportHook::GetOriginalAddress() {
+			return m_pOriginalAddress;
+		}
+
+		const void* SmartImportHook::GetHookAddress() {
+			return m_pHookAddress;
+		}
+
+		// ----------------------------------------------------------------
+		// Manual Import Hook
+		// ----------------------------------------------------------------
+
+		static std::vector<std::unique_ptr<SmartImportHook>> g_vecManualImportHooks;
+
+		bool HookImport(const HMODULE hModule, const char* const szImportName, const void* const pHookAddress) {
+			if (!hModule) {
+				return false;
+			}
+
+			if (!szImportName) {
+				return false;
+			}
+
+			if (!pHookAddress) {
+				return false;
+			}
+
+			auto pHook = std::make_unique<SmartImportHook>(hModule, szImportName);
+			if (!pHook) {
+				return false;
+			}
+
+			if (!pHook->Hook(pHookAddress)) {
+				return false;
+			}
+
+			g_vecManualImportHooks.push_back(std::move(pHook));
+			return true;
+		}
+
+		bool UnHookImport(const void* const pHookAddress) {
+			if (!pHookAddress) {
+				return false;
+			}
+
+			for (auto it = g_vecManualImportHooks.begin(); it != g_vecManualImportHooks.end(); ++it) {
+				if (pHookAddress != (*it)->GetHookAddress()) {
+					continue;
+				}
+
+				g_vecManualImportHooks.erase(it);
+				return true;
+			}
+
+			return false;
+		}
+
+		// ----------------------------------------------------------------
+		// Smart Export Hook
+		// ----------------------------------------------------------------
+
+		SmartExportHook::SmartExportHook(const HMODULE hModule, const char* const szExportName) {
+			m_hModule = nullptr;
+			m_pAddress = nullptr;
+			m_unOriginalAddress = 0;
+			m_pHookAddress = nullptr;
+
+			if (!hModule) {
+				return;
+			}
+
+			m_hModule = hModule;
+
+			if (!szExportName) {
+				return;
+			}
+
+			const PIMAGE_DOS_HEADER pDH = reinterpret_cast<PIMAGE_DOS_HEADER>(hModule);
+			const PIMAGE_NT_HEADERS pNTHs = reinterpret_cast<PIMAGE_NT_HEADERS>(reinterpret_cast<char*>(hModule) + pDH->e_lfanew);
+			const PIMAGE_OPTIONAL_HEADER pOH = &(pNTHs->OptionalHeader);
+
+			const PIMAGE_DATA_DIRECTORY pExportDD = &(pOH->DataDirectory[IMAGE_DIRECTORY_ENTRY_EXPORT]);
+			const PIMAGE_EXPORT_DIRECTORY pExportDirectory = reinterpret_cast<PIMAGE_EXPORT_DIRECTORY>(reinterpret_cast<char*>(hModule) + pExportDD->VirtualAddress);
+
+			const PDWORD pExportAddresses = reinterpret_cast<PDWORD>(reinterpret_cast<char*>(hModule) + pExportDirectory->AddressOfFunctions);
+			const PWORD pExportOrdinals = reinterpret_cast<PWORD>(reinterpret_cast<char*>(hModule) + pExportDirectory->AddressOfNameOrdinals);
+			const PDWORD pExportNames = reinterpret_cast<PDWORD>(reinterpret_cast<char*>(hModule) + pExportDirectory->AddressOfNames);
+
+			const size_t unAddressOfFunctions = pExportDirectory->NumberOfFunctions;
+			for (size_t i = 0; i < unAddressOfFunctions; ++i) {
+				if (strncmp(szExportName, reinterpret_cast<char*>(hModule) + pExportNames[i], 0x7FF) == 0) {
+					m_pAddress = reinterpret_cast<PDWORD>(&(pExportAddresses[pExportOrdinals[i]]));
+					m_unOriginalAddress = *m_pAddress;
+				}
+			}
+
+		}
+
+		SmartExportHook::~SmartExportHook() {
+			UnHook();
+		}
+
+		bool SmartExportHook::Hook(const void* const pHookAddress) {
+			if (!m_hModule) {
+				return false;
+			}
+
+			if (!m_pAddress) {
+				return false;
+			}
+
+			if (*m_pAddress != m_unOriginalAddress) {
+				return false;
+			}
+
+			const size_t unNewAddress = reinterpret_cast<size_t>(pHookAddress) - reinterpret_cast<size_t>(m_hModule);
+			if (unNewAddress >= 0xFFFFFFFF) {
+				return false;
+			}
+
+			Detours::Memory::SmartProtection Memory(m_pAddress, sizeof(DWORD));
+			if (Memory.ChangeProtection(PAGE_READWRITE)) {
+				*m_pAddress = static_cast<DWORD>(unNewAddress);
+				m_pHookAddress = pHookAddress;
+				return true;
+			}
+
+			return false;
+		}
+
+		bool SmartExportHook::UnHook() {
+			if (!m_hModule) {
+				return false;
+			}
+
+			if (!m_pAddress) {
+				return false;
+			}
+
+			if (*m_pAddress == m_unOriginalAddress) {
+				return false;
+			}
+
+			Detours::Memory::SmartProtection Memory(m_pAddress, sizeof(DWORD));
+			if (Memory.ChangeProtection(PAGE_READWRITE)) {
+				*m_pAddress = m_unOriginalAddress;
+				m_pHookAddress = nullptr;
+				return true;
+			}
+
+			return false;
+		}
+
+		const void* SmartExportHook::GetOriginalAddress() {
+			if (!m_hModule) {
+				return nullptr;
+			}
+			return reinterpret_cast<const void*>(reinterpret_cast<char*>(m_hModule) + m_unOriginalAddress);
+		}
+
+		const void* SmartExportHook::GetHookAddress() {
+			return m_pHookAddress;
+		}
+
+		// ----------------------------------------------------------------
+		// Manual Import Hook
+		// ----------------------------------------------------------------
+
+		static std::vector<std::unique_ptr<SmartExportHook>> g_vecManualExportHooks;
+
+		bool HookExport(const HMODULE hModule, const char* const szExportName, const void* const pHookAddress) {
+			if (!hModule) {
+				return false;
+			}
+
+			if (!szExportName) {
+				return false;
+			}
+
+			if (!pHookAddress) {
+				return false;
+			}
+
+			auto pHook = std::make_unique<SmartExportHook>(hModule, szExportName);
+			if (!pHook) {
+				return false;
+			}
+
+			if (!pHook->Hook(pHookAddress)) {
+				return false;
+			}
+
+			g_vecManualExportHooks.push_back(std::move(pHook));
+			return true;
+		}
+
+		bool UnHookExport(const void* const pHookAddress) {
+			if (!pHookAddress) {
+				return false;
+			}
+
+			for (auto it = g_vecManualExportHooks.begin(); it != g_vecManualExportHooks.end(); ++it) {
+				if (pHookAddress != (*it)->GetHookAddress()) {
+					continue;
+				}
+
+				g_vecManualExportHooks.erase(it);
 				return true;
 			}
 

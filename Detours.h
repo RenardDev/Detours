@@ -917,30 +917,21 @@ namespace Detours {
 	namespace Memory {
 
 		// ----------------------------------------------------------------
-		// Memory Protections Flags
-		// ----------------------------------------------------------------
-
-		enum MemoryProtectionsFlags : unsigned char {
-			MEMORYPROTECTION_READWRITE = 0,
-			MEMORYPROTECTION_READWRITE_EXECUTE = 1
-		};
-
-		// ----------------------------------------------------------------
-		// Smart Memory Protection
+		// Smart Protection
 		// ----------------------------------------------------------------
 
 		/// <summary>
 		/// Smart memory protection that automatically restores protection.
 		/// </summary>
-		class SmartMemoryProtection {
+		class SmartProtection {
 		public:
 			/// <summary>
 			/// Smart memory protection that automatically restores protection.
 			/// </summary>
 			/// <param name='pAddress'>Memory address.</param>
 			/// <param name='unSize'>Memory size.</param>
-			SmartMemoryProtection(const void* const pAddress, const size_t unSize);
-			~SmartMemoryProtection();
+			SmartProtection(const void* const pAddress, const size_t unSize);
+			~SmartProtection();
 
 		public:
 			/// <summary>
@@ -948,7 +939,7 @@ namespace Detours {
 			/// </summary>
 			/// <param name='unFlag'>Memory protection flag.</param>
 			/// <returns>Returns True on success, False otherwise.</returns>
-			bool ChangeProtection(const unsigned char unFlag = MEMORYPROTECTION_READWRITE);
+			bool ChangeProtection(const DWORD unNewProtection);
 
 			/// <summary>
 			/// Restore memory protection.
@@ -963,6 +954,9 @@ namespace Detours {
 			/// <returns>Returns memory size.</returns>
 			const size_t GetSize();
 
+			/// <returns>Returns original memory protection.</returns>
+			DWORD GetOriginalProtection();
+
 		private:
 			const void* const m_pAddress;
 			const size_t m_unSize;
@@ -970,7 +964,7 @@ namespace Detours {
 		};
 
 		// ----------------------------------------------------------------
-		// Manual Memory Protection
+		// Manual Protection
 		// ----------------------------------------------------------------
 
 		/// <summary>
@@ -980,24 +974,151 @@ namespace Detours {
 		/// <param name='unSize'>Memory size.</param>
 		/// <param name='unFlag'>Memory protection flag.</param>
 		/// <returns>Returns True on success, False otherwise.</returns>
-		bool ChangeMemoryProtection(const void* const pAddress, const size_t unSize, const unsigned char unFlag = MEMORYPROTECTION_READWRITE);
+		bool ChangeProtection(const void* const pAddress, const size_t unSize, const DWORD unNewProtection);
 
 		/// <summary>
 		/// Restore memory protection.
 		/// </summary>
 		/// <param name='pAddress'>Memory address.</param>
-		bool RestoreMemoryProtection(const void* const pAddress);
+		bool RestoreProtection(const void* const pAddress);
 	}
 
 	// ----------------------------------------------------------------
 	// Hook
 	// ----------------------------------------------------------------
-	// TODO:
-	//  1. Import Hook
-	//  2. Export Hook
-	//  3. Inline Hook
-	/*
 	namespace Hook {
+
+		// ----------------------------------------------------------------
+		// Smart Import Hook
+		// ----------------------------------------------------------------
+
+		/// <summary>
+		/// Smart hook that automatically unhooking.
+		/// </summary>
+		class SmartImportHook {
+		public:
+			/// <summary>
+			/// Smart hook that automatically unhooking.
+			/// </summary>
+			/// <param name='szModuleName'>Module name.</param>
+			/// <param name='szExportName'>Importing name.</param>
+			/// <param name='szImportModuleName'>Importing module name.</param>
+			SmartImportHook(const HMODULE hModule, const char* const szImportName, const char* const szImportModuleName = nullptr);
+			~SmartImportHook();
+
+		public:
+			/// <summary>
+			/// Hook with a specific address.
+			/// </summary>
+			/// <param name='pHookAddress'>Hook address.</param>
+			bool Hook(const void* const pHookAddress);
+
+			/// <summary>
+			/// UnHook.
+			/// </summary>
+			bool UnHook();
+
+		public:
+			/// <returns>Returns original address.</returns>
+			const void* GetOriginalAddress();
+
+			/// <returns>Returns hook address.</returns>
+			const void* GetHookAddress();
+
+		private:
+			const void** m_pAddress;
+			const void* m_pOriginalAddress;
+			const void* m_pHookAddress;
+		};
+
+		// ----------------------------------------------------------------
+		// Manual Import Hook
+		// ----------------------------------------------------------------
+
+		/// <summary>
+		/// Change memory protection.
+		/// </summary>
+		/// <param name='hModule'>Module handle.</param>
+		/// <param name='szImportName'>Importing name.</param>
+		/// <param name='pHookAddress'>Hook address.</param>
+		/// <returns>Returns True on success, False otherwise.</returns>
+		bool HookImport(const HMODULE hModule, const char* const szImportName, const void* const pHookAddress);
+
+		/// <summary>
+		/// Restore memory protection.
+		/// </summary>
+		/// <param name='pHookAddress'>Hook address.</param>
+		bool UnHookImport(const void* const pHookAddress);
+
+		// ----------------------------------------------------------------
+		// Smart Export Hook
+		// ----------------------------------------------------------------
+
+		/// <summary>
+		/// Smart hook that automatically unhooking.
+		/// </summary>
+		class SmartExportHook {
+		public:
+			/// <summary>
+			/// Smart hook that automatically unhooking.
+			/// </summary>
+			/// <param name='szModuleName'>Module name.</param>
+			/// <param name='szExportName'>Exporting name.</param>
+			SmartExportHook(const HMODULE hModule, const char* const szExportName);
+			~SmartExportHook();
+
+		public:
+			/// <summary>
+			/// Hook with a specific address.
+			/// </summary>
+			/// <param name='pHookAddress'>Hook address.</param>
+			bool Hook(const void* const pHookAddress);
+
+			/// <summary>
+			/// UnHook.
+			/// </summary>
+			bool UnHook();
+
+		public:
+			/// <returns>Returns original address.</returns>
+			const void* GetOriginalAddress();
+
+			/// <returns>Returns hook address.</returns>
+			const void* GetHookAddress();
+
+		private:
+			HMODULE m_hModule;
+			PDWORD m_pAddress;
+			DWORD m_unOriginalAddress;
+			const void* m_pHookAddress;
+		};
+
+		// ----------------------------------------------------------------
+		// Manual Export Hook
+		// ----------------------------------------------------------------
+
+		/// <summary>
+		/// Change memory protection.
+		/// </summary>
+		/// <param name='hModule'>Module handle.</param>
+		/// <param name='szExportName'>Exporting name.</param>
+		/// <param name='pHookAddress'>Hook address.</param>
+		/// <returns>Returns True on success, False otherwise.</returns>
+		bool HookExport(const HMODULE hModule, const char* const szExportName, const void* const pHookAddress);
+
+		/// <summary>
+		/// Restore memory protection.
+		/// </summary>
+		/// <param name='pHookAddress'>Hook address.</param>
+		bool UnHookExport(const void* const pHookAddress);
+	}
+
+	// ----------------------------------------------------------------
+	// Exception
+	// ----------------------------------------------------------------
+	/*
+	namespace Exception {
+		// KiUserExceptionDispatcher
 	}
 	*/
 }
