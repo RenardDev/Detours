@@ -2075,7 +2075,7 @@ namespace Detours {
 						continue;
 					} else {
 						const PIMAGE_IMPORT_BY_NAME pImportByName = reinterpret_cast<PIMAGE_IMPORT_BY_NAME>(reinterpret_cast<char*>(hModule) + pThunkDataImportNameTable[j].u1.AddressOfData);
-						if (strncmp(pImportByName->Name, szImportName, 0x7FF) == 0) {
+						if (strncmp(pImportByName->Name, szImportName, 0x7FFu) == 0) {
 							m_pAddress = reinterpret_cast<const void**>(&(pThunkDataImportAddressTable[j].u1.Function));
 							m_pOriginalAddress = *m_pAddress;
 						}
@@ -2242,7 +2242,7 @@ namespace Detours {
 			}
 
 			const size_t unNewAddress = reinterpret_cast<size_t>(pHookAddress) - reinterpret_cast<size_t>(m_hModule);
-			if (unNewAddress >= 0xFFFFFFFF) {
+			if (unNewAddress >= 0xFFFFFFFFui32) {
 				return false;
 			}
 

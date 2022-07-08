@@ -986,6 +986,7 @@ namespace Detours {
 	// ----------------------------------------------------------------
 	// Hook
 	// ----------------------------------------------------------------
+	// TODO: InlineHook
 	namespace Hook {
 
 		// ----------------------------------------------------------------
@@ -1116,6 +1117,7 @@ namespace Detours {
 	// ----------------------------------------------------------------
 	// Exception
 	// ----------------------------------------------------------------
+	// TODO: KiUserExceptionDispatcher hook and global exception handler
 	/*
 	namespace Exception {
 		// KiUserExceptionDispatcher
