@@ -10,195 +10,10 @@
 #include <vector>
 #include <memory>
 
-// C++
-#include <cstdio>
-
 // ----------------------------------------------------------------
 // Detours
 // ----------------------------------------------------------------
 namespace Detours {
-
-	// ----------------------------------------------------------------
-	// Codec
-	// ----------------------------------------------------------------
-	namespace Codec {
-
-		// ----------------------------------------------------------------
-		// Encode/Decode HEX
-		// ----------------------------------------------------------------
-
-		// HEX Table
-		static const char nHexTable[2][16] = {
-			{
-				// Lowercase
-				'0', '1', '2', '3',
-				'4', '5', '6', '7',
-				'8', '9', 'a', 'b',
-				'c', 'd', 'e', 'f'
-			}, {
-				// Uppercase
-				'0', '1', '2', '3',
-				'4', '5', '6', '7',
-				'8', '9', 'A', 'B',
-				'C', 'D', 'E', 'F'
-			}
-		};
-
-		// ASCII => HEX
-		static const unsigned char unHexTableLower[256] = {
-			0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
-			0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
-			0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
-			0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
-			0xFF, 0x0A, 0x0B, 0x0C, 0x0D, 0x0E, 0x0F, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
-			0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
-			0xFF, 0x0A, 0x0B, 0x0C, 0x0D, 0x0E, 0x0F, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
-			0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
-			0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
-			0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
-			0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
-			0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
-			0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
-			0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
-			0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
-			0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF
-		};
-
-		// ASCII => HEX << 4
-		static const unsigned char unHexTableUpper[256] = {
-			0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
-			0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
-			0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
-			0x00, 0x10, 0x20, 0x30, 0x40, 0x50, 0x60, 0x70, 0x80, 0x90, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
-			0xFF, 0xA0, 0xB0, 0xC0, 0xD0, 0xE0, 0xF0, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
-			0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
-			0xFF, 0xA0, 0xB0, 0xC0, 0xD0, 0xE0, 0xF0, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
-			0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
-			0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
-			0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
-			0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
-			0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
-			0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
-			0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
-			0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
-			0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF
-		};
-
-		bool EncodeToHexA(const unsigned char* const pData, const size_t unDataSize, char* const szHex, const bool bUseUpperCase) {
-			if (!pData) {
-				return false;
-			}
-
-			if (!unDataSize) {
-				return false;
-			}
-
-			if (!szHex) {
-				return false;
-			}
-
-			for (size_t i = 0; i < unDataSize * 2; i += 2) {
-				const unsigned char unSymbol = pData[i / 2];
-				szHex[i] = nHexTable[bUseUpperCase][unSymbol >> 4];
-				szHex[i + 1] = nHexTable[bUseUpperCase][unSymbol & 0xF];
-			}
-
-			return true;
-		}
-
-		bool EncodeToHexW(const unsigned char* const pData, const size_t unDataSize, wchar_t* const szHex, const bool bUseUpperCase) {
-			if (!pData) {
-				return false;
-			}
-
-			if (!unDataSize) {
-				return false;
-			}
-
-			if (!szHex) {
-				return false;
-			}
-
-			for (size_t i = 0; i < unDataSize * 2; i += 2) {
-				const unsigned char unSymbol = pData[i / 2];
-				szHex[i] = static_cast<wchar_t>(nHexTable[bUseUpperCase][unSymbol >> 4]);
-				szHex[i + 1] = static_cast<wchar_t>(nHexTable[bUseUpperCase][unSymbol & 0xF]);
-			}
-
-			return true;
-		}
-
-#ifdef UNICODE
-		bool EncodeToHex(const unsigned char* const pData, const size_t unDataSize, wchar_t* szHex, const bool bUseUpperCase) {
-			return EncodeToHexW(pData, unDataSize, szHex, bUseUpperCase);
-		}
-#else
-		bool EncodeToHex(const unsigned char* const pData, const size_t unDataSize, char* szHex, const bool bUseUpperCase) {
-			return EncodeToHexA(pData, unDataSize, szHex, bUseUpperCase);
-		}
-#endif
-
-		bool DecodeFromHexA(const char* const szHex, const size_t unDecodeBytes, unsigned char* const pData) {
-			if (!szHex) {
-				return false;
-			}
-
-			if (!pData) {
-				return false;
-			}
-
-			if (!unDecodeBytes) {
-				return false;
-			}
-
-			for (size_t i = 0; i < unDecodeBytes * 2; i += 2) {
-				const unsigned char unHigh = unHexTableUpper[static_cast<unsigned char>(szHex[i])];
-				const unsigned char unLow = unHexTableLower[static_cast<unsigned char>(szHex[i + 1])];
-				if ((unHigh == 0xFF) || (unLow == 0xFF)) {
-					return false;
-				}
-				pData[i / 2] = unHigh | unLow;
-			}
-
-			return true;
-		}
-
-		bool DecodeFromHexW(const wchar_t* const szHex, const size_t unDecodeBytes, unsigned char* const pData) {
-			if (!szHex) {
-				return false;
-			}
-
-			if (!pData) {
-				return false;
-			}
-
-			if (!unDecodeBytes) {
-				return false;
-			}
-
-			for (size_t i = 0; i < unDecodeBytes * 2; i += 2) {
-				const unsigned char unHigh = unHexTableUpper[static_cast<unsigned char>(szHex[i])];
-				const unsigned char unLow = unHexTableLower[static_cast<unsigned char>(szHex[i + 1])];
-				if ((unHigh == 0xFF) || (unLow == 0xFF)) {
-					return false;
-				}
-				pData[i / 2] = unHigh | unLow;
-			}
-
-			return true;
-		}
-
-#ifdef UNICODE
-		bool DecodeFromHex(const wchar_t* const szHex, const size_t unDecodeBytes, unsigned char* const pData) {
-			return DecodeFromHexW(szHex, unDecodeBytes, pData);
-		}
-#else
-		bool DecodeFromHex(const char* const szHex, const size_t unDecodeBytes, unsigned char* const  pData) {
-			return DecodeFromHexA(szHex, unDecodeBytes, pData);
-		}
-#endif
-	}
-
 
 	// ----------------------------------------------------------------
 	// Scan
@@ -1660,6 +1475,7 @@ namespace Detours {
 		// ----------------------------------------------------------------
 		// FindRTTI
 		// ----------------------------------------------------------------
+		// TODO: POGO optimization
 
 		static const void* const _FindRTTI(const void* const pAddress, const size_t unSize, const char* const szRTTI) {
 			if (!pAddress) {
@@ -1941,6 +1757,29 @@ namespace Detours {
 			VirtualProtect(const_cast<void* const>(m_pAddress), m_unSize, m_unOriginalProtection, &unProtection);
 		}
 
+		bool SmartProtection::GetProtection(const PDWORD pProtection) {
+			if (!m_pAddress) {
+				return false;
+			}
+
+			if (!m_unSize) {
+				return false;
+			}
+
+			MEMORY_BASIC_INFORMATION mbi;
+			memset(&mbi, 0, sizeof(MEMORY_BASIC_INFORMATION));
+
+			if (!VirtualQuery(m_pAddress, &mbi, sizeof(MEMORY_BASIC_INFORMATION))) {
+				return false;
+			}
+
+			if (pProtection) {
+				*pProtection = mbi.Protect;
+			}
+
+			return true;
+		}
+
 		bool SmartProtection::ChangeProtection(const DWORD unNewProtection) {
 			if (!m_pAddress) {
 				return false;
@@ -2005,6 +1844,13 @@ namespace Detours {
 			auto pMemory = std::make_unique<SmartProtection>(pAddress, unSize);
 			if (!pMemory) {
 				return false;
+			}
+
+			const void* const pOriginalAddress = pMemory->GetAddress();
+			for (auto it = g_vecManualProtections.begin(); it != g_vecManualProtections.end(); ++it) {
+				if (pOriginalAddress == (*it)->GetAddress()) {
+					return false;
+				}
 			}
 
 			if (!pMemory->ChangeProtection(unNewProtection)) {
@@ -2097,7 +1943,7 @@ namespace Detours {
 				return false;
 			}
 
-			Detours::Memory::SmartProtection Memory(m_pAddress, sizeof(void*));
+			Memory::SmartProtection Memory(m_pAddress, sizeof(void*));
 			if (Memory.ChangeProtection(PAGE_READWRITE)) {
 				*m_pAddress = pHookAddress;
 				m_pHookAddress = pHookAddress;
@@ -2116,7 +1962,7 @@ namespace Detours {
 				return false;
 			}
 
-			Detours::Memory::SmartProtection Memory(m_pAddress, sizeof(void*));
+			Memory::SmartProtection Memory(m_pAddress, sizeof(void*));
 			if (Memory.ChangeProtection(PAGE_READWRITE)) {
 				*m_pAddress = m_pOriginalAddress;
 				m_pHookAddress = nullptr;
@@ -2156,6 +2002,13 @@ namespace Detours {
 			auto pHook = std::make_unique<SmartImportHook>(hModule, szImportName);
 			if (!pHook) {
 				return false;
+			}
+
+			const void* const pOriginalAddress = pHook->GetOriginalAddress();
+			for (auto it = g_vecManualImportHooks.begin(); it != g_vecManualImportHooks.end(); ++it) {
+				if (pOriginalAddress == (*it)->GetOriginalAddress()) {
+					return false;
+				}
 			}
 
 			if (!pHook->Hook(pHookAddress)) {
@@ -2246,7 +2099,7 @@ namespace Detours {
 				return false;
 			}
 
-			Detours::Memory::SmartProtection Memory(m_pAddress, sizeof(DWORD));
+			Memory::SmartProtection Memory(m_pAddress, sizeof(DWORD));
 			if (Memory.ChangeProtection(PAGE_READWRITE)) {
 				*m_pAddress = static_cast<DWORD>(unNewAddress);
 				m_pHookAddress = pHookAddress;
@@ -2269,7 +2122,7 @@ namespace Detours {
 				return false;
 			}
 
-			Detours::Memory::SmartProtection Memory(m_pAddress, sizeof(DWORD));
+			Memory::SmartProtection Memory(m_pAddress, sizeof(DWORD));
 			if (Memory.ChangeProtection(PAGE_READWRITE)) {
 				*m_pAddress = m_unOriginalAddress;
 				m_pHookAddress = nullptr;
@@ -2291,7 +2144,7 @@ namespace Detours {
 		}
 
 		// ----------------------------------------------------------------
-		// Manual Import Hook
+		// Manual Export Hook
 		// ----------------------------------------------------------------
 
 		static std::vector<std::unique_ptr<SmartExportHook>> g_vecManualExportHooks;
@@ -2312,6 +2165,13 @@ namespace Detours {
 			auto pHook = std::make_unique<SmartExportHook>(hModule, szExportName);
 			if (!pHook) {
 				return false;
+			}
+
+			const void* const pOriginalAddress = pHook->GetOriginalAddress();
+			for (auto it = g_vecManualExportHooks.begin(); it != g_vecManualExportHooks.end(); ++it) {
+				if (pOriginalAddress == (*it)->GetOriginalAddress()) {
+					return false;
+				}
 			}
 
 			if (!pHook->Hook(pHookAddress)) {
@@ -2338,10 +2198,310 @@ namespace Detours {
 
 			return false;
 		}
-	}
-}
 
-int _tmain() {
-	_tprintf_s(_T("[ OK ]\n"));
-	return 0;
+		// ----------------------------------------------------------------
+		// Smart Memory Hook
+		// ----------------------------------------------------------------
+
+		static std::vector<std::unique_ptr<SmartMemoryHook>> g_vecMemoryHooks;
+
+		static LONG NTAPI VectoredExceptionHandler(PEXCEPTION_POINTERS pExceptionInfo) noexcept {
+			if (!pExceptionInfo) {
+				return EXCEPTION_ACCESS_VIOLATION;
+			}
+
+			const PEXCEPTION_RECORD pExceptionRecord = pExceptionInfo->ExceptionRecord;
+			if (!pExceptionRecord) {
+				return EXCEPTION_ACCESS_VIOLATION;
+			}
+
+			const PCONTEXT pCTX = pExceptionInfo->ContextRecord;
+			if (!pCTX) {
+				return EXCEPTION_ACCESS_VIOLATION;
+			}
+
+			if (pExceptionRecord->ExceptionCode != EXCEPTION_ACCESS_VIOLATION) {
+				return EXCEPTION_ACCESS_VIOLATION;
+			}
+
+			const void* const pAddress = pExceptionRecord->ExceptionAddress;
+			if (!pAddress) {
+				return EXCEPTION_ACCESS_VIOLATION;
+			}
+
+			for (auto it = g_vecMemoryHooks.begin(); it != g_vecMemoryHooks.end(); ++it) {
+				if (pAddress == (*it)->GetAddress()) {
+					if ((*it)->IsAutoDisable()) {
+						(*it)->Disable();
+					}
+
+#ifdef _M_X64
+					pCTX->Rip = reinterpret_cast<DWORD64>((*it)->GetHookAddress());
+#elif _M_IX86
+					pCTX->Eip = reinterpret_cast<DWORD>((*it)->GetHookAddress());
+#endif
+
+					return EXCEPTION_CONTINUE_EXECUTION;
+				}
+			}
+
+			return EXCEPTION_CONTINUE_SEARCH;
+		}
+
+		SmartMemoryHook::SmartMemoryHook(const void* const pAddress, const size_t unSize, bool bAutoDisable) : m_pAddress(pAddress), m_unSize(unSize) {
+			m_bAutoDisable = bAutoDisable;
+			m_pVEH = nullptr;
+			m_pHookAddress = nullptr;
+
+			if (!m_pAddress) {
+				return;
+			}
+
+			if (!m_unSize) {
+				return;
+			}
+
+			m_pVEH = AddVectoredExceptionHandler(TRUE, VectoredExceptionHandler);
+		}
+
+		SmartMemoryHook::~SmartMemoryHook() {
+			UnHook();
+			if (m_pVEH) {
+				RemoveVectoredExceptionHandler(m_pVEH);
+			}
+		}
+
+		bool SmartMemoryHook::Hook(const void* const pHookAddress) {
+			if (!m_pAddress) {
+				return false;
+			}
+
+			if (!m_unSize) {
+				return false;
+			}
+
+			if (m_pHookAddress) {
+				return false;
+			}
+
+			m_pHookAddress = pHookAddress;
+
+			auto pMemory = std::make_unique<Memory::SmartProtection>(m_pAddress, m_unSize);
+			if (!pMemory) {
+				return false;
+			}
+
+			for (auto it = Memory::g_vecManualProtections.begin(); it != Memory::g_vecManualProtections.end(); ++it) {
+				if (m_pAddress == (*it)->GetAddress()) {
+					return false;
+				}
+			}
+
+			DWORD unProtection = 0;
+			if (!pMemory->GetProtection(&unProtection)) {
+				return false;
+			}
+
+			if (unProtection & PAGE_EXECUTE) {
+				unProtection &= ~(PAGE_EXECUTE);
+			}
+
+			if (unProtection & PAGE_EXECUTE_READ) {
+				unProtection &= ~(PAGE_EXECUTE_READ);
+			}
+
+			if (unProtection & PAGE_EXECUTE_READWRITE) {
+				unProtection &= ~(PAGE_EXECUTE_READWRITE);
+			}
+
+			if (!unProtection) {
+				unProtection |= PAGE_READONLY;
+			}
+
+			if (!pMemory->ChangeProtection(unProtection)) {
+				return false;
+			}
+
+			Memory::g_vecManualProtections.push_back(std::move(pMemory));
+			return true;
+		}
+
+		bool SmartMemoryHook::UnHook() {
+			if (!m_pAddress) {
+				return false;
+			}
+
+			if (!m_unSize) {
+				return false;
+			}
+
+			if (!m_pHookAddress) {
+				return false;
+			}
+
+			return Memory::RestoreProtection(m_pAddress);
+		}
+
+		bool SmartMemoryHook::Enable() {
+			if (!m_pAddress) {
+				return false;
+			}
+
+			if (!m_unSize) {
+				return false;
+			}
+
+			if (!m_pHookAddress) {
+				return false;
+			}
+
+			for (auto it = Memory::g_vecManualProtections.begin(); it != Memory::g_vecManualProtections.end(); ++it) {
+				if (m_pAddress == (*it)->GetAddress()) {
+					DWORD unProtection = 0;
+					if (!(*it)->GetProtection(&unProtection)) {
+						return false;
+					}
+
+					if (unProtection & PAGE_EXECUTE) {
+						unProtection &= ~(PAGE_EXECUTE);
+					}
+
+					if (unProtection & PAGE_EXECUTE_READ) {
+						unProtection &= ~(PAGE_EXECUTE_READ);
+					}
+
+					if (unProtection & PAGE_EXECUTE_READWRITE) {
+						unProtection &= ~(PAGE_EXECUTE_READWRITE);
+					}
+
+					if (!unProtection) {
+						unProtection |= PAGE_READONLY;
+					}
+
+					if (!(*it)->ChangeProtection(unProtection)) {
+						return false;
+					}
+
+					return true;
+				}
+			}
+
+			return false;
+		}
+
+		bool SmartMemoryHook::Disable() {
+			if (!m_pAddress) {
+				return false;
+			}
+
+			if (!m_unSize) {
+				return false;
+			}
+
+			if (!m_pHookAddress) {
+				return false;
+			}
+
+			for (auto it = Memory::g_vecManualProtections.begin(); it != Memory::g_vecManualProtections.end(); ++it) {
+				if (m_pAddress == (*it)->GetAddress()) {
+					return (*it)->RestoreProtection();
+				}
+			}
+
+			return false;
+		}
+
+		const void* const SmartMemoryHook::GetAddress() {
+			return m_pAddress;
+		}
+
+		const size_t SmartMemoryHook::GetSize() {
+			return m_unSize;
+		}
+
+		bool SmartMemoryHook::IsAutoDisable() {
+			return m_bAutoDisable;
+		}
+
+		const void* SmartMemoryHook::GetHookAddress() {
+			return m_pHookAddress;
+		}
+
+		// ----------------------------------------------------------------
+		// Manual Memory Hook
+		// ----------------------------------------------------------------
+
+		bool HookMemory(const void* const pAddress, const void* const pHookAddress, bool bAutoDisable) {
+			if (!pAddress) {
+				return false;
+			}
+
+			if (!pHookAddress) {
+				return false;
+			}
+
+			auto pHook = std::make_unique<SmartMemoryHook>(pAddress, 1, bAutoDisable);
+			if (!pHook) {
+				return false;
+			}
+
+			if (!pHook->Hook(pHookAddress)) {
+				return false;
+			}
+
+			g_vecMemoryHooks.push_back(std::move(pHook));
+			return true;
+		}
+
+		bool UnHookMemory(const void* const pHookAddress) {
+			if (!pHookAddress) {
+				return false;
+			}
+
+			for (auto it = g_vecMemoryHooks.begin(); it != g_vecMemoryHooks.end(); ++it) {
+				if (pHookAddress != (*it)->GetHookAddress()) {
+					continue;
+				}
+
+				g_vecMemoryHooks.erase(it);
+				return true;
+			}
+
+			return false;
+		}
+
+		bool EnableHookMemory(const void* const pHookAddress) {
+			if (!pHookAddress) {
+				return false;
+			}
+
+			for (auto it = g_vecMemoryHooks.begin(); it != g_vecMemoryHooks.end(); ++it) {
+				if (pHookAddress != (*it)->GetHookAddress()) {
+					continue;
+				}
+
+				(*it)->Enable();
+				return true;
+			}
+
+			return false;
+		}
+
+		bool DisableHookMemory(const void* const pHookAddress) {
+			if (!pHookAddress) {
+				return false;
+			}
+
+			for (auto it = g_vecMemoryHooks.begin(); it != g_vecMemoryHooks.end(); ++it) {
+				if (pHookAddress != (*it)->GetHookAddress()) {
+					continue;
+				}
+
+				(*it)->Disable();
+				return true;
+			}
+
+			return false;
+		}
+	}
 }

@@ -29,96 +29,6 @@
 namespace Detours {
 
 	// ----------------------------------------------------------------
-	// Codec
-	// ----------------------------------------------------------------
-	namespace Codec {
-
-		// ----------------------------------------------------------------
-		// Encode/Decode HEX
-		// ----------------------------------------------------------------
-
-		/// <summary>
-		/// Encode the data array to a hexadecimal string.
-		/// </summary>
-		/// <param name='pData'>Input data.</param>
-		/// <param name='unDataSize'>The size in bytes of the input data.</param>
-		/// <param name='szHex'>Output hexadecimal string.</param>
-		/// <param name='bUseUpperCase'>Does the output string have to be in capital letters?</param>
-		/// <returns>Returns True on success, False otherwise.</returns>
-		bool EncodeToHexA(const unsigned char* const pData, const size_t unDataSize, char* const szHex, const bool bUseUpperCase = true);
-
-		/// <summary>
-		/// Encode the data array to a hexadecimal string.
-		/// </summary>
-		/// <param name='pData'>Input data.</param>
-		/// <param name='unDataSize'>The size in bytes of the input data.</param>
-		/// <param name='szHex'>Output hexadecimal string.</param>
-		/// <param name='bUseUpperCase'>Does the output string have to be in capital letters?</param>
-		/// <returns>Returns True on success, False otherwise.</returns>
-		bool EncodeToHexW(const unsigned char* const pData, const size_t unDataSize, wchar_t* const szHex, const bool bUseUpperCase = true);
-
-#ifdef UNICODE
-		/// <summary>
-		/// Encode the data array to a hexadecimal string.
-		/// </summary>
-		/// <param name='pData'>Input data.</param>
-		/// <param name='unDataSize'>The size in bytes of the input data.</param>
-		/// <param name='szHex'>Output hexadecimal string.</param>
-		/// <param name='bUseUpperCase'>Does the output string have to be in capital letters?</param>
-		/// <returns>Returns True on success, False otherwise.</returns>
-		bool EncodeToHex(const unsigned char* const pData, const size_t unDataSize, wchar_t* const szHex, const bool bUseUpperCase = true);
-#else
-		/// <summary>
-		/// Encode the data array to a hexadecimal string.
-		/// </summary>
-		/// <param name='pData'>Input data.</param>
-		/// <param name='unDataSize'>The size in bytes of the input data.</param>
-		/// <param name='szHex'>Output hexadecimal string.</param>
-		/// <param name='bUseUpperCase'>Does the output string have to be in capital letters?</param>
-		/// <returns>Returns True on success, False otherwise.</returns>
-		bool EncodeToHex(const unsigned char* const pData, const size_t unDataSize, char* const szHex, const bool bUseUpperCase = true);
-#endif
-
-		/// <summary>
-		/// Decoding a hexadecimal string into an array of data.
-		/// </summary>
-		/// <param name='szHex'>Input hexadecimal string.</param>
-		/// <param name='unHexSize'>The size in bytes of the input hexadecimal string.</param>
-		/// <param name='pData'>Output data.</param>
-		/// <returns>Returns True on success, False otherwise.</returns>
-		bool DecodeFromHexA(const char* const szHex, const size_t unDecodeBytes, unsigned char* const pData);
-
-		/// <summary>
-		/// Decoding a hexadecimal string into an array of data.
-		/// </summary>
-		/// <param name='szHex'>Input hexadecimal string.</param>
-		/// <param name='unHexSize'>The size in bytes of the input hexadecimal string.</param>
-		/// <param name='pData'>Output data.</param>
-		/// <returns>Returns True on success, False otherwise.</returns>
-		bool DecodeFromHexW(const wchar_t* const szHex, const size_t unDecodeBytes, unsigned char* const pData);
-
-#ifdef UNICODE
-		/// <summary>
-		/// Decoding a hexadecimal string into an array of data.
-		/// </summary>
-		/// <param name='szHex'>Input hexadecimal string.</param>
-		/// <param name='unHexSize'>The size in bytes of the input hexadecimal string.</param>
-		/// <param name='pData'>Output data.</param>
-		/// <returns>Returns True on success, False otherwise.</returns>
-		bool DecodeFromHex(const wchar_t* const szHex, const size_t unDecodeBytes, unsigned char* const pData);
-#else
-		/// <summary>
-		/// Decoding a hexadecimal string into an array of data.
-		/// </summary>
-		/// <param name='szHex'>Input hexadecimal string.</param>
-		/// <param name='unHexSize'>The size in bytes of the input hexadecimal string.</param>
-		/// <param name='pData'>Output data.</param>
-		/// <returns>Returns True on success, False otherwise.</returns>
-		bool DecodeFromHex(const char* const szHex, const size_t unDecodeBytes, unsigned char* const pData);
-#endif
-	}
-
-	// ----------------------------------------------------------------
 	// Scan
 	// ----------------------------------------------------------------
 	namespace Scan {
@@ -935,6 +845,13 @@ namespace Detours {
 
 		public:
 			/// <summary>
+			/// Get current memory protection.</returns>
+			/// </summary>
+			/// <param name='pProtection'>Recording address.</param>
+			/// <returns>Returns True on success, False otherwise.</returns>
+			bool GetProtection(const PDWORD pProtection);
+
+			/// <summary>
 			/// Change memory protection.
 			/// </summary>
 			/// <param name='unFlag'>Memory protection flag.</param>
@@ -986,7 +903,6 @@ namespace Detours {
 	// ----------------------------------------------------------------
 	// Hook
 	// ----------------------------------------------------------------
-	// TODO: InlineHook
 	namespace Hook {
 
 		// ----------------------------------------------------------------
@@ -1112,17 +1028,102 @@ namespace Detours {
 		/// </summary>
 		/// <param name='pHookAddress'>Hook address.</param>
 		bool UnHookExport(const void* const pHookAddress);
-	}
 
-	// ----------------------------------------------------------------
-	// Exception
-	// ----------------------------------------------------------------
-	// TODO: KiUserExceptionDispatcher hook and global exception handler
-	/*
-	namespace Exception {
-		// KiUserExceptionDispatcher
+		// ----------------------------------------------------------------
+		// Smart Memory Hook
+		// ----------------------------------------------------------------
+
+		/// <summary>
+		/// Smart hook that automatically unhooking.
+		/// </summary>
+		class SmartMemoryHook {
+		public:
+			/// <summary>
+			/// Smart hook that automatically unhooking.
+			/// </summary>
+			/// <param name='pAddress'>Memory address.</param>
+			/// <param name='unSize'>Memory size.</param>
+			SmartMemoryHook(const void* const pAddress, const size_t unSize = 1, bool bAutoDisable = false);
+			~SmartMemoryHook();
+
+		public:
+			/// <summary>
+			/// Hook with a specific address.
+			/// </summary>
+			/// <param name='pHookAddress'>Hook address.</param>
+			bool Hook(const void* const pHookAddress);
+
+			/// <summary>
+			/// UnHook.
+			/// </summary>
+			bool UnHook();
+
+		public:
+			/// <summary>
+			/// Enable hook.
+			/// </summary>
+			/// <returns>Returns True on success, False otherwise.</returns>
+			bool Enable();
+
+			/// <summary>
+			/// Disable hook.
+			/// </summary>
+			/// <returns>Returns True on success, False otherwise.</returns>
+			bool Disable();
+
+		public:
+			/// <returns>Returns memory address.</returns>
+			const void* const GetAddress();
+			
+			/// <returns>Returns memory size.</returns>
+			const size_t GetSize();
+
+			/// <returns>Returns auto disable param.</returns>
+			bool IsAutoDisable();
+
+			/// <returns>Returns hook address.</returns>
+			const void* GetHookAddress();
+
+		private:
+			const void* const m_pAddress;
+			const size_t m_unSize;
+			bool m_bAutoDisable;
+			PVOID m_pVEH;
+			const void* m_pHookAddress;
+		};
+
+		// ----------------------------------------------------------------
+		// Manual Memory Hook
+		// ----------------------------------------------------------------
+
+		/// <summary>
+		/// Change memory protection.
+		/// </summary>
+		/// <param name='pAddress'>Memory address.</param>
+		/// <param name='pHookAddress'>Hook address.</param>
+		/// <returns>Returns True on success, False otherwise.</returns>
+		bool HookMemory(const void* const pAddress, const void* const pHookAddress, bool bAutoDisable = false);
+
+		/// <summary>
+		/// Restore memory protection.
+		/// </summary>
+		/// <param name='pHookAddress'>Hook address.</param>
+		bool UnHookMemory(const void* const pHookAddress);
+
+		/// <summary>
+		/// Enable hook.
+		/// </summary>
+		/// <param name='pHookAddress'>Hook address.</param>
+		/// <returns>Returns True on success, False otherwise.</returns>
+		bool EnableHookMemory(const void* const pHookAddress);
+
+		/// <summary>
+		/// Disable hook.
+		/// </summary>
+		/// <param name='pHookAddress'>Hook address.</param>
+		/// <returns>Returns True on success, False otherwise.</returns>
+		bool DisableHookMemory(const void* const pHookAddress);
 	}
-	*/
 }
 
 #endif // !_DETOURS_H_
