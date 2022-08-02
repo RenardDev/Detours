@@ -3,12 +3,19 @@
 #include <Windows.h>
 #include <tchar.h>
 
+// Advanced
+#include <intrin.h>
+
 // C++
 #include <cstdio>
 #include <typeinfo>
 
 // Detours
 #include "Detours.h"
+
+// interrupts.asm
+extern "C" void _int7D();
+extern "C" void _int7E();
 
 class TestingRTTI {
 public:
@@ -30,8 +37,26 @@ __declspec(dllexport) TestingRTTI* g_pTestingRTTI = nullptr;
 typedef void(WINAPI* fnSleep)(DWORD dwMilliseconds);
 void WINAPI Sleep_Hook(DWORD dwMilliseconds) {
 	_tprintf_s(_T("[Hook] Called!\n"));
+}
 
-	Detours::Hook::EnableHookMemory(Sleep_Hook); // This is only needed for memory hook.
+bool __fastcall Sleep_MemoryHook(Detours::Hook::SmartMemoryHook* pHook, PCONTEXT pCTX) {
+	_tprintf_s(_T("[Hook] Called!\n"));
+#ifdef _WIN64
+	pCTX->Rip = *reinterpret_cast<PDWORD64>(pCTX->Rsp); // [SP] = RETURN ADDRESS
+	pCTX->Rsp += 8; // Clearing stack (RETURN ADDRESS)
+#elif _WIN32
+	pCTX->Eip = *reinterpret_cast<PDWORD>(pCTX->Esp); // [SP] = RETURN ADDRESS
+	pCTX->Esp += 4; // Clearing stack (RETURN ADDRESS)
+#else
+#error Unknown platform
+#endif
+	pHook->Enable();
+	return true;
+}
+
+bool __fastcall Interrupt(unsigned char unID, PCONTEXT pCTX) {
+	_tprintf_s(_T("[Interrupt] Called with ID=0x%02X!\n"), unID);
+	return true;
 }
 
 int _tmain() {
@@ -117,11 +142,18 @@ int _tmain() {
 
 	_tprintf_s(_T("Hook Memory Example\n"));
 
-	_tprintf_s(_T("HookMemory = %d\n"), Detours::Hook::HookMemory(Sleep, Sleep_Hook, true));
+	_tprintf_s(_T("HookMemory = %d\n"), Detours::Hook::HookMemory(Sleep, Sleep_MemoryHook, true));
 
 	Sleep(1000);
 
-	_tprintf_s(_T("UnHookMemory = %d\n"), Detours::Hook::UnHookMemory(Sleep_Hook));
+	_tprintf_s(_T("UnHookMemory = %d\n"), Detours::Hook::UnHookMemory(Sleep_MemoryHook));
+
+	_tprintf_s(_T("AddCallBack = %d\n"), Detours::Interrupt::AddCallBack(0x7D, Interrupt));
+
+	_int7D();
+	_int7E();
+
+	_tprintf_s(_T("RemoveCallBack = %d\n"), Detours::Interrupt::RemoveCallBack(Interrupt));
 
 	_tprintf_s(_T("\n"));
 

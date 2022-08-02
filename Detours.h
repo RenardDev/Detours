@@ -901,6 +901,75 @@ namespace Detours {
 	}
 
 	// ----------------------------------------------------------------
+	// Interrupt
+	// ----------------------------------------------------------------
+	namespace Interrupt {
+
+		// ----------------------------------------------------------------
+		// Interrupt CallBack
+		// ----------------------------------------------------------------
+
+		typedef bool(__fastcall* fnInterruptCallBack)(unsigned char unID, PCONTEXT pCTX);
+
+		// ----------------------------------------------------------------
+		// Smart Interrupt Listener
+		// ----------------------------------------------------------------
+
+		/// <summary>
+		/// Smart interrupt listener.
+		/// </summary>
+		class SmartInterruptListener {
+		public:
+			/// <summary>
+			/// Smart interrupt listener.
+			/// </summary>
+			SmartInterruptListener();
+			~SmartInterruptListener();
+
+		public:
+			/// <summary>
+			/// Start callback for specific interrupt.
+			/// </summary>
+			/// <param name='unID'>Interrupt ID.</param>
+			/// <param name='pCallBack'>Callback address.</param>
+			/// <returns>Returns True on success, False otherwise.</returns>
+			bool Start(const fnInterruptCallBack pCallBack);
+
+			/// <summary>
+			/// Stop callback.
+			/// </summary>
+			/// <returns>Returns True on success, False otherwise.</returns>
+			bool Stop();
+
+		public:
+			/// <returns>Returns callback.</returns>
+			const fnInterruptCallBack GetCallBack();
+
+		private:
+			PVOID m_pVEH;
+			fnInterruptCallBack m_pCallBack;
+		};
+
+		// ----------------------------------------------------------------
+		// Manual Memory Hook
+		// ----------------------------------------------------------------
+
+		/// <summary>
+		/// Add callback for specific interrupt.
+		/// </summary>
+		/// <param name='unID'>Interrupt ID.</param>
+		/// <param name='pCallBack'>Callback address.</param>
+		/// <returns>Returns True on success, False otherwise.</returns>
+		bool AddCallBack(unsigned char unID, const fnInterruptCallBack pCallBack);
+
+		/// <summary>
+		/// Remove callback.
+		/// </summary>
+		/// <param name='pCallBack'>Callback address.</param>
+		bool RemoveCallBack(const fnInterruptCallBack pCallBack);
+	}
+
+	// ----------------------------------------------------------------
 	// Hook
 	// ----------------------------------------------------------------
 	namespace Hook {
@@ -1030,6 +1099,12 @@ namespace Detours {
 		bool UnHookExport(const void* const pHookAddress);
 
 		// ----------------------------------------------------------------
+		// Memory Hook CallBack
+		// ----------------------------------------------------------------
+
+		typedef bool(__fastcall* fnMemoryHookCallBack)(class SmartMemoryHook* pHook, PCONTEXT pCTX);
+
+		// ----------------------------------------------------------------
 		// Smart Memory Hook
 		// ----------------------------------------------------------------
 
@@ -1050,8 +1125,8 @@ namespace Detours {
 			/// <summary>
 			/// Hook with a specific address.
 			/// </summary>
-			/// <param name='pHookAddress'>Hook address.</param>
-			bool Hook(const void* const pHookAddress);
+			/// <param name='pCallBack'>Callback address.</param>
+			bool Hook(const fnMemoryHookCallBack pCallBack);
 
 			/// <summary>
 			/// UnHook.
@@ -1074,22 +1149,22 @@ namespace Detours {
 		public:
 			/// <returns>Returns memory address.</returns>
 			const void* const GetAddress();
-			
+
 			/// <returns>Returns memory size.</returns>
 			const size_t GetSize();
 
 			/// <returns>Returns auto disable param.</returns>
 			bool IsAutoDisable();
 
-			/// <returns>Returns hook address.</returns>
-			const void* GetHookAddress();
+			/// <returns>Returns callback address.</returns>
+			fnMemoryHookCallBack GetCallBack();
 
 		private:
 			const void* const m_pAddress;
 			const size_t m_unSize;
 			bool m_bAutoDisable;
 			PVOID m_pVEH;
-			const void* m_pHookAddress;
+			fnMemoryHookCallBack m_pCallBack;
 		};
 
 		// ----------------------------------------------------------------
@@ -1100,29 +1175,29 @@ namespace Detours {
 		/// Change memory protection.
 		/// </summary>
 		/// <param name='pAddress'>Memory address.</param>
-		/// <param name='pHookAddress'>Hook address.</param>
+		/// <param name='pCallBack'>Callback address.</param>
 		/// <returns>Returns True on success, False otherwise.</returns>
-		bool HookMemory(const void* const pAddress, const void* const pHookAddress, bool bAutoDisable = false);
+		bool HookMemory(const void* const pAddress, const fnMemoryHookCallBack pCallBack, bool bAutoDisable = false);
 
 		/// <summary>
 		/// Restore memory protection.
 		/// </summary>
-		/// <param name='pHookAddress'>Hook address.</param>
-		bool UnHookMemory(const void* const pHookAddress);
+		/// <param name='pCallBack'>Callback address.</param>
+		bool UnHookMemory(const fnMemoryHookCallBack pCallBack);
 
 		/// <summary>
 		/// Enable hook.
 		/// </summary>
-		/// <param name='pHookAddress'>Hook address.</param>
+		/// <param name='pCallBack'>Callback address.</param>
 		/// <returns>Returns True on success, False otherwise.</returns>
-		bool EnableHookMemory(const void* const pHookAddress);
+		bool EnableHookMemory(const fnMemoryHookCallBack pCallBack);
 
 		/// <summary>
 		/// Disable hook.
 		/// </summary>
-		/// <param name='pHookAddress'>Hook address.</param>
+		/// <param name='pCallBack'>Callback address.</param>
 		/// <returns>Returns True on success, False otherwise.</returns>
-		bool DisableHookMemory(const void* const pHookAddress);
+		bool DisableHookMemory(const fnMemoryHookCallBack pCallBack);
 	}
 }
 

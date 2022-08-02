@@ -27,4 +27,12 @@
       <Filter>Исходные файлы</Filter>
     </ClInclude>
   </ItemGroup>
+  <ItemGroup>
+    <MASM Include="interrupts32.asm">
+      <Filter>Исходные файлы</Filter>
+    </MASM>
+    <MASM Include="interrupts64.asm">
+      <Filter>Исходные файлы</Filter>
+    </MASM>
+  </ItemGroup>
 </Project>
