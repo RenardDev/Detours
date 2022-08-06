@@ -17,6 +17,24 @@
 namespace Detours {
 
 	// ----------------------------------------------------------------
+	// Namespaces
+	// ----------------------------------------------------------------
+	
+	using namespace Scan;
+	using namespace Memory;
+	using namespace Exception;
+	using namespace Hook;
+
+	// ----------------------------------------------------------------
+	// Storage
+	// ----------------------------------------------------------------
+	static std::unordered_map<void*, std::unique_ptr<Protection>> g_Protections;
+	static std::vector<fnExceptionCallBack> g_ExceptionCallBacks;
+	static std::unordered_map<void*, std::unique_ptr<ImportHook>> g_ImportHooks;
+	static std::unordered_map<void*, std::unique_ptr<ExportHook>> g_ExportHooks;
+	static std::unordered_map<void*, std::unique_ptr<MemoryHook>> g_MemoryHooks;
+
+	// ----------------------------------------------------------------
 	// Scan
 	// ----------------------------------------------------------------
 	namespace Scan {
@@ -2014,8 +2032,6 @@ namespace Detours {
 		// Simple Protection
 		// ----------------------------------------------------------------
 
-		static std::unordered_map<void*, std::unique_ptr<Protection>> g_Protections;
-
 		bool ChangeProtection(const void* const pAddress, const size_t unSize, const DWORD unNewProtection) {
 			if (!pAddress) {
 				return false;
@@ -2025,12 +2041,12 @@ namespace Detours {
 				return false;
 			}
 
-			auto Memory = std::make_unique<Protection>(pAddress, unSize);
-			if (!Memory) {
+			auto pMemory = std::make_unique<Protection>(pAddress, unSize);
+			if (!pMemory) {
 				return false;
 			}
 
-			const void* const pMemoryAddress = Memory->GetAddress();
+			const void* const pMemoryAddress = pMemory->GetAddress();
 			if (!pMemoryAddress) {
 				return false;
 			}
@@ -2040,11 +2056,11 @@ namespace Detours {
 				return false;
 			}
 
-			if (!Memory->ChangeProtection(unNewProtection)) {
+			if (!pMemory->ChangeProtection(unNewProtection)) {
 				return false;
 			}
 
-			g_Protections.insert(std::pair<void*, std::unique_ptr<Protection>>(const_cast<void*>(pMemoryAddress), std::move(Memory)));
+			g_Protections.insert(std::pair<void*, std::unique_ptr<Protection>>(const_cast<void*>(pMemoryAddress), std::move(pMemory)));
 			return true;
 		}
 
@@ -2072,8 +2088,6 @@ namespace Detours {
 		// ExceptionHandler
 		// ----------------------------------------------------------------
 
-		static std::vector<fnExceptionCallBack> g_ExceptionCallBacks;
-
 		static LONG NTAPI ExceptionHandler(PEXCEPTION_POINTERS pExceptionInfo) noexcept {
 			if (!pExceptionInfo) {
 				return EXCEPTION_ACCESS_VIOLATION;
@@ -2087,6 +2101,27 @@ namespace Detours {
 			const PCONTEXT pCTX = pExceptionInfo->ContextRecord;
 			if (!pCTX) {
 				return EXCEPTION_ACCESS_VIOLATION;
+			}
+
+			// MemoryHook
+			auto Hook = g_MemoryHooks.find(pException->ExceptionAddress);
+			if (Hook != g_MemoryHooks.end()) {
+				auto& pMemoryHook = Hook->second;
+				if (pMemoryHook) {
+					Hook::MemoryHook* pHook = pMemoryHook.get();
+					if (pHook) {
+						if (pHook->IsAutoDisable()) {
+							pHook->Disable();
+						}
+
+						const Hook::fnMemoryHookCallBack pCallBack = pHook->GetCallBack();
+						if (pCallBack) {
+							if (pCallBack(pHook, pCTX)) {
+								return EXCEPTION_CONTINUE_EXECUTION;
+							}
+						}
+					}
+				}
 			}
 
 			const EXCEPTION_RECORD Exception = *pException;
@@ -2232,7 +2267,7 @@ namespace Detours {
 				return false;
 			}
 
-			Memory::Protection Memory(m_pAddress, sizeof(void*));
+			Protection Memory(m_pAddress, sizeof(void*));
 			if (Memory.ChangeProtection(PAGE_READWRITE)) {
 				*m_pAddress = pHookAddress;
 				m_pHookAddress = pHookAddress;
@@ -2251,7 +2286,7 @@ namespace Detours {
 				return false;
 			}
 
-			Memory::Protection Memory(m_pAddress, sizeof(void*));
+			Protection Memory(m_pAddress, sizeof(void*));
 			if (Memory.ChangeProtection(PAGE_READWRITE)) {
 				*m_pAddress = m_pOriginalAddress;
 				m_pHookAddress = nullptr;
@@ -2273,8 +2308,6 @@ namespace Detours {
 		// Simple Import Hook
 		// ----------------------------------------------------------------
 
-		static std::unordered_map<void*, std::unique_ptr<ImportHook>> g_ImportHooks;
-
 		bool HookImport(const HMODULE hModule, const char* const szImportName, const void* const pHookAddress) {
 			if (!hModule) {
 				return false;
@@ -2288,22 +2321,22 @@ namespace Detours {
 				return false;
 			}
 
-			auto Hook = std::make_unique<ImportHook>(hModule, szImportName);
-			if (!Hook) {
+			auto pHook = std::make_unique<ImportHook>(hModule, szImportName);
+			if (!pHook) {
 				return false;
 			}
 
-			const void* const pOriginalAddress = Hook->GetOriginalAddress();
+			const void* const pOriginalAddress = pHook->GetOriginalAddress();
 			auto pImportHook = g_ImportHooks.find(const_cast<void*>(pOriginalAddress));
 			if (pImportHook != g_ImportHooks.end()) {
 				return false;
 			}
 
-			if (!Hook->Hook(pHookAddress)) {
+			if (!pHook->Hook(pHookAddress)) {
 				return false;
 			}
 
-			g_ImportHooks.insert(std::pair<void*, std::unique_ptr<ImportHook>>(const_cast<void*>(pOriginalAddress), std::move(Hook)));
+			g_ImportHooks.insert(std::pair<void*, std::unique_ptr<ImportHook>>(const_cast<void*>(pOriginalAddress), std::move(pHook)));
 			return true;
 		}
 
@@ -2313,12 +2346,12 @@ namespace Detours {
 			}
 
 			for (auto it = g_ImportHooks.begin(); it != g_ImportHooks.end(); ++it) {
-				auto& ImportHook = it->second;
-				if (!ImportHook) {
+				auto& pImportHook = it->second;
+				if (!pImportHook) {
 					continue;
 				}
 
-				if (pHookAddress == ImportHook->GetHookAddress()) {
+				if (pHookAddress == pImportHook->GetHookAddress()) {
 					g_ImportHooks.erase(it);
 					return true;
 				}
@@ -2392,7 +2425,7 @@ namespace Detours {
 			}
 #endif
 
-			Memory::Protection Memory(m_pAddress, sizeof(DWORD));
+			Protection Memory(m_pAddress, sizeof(DWORD));
 			if (Memory.ChangeProtection(PAGE_READWRITE)) {
 				*m_pAddress = static_cast<DWORD>(unNewAddress);
 				m_pHookAddress = pHookAddress;
@@ -2415,7 +2448,7 @@ namespace Detours {
 				return false;
 			}
 
-			Memory::Protection Memory(m_pAddress, sizeof(DWORD));
+			Protection Memory(m_pAddress, sizeof(DWORD));
 			if (Memory.ChangeProtection(PAGE_READWRITE)) {
 				*m_pAddress = m_unOriginalAddress;
 				m_pHookAddress = nullptr;
@@ -2440,8 +2473,6 @@ namespace Detours {
 		// Simple Export Hook
 		// ----------------------------------------------------------------
 
-		static std::unordered_map<void*, std::unique_ptr<ExportHook>> g_ExportHooks;
-
 		bool HookExport(const HMODULE hModule, const char* const szExportName, const void* const pHookAddress) {
 			if (!hModule) {
 				return false;
@@ -2455,22 +2486,22 @@ namespace Detours {
 				return false;
 			}
 
-			auto Hook = std::make_unique<ExportHook>(hModule, szExportName);
-			if (!Hook) {
+			auto pHook = std::make_unique<ExportHook>(hModule, szExportName);
+			if (!pHook) {
 				return false;
 			}
 
-			const void* const pOriginalAddress = Hook->GetOriginalAddress();
+			const void* const pOriginalAddress = pHook->GetOriginalAddress();
 			auto pExportHook = g_ExportHooks.find(const_cast<void*>(pOriginalAddress));
 			if (pExportHook != g_ExportHooks.end()) {
 				return false;
 			}
 
-			if (!Hook->Hook(pHookAddress)) {
+			if (!pHook->Hook(pHookAddress)) {
 				return false;
 			}
 
-			g_ExportHooks.insert(std::pair<void*, std::unique_ptr<ExportHook>>(const_cast<void*>(pOriginalAddress), std::move(Hook)));
+			g_ExportHooks.insert(std::pair<void*, std::unique_ptr<ExportHook>>(const_cast<void*>(pOriginalAddress), std::move(pHook)));
 			return true;
 		}
 
@@ -2480,12 +2511,12 @@ namespace Detours {
 			}
 
 			for (auto it = g_ExportHooks.begin(); it != g_ExportHooks.end(); ++it) {
-				auto& ExportHook = it->second;
-				if (!ExportHook) {
+				auto& pExportHook = it->second;
+				if (!pExportHook) {
 					continue;
 				}
 
-				if (pHookAddress == ExportHook->GetHookAddress()) {
+				if (pHookAddress == pExportHook->GetHookAddress()) {
 					g_ExportHooks.erase(it);
 					return true;
 				}
@@ -2498,8 +2529,6 @@ namespace Detours {
 		// Memory Hook
 		// ----------------------------------------------------------------
 
-		static std::unordered_map<void*, std::unique_ptr<MemoryHook>> g_MemoryHooks;
-
 		static bool __fastcall MemoryExceptionCallBack(const EXCEPTION_RECORD Exception, const PCONTEXT pCTX) noexcept {
 			if (Exception.ExceptionCode != EXCEPTION_ACCESS_VIOLATION) {
 				return false;
@@ -2510,31 +2539,26 @@ namespace Detours {
 				return false;
 			}
 
-			auto Hook = g_MemoryHooks.find(const_cast<void*>(pAddress));
-			if (Hook == g_MemoryHooks.end()) {
+			auto pHook = g_MemoryHooks.find(const_cast<void*>(pAddress));
+			if (pHook == g_MemoryHooks.end()) {
 				return false;
 			}
 
-			auto& pMemoryHook = Hook->second;
+			auto& pMemoryHook = pHook->second;
 			if (!pMemoryHook) {
 				return false;
 			}
 
-			MemoryHook* pHook = pMemoryHook.get();
-			if (!pHook) {
-				return false;
+			if (pMemoryHook->IsAutoDisable()) {
+				pMemoryHook->Disable();
 			}
 
-			if (pHook->IsAutoDisable()) {
-				pHook->Disable();
-			}
-
-			const fnMemoryHookCallBack pCallBack = pHook->GetCallBack();
+			const fnMemoryHookCallBack pCallBack = pMemoryHook->GetCallBack();
 			if (!pCallBack) {
 				return false;
 			}
 
-			if (!pCallBack(pHook, pCTX)) {
+			if (!pCallBack(pMemoryHook.get(), pCTX)) {
 				return false;
 			}
 
@@ -2544,16 +2568,6 @@ namespace Detours {
 		MemoryHook::MemoryHook(const void* const pAddress, const size_t unSize, bool bAutoDisable) : m_pAddress(pAddress), m_unSize(unSize) {
 			m_bAutoDisable = bAutoDisable;
 			m_pCallBack = nullptr;
-
-			if (!m_pAddress) {
-				return;
-			}
-
-			if (!m_unSize) {
-				return;
-			}
-
-			Exception::AddCallBack(MemoryExceptionCallBack);
 		}
 
 		MemoryHook::~MemoryHook() {
@@ -2575,23 +2589,23 @@ namespace Detours {
 
 			m_pCallBack = pCallBack;
 
-			auto Memory = std::make_unique<Memory::Protection>(m_pAddress, m_unSize);
-			if (!Memory) {
+			auto pMemory = std::make_unique<Protection>(m_pAddress, m_unSize);
+			if (!pMemory) {
 				return false;
 			}
 
-			const void* const pMemoryAddress = Memory->GetAddress();
+			const void* const pMemoryAddress = pMemory->GetAddress();
 			if (!pMemoryAddress) {
 				return false;
 			}
 
-			auto Protection = Memory::g_Protections.find(const_cast<void*>(pMemoryAddress));
-			if (Protection != Memory::g_Protections.end()) {
+			auto pProtection = g_Protections.find(const_cast<void*>(pMemoryAddress));
+			if (pProtection != g_Protections.end()) {
 				return false;
 			}
 
 			DWORD unProtection = 0;
-			if (!Memory->GetProtection(&unProtection)) {
+			if (!pMemory->GetProtection(&unProtection)) {
 				return false;
 			}
 
@@ -2611,11 +2625,11 @@ namespace Detours {
 				unProtection |= PAGE_READONLY;
 			}
 
-			if (!Memory->ChangeProtection(unProtection)) {
+			if (!pMemory->ChangeProtection(unProtection)) {
 				return false;
 			}
 
-			Memory::g_Protections.insert(std::pair<void*, std::unique_ptr<Memory::Protection>>(const_cast<void*>(pMemoryAddress), std::move(Memory)));
+			g_Protections.insert(std::pair<void*, std::unique_ptr<Protection>>(const_cast<void*>(pMemoryAddress), std::move(pMemory)));
 			return true;
 		}
 
@@ -2632,7 +2646,7 @@ namespace Detours {
 				return false;
 			}
 
-			return Memory::RestoreProtection(m_pAddress);
+			return RestoreProtection(m_pAddress);
 		}
 
 		bool MemoryHook::Enable() {
@@ -2648,18 +2662,18 @@ namespace Detours {
 				return false;
 			}
 
-			auto Protection = Memory::g_Protections.find(const_cast<void*>(m_pAddress));
-			if (Protection == Memory::g_Protections.end()) {
+			auto pProtection = g_Protections.find(const_cast<void*>(m_pAddress));
+			if (pProtection == g_Protections.end()) {
 				return false;
 			}
 
-			auto& MemoryProtection = Protection->second;
-			if (!MemoryProtection) {
+			auto& pMemoryProtection = pProtection->second;
+			if (!pMemoryProtection) {
 				return false;
 			}
 
 			DWORD unProtection = 0;
-			if (!MemoryProtection->GetProtection(&unProtection)) {
+			if (!pMemoryProtection->GetProtection(&unProtection)) {
 				return false;
 			}
 
@@ -2679,7 +2693,7 @@ namespace Detours {
 				unProtection |= PAGE_READONLY;
 			}
 
-			if (!MemoryProtection->ChangeProtection(unProtection)) {
+			if (!pMemoryProtection->ChangeProtection(unProtection)) {
 				return false;
 			}
 
@@ -2699,17 +2713,17 @@ namespace Detours {
 				return false;
 			}
 
-			auto Protection = Memory::g_Protections.find(const_cast<void*>(m_pAddress));
-			if (Protection == Memory::g_Protections.end()) {
+			auto pProtection = g_Protections.find(const_cast<void*>(m_pAddress));
+			if (pProtection == g_Protections.end()) {
 				return false;
 			}
 
-			auto& MemoryProtection = Protection->second;
-			if (!MemoryProtection) {
+			auto& pMemoryProtection = pProtection->second;
+			if (!pMemoryProtection) {
 				return false;
 			}
 
-			return MemoryProtection->RestoreProtection();
+			return pMemoryProtection->RestoreProtection();
 		}
 
 		const void* const MemoryHook::GetAddress() {
@@ -2760,12 +2774,12 @@ namespace Detours {
 			}
 
 			for (auto it = g_MemoryHooks.begin(); it != g_MemoryHooks.end(); ++it) {
-				auto& MemoryHook = it->second;
-				if (!MemoryHook) {
+				auto& pMemoryHook = it->second;
+				if (!pMemoryHook) {
 					continue;
 				}
 
-				if (pCallBack == MemoryHook->GetCallBack()) {
+				if (pCallBack == pMemoryHook->GetCallBack()) {
 					g_MemoryHooks.erase(it);
 					return true;
 				}
@@ -2780,13 +2794,13 @@ namespace Detours {
 			}
 
 			for (auto it = g_MemoryHooks.begin(); it != g_MemoryHooks.end(); ++it) {
-				auto& MemoryHook = it->second;
-				if (!MemoryHook) {
+				auto& pMemoryHook = it->second;
+				if (!pMemoryHook) {
 					continue;
 				}
 
-				if (pCallBack == MemoryHook->GetCallBack()) {
-					MemoryHook->Enable();
+				if (pCallBack == pMemoryHook->GetCallBack()) {
+					pMemoryHook->Enable();
 					return true;
 				}
 			}
@@ -2800,13 +2814,13 @@ namespace Detours {
 			}
 
 			for (auto it = g_MemoryHooks.begin(); it != g_MemoryHooks.end(); ++it) {
-				auto& MemoryHook = it->second;
-				if (!MemoryHook) {
+				auto& pMemoryHook = it->second;
+				if (!pMemoryHook) {
 					continue;
 				}
 
-				if (pCallBack == MemoryHook->GetCallBack()) {
-					MemoryHook->Disable();
+				if (pCallBack == pMemoryHook->GetCallBack()) {
+					pMemoryHook->Disable();
 					return true;
 				}
 			}

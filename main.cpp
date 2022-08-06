@@ -168,6 +168,8 @@ int _tmain() {
 
 	_tprintf_s(_T("UnHookMemory = %d\n"), Detours::Hook::UnHookMemory(Sleep_MemoryHook));
 
+	_tprintf_s(_T("\n"));
+
 	// ----------------------------------------------------------------
 	// Global exception handler
 	// ----------------------------------------------------------------
