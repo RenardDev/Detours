@@ -1667,6 +1667,8 @@ namespace Detours {
 			const PIMAGE_FILE_HEADER pFH = &(pNTHs->FileHeader);
 			const PIMAGE_OPTIONAL_HEADER pOH = &(pNTHs->OptionalHeader);
 
+#ifndef _WIN64
+			// POGO
 			const IMAGE_DATA_DIRECTORY DebugDD = pOH->DataDirectory[IMAGE_DIRECTORY_ENTRY_DEBUG];
 			if (DebugDD.Size) {
 				const DWORD unCount = DebugDD.Size / sizeof(IMAGE_DEBUG_DIRECTORY);
@@ -1693,7 +1695,7 @@ namespace Detours {
 					}
 
 					DWORD unBeginRVA = 0;
-					DWORD unEndRVA = 0;
+					size_t unSize = 0;
 
 					PIMAGE_POGO_BLOCK pBlock = pPI->Blocks;
 					while (pBlock->unRVA != 0) {
@@ -1709,17 +1711,17 @@ namespace Detours {
 							}
 						}
 
-						if (unEndRVA) {
+						if (unBeginRVA) {
 							if (strcmp(pBlock->Name, ".data$rs") == 0) {
-								unEndRVA = pBlock->unRVA + pBlock->unSize;
+								unSize = pBlock->unRVA + pBlock->unSize;
 							}
 						}
 
 						pBlock = reinterpret_cast<PIMAGE_POGO_BLOCK>(reinterpret_cast<char*>(pBlock) + unBlockSize);
 					}
 
-					if (unBeginRVA && unEndRVA) {
-						const void* const pAddress = FindRTTI(reinterpret_cast<char*>(hModule) + unBeginRVA, unEndRVA - unBeginRVA, szRTTI);
+					if (unBeginRVA && unSize) {
+						const void* const pAddress = FindRTTI(reinterpret_cast<char*>(hModule) + unBeginRVA, unSize - unBeginRVA, szRTTI);
 						if (pAddress) {
 							return pAddress;
 						}
@@ -1728,6 +1730,25 @@ namespace Detours {
 					break;
 				}
 			}
+#endif
+
+#ifndef _WIN64
+			// Sections
+			const PIMAGE_SECTION_HEADER pFirstSection = reinterpret_cast<PIMAGE_SECTION_HEADER>(reinterpret_cast<char*>(pOH) + pFH->SizeOfOptionalHeader);
+			const WORD unNumberOfSections = pFH->NumberOfSections;
+			DWORD unRVA = 0;
+			for (WORD i = 0; i < unNumberOfSections; ++i) {
+				if (strcmp(reinterpret_cast<char*>(pFirstSection[i].Name), ".rdata") == 0) {
+					unRVA = pFirstSection[i].PointerToRawData;
+					break;
+				}
+			}
+
+			const void* const pAddress = FindRTTI(reinterpret_cast<char*>(hModule) + unRVA, static_cast<size_t>(pOH->SizeOfImage) - 1 - unRVA, szRTTI);
+			if (pAddress) {
+				return pAddress;
+			}
+#endif
 
 			return FindRTTI(reinterpret_cast<void*>(hModule), static_cast<size_t>(pOH->SizeOfImage) - 1, szRTTI);
 		}
