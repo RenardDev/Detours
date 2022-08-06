@@ -1685,7 +1685,7 @@ namespace Detours {
 					} IMAGE_POGO_BLOCK, *PIMAGE_POGO_BLOCK;
 
 					typedef struct _IMAGE_POGO_INFO {
-						DWORD Signature; // 0x4C544347
+						DWORD Signature; // 0x4C544347 ('LTCG')
 						IMAGE_POGO_BLOCK Blocks[1];
 					} IMAGE_POGO_INFO, *PIMAGE_POGO_INFO;
 
@@ -2386,9 +2386,11 @@ namespace Detours {
 			}
 
 			const size_t unNewAddress = reinterpret_cast<size_t>(pHookAddress) - reinterpret_cast<size_t>(m_hModule);
+#ifdef _WIN64
 			if (unNewAddress >= 0xFFFFFFFFui32) {
 				return false;
 			}
+#endif
 
 			Memory::Protection Memory(m_pAddress, sizeof(DWORD));
 			if (Memory.ChangeProtection(PAGE_READWRITE)) {

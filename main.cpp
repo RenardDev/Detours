@@ -172,6 +172,8 @@ int _tmain() {
 	// Global exception handler
 	// ----------------------------------------------------------------
 
+	_tprintf_s(_T("Global Exception Example\n"));
+
 	_tprintf_s(_T("AddCallBack = %d\n"), Detours::Exception::AddCallBack(OnException));
 
 	_int7D();
