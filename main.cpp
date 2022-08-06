@@ -185,6 +185,21 @@ int _tmain() {
 
 	_tprintf_s(_T("\n"));
 
+	// ----------------------------------------------------------------
+	// Kernel-User Shared Data
+	// ----------------------------------------------------------------
+
+	_tprintf_s(_T("Kernel-User Shared Data Example\n"));
+
+	const ULONG unLowPartTime = Detours::KUserSharedData.SystemTime.LowPart;
+	_tprintf_s(_T("SystemTime = %lu\n"), unLowPartTime);
+
+	_tprintf_s(_T("Sleeping 5 sec...\n")); Sleep(5000);
+
+	_tprintf_s(_T("ElapsedTime = %lu\n"), (Detours::KUserSharedData.SystemTime.LowPart - unLowPartTime) / 10000);
+
+	_tprintf_s(_T("\n"));
+
 	delete g_pTestingRTTI;
 	_tprintf_s(_T("[ OK ]\n"));
 	return 0;

@@ -35,6 +35,16 @@ namespace Detours {
 	static std::unordered_map<void*, std::unique_ptr<MemoryHook>> g_MemoryHooks;
 
 	// ----------------------------------------------------------------
+	// KUSER_SHARED_DATA
+	// ----------------------------------------------------------------
+
+#ifdef _WIN64
+	KUSER_SHARED_DATA& KUserSharedData = *reinterpret_cast<PKUSER_SHARED_DATA>(0x000000007FFE0000);
+#elif _WIN32
+	KUSER_SHARED_DATA& KUserSharedData = *reinterpret_cast<PKUSER_SHARED_DATA>(0x7FFE0000);
+#endif
+
+	// ----------------------------------------------------------------
 	// Scan
 	// ----------------------------------------------------------------
 	namespace Scan {
