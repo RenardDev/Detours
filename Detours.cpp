@@ -1766,7 +1766,8 @@ namespace Detours {
 			const WORD unNumberOfSections = pFH->NumberOfSections;
 			DWORD unRVA = 0;
 			for (WORD i = 0; i < unNumberOfSections; ++i) {
-				if (strcmp(reinterpret_cast<char*>(pFirstSection[i].Name), ".rdata") == 0) {
+				const PDWORD pName = reinterpret_cast<PDWORD>(pFirstSection[i].Name);
+				if ((pName[0] == 0x6164722E) && (pName[1] == 0x00006174)) { // .rdata = [0x6164722E, 0x00006174]
 					unRVA = pFirstSection[i].PointerToRawData;
 					break;
 				}
