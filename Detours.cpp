@@ -9,7 +9,6 @@
 // STL
 #include <memory>
 #include <unordered_map>
-#include <vector>
 
 // ----------------------------------------------------------------
 // Detours
@@ -1476,7 +1475,6 @@ namespace Detours {
 		// ----------------------------------------------------------------
 		// FindRTTI
 		// ----------------------------------------------------------------
-		// TODO: POGO optimization
 
 		static const void* const _FindRTTI(const void* const pAddress, const size_t unSize, const char* const szRTTI) {
 			if (!pAddress) {
@@ -1665,7 +1663,70 @@ namespace Detours {
 
 			const PIMAGE_DOS_HEADER pDH = reinterpret_cast<PIMAGE_DOS_HEADER>(hModule);
 			const PIMAGE_NT_HEADERS pNTHs = reinterpret_cast<PIMAGE_NT_HEADERS>(reinterpret_cast<char*>(hModule) + pDH->e_lfanew);
+			const PIMAGE_FILE_HEADER pFH = &(pNTHs->FileHeader);
 			const PIMAGE_OPTIONAL_HEADER pOH = &(pNTHs->OptionalHeader);
+
+			const IMAGE_DATA_DIRECTORY DebugDD = pOH->DataDirectory[IMAGE_DIRECTORY_ENTRY_DEBUG];
+			if (DebugDD.Size) {
+				const DWORD unCount = DebugDD.Size / sizeof(IMAGE_DEBUG_DIRECTORY);
+				const PIMAGE_DEBUG_DIRECTORY pDebugDirectory = reinterpret_cast<PIMAGE_DEBUG_DIRECTORY>(reinterpret_cast<char*>(hModule) + DebugDD.VirtualAddress);
+				for (DWORD k = 0; k < unCount; ++k) {
+					if (pDebugDirectory[k].Type != IMAGE_DEBUG_TYPE_POGO) {
+						continue;
+					}
+
+					typedef struct _IMAGE_POGO_BLOCK {
+						DWORD unRVA;
+						DWORD unSize;
+						char Name[1];
+					} IMAGE_POGO_BLOCK, *PIMAGE_POGO_BLOCK;
+
+					typedef struct _IMAGE_POGO_INFO {
+						DWORD Signature; // 0x4C544347
+						IMAGE_POGO_BLOCK Blocks[1];
+					} IMAGE_POGO_INFO, *PIMAGE_POGO_INFO;
+
+					const PIMAGE_POGO_INFO pPI = reinterpret_cast<PIMAGE_POGO_INFO>(reinterpret_cast<char*>(hModule) + pDebugDirectory[k].AddressOfRawData);
+					if (pPI->Signature != 0x4C544347) {
+						break;
+					}
+
+					DWORD unBeginRVA = 0;
+					DWORD unEndRVA = 0;
+
+					PIMAGE_POGO_BLOCK pBlock = pPI->Blocks;
+					while (pBlock->unRVA != 0) {
+						const size_t unNameLength = strlen(pBlock->Name) + 1;
+						size_t unBlockSize = sizeof(DWORD) * 2 + unNameLength;
+						if (unBlockSize & 3) {
+							unBlockSize += (4 - (unBlockSize & 3));
+						}
+
+						if (!unBeginRVA) {
+							if (strcmp(pBlock->Name, ".rdata") == 0) {
+								unBeginRVA = pBlock->unRVA;
+							}
+						}
+
+						if (unEndRVA) {
+							if (strcmp(pBlock->Name, ".data$rs") == 0) {
+								unEndRVA = pBlock->unRVA + pBlock->unSize;
+							}
+						}
+
+						pBlock = reinterpret_cast<PIMAGE_POGO_BLOCK>(reinterpret_cast<char*>(pBlock) + unBlockSize);
+					}
+
+					if (unBeginRVA && unEndRVA) {
+						const void* const pAddress = FindRTTI(reinterpret_cast<char*>(hModule) + unBeginRVA, unEndRVA - unBeginRVA, szRTTI);
+						if (pAddress) {
+							return pAddress;
+						}
+					}
+
+					break;
+				}
+			}
 
 			return FindRTTI(reinterpret_cast<void*>(hModule), static_cast<size_t>(pOH->SizeOfImage) - 1, szRTTI);
 		}
@@ -1721,10 +1782,110 @@ namespace Detours {
 	namespace Memory {
 
 		// ----------------------------------------------------------------
-		// Smart Protection
+		// Server
 		// ----------------------------------------------------------------
 
-		SmartProtection::SmartProtection(const void* const pAddress, const size_t unSize) : m_pAddress(pAddress), m_unSize(unSize) {
+		Server::Server(const size_t unMemorySize, bool bIsGlobal) : m_unMemorySize(unMemorySize) {
+			memset(m_szSessionName, 0, sizeof(m_szSessionName));
+			m_hMap = nullptr;
+			m_pAddress = nullptr;
+
+			if (!unMemorySize) {
+				return;
+			}
+
+			const DWORD unPID = GetCurrentProcessId();
+			const DWORD unTID = GetCurrentThreadId();
+			const DWORD64 unCycle = __rdtsc();
+			_stprintf_s(m_szSessionName, _T("GLOBAL:%08X:%08X:%08X%08X"), 0xFFFFFFFF - unPID, 0xFFFFFFFF - unTID, static_cast<DWORD>(unCycle & 0xFFFFFFFF), static_cast<DWORD>((unCycle >> 32) & 0xFFFFFFFF));
+
+			TCHAR szMap[64];
+			memset(szMap, 0, sizeof(szMap));
+			if (bIsGlobal) {
+				_stprintf_s(szMap, _T("Global\\%s"), m_szSessionName);
+			} else {
+				_stprintf_s(szMap, _T("Local\\%s"), m_szSessionName);
+			}
+
+			m_hMap = CreateFileMapping(INVALID_HANDLE_VALUE, nullptr, PAGE_READWRITE, 0, unMemorySize & 0xFFFFFFFF, szMap);
+			if (m_hMap && (m_hMap != INVALID_HANDLE_VALUE)) {
+				m_pAddress = MapViewOfFile(m_hMap, FILE_MAP_ALL_ACCESS, 0, 0, unMemorySize);
+			}
+		}
+
+		Server::~Server() {
+			if (m_pAddress) {
+				UnmapViewOfFile(m_pAddress);
+			}
+
+			if (m_hMap && (m_hMap != INVALID_HANDLE_VALUE)) {
+				CloseHandle(m_hMap);
+			}
+		}
+
+		bool Server::GetSessionName(TCHAR szSessionName[64]) {
+			if (!m_hMap || (m_hMap == INVALID_HANDLE_VALUE)) {
+				return false;
+			}
+
+			memcpy(szSessionName, m_szSessionName, sizeof(m_szSessionName));
+
+			return true;
+		}
+
+		void* Server::GetAddress() {
+			return m_pAddress;
+		}
+
+		// ----------------------------------------------------------------
+		// Client
+		// ----------------------------------------------------------------
+
+		Client::Client(const size_t unMemorySize, TCHAR szSessionName[64], bool bIsGlobal) : m_unMemorySize(unMemorySize) {
+			m_hMap = nullptr;
+			m_pAddress = nullptr;
+
+			if (!unMemorySize) {
+				return;
+			}
+
+			if (!szSessionName) {
+				return;
+			}
+
+			TCHAR szMap[64];
+			memset(szMap, 0, sizeof(szMap));
+			if (bIsGlobal) {
+				_stprintf_s(szMap, _T("Global\\%s"), szSessionName);
+			} else {
+				_stprintf_s(szMap, _T("Local\\%s"), szSessionName);
+			}
+
+			m_hMap = OpenFileMapping(FILE_MAP_ALL_ACCESS, FALSE, szMap);
+			if (m_hMap && (m_hMap != INVALID_HANDLE_VALUE)) {
+				m_pAddress = MapViewOfFile(m_hMap, FILE_MAP_ALL_ACCESS, 0, 0, unMemorySize);
+			}
+		}
+
+		Client::~Client() {
+			if (m_pAddress) {
+				UnmapViewOfFile(m_pAddress);
+			}
+
+			if (m_hMap && (m_hMap != INVALID_HANDLE_VALUE)) {
+				CloseHandle(m_hMap);
+			}
+		}
+
+		void* Client::GetAddress() {
+			return m_pAddress;
+		}
+
+		// ----------------------------------------------------------------
+		// Protection
+		// ----------------------------------------------------------------
+
+		Protection::Protection(const void* const pAddress, const size_t unSize) : m_pAddress(pAddress), m_unSize(unSize) {
 			m_unOriginalProtection = 0;
 
 			if (!pAddress) {
@@ -1745,7 +1906,7 @@ namespace Detours {
 			m_unOriginalProtection = mbi.Protect;
 		}
 
-		SmartProtection::~SmartProtection() {
+		Protection::~Protection() {
 			if (!m_pAddress) {
 				return;
 			}
@@ -1758,7 +1919,7 @@ namespace Detours {
 			VirtualProtect(const_cast<void* const>(m_pAddress), m_unSize, m_unOriginalProtection, &unProtection);
 		}
 
-		bool SmartProtection::GetProtection(const PDWORD pProtection) {
+		bool Protection::GetProtection(const PDWORD pProtection) {
 			if (!m_pAddress) {
 				return false;
 			}
@@ -1781,7 +1942,7 @@ namespace Detours {
 			return true;
 		}
 
-		bool SmartProtection::ChangeProtection(const DWORD unNewProtection) {
+		bool Protection::ChangeProtection(const DWORD unNewProtection) {
 			if (!m_pAddress) {
 				return false;
 			}
@@ -1798,7 +1959,7 @@ namespace Detours {
 			return true;
 		}
 
-		bool SmartProtection::RestoreProtection() {
+		bool Protection::RestoreProtection() {
 			if (!m_pAddress) {
 				return false;
 			}
@@ -1815,15 +1976,15 @@ namespace Detours {
 			return true;
 		}
 
-		const void* const SmartProtection::GetAddress() {
+		const void* const Protection::GetAddress() {
 			return m_pAddress;
 		}
 
-		const size_t SmartProtection::GetSize() {
+		const size_t Protection::GetSize() {
 			return m_unSize;
 		}
 
-		DWORD SmartProtection::GetOriginalProtection() {
+		DWORD Protection::GetOriginalProtection() {
 			return m_unOriginalProtection;
 		}
 
@@ -1831,7 +1992,7 @@ namespace Detours {
 		// Manual Protection
 		// ----------------------------------------------------------------
 
-		static std::unordered_map<size_t, std::unique_ptr<SmartProtection>> g_Protections;
+		static std::unordered_map<void*, std::unique_ptr<Protection>> g_Protections;
 
 		bool ChangeProtection(const void* const pAddress, const size_t unSize, const DWORD unNewProtection) {
 			if (!pAddress) {
@@ -1842,7 +2003,7 @@ namespace Detours {
 				return false;
 			}
 
-			auto Memory = std::make_unique<SmartProtection>(pAddress, unSize);
+			auto Memory = std::make_unique<Protection>(pAddress, unSize);
 			if (!Memory) {
 				return false;
 			}
@@ -1852,8 +2013,8 @@ namespace Detours {
 				return false;
 			}
 
-			auto Protection = g_Protections.find(reinterpret_cast<size_t>(pMemoryAddress));
-			if (Protection != g_Protections.end()) {
+			auto pProtection = g_Protections.find(const_cast<void*>(pMemoryAddress));
+			if (pProtection != g_Protections.end()) {
 				return false;
 			}
 
@@ -1861,7 +2022,7 @@ namespace Detours {
 				return false;
 			}
 
-			g_Protections.insert(std::pair<size_t, std::unique_ptr<SmartProtection>>(reinterpret_cast<size_t>(pMemoryAddress), std::move(Memory)));
+			g_Protections.insert(std::pair<void*, std::unique_ptr<Protection>>(const_cast<void*>(pMemoryAddress), std::move(Memory)));
 			return true;
 		}
 
@@ -1870,7 +2031,7 @@ namespace Detours {
 				return false;
 			}
 
-			auto Protection = g_Protections.find(reinterpret_cast<size_t>(pAddress));
+			auto Protection = g_Protections.find(const_cast<void*>(pAddress));
 			if (Protection == g_Protections.end()) {
 				return false;
 			}
@@ -1881,19 +2042,23 @@ namespace Detours {
 	}
 
 	// ----------------------------------------------------------------
-	// Interrupt
+	// Exception
 	// ----------------------------------------------------------------
-	namespace Interrupt {
+	namespace Exception {
 
-		static std::vector<std::unique_ptr<SmartInterruptListener>> g_Listeners;
+		// ----------------------------------------------------------------
+		// ExceptionHandler
+		// ----------------------------------------------------------------
 
-		static LONG NTAPI InterruptHandler(PEXCEPTION_POINTERS pExceptionInfo) noexcept {
+		static std::vector<fnExceptionCallBack> g_ExceptionCallBacks;
+
+		static LONG NTAPI ExceptionHandler(PEXCEPTION_POINTERS pExceptionInfo) noexcept {
 			if (!pExceptionInfo) {
 				return EXCEPTION_ACCESS_VIOLATION;
 			}
 
-			const PEXCEPTION_RECORD pExceptionRecord = pExceptionInfo->ExceptionRecord;
-			if (!pExceptionRecord) {
+			const PEXCEPTION_RECORD pException = pExceptionInfo->ExceptionRecord;
+			if (!pException) {
 				return EXCEPTION_ACCESS_VIOLATION;
 			}
 
@@ -1902,40 +2067,14 @@ namespace Detours {
 				return EXCEPTION_ACCESS_VIOLATION;
 			}
 
-			if (pExceptionRecord->ExceptionCode != EXCEPTION_ACCESS_VIOLATION) {
-				return EXCEPTION_ACCESS_VIOLATION;
-			}
-
-			const unsigned char* const pAddress = reinterpret_cast<const unsigned char* const>(pExceptionRecord->ExceptionAddress);
-			if (!pAddress) {
-				return EXCEPTION_ACCESS_VIOLATION;
-			}
-
-			if (pAddress[0] != 0xCD) {
-				return EXCEPTION_CONTINUE_SEARCH;
-			}
-
-			const unsigned char unID = pAddress[1];
-
-			for (auto it = g_Listeners.begin(); it != g_Listeners.end(); ++it) {
-				auto& Listener = (*it);
-				if (!Listener) {
-					continue;
-				}
-
-				const fnInterruptCallBack pCallBack = Listener->GetCallBack();
+			const EXCEPTION_RECORD Exception = *pException;
+			for (auto it = g_ExceptionCallBacks.begin(); it != g_ExceptionCallBacks.end(); ++it) {
+				const fnExceptionCallBack pCallBack = *it;
 				if (!pCallBack) {
 					continue;
 				}
 
-				if (pCallBack(unID, pCTX)) {
-#ifdef _WIN64
-					pCTX->Rip += 2;
-#elif _WIN32
-					pCTX->Eip += 2;
-#else
-#error Unknown platform
-#endif
+				if (pCallBack(Exception, pCTX)) {
 					return EXCEPTION_CONTINUE_EXECUTION;
 				}
 			}
@@ -1944,102 +2083,61 @@ namespace Detours {
 		}
 
 		// ----------------------------------------------------------------
-		// Smart Interrupt Listener
+		// Exception
 		// ----------------------------------------------------------------
 
-		SmartInterruptListener::SmartInterruptListener() {
-			m_pCallBack = nullptr;
-			m_pVEH = AddVectoredExceptionHandler(TRUE, InterruptHandler);
+		class Exception {
+		public:
+			Exception();
+			~Exception();
+
+		public:
+			PVOID m_pVEH;
+		};
+
+		Exception::Exception() {
+			m_pVEH = AddVectoredExceptionHandler(TRUE, ExceptionHandler);
 		}
 
-		SmartInterruptListener::~SmartInterruptListener() {
+		Exception::~Exception() {
 			if (m_pVEH) {
 				RemoveVectoredExceptionHandler(m_pVEH);
 			}
 		}
 
-		bool SmartInterruptListener::Start(const fnInterruptCallBack pCallBack) {
-			if (!m_pVEH) {
-				return false;
-			}
+		static Exception g_Exception;
 
+		bool AddCallBack(const fnExceptionCallBack pCallBack) {
 			if (!pCallBack) {
 				return false;
 			}
 
-			if (m_pCallBack) {
+			if (!g_Exception.m_pVEH) {
 				return false;
 			}
 
-			m_pCallBack = pCallBack;
-
-			return true;
-		}
-
-		bool SmartInterruptListener::Stop() {
-			if (!m_pVEH) {
-				return false;
-			}
-
-			if (!m_pCallBack) {
-				return false;
-			}
-
-			m_pCallBack = nullptr;
-
-			return true;
-		}
-
-		const fnInterruptCallBack SmartInterruptListener::GetCallBack() {
-			return m_pCallBack;
-		}
-
-		// ----------------------------------------------------------------
-		// Manual Interrupt CallBacks
-		// ----------------------------------------------------------------
-
-		bool AddCallBack(unsigned char unID, const fnInterruptCallBack pCallBack) {
-			if (!pCallBack) {
-				return false;
-			}
-
-			for (auto it = g_Listeners.begin(); it != g_Listeners.end(); ++it) {
-				auto& Listener = (*it);
-				if (!Listener) {
-					continue;
-				}
-
-				if (pCallBack == Listener->GetCallBack()) {
+			for (auto it = g_ExceptionCallBacks.begin(); it != g_ExceptionCallBacks.end(); ++it) {
+				if (pCallBack == *it) {
 					return false;
 				}
 			}
 
-			auto Listener = std::make_unique<SmartInterruptListener>();
-			if (!Listener) {
-				return false;
-			}
-
-			if (!Listener->Start(pCallBack)) {
-				return false;
-			}
-
-			g_Listeners.push_back(std::move(Listener));
+			g_ExceptionCallBacks.push_back(pCallBack);
 			return true;
 		}
 
-		bool RemoveCallBack(const fnInterruptCallBack pCallBack) {
+		bool RemoveCallBack(const fnExceptionCallBack pCallBack) {
 			if (!pCallBack) {
 				return false;
 			}
 
-			for (auto it = g_Listeners.begin(); it != g_Listeners.end(); ++it) {
-				auto& Listener = (*it);
-				if (!Listener) {
-					continue;
-				}
+			if (!g_Exception.m_pVEH) {
+				return false;
+			}
 
-				if (pCallBack == Listener->GetCallBack()) {
-					g_Listeners.erase(it);
+			for (auto it = g_ExceptionCallBacks.begin(); it != g_ExceptionCallBacks.end(); ++it) {
+				if (pCallBack == *it) {
+					g_ExceptionCallBacks.erase(it);
 					return true;
 				}
 			}
@@ -2054,10 +2152,10 @@ namespace Detours {
 	namespace Hook {
 
 		// ----------------------------------------------------------------
-		// Smart Import Hook
+		// Import Hook
 		// ----------------------------------------------------------------
 
-		SmartImportHook::SmartImportHook(const HMODULE hModule, const char* const szImportName, const char* const szImportModuleName) {
+		ImportHook::ImportHook(const HMODULE hModule, const char* const szImportName, const char* const szImportModuleName) {
 			m_pAddress = nullptr;
 			m_pOriginalAddress = nullptr;
 			m_pHookAddress = nullptr;
@@ -2099,11 +2197,11 @@ namespace Detours {
 			}
 		}
 
-		SmartImportHook::~SmartImportHook() {
+		ImportHook::~ImportHook() {
 			UnHook();
 		}
 
-		bool SmartImportHook::Hook(const void* const pHookAddress) {
+		bool ImportHook::Hook(const void* const pHookAddress) {
 			if (!m_pAddress) {
 				return false;
 			}
@@ -2112,7 +2210,7 @@ namespace Detours {
 				return false;
 			}
 
-			Memory::SmartProtection Memory(m_pAddress, sizeof(void*));
+			Memory::Protection Memory(m_pAddress, sizeof(void*));
 			if (Memory.ChangeProtection(PAGE_READWRITE)) {
 				*m_pAddress = pHookAddress;
 				m_pHookAddress = pHookAddress;
@@ -2122,7 +2220,7 @@ namespace Detours {
 			return false;
 		}
 
-		bool SmartImportHook::UnHook() {
+		bool ImportHook::UnHook() {
 			if (!m_pAddress) {
 				return false;
 			}
@@ -2131,7 +2229,7 @@ namespace Detours {
 				return false;
 			}
 
-			Memory::SmartProtection Memory(m_pAddress, sizeof(void*));
+			Memory::Protection Memory(m_pAddress, sizeof(void*));
 			if (Memory.ChangeProtection(PAGE_READWRITE)) {
 				*m_pAddress = m_pOriginalAddress;
 				m_pHookAddress = nullptr;
@@ -2141,11 +2239,11 @@ namespace Detours {
 			return false;
 		}
 
-		const void* SmartImportHook::GetOriginalAddress() {
+		const void* ImportHook::GetOriginalAddress() {
 			return m_pOriginalAddress;
 		}
 
-		const void* SmartImportHook::GetHookAddress() {
+		const void* ImportHook::GetHookAddress() {
 			return m_pHookAddress;
 		}
 
@@ -2153,7 +2251,7 @@ namespace Detours {
 		// Manual Import Hook
 		// ----------------------------------------------------------------
 
-		static std::unordered_map<size_t, std::unique_ptr<SmartImportHook>> g_ImportHooks;
+		static std::unordered_map<void*, std::unique_ptr<ImportHook>> g_ImportHooks;
 
 		bool HookImport(const HMODULE hModule, const char* const szImportName, const void* const pHookAddress) {
 			if (!hModule) {
@@ -2168,14 +2266,14 @@ namespace Detours {
 				return false;
 			}
 
-			auto Hook = std::make_unique<SmartImportHook>(hModule, szImportName);
+			auto Hook = std::make_unique<ImportHook>(hModule, szImportName);
 			if (!Hook) {
 				return false;
 			}
 
 			const void* const pOriginalAddress = Hook->GetOriginalAddress();
-			auto ImportHook = g_ImportHooks.find(reinterpret_cast<size_t>(pOriginalAddress));
-			if (ImportHook != g_ImportHooks.end()) {
+			auto pImportHook = g_ImportHooks.find(const_cast<void*>(pOriginalAddress));
+			if (pImportHook != g_ImportHooks.end()) {
 				return false;
 			}
 
@@ -2183,7 +2281,7 @@ namespace Detours {
 				return false;
 			}
 
-			g_ImportHooks.insert(std::pair<size_t, std::unique_ptr<SmartImportHook>>(reinterpret_cast<size_t>(pOriginalAddress), std::move(Hook)));
+			g_ImportHooks.insert(std::pair<void*, std::unique_ptr<ImportHook>>(const_cast<void*>(pOriginalAddress), std::move(Hook)));
 			return true;
 		}
 
@@ -2208,10 +2306,10 @@ namespace Detours {
 		}
 
 		// ----------------------------------------------------------------
-		// Smart Export Hook
+		// Export Hook
 		// ----------------------------------------------------------------
 
-		SmartExportHook::SmartExportHook(const HMODULE hModule, const char* const szExportName) {
+		ExportHook::ExportHook(const HMODULE hModule, const char* const szExportName) {
 			m_hModule = nullptr;
 			m_pAddress = nullptr;
 			m_unOriginalAddress = 0;
@@ -2248,11 +2346,11 @@ namespace Detours {
 
 		}
 
-		SmartExportHook::~SmartExportHook() {
+		ExportHook::~ExportHook() {
 			UnHook();
 		}
 
-		bool SmartExportHook::Hook(const void* const pHookAddress) {
+		bool ExportHook::Hook(const void* const pHookAddress) {
 			if (!m_hModule) {
 				return false;
 			}
@@ -2270,7 +2368,7 @@ namespace Detours {
 				return false;
 			}
 
-			Memory::SmartProtection Memory(m_pAddress, sizeof(DWORD));
+			Memory::Protection Memory(m_pAddress, sizeof(DWORD));
 			if (Memory.ChangeProtection(PAGE_READWRITE)) {
 				*m_pAddress = static_cast<DWORD>(unNewAddress);
 				m_pHookAddress = pHookAddress;
@@ -2280,7 +2378,7 @@ namespace Detours {
 			return false;
 		}
 
-		bool SmartExportHook::UnHook() {
+		bool ExportHook::UnHook() {
 			if (!m_hModule) {
 				return false;
 			}
@@ -2293,7 +2391,7 @@ namespace Detours {
 				return false;
 			}
 
-			Memory::SmartProtection Memory(m_pAddress, sizeof(DWORD));
+			Memory::Protection Memory(m_pAddress, sizeof(DWORD));
 			if (Memory.ChangeProtection(PAGE_READWRITE)) {
 				*m_pAddress = m_unOriginalAddress;
 				m_pHookAddress = nullptr;
@@ -2303,14 +2401,14 @@ namespace Detours {
 			return false;
 		}
 
-		const void* SmartExportHook::GetOriginalAddress() {
+		const void* ExportHook::GetOriginalAddress() {
 			if (!m_hModule) {
 				return nullptr;
 			}
 			return reinterpret_cast<const void*>(reinterpret_cast<char*>(m_hModule) + m_unOriginalAddress);
 		}
 
-		const void* SmartExportHook::GetHookAddress() {
+		const void* ExportHook::GetHookAddress() {
 			return m_pHookAddress;
 		}
 
@@ -2318,7 +2416,7 @@ namespace Detours {
 		// Manual Export Hook
 		// ----------------------------------------------------------------
 
-		static std::unordered_map<size_t, std::unique_ptr<SmartExportHook>> g_ExportHooks;
+		static std::unordered_map<void*, std::unique_ptr<ExportHook>> g_ExportHooks;
 
 		bool HookExport(const HMODULE hModule, const char* const szExportName, const void* const pHookAddress) {
 			if (!hModule) {
@@ -2333,14 +2431,14 @@ namespace Detours {
 				return false;
 			}
 
-			auto Hook = std::make_unique<SmartExportHook>(hModule, szExportName);
+			auto Hook = std::make_unique<ExportHook>(hModule, szExportName);
 			if (!Hook) {
 				return false;
 			}
 
 			const void* const pOriginalAddress = Hook->GetOriginalAddress();
-			auto ExportHook = g_ExportHooks.find(reinterpret_cast<size_t>(pOriginalAddress));
-			if (ExportHook != g_ExportHooks.end()) {
+			auto pExportHook = g_ExportHooks.find(const_cast<void*>(pOriginalAddress));
+			if (pExportHook != g_ExportHooks.end()) {
 				return false;
 			}
 
@@ -2348,7 +2446,7 @@ namespace Detours {
 				return false;
 			}
 
-			g_ExportHooks.insert(std::pair<size_t, std::unique_ptr<SmartExportHook>>(reinterpret_cast<size_t>(pOriginalAddress), std::move(Hook)));
+			g_ExportHooks.insert(std::pair<void*, std::unique_ptr<ExportHook>>(const_cast<void*>(pOriginalAddress), std::move(Hook)));
 			return true;
 		}
 
@@ -2373,48 +2471,34 @@ namespace Detours {
 		}
 
 		// ----------------------------------------------------------------
-		// Smart Memory Hook
+		// Memory Hook
 		// ----------------------------------------------------------------
 
-		static std::unordered_map<size_t, std::unique_ptr<SmartMemoryHook>> g_MemoryHooks;
+		static std::unordered_map<void*, std::unique_ptr<MemoryHook>> g_MemoryHooks;
 
-		static LONG NTAPI MemoryHookHandler(PEXCEPTION_POINTERS pExceptionInfo) noexcept {
-			if (!pExceptionInfo) {
-				return EXCEPTION_ACCESS_VIOLATION;
+		static bool __fastcall MemoryExceptionCallBack(const EXCEPTION_RECORD Exception, const PCONTEXT pCTX) noexcept {
+			if (Exception.ExceptionCode != EXCEPTION_ACCESS_VIOLATION) {
+				return false;
 			}
 
-			const PEXCEPTION_RECORD pExceptionRecord = pExceptionInfo->ExceptionRecord;
-			if (!pExceptionRecord) {
-				return EXCEPTION_ACCESS_VIOLATION;
-			}
-
-			const PCONTEXT pCTX = pExceptionInfo->ContextRecord;
-			if (!pCTX) {
-				return EXCEPTION_ACCESS_VIOLATION;
-			}
-
-			if (pExceptionRecord->ExceptionCode != EXCEPTION_ACCESS_VIOLATION) {
-				return EXCEPTION_ACCESS_VIOLATION;
-			}
-
-			const void* const pAddress = pExceptionRecord->ExceptionAddress;
+			const void* const pAddress = Exception.ExceptionAddress;
 			if (!pAddress) {
-				return EXCEPTION_ACCESS_VIOLATION;
+				return false;
 			}
 
-			auto Hook = g_MemoryHooks.find(reinterpret_cast<size_t>(pAddress));
+			auto Hook = g_MemoryHooks.find(const_cast<void*>(pAddress));
 			if (Hook == g_MemoryHooks.end()) {
-				return EXCEPTION_CONTINUE_SEARCH;
+				return false;
 			}
 
-			auto& MemoryHook = Hook->second;
-			if (!MemoryHook) {
-				return EXCEPTION_ACCESS_VIOLATION;
+			auto& pMemoryHook = Hook->second;
+			if (!pMemoryHook) {
+				return false;
 			}
 
-			SmartMemoryHook* pHook = MemoryHook.get();
+			MemoryHook* pHook = pMemoryHook.get();
 			if (!pHook) {
-				return EXCEPTION_ACCESS_VIOLATION;
+				return false;
 			}
 
 			if (pHook->IsAutoDisable()) {
@@ -2423,19 +2507,18 @@ namespace Detours {
 
 			const fnMemoryHookCallBack pCallBack = pHook->GetCallBack();
 			if (!pCallBack) {
-				return EXCEPTION_CONTINUE_SEARCH;
+				return false;
 			}
 
 			if (!pCallBack(pHook, pCTX)) {
-				return EXCEPTION_CONTINUE_SEARCH;
+				return false;
 			}
 
-			return EXCEPTION_CONTINUE_EXECUTION;
+			return true;
 		}
 
-		SmartMemoryHook::SmartMemoryHook(const void* const pAddress, const size_t unSize, bool bAutoDisable) : m_pAddress(pAddress), m_unSize(unSize) {
+		MemoryHook::MemoryHook(const void* const pAddress, const size_t unSize, bool bAutoDisable) : m_pAddress(pAddress), m_unSize(unSize) {
 			m_bAutoDisable = bAutoDisable;
-			m_pVEH = nullptr;
 			m_pCallBack = nullptr;
 
 			if (!m_pAddress) {
@@ -2446,26 +2529,19 @@ namespace Detours {
 				return;
 			}
 
-			m_pVEH = AddVectoredExceptionHandler(TRUE, MemoryHookHandler);
+			Exception::AddCallBack(MemoryExceptionCallBack);
 		}
 
-		SmartMemoryHook::~SmartMemoryHook() {
+		MemoryHook::~MemoryHook() {
 			UnHook();
-			if (m_pVEH) {
-				RemoveVectoredExceptionHandler(m_pVEH);
-			}
 		}
 
-		bool SmartMemoryHook::Hook(const fnMemoryHookCallBack pCallBack) {
+		bool MemoryHook::Hook(const fnMemoryHookCallBack pCallBack) {
 			if (!m_pAddress) {
 				return false;
 			}
 
 			if (!m_unSize) {
-				return false;
-			}
-
-			if (!m_pVEH) {
 				return false;
 			}
 
@@ -2475,7 +2551,7 @@ namespace Detours {
 
 			m_pCallBack = pCallBack;
 
-			auto Memory = std::make_unique<Memory::SmartProtection>(m_pAddress, m_unSize);
+			auto Memory = std::make_unique<Memory::Protection>(m_pAddress, m_unSize);
 			if (!Memory) {
 				return false;
 			}
@@ -2485,7 +2561,7 @@ namespace Detours {
 				return false;
 			}
 
-			auto Protection = Memory::g_Protections.find(reinterpret_cast<size_t>(pMemoryAddress));
+			auto Protection = Memory::g_Protections.find(const_cast<void*>(pMemoryAddress));
 			if (Protection != Memory::g_Protections.end()) {
 				return false;
 			}
@@ -2515,20 +2591,16 @@ namespace Detours {
 				return false;
 			}
 
-			Memory::g_Protections.insert(std::pair<size_t, std::unique_ptr<Memory::SmartProtection>>(reinterpret_cast<size_t>(pMemoryAddress), std::move(Memory)));
+			Memory::g_Protections.insert(std::pair<void*, std::unique_ptr<Memory::Protection>>(const_cast<void*>(pMemoryAddress), std::move(Memory)));
 			return true;
 		}
 
-		bool SmartMemoryHook::UnHook() {
+		bool MemoryHook::UnHook() {
 			if (!m_pAddress) {
 				return false;
 			}
 
 			if (!m_unSize) {
-				return false;
-			}
-
-			if (!m_pVEH) {
 				return false;
 			}
 
@@ -2539,7 +2611,7 @@ namespace Detours {
 			return Memory::RestoreProtection(m_pAddress);
 		}
 
-		bool SmartMemoryHook::Enable() {
+		bool MemoryHook::Enable() {
 			if (!m_pAddress) {
 				return false;
 			}
@@ -2548,15 +2620,11 @@ namespace Detours {
 				return false;
 			}
 
-			if (!m_pVEH) {
-				return false;
-			}
-
 			if (!m_pCallBack) {
 				return false;
 			}
 
-			auto Protection = Memory::g_Protections.find(reinterpret_cast<size_t>(m_pAddress));
+			auto Protection = Memory::g_Protections.find(const_cast<void*>(m_pAddress));
 			if (Protection == Memory::g_Protections.end()) {
 				return false;
 			}
@@ -2594,7 +2662,7 @@ namespace Detours {
 			return true;
 		}
 
-		bool SmartMemoryHook::Disable() {
+		bool MemoryHook::Disable() {
 			if (!m_pAddress) {
 				return false;
 			}
@@ -2603,15 +2671,11 @@ namespace Detours {
 				return false;
 			}
 
-			if (!m_pVEH) {
-				return false;
-			}
-
 			if (!m_pCallBack) {
 				return false;
 			}
 
-			auto Protection = Memory::g_Protections.find(reinterpret_cast<size_t>(m_pAddress));
+			auto Protection = Memory::g_Protections.find(const_cast<void*>(m_pAddress));
 			if (Protection == Memory::g_Protections.end()) {
 				return false;
 			}
@@ -2624,19 +2688,19 @@ namespace Detours {
 			return MemoryProtection->RestoreProtection();
 		}
 
-		const void* const SmartMemoryHook::GetAddress() {
+		const void* const MemoryHook::GetAddress() {
 			return m_pAddress;
 		}
 
-		const size_t SmartMemoryHook::GetSize() {
+		const size_t MemoryHook::GetSize() {
 			return m_unSize;
 		}
 
-		bool SmartMemoryHook::IsAutoDisable() {
+		bool MemoryHook::IsAutoDisable() {
 			return m_bAutoDisable;
 		}
 
-		fnMemoryHookCallBack SmartMemoryHook::GetCallBack() {
+		fnMemoryHookCallBack MemoryHook::GetCallBack() {
 			return m_pCallBack;
 		}
 
@@ -2653,7 +2717,7 @@ namespace Detours {
 				return false;
 			}
 
-			auto pHook = std::make_unique<SmartMemoryHook>(pAddress, 1, bAutoDisable);
+			auto pHook = std::make_unique<MemoryHook>(pAddress, 1, bAutoDisable);
 			if (!pHook) {
 				return false;
 			}
@@ -2662,7 +2726,7 @@ namespace Detours {
 				return false;
 			}
 
-			g_MemoryHooks.insert(std::pair<size_t, std::unique_ptr<SmartMemoryHook>>(reinterpret_cast<size_t>(pAddress), std::move(pHook)));
+			g_MemoryHooks.insert(std::pair<void*, std::unique_ptr<MemoryHook>>(const_cast<void*>(pAddress), std::move(pHook)));
 			return true;
 		}
 

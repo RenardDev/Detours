@@ -39,7 +39,7 @@ void WINAPI Sleep_Hook(DWORD dwMilliseconds) {
 	_tprintf_s(_T("[Hook] Called!\n"));
 }
 
-bool __fastcall Sleep_MemoryHook(Detours::Hook::SmartMemoryHook* pHook, PCONTEXT pCTX) {
+bool __fastcall Sleep_MemoryHook(Detours::Hook::MemoryHook* pHook, PCONTEXT pCTX) {
 	_tprintf_s(_T("[Hook] Called!\n"));
 #ifdef _WIN64
 	pCTX->Rip = *reinterpret_cast<PDWORD64>(pCTX->Rsp); // [SP] = RETURN ADDRESS
@@ -54,8 +54,28 @@ bool __fastcall Sleep_MemoryHook(Detours::Hook::SmartMemoryHook* pHook, PCONTEXT
 	return true;
 }
 
-bool __fastcall Interrupt(unsigned char unID, PCONTEXT pCTX) {
-	_tprintf_s(_T("[Interrupt] Called with ID=0x%02X!\n"), unID);
+bool __fastcall OnException(const EXCEPTION_RECORD Exception, const PCONTEXT pCTX) {
+	if (Exception.ExceptionCode != EXCEPTION_ACCESS_VIOLATION) {
+		return false;
+	}
+
+	const unsigned char* const pAddress = reinterpret_cast<const unsigned char* const>(Exception.ExceptionAddress);
+	if (!pAddress) {
+		return false;
+	}
+
+	if (pAddress[0] == 0xCD) {
+		_tprintf_s(_T("[OnException] Called `int 0x%02X`\n"), pAddress[1]);
+	}
+
+#ifdef _WIN64
+	pCTX->Rip += 2;
+#elif _WIN32
+	pCTX->Eip += 2;
+#else
+#error Unknown platform
+#endif
+
 	return true;
 }
 
@@ -148,12 +168,16 @@ int _tmain() {
 
 	_tprintf_s(_T("UnHookMemory = %d\n"), Detours::Hook::UnHookMemory(Sleep_MemoryHook));
 
-	_tprintf_s(_T("AddCallBack = %d\n"), Detours::Interrupt::AddCallBack(0x7D, Interrupt));
+	// ----------------------------------------------------------------
+	// Global exception handler
+	// ----------------------------------------------------------------
+
+	_tprintf_s(_T("AddCallBack = %d\n"), Detours::Exception::AddCallBack(OnException));
 
 	_int7D();
 	_int7E();
 
-	_tprintf_s(_T("RemoveCallBack = %d\n"), Detours::Interrupt::RemoveCallBack(Interrupt));
+	_tprintf_s(_T("RemoveCallBack = %d\n"), Detours::Exception::RemoveCallBack(OnException));
 
 	_tprintf_s(_T("\n"));
 

@@ -9,6 +9,9 @@
 // C++
 #include <cstdlib>
 
+// STL
+#include <vector>
+
 // General definitions
 #ifndef DETOURS_MAX_STRSIZE
 #define DETOURS_MAX_STRSIZE 0x1000 // 4 KiB
@@ -20,7 +23,7 @@
 #endif // !_M_IX86 && !_M_X64
 
 #if !defined(_WIN32) && !defined(_WIN64)
-#error Only Windows platforms are supported.
+#error Only Windows platform are supported.
 #endif // !_WIN32 && !_WIN64
 
 // ----------------------------------------------------------------
@@ -827,21 +830,59 @@ namespace Detours {
 	namespace Memory {
 
 		// ----------------------------------------------------------------
-		// Smart Protection
+		// Server
+		// ----------------------------------------------------------------
+
+		class Server {
+		public:
+			Server(const size_t unMemorySize, bool bIsGlobal = false);
+			~Server();
+
+		public:
+			bool GetSessionName(TCHAR szSessionName[64]);
+			void* GetAddress();
+
+		private:
+			const size_t m_unMemorySize;
+			TCHAR m_szSessionName[64];
+			HANDLE m_hMap;
+			void* m_pAddress;
+		};
+
+		// ----------------------------------------------------------------
+		// Client
+		// ----------------------------------------------------------------
+
+		class Client {
+		public:
+			Client(const size_t unMemorySize, TCHAR szSessionName[64], bool bIsGlobal = false);
+			~Client();
+
+		public:
+			void* GetAddress();
+
+		private:
+			const size_t m_unMemorySize;
+			HANDLE m_hMap;
+			void* m_pAddress;
+		};
+
+		// ----------------------------------------------------------------
+		// Protection
 		// ----------------------------------------------------------------
 
 		/// <summary>
-		/// Smart memory protection that automatically restores protection.
+		/// Memory protection that automatically restores protection.
 		/// </summary>
-		class SmartProtection {
+		class Protection {
 		public:
 			/// <summary>
-			/// Smart memory protection that automatically restores protection.
+			/// Memory protection that automatically restores protection.
 			/// </summary>
 			/// <param name='pAddress'>Memory address.</param>
 			/// <param name='unSize'>Memory size.</param>
-			SmartProtection(const void* const pAddress, const size_t unSize);
-			~SmartProtection();
+			Protection(const void* const pAddress, const size_t unSize);
+			~Protection();
 
 		public:
 			/// <summary>
@@ -881,7 +922,7 @@ namespace Detours {
 		};
 
 		// ----------------------------------------------------------------
-		// Manual Protection
+		// Simple Protection
 		// ----------------------------------------------------------------
 
 		/// <summary>
@@ -901,72 +942,22 @@ namespace Detours {
 	}
 
 	// ----------------------------------------------------------------
-	// Interrupt
+	// Exception
 	// ----------------------------------------------------------------
-	namespace Interrupt {
+	namespace Exception {
 
 		// ----------------------------------------------------------------
-		// Interrupt CallBack
+		// ExceptionCallBack
 		// ----------------------------------------------------------------
 
-		typedef bool(__fastcall* fnInterruptCallBack)(unsigned char unID, PCONTEXT pCTX);
+		typedef bool(__fastcall* fnExceptionCallBack)(const EXCEPTION_RECORD Exception, const PCONTEXT pCTX);
 
 		// ----------------------------------------------------------------
-		// Smart Interrupt Listener
+		// Exception
 		// ----------------------------------------------------------------
 
-		/// <summary>
-		/// Smart interrupt listener.
-		/// </summary>
-		class SmartInterruptListener {
-		public:
-			/// <summary>
-			/// Smart interrupt listener.
-			/// </summary>
-			SmartInterruptListener();
-			~SmartInterruptListener();
-
-		public:
-			/// <summary>
-			/// Start callback for specific interrupt.
-			/// </summary>
-			/// <param name='unID'>Interrupt ID.</param>
-			/// <param name='pCallBack'>Callback address.</param>
-			/// <returns>Returns True on success, False otherwise.</returns>
-			bool Start(const fnInterruptCallBack pCallBack);
-
-			/// <summary>
-			/// Stop callback.
-			/// </summary>
-			/// <returns>Returns True on success, False otherwise.</returns>
-			bool Stop();
-
-		public:
-			/// <returns>Returns callback.</returns>
-			const fnInterruptCallBack GetCallBack();
-
-		private:
-			PVOID m_pVEH;
-			fnInterruptCallBack m_pCallBack;
-		};
-
-		// ----------------------------------------------------------------
-		// Manual Memory Hook
-		// ----------------------------------------------------------------
-
-		/// <summary>
-		/// Add callback for specific interrupt.
-		/// </summary>
-		/// <param name='unID'>Interrupt ID.</param>
-		/// <param name='pCallBack'>Callback address.</param>
-		/// <returns>Returns True on success, False otherwise.</returns>
-		bool AddCallBack(unsigned char unID, const fnInterruptCallBack pCallBack);
-
-		/// <summary>
-		/// Remove callback.
-		/// </summary>
-		/// <param name='pCallBack'>Callback address.</param>
-		bool RemoveCallBack(const fnInterruptCallBack pCallBack);
+		bool AddCallBack(const fnExceptionCallBack pCallBack);
+		bool RemoveCallBack(const fnExceptionCallBack pCallBack);
 	}
 
 	// ----------------------------------------------------------------
@@ -975,22 +966,22 @@ namespace Detours {
 	namespace Hook {
 
 		// ----------------------------------------------------------------
-		// Smart Import Hook
+		// Import Hook
 		// ----------------------------------------------------------------
 
 		/// <summary>
-		/// Smart hook that automatically unhooking.
+		/// Hook that automatically unhooking.
 		/// </summary>
-		class SmartImportHook {
+		class ImportHook {
 		public:
 			/// <summary>
-			/// Smart hook that automatically unhooking.
+			/// Hook that automatically unhooking.
 			/// </summary>
 			/// <param name='szModuleName'>Module name.</param>
 			/// <param name='szExportName'>Importing name.</param>
 			/// <param name='szImportModuleName'>Importing module name.</param>
-			SmartImportHook(const HMODULE hModule, const char* const szImportName, const char* const szImportModuleName = nullptr);
-			~SmartImportHook();
+			ImportHook(const HMODULE hModule, const char* const szImportName, const char* const szImportModuleName = nullptr);
+			~ImportHook();
 
 		public:
 			/// <summary>
@@ -1018,11 +1009,11 @@ namespace Detours {
 		};
 
 		// ----------------------------------------------------------------
-		// Manual Import Hook
+		// Simple Import Hook
 		// ----------------------------------------------------------------
 
 		/// <summary>
-		/// Change memory protection.
+		/// Hook with a specific address.
 		/// </summary>
 		/// <param name='hModule'>Module handle.</param>
 		/// <param name='szImportName'>Importing name.</param>
@@ -1031,27 +1022,27 @@ namespace Detours {
 		bool HookImport(const HMODULE hModule, const char* const szImportName, const void* const pHookAddress);
 
 		/// <summary>
-		/// Restore memory protection.
+		/// UnHook.
 		/// </summary>
 		/// <param name='pHookAddress'>Hook address.</param>
 		bool UnHookImport(const void* const pHookAddress);
 
 		// ----------------------------------------------------------------
-		// Smart Export Hook
+		// Export Hook
 		// ----------------------------------------------------------------
 
 		/// <summary>
-		/// Smart hook that automatically unhooking.
+		/// Hook that automatically unhooking.
 		/// </summary>
-		class SmartExportHook {
+		class ExportHook {
 		public:
 			/// <summary>
-			/// Smart hook that automatically unhooking.
+			/// Hook that automatically unhooking.
 			/// </summary>
 			/// <param name='szModuleName'>Module name.</param>
 			/// <param name='szExportName'>Exporting name.</param>
-			SmartExportHook(const HMODULE hModule, const char* const szExportName);
-			~SmartExportHook();
+			ExportHook(const HMODULE hModule, const char* const szExportName);
+			~ExportHook();
 
 		public:
 			/// <summary>
@@ -1080,11 +1071,11 @@ namespace Detours {
 		};
 
 		// ----------------------------------------------------------------
-		// Manual Export Hook
+		// Simple Export Hook
 		// ----------------------------------------------------------------
 
 		/// <summary>
-		/// Change memory protection.
+		/// Hook with a specific address.
 		/// </summary>
 		/// <param name='hModule'>Module handle.</param>
 		/// <param name='szExportName'>Exporting name.</param>
@@ -1093,7 +1084,7 @@ namespace Detours {
 		bool HookExport(const HMODULE hModule, const char* const szExportName, const void* const pHookAddress);
 
 		/// <summary>
-		/// Restore memory protection.
+		/// UnHook.
 		/// </summary>
 		/// <param name='pHookAddress'>Hook address.</param>
 		bool UnHookExport(const void* const pHookAddress);
@@ -1102,24 +1093,24 @@ namespace Detours {
 		// Memory Hook CallBack
 		// ----------------------------------------------------------------
 
-		typedef bool(__fastcall* fnMemoryHookCallBack)(class SmartMemoryHook* pHook, PCONTEXT pCTX);
+		typedef bool(__fastcall* fnMemoryHookCallBack)(class MemoryHook* pHook, PCONTEXT pCTX);
 
 		// ----------------------------------------------------------------
-		// Smart Memory Hook
+		// Memory Hook
 		// ----------------------------------------------------------------
 
 		/// <summary>
-		/// Smart hook that automatically unhooking.
+		/// Hook that automatically unhooking.
 		/// </summary>
-		class SmartMemoryHook {
+		class MemoryHook {
 		public:
 			/// <summary>
-			/// Smart hook that automatically unhooking.
+			/// Hook that automatically unhooking.
 			/// </summary>
 			/// <param name='pAddress'>Memory address.</param>
 			/// <param name='unSize'>Memory size.</param>
-			SmartMemoryHook(const void* const pAddress, const size_t unSize = 1, bool bAutoDisable = false);
-			~SmartMemoryHook();
+			MemoryHook(const void* const pAddress, const size_t unSize = 1, bool bAutoDisable = false);
+			~MemoryHook();
 
 		public:
 			/// <summary>
@@ -1163,16 +1154,15 @@ namespace Detours {
 			const void* const m_pAddress;
 			const size_t m_unSize;
 			bool m_bAutoDisable;
-			PVOID m_pVEH;
 			fnMemoryHookCallBack m_pCallBack;
 		};
 
 		// ----------------------------------------------------------------
-		// Manual Memory Hook
+		// Simple Memory Hook
 		// ----------------------------------------------------------------
 
 		/// <summary>
-		/// Change memory protection.
+		/// Hook with a specific address.
 		/// </summary>
 		/// <param name='pAddress'>Memory address.</param>
 		/// <param name='pCallBack'>Callback address.</param>
@@ -1180,7 +1170,7 @@ namespace Detours {
 		bool HookMemory(const void* const pAddress, const fnMemoryHookCallBack pCallBack, bool bAutoDisable = false);
 
 		/// <summary>
-		/// Restore memory protection.
+		/// UnHook.
 		/// </summary>
 		/// <param name='pCallBack'>Callback address.</param>
 		bool UnHookMemory(const fnMemoryHookCallBack pCallBack);
