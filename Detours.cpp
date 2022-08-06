@@ -9,6 +9,7 @@
 // STL
 #include <memory>
 #include <unordered_map>
+#include <vector>
 
 // ----------------------------------------------------------------
 // Detours
@@ -1499,19 +1500,19 @@ namespace Detours {
 			}
 
 #pragma pack(push, r1, 1)
-			typedef const struct _PMD {
+			typedef struct _PMD {
 				int mdisp;
 				int pdisp;
 				int vdisp;
 			} PMD, *PPMD;
 
-			typedef const struct _TYPE_DESCRIPTOR {
+			typedef struct _TYPE_DESCRIPTOR {
 				void* pVFTable;
 				void* pSpare;
 				char szName[1];
 			} TYPE_DESCRIPTOR, *PTYPE_DESCRIPTOR;
 
-			typedef const struct _RTTI_BASE_CLASS_DESCRIPTOR {
+			typedef struct _RTTI_BASE_CLASS_DESCRIPTOR {
 #ifdef _M_X64
 				unsigned int pTypeDescriptor;
 #elif _M_IX86
@@ -1522,7 +1523,7 @@ namespace Detours {
 				unsigned int unAttributes;
 			} RTTI_BASE_CLASS_DESCRIPTOR, *PRTTI_BASE_CLASS_DESCRIPTOR;
 
-			typedef const struct _RTTI_BASE_CLASS_ARRAY {
+			typedef struct _RTTI_BASE_CLASS_ARRAY {
 #ifdef _M_X64
 				unsigned int pBaseClassDescriptors;
 #elif _M_IX86
@@ -1530,7 +1531,7 @@ namespace Detours {
 #endif
 			} RTTI_BASE_CLASS_ARRAY, *PRTTI_BASE_CLASS_ARRAY;
 
-			typedef const struct _RTTI_CLASS_HIERARCHY_DESCRIPTOR {
+			typedef struct _RTTI_CLASS_HIERARCHY_DESCRIPTOR {
 				unsigned int unSignature;
 				unsigned int unAttributes;
 				unsigned int unNumberOfBaseClasses;
@@ -1541,7 +1542,7 @@ namespace Detours {
 #endif
 			} RTTI_CLASS_HIERARCHY_DESCRIPTOR, *PRTTI_CLASS_HIERARCHY_DESCRIPTOR;
 
-			typedef const struct _RTTI_COMPLETE_OBJECT_LOCATOR {
+			typedef struct _RTTI_COMPLETE_OBJECT_LOCATOR {
 				unsigned int unSignature;
 				unsigned int unOffset;
 				unsigned int unConstructorOffset;
@@ -1555,48 +1556,48 @@ namespace Detours {
 			} RTTI_COMPLETE_OBJECT_LOCATOR, *PRTTI_COMPLETE_OBJECT_LOCATOR;
 #pragma pack(pop, r1)
 
-			const void* pReference = pAddress;
-			const void* pEndAddress = reinterpret_cast<const unsigned char*>(pAddress) + unSize;
+			void* pReference = const_cast<void*>(pAddress);
+			void* pEndAddress = reinterpret_cast<char*>(const_cast<void*>(pAddress)) + unSize;
 			while (pReference && (pReference < pEndAddress)) {
-				pReference = FindData(pReference, reinterpret_cast<size_t>(pEndAddress) - reinterpret_cast<size_t>(pReference), reinterpret_cast<const unsigned char* const>(szRTTI), unRTTILength);
+				pReference = const_cast<void*>(FindData(pReference, reinterpret_cast<size_t>(pEndAddress) - reinterpret_cast<size_t>(pReference), reinterpret_cast<const unsigned char* const>(szRTTI), unRTTILength));
 				if (!pReference) {
 					break;
 				}
 
-				PTYPE_DESCRIPTOR pTypeDescriptor = reinterpret_cast<PTYPE_DESCRIPTOR>(reinterpret_cast<const unsigned char*>(pReference) - sizeof(void*) * 2);
+				const PTYPE_DESCRIPTOR pTypeDescriptor = reinterpret_cast<PTYPE_DESCRIPTOR>(reinterpret_cast<char*>(pReference) - sizeof(void*) * 2);
 				if ((pTypeDescriptor->pVFTable < pAddress) || (pTypeDescriptor->pVFTable >= pEndAddress)) {
-					pReference = reinterpret_cast<const void*>(reinterpret_cast<const unsigned char*>(pReference) + 1);
+					pReference = reinterpret_cast<void*>(reinterpret_cast<char*>(pReference) + 1);
 					continue;
 				}
 				if (pTypeDescriptor->pSpare) {
-					pReference = reinterpret_cast<const void*>(reinterpret_cast<const unsigned char*>(pReference) + 1);
+					pReference = reinterpret_cast<void*>(reinterpret_cast<char*>(pReference) + 1);
 					continue;
 				}
 
-				const void* pTypeDescriptorReference = pAddress;
+				void* pTypeDescriptorReference = const_cast<void*>(pAddress);
 				while (pTypeDescriptorReference && (pTypeDescriptorReference < pEndAddress)) {
 #ifdef _M_X64
 					const size_t unTypeDescriptorOffsetTemp = reinterpret_cast<size_t>(pTypeDescriptor) - reinterpret_cast<size_t>(pAddress);
 					const unsigned int unTypeDescriptorOffset = (*(reinterpret_cast<const unsigned int*>(&unTypeDescriptorOffsetTemp)));
-					pTypeDescriptorReference = FindData(pTypeDescriptorReference, reinterpret_cast<size_t>(pEndAddress) - reinterpret_cast<size_t>(pTypeDescriptorReference), reinterpret_cast<const unsigned char* const>(&unTypeDescriptorOffset), sizeof(int));
+					pTypeDescriptorReference = const_cast<void*>(FindData(pTypeDescriptorReference, reinterpret_cast<size_t>(pEndAddress) - reinterpret_cast<size_t>(pTypeDescriptorReference), reinterpret_cast<const unsigned char* const>(&unTypeDescriptorOffset), sizeof(int)));
 					if (!pTypeDescriptorReference) {
 						break;
 					}
 #elif _M_IX86
-					pTypeDescriptorReference = FindData(pTypeDescriptorReference, reinterpret_cast<size_t>(pEndAddress) - reinterpret_cast<size_t>(pTypeDescriptorReference), reinterpret_cast<const unsigned char* const>(&pTypeDescriptor), sizeof(int));
+					pTypeDescriptorReference = const_cast<void*>(FindData(pTypeDescriptorReference, reinterpret_cast<size_t>(pEndAddress) - reinterpret_cast<size_t>(pTypeDescriptorReference), reinterpret_cast<const unsigned char* const>(&pTypeDescriptor), sizeof(int)));
 					if (!pTypeDescriptorReference) {
 						break;
 					}
 #endif
 
-					const PRTTI_COMPLETE_OBJECT_LOCATOR pCompleteObjectLocation = reinterpret_cast<PRTTI_COMPLETE_OBJECT_LOCATOR>(reinterpret_cast<const unsigned char*>(pTypeDescriptorReference) - sizeof(int) * 3);
+					const PRTTI_COMPLETE_OBJECT_LOCATOR pCompleteObjectLocation = reinterpret_cast<PRTTI_COMPLETE_OBJECT_LOCATOR>(reinterpret_cast<char*>(pTypeDescriptorReference) - sizeof(int) * 3);
 #ifdef _M_X64
 					const PRTTI_CLASS_HIERARCHY_DESCRIPTOR pClassHierarchyDescriptor = reinterpret_cast<PRTTI_CLASS_HIERARCHY_DESCRIPTOR>(reinterpret_cast<size_t>(pAddress) + pCompleteObjectLocation->pClassHierarchyDescriptor);
 #elif _M_IX86
 					const PRTTI_CLASS_HIERARCHY_DESCRIPTOR pClassHierarchyDescriptor = pCompleteObjectLocation->pClassHierarchyDescriptor;
 #endif
 					if ((pClassHierarchyDescriptor < pAddress) || (pClassHierarchyDescriptor >= pEndAddress)) {
-						pTypeDescriptorReference = reinterpret_cast<const void*>(reinterpret_cast<const unsigned char*>(pTypeDescriptorReference) + 1);
+						pTypeDescriptorReference = reinterpret_cast<void*>(reinterpret_cast<char*>(pTypeDescriptorReference) + 1);
 						continue;
 					}
 
@@ -1606,7 +1607,7 @@ namespace Detours {
 					const PRTTI_BASE_CLASS_ARRAY pBaseClassArray = pClassHierarchyDescriptor->pBaseClassArray;
 #endif
 					if ((pBaseClassArray < pAddress) || (pBaseClassArray >= pEndAddress)) {
-						pTypeDescriptorReference = reinterpret_cast<const void*>(reinterpret_cast<const unsigned char*>(pTypeDescriptorReference) + 1);
+						pTypeDescriptorReference = reinterpret_cast<void*>(reinterpret_cast<char*>(pTypeDescriptorReference) + 1);
 						continue;
 					}
 
@@ -1616,12 +1617,12 @@ namespace Detours {
 					const PRTTI_BASE_CLASS_DESCRIPTOR pBaseClassDescriptors = pBaseClassArray->pBaseClassDescriptors[0];
 #endif
 					if ((pBaseClassDescriptors < pAddress) || (pBaseClassDescriptors >= pEndAddress)) {
-						pTypeDescriptorReference = reinterpret_cast<const void*>(reinterpret_cast<const unsigned char*>(pTypeDescriptorReference) + 1);
+						pTypeDescriptorReference = reinterpret_cast<void*>(reinterpret_cast<char*>(pTypeDescriptorReference) + 1);
 						continue;
 					}
 
-					for (unsigned int i = 0; i < pClassHierarchyDescriptor->unNumberOfBaseClasses; ++i) {
-						PRTTI_BASE_CLASS_DESCRIPTOR pBaseClassDescriptor = (&pBaseClassDescriptors)[i];
+					for (size_t i = 0; i < pClassHierarchyDescriptor->unNumberOfBaseClasses; ++i) {
+						const PRTTI_BASE_CLASS_DESCRIPTOR pBaseClassDescriptor = (&pBaseClassDescriptors)[i];
 						if (!pBaseClassDescriptor) {
 							continue;
 						}
@@ -1638,10 +1639,10 @@ namespace Detours {
 						}
 					}
 
-					pTypeDescriptorReference = reinterpret_cast<const void*>(reinterpret_cast<const unsigned char*>(pTypeDescriptorReference) + 1);
+					pTypeDescriptorReference = reinterpret_cast<void*>(reinterpret_cast<char*>(pTypeDescriptorReference) + 1);
 				}
 
-				pReference = reinterpret_cast<const void*>(reinterpret_cast<const unsigned char*>(pReference) + 1);
+				pReference = reinterpret_cast<void*>(reinterpret_cast<char*>(pReference) + 1);
 			}
 
 			return nullptr;
@@ -1989,7 +1990,7 @@ namespace Detours {
 		}
 
 		// ----------------------------------------------------------------
-		// Manual Protection
+		// Simple Protection
 		// ----------------------------------------------------------------
 
 		static std::unordered_map<void*, std::unique_ptr<Protection>> g_Protections;
@@ -2248,7 +2249,7 @@ namespace Detours {
 		}
 
 		// ----------------------------------------------------------------
-		// Manual Import Hook
+		// Simple Import Hook
 		// ----------------------------------------------------------------
 
 		static std::unordered_map<void*, std::unique_ptr<ImportHook>> g_ImportHooks;
@@ -2413,7 +2414,7 @@ namespace Detours {
 		}
 
 		// ----------------------------------------------------------------
-		// Manual Export Hook
+		// Simple Export Hook
 		// ----------------------------------------------------------------
 
 		static std::unordered_map<void*, std::unique_ptr<ExportHook>> g_ExportHooks;
@@ -2705,7 +2706,7 @@ namespace Detours {
 		}
 
 		// ----------------------------------------------------------------
-		// Manual Memory Hook
+		// Simple Memory Hook
 		// ----------------------------------------------------------------
 
 		bool HookMemory(const void* const pAddress, const fnMemoryHookCallBack pCallBack, bool bAutoDisable) {

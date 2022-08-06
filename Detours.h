@@ -9,9 +9,6 @@
 // C++
 #include <cstdlib>
 
-// STL
-#include <vector>
-
 // General definitions
 #ifndef DETOURS_MAX_STRSIZE
 #define DETOURS_MAX_STRSIZE 0x1000 // 4 KiB
