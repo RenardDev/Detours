@@ -91,7 +91,7 @@ int _tmain() {
 
 	_tprintf_s(_T("FindSignature Example\n"));
 #ifdef _M_X64
-	printf("Sleep = 0x%08llX\n", reinterpret_cast<size_t>(Detours::Scan::FindSignature(_T("kernelbase.dll"), "\x33\xD2\xE9\x2A\x2A\x2A\x2A\xCC\x71\x28")));
+	printf("Sleep = 0x%016llX\n", reinterpret_cast<size_t>(Detours::Scan::FindSignature(_T("kernelbase.dll"), "\x33\xD2\xE9\x2A\x2A\x2A\x2A\xCC\x71\x28")));
 #elif _M_IX86
 	printf("Sleep = 0x%08X\n", reinterpret_cast<size_t>(Detours::Scan::FindSignature(_T("kernelbase.dll"), "\x8B\xFF\x55\x8B\xEC\x6A\x2A\xFF\x75\x08\xE8\x2A\x2A\x2A\x2A\x5D\xC2")));
 #endif
@@ -103,7 +103,7 @@ int _tmain() {
 
 	_tprintf_s(_T("FindData Example\n"));
 #ifdef _M_X64
-	printf("Sleep = 0x%08llX\n", reinterpret_cast<size_t>(Detours::Scan::FindData(_T("kernelbase.dll"), reinterpret_cast<const unsigned char* const>("\x55\x90"), 2)));
+	printf("Sleep = 0x%016llX\n", reinterpret_cast<size_t>(Detours::Scan::FindData(_T("kernelbase.dll"), reinterpret_cast<const unsigned char* const>("\x55\x90"), 2)));
 #elif _M_IX86
 	printf("Sleep = 0x%08X\n", reinterpret_cast<size_t>(Detours::Scan::FindData(_T("kernelbase.dll"), reinterpret_cast < const unsigned char* const>("\x55\x90"), 2)));
 #endif
@@ -116,7 +116,7 @@ int _tmain() {
 	_tprintf_s(_T("FindRTTI Example\n"));
 	void** pVTable = reinterpret_cast<void**>(const_cast<void*>(Detours::Scan::FindRTTI(_T("Detours.exe"), ".?AVTestingRTTI@@")));
 #ifdef _M_X64
-	printf("'%s' = 0x%08llX\n", typeid(TestingRTTI).raw_name(), reinterpret_cast<size_t>(pVTable));
+	printf("'%s' = 0x%016llX\n", typeid(TestingRTTI).raw_name(), reinterpret_cast<size_t>(pVTable));
 #elif _M_IX86
 	printf("'%s' = 0x%08X\n", typeid(TestingRTTI).raw_name(), reinterpret_cast<size_t>(pVTable));
 #endif
