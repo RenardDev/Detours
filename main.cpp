@@ -196,9 +196,9 @@ int _tmain() {
 	const ULONG unLowPartTime = Detours::KUserSharedData.SystemTime.LowPart;
 	_tprintf_s(_T("SystemTime = %lu\n"), unLowPartTime);
 
-	_tprintf_s(_T("Sleeping 5 sec...\n")); Sleep(5000);
+	_tprintf_s(_T("Sleeping 1200 ms...\n")); Sleep(1200);
 
-	_tprintf_s(_T("ElapsedTime = %lu\n"), (Detours::KUserSharedData.SystemTime.LowPart - unLowPartTime) / 10000);
+	_tprintf_s(_T("ElapsedTime = %lu ms\n"), (Detours::KUserSharedData.SystemTime.LowPart - unLowPartTime) / 10000);
 
 	_tprintf_s(_T("\n"));
 

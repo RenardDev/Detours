@@ -37,10 +37,10 @@ namespace Detours {
 	static std::unordered_map<void*, std::unique_ptr<MemoryHook>> g_MemoryHooks;
 
 	// ----------------------------------------------------------------
-	// Scan
+	// KUSER_SHARED_DATA
 	// ----------------------------------------------------------------
 
-	KUSER_SHARED_DATA& KUserSharedData = *reinterpret_cast<PKUSER_SHARED_DATA>(0x7FFE0000);
+	const KUSER_SHARED_DATA& KUserSharedData = *reinterpret_cast<PKUSER_SHARED_DATA>(0x7FFE0000);
 
 	// ----------------------------------------------------------------
 	// Scan
@@ -92,6 +92,7 @@ namespace Detours {
 			const PIMAGE_SECTION_HEADER pFirstSection = reinterpret_cast<PIMAGE_SECTION_HEADER>(reinterpret_cast<char*>(pOH) + pFH->SizeOfOptionalHeader);
 			const WORD unNumberOfSections = pFH->NumberOfSections;
 			const size_t unSectionAlignment = static_cast<size_t>(pOH->SectionAlignment);
+			size_t unValidSections = 0;
 			for (WORD i = 0; i < unNumberOfSections; ++i) {
 				if (memcmp(SectionName.data(), pFirstSection[i].Name, 8) == 0) {
 					if (pAddress) {
@@ -99,7 +100,7 @@ namespace Detours {
 					}
 
 					if (pSize) {
-						*pSize = P2ALIGNUP(static_cast<size_t>(pFirstSection[i].SizeOfRawData), unSectionAlignment);
+						*pSize = P2ALIGNUP(static_cast<size_t>(pFirstSection[i].SizeOfRawData), unSectionAlignment);;
 					}
 
 					return true;
@@ -127,52 +128,55 @@ namespace Detours {
 			const PIMAGE_OPTIONAL_HEADER pOH = &(pNTHs->OptionalHeader);
 
 			const IMAGE_DATA_DIRECTORY DebugDD = pOH->DataDirectory[IMAGE_DIRECTORY_ENTRY_DEBUG];
-			if (DebugDD.Size) {
-				const DWORD unCount = DebugDD.Size / sizeof(IMAGE_DEBUG_DIRECTORY);
-				const PIMAGE_DEBUG_DIRECTORY pDebugDirectory = reinterpret_cast<PIMAGE_DEBUG_DIRECTORY>(reinterpret_cast<char*>(hModule) + DebugDD.VirtualAddress);
-				for (DWORD k = 0; k < unCount; ++k) {
-					if (pDebugDirectory[k].Type != IMAGE_DEBUG_TYPE_POGO) {
-						continue;
+			if (!DebugDD.Size) {
+				return false;
+			}
+
+			const DWORD unCount = DebugDD.Size / sizeof(IMAGE_DEBUG_DIRECTORY);
+			const PIMAGE_DEBUG_DIRECTORY pDebugDirectory = reinterpret_cast<PIMAGE_DEBUG_DIRECTORY>(reinterpret_cast<char*>(hModule) + DebugDD.VirtualAddress);
+			for (DWORD k = 0; k < unCount; ++k) {
+				if (pDebugDirectory[k].Type != IMAGE_DEBUG_TYPE_POGO) {
+					continue;
+				}
+
+				typedef struct _IMAGE_POGO_BLOCK {
+					DWORD unRVA;
+					DWORD unSize;
+					char Name[1];
+				} IMAGE_POGO_BLOCK, *PIMAGE_POGO_BLOCK;
+
+				typedef struct _IMAGE_POGO_INFO {
+					DWORD Signature; // 0x4C544347 = 'LTCG'
+					IMAGE_POGO_BLOCK Blocks[1];
+				} IMAGE_POGO_INFO, *PIMAGE_POGO_INFO;
+
+				const PIMAGE_POGO_INFO pPI = reinterpret_cast<PIMAGE_POGO_INFO>(reinterpret_cast<char*>(hModule) + pDebugDirectory[k].AddressOfRawData);
+				if (pPI->Signature != 0x4C544347) {
+					continue;
+				}
+
+				PIMAGE_POGO_BLOCK pBlock = pPI->Blocks;
+				size_t unValidSections = 0;
+				while (pBlock->unRVA != 0) {
+					const size_t unNameLength = strlen(pBlock->Name) + 1;
+					size_t unBlockSize = sizeof(DWORD) * 2 + unNameLength;
+					if (unBlockSize & 3) {
+						unBlockSize += (4 - (unBlockSize & 3));
 					}
 
-					typedef struct _IMAGE_POGO_BLOCK {
-						DWORD unRVA;
-						DWORD unSize;
-						char Name[1];
-					} IMAGE_POGO_BLOCK, *PIMAGE_POGO_BLOCK;
-
-					typedef struct _IMAGE_POGO_INFO {
-						DWORD Signature; // 0x4C544347 = 'LTCG'
-						IMAGE_POGO_BLOCK Blocks[1];
-					} IMAGE_POGO_INFO, *PIMAGE_POGO_INFO;
-
-					const PIMAGE_POGO_INFO pPI = reinterpret_cast<PIMAGE_POGO_INFO>(reinterpret_cast<char*>(hModule) + pDebugDirectory[k].AddressOfRawData);
-					if (pPI->Signature != 0x4C544347) {
-						break;
-					}
-
-					PIMAGE_POGO_BLOCK pBlock = pPI->Blocks;
-					while (pBlock->unRVA != 0) {
-						const size_t unNameLength = strlen(pBlock->Name) + 1;
-						size_t unBlockSize = sizeof(DWORD) * 2 + unNameLength;
-						if (unBlockSize & 3) {
-							unBlockSize += (4 - (unBlockSize & 3));
+					if (strcmp(szSectionName, pBlock->Name) == 0) {
+						if (pAddress) {
+							*pAddress = reinterpret_cast<void*>(reinterpret_cast<char*>(hModule) + pBlock->unRVA);
 						}
 
-						if (strcmp(szSectionName, pBlock->Name) == 0) {
-							if (pAddress) {
-								*pAddress = reinterpret_cast<void*>(reinterpret_cast<char*>(hModule) + pBlock->unRVA);
-							}
-
-							if (pSize) {
-								*pSize = static_cast<size_t>(pBlock->unSize);
-							}
-
-							return true;
+						if (pSize) {
+							*pSize = static_cast<size_t>(pBlock->unSize);
 						}
 
-						pBlock = reinterpret_cast<PIMAGE_POGO_BLOCK>(reinterpret_cast<char*>(pBlock) + unBlockSize);
+						return true;
 					}
+
+					pBlock = reinterpret_cast<PIMAGE_POGO_BLOCK>(reinterpret_cast<char*>(pBlock) + unBlockSize);
 				}
 			}
 
@@ -923,7 +927,7 @@ namespace Detours {
 		}
 
 		const void* const FindSignatureAVX(const char* const szModuleName, const char* const szSectionName, const char* const szSignature, const unsigned char unIgnoredByte) {
-			return FindSignatureAVXA(szModuleName, szSecitonName, szSignature, unIgnoredByte);
+			return FindSignatureAVXA(szModuleName, szSectionName, szSignature, unIgnoredByte);
 		}
 #endif
 
@@ -3573,6 +3577,7 @@ namespace Detours {
 	// ----------------------------------------------------------------
 	// Memory
 	// ----------------------------------------------------------------
+
 	namespace Memory {
 
 		// ----------------------------------------------------------------
@@ -3836,6 +3841,7 @@ namespace Detours {
 	// ----------------------------------------------------------------
 	// Exception
 	// ----------------------------------------------------------------
+
 	namespace Exception {
 
 		// ----------------------------------------------------------------
@@ -3960,6 +3966,7 @@ namespace Detours {
 	// ----------------------------------------------------------------
 	// Hook
 	// ----------------------------------------------------------------
+
 	namespace Hook {
 
 		// ----------------------------------------------------------------
