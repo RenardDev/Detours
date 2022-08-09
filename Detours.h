@@ -22,6 +22,9 @@
 #define DETOURS_MAX_STRSIZE 0x1000 // 4 KiB
 #endif // !DETOURS_MAX_SIZE
 
+// Macro to declare a const 8-byte array.
+#define DECLARE_SECTOR_NAME(...) std::array<const unsigned char, 8>({ __VA_ARGS__ })
+
 // ----------------------------------------------------------------
 // Checking platform
 // ----------------------------------------------------------------
@@ -208,7 +211,7 @@ namespace Detours {
 		/// <param name='pAddress'>Section address.</param>
 		/// <param name='pSize'>Section size.</param>
 		/// <returns>Returns True on success, False otherwise.</returns>
-		bool FindSection(const HMODULE hModule, const std::array<unsigned char, 8>& SectionName, void** pAddress, size_t* pSize);
+		bool FindSection(const HMODULE hModule, const std::array<const unsigned char, 8>& SectionName, void** pAddress, size_t* pSize);
 
 		// ----------------------------------------------------------------
 		// FindSectionPOGO

@@ -79,7 +79,7 @@ namespace Detours {
 		// FindSection
 		// ----------------------------------------------------------------
 
-		bool FindSection(const HMODULE hModule, const std::array<unsigned char, 8>& SectionName, void** pAddress, size_t* pSize) {
+		bool FindSection(const HMODULE hModule, const std::array<const unsigned char, 8>& SectionName, void** pAddress, size_t* pSize) {
 			if (!hModule) {
 				return false;
 			}
@@ -246,7 +246,7 @@ namespace Detours {
 			return FindSignatureNative(reinterpret_cast<void*>(hModule), static_cast<size_t>(pOH->SizeOfImage) - 1, szSignature, unIgnoredByte);
 		}
 
-		const void* const FindSignatureNative(const HMODULE hModule, const std::array<unsigned char, 8>& SectionName, const char* const szSignature, const unsigned char unIgnoredByte) {
+		const void* const FindSignatureNative(const HMODULE hModule, const std::array<const unsigned char, 8>& SectionName, const char* const szSignature, const unsigned char unIgnoredByte) {
 			if (!hModule) {
 				return nullptr;
 			}
@@ -303,7 +303,7 @@ namespace Detours {
 			return FindSignatureNative(hMod, szSignature, unIgnoredByte);
 		}
 
-		const void* const FindSignatureNativeA(const char* const szModuleName, const std::array<unsigned char, 8>& SectionName, const char* const szSignature, const unsigned char unIgnoredByte) {
+		const void* const FindSignatureNativeA(const char* const szModuleName, const std::array<const unsigned char, 8>& SectionName, const char* const szSignature, const unsigned char unIgnoredByte) {
 			if (!szModuleName) {
 				return nullptr;
 			}
@@ -358,7 +358,7 @@ namespace Detours {
 			return FindSignatureNative(hMod, szSignature, unIgnoredByte);
 		}
 
-		const void* const FindSignatureNativeW(const wchar_t* const szModuleName, const std::array<unsigned char, 8>& SectionName, const char* const szSignature, const unsigned char unIgnoredByte) {
+		const void* const FindSignatureNativeW(const wchar_t* const szModuleName, const std::array<const unsigned char, 8>& SectionName, const char* const szSignature, const unsigned char unIgnoredByte) {
 			if (!szModuleName) {
 				return nullptr;
 			}
@@ -401,7 +401,7 @@ namespace Detours {
 			return FindSignatureNativeW(szModuleName, szSignature, unIgnoredByte);
 		}
 
-		const void* const FindSignatureNative(const wchar_t* const szModuleName, const std::array<unsigned char, 8>& SectionName, const char* const szSignature, const unsigned char unIgnoredByte) {
+		const void* const FindSignatureNative(const wchar_t* const szModuleName, const std::array<const unsigned char, 8>& SectionName, const char* const szSignature, const unsigned char unIgnoredByte) {
 			return FindSignatureNativeW(szModuleName, SectionName, szSignature, unIgnoredByte);
 		}
 
@@ -413,7 +413,7 @@ namespace Detours {
 			return FindSignatureNativeA(szModuleName, szSignature, unIgnoredByte);
 		}
 
-		const void* const FindSignatureNative(const char* const szModuleName, const std::array<unsigned char, 8>& SectionName, const char* const szSignature, const unsigned char unIgnoredByte) {
+		const void* const FindSignatureNative(const char* const szModuleName, const std::array<const unsigned char, 8>& SectionName, const char* const szSignature, const unsigned char unIgnoredByte) {
 			return FindSignatureNativeA(szModuleName, SectionName, szSignature, unIgnoredByte);
 		}
 
@@ -499,7 +499,7 @@ namespace Detours {
 			return FindSignatureSSE2(reinterpret_cast<void*>(hModule), static_cast<size_t>(pOH->SizeOfImage) - 1, szSignature, unIgnoredByte);
 		}
 
-		const void* const FindSignatureSSE2(const HMODULE hModule, const std::array<unsigned char, 8>& SectionName, const char* const szSignature, const unsigned char unIgnoredByte) {
+		const void* const FindSignatureSSE2(const HMODULE hModule, const std::array<const unsigned char, 8>& SectionName, const char* const szSignature, const unsigned char unIgnoredByte) {
 			if (!hModule) {
 				return nullptr;
 			}
@@ -556,7 +556,7 @@ namespace Detours {
 			return FindSignatureSSE2(hMod, szSignature, unIgnoredByte);
 		}
 
-		const void* const FindSignatureSSE2A(const char* const szModuleName, const std::array<unsigned char, 8>& SectionName, const char* const szSignature, const unsigned char unIgnoredByte) {
+		const void* const FindSignatureSSE2A(const char* const szModuleName, const std::array<const unsigned char, 8>& SectionName, const char* const szSignature, const unsigned char unIgnoredByte) {
 			if (!szModuleName) {
 				return nullptr;
 			}
@@ -611,7 +611,7 @@ namespace Detours {
 			return FindSignatureSSE2(hMod, szSignature, unIgnoredByte);
 		}
 
-		const void* const FindSignatureSSE2W(const wchar_t* const szModuleName, const std::array<unsigned char, 8>& SectionName, const char* const szSignature, const unsigned char unIgnoredByte) {
+		const void* const FindSignatureSSE2W(const wchar_t* const szModuleName, const std::array<const unsigned char, 8>& SectionName, const char* const szSignature, const unsigned char unIgnoredByte) {
 			if (!szModuleName) {
 				return nullptr;
 			}
@@ -654,7 +654,7 @@ namespace Detours {
 			return FindSignatureSSE2W(szModuleName, szSignature, unIgnoredByte);
 		}
 
-		const void* const FindSignatureSSE2(const wchar_t* const szModuleName, const std::array<unsigned char, 8>& SectionName, const char* const szSignature, const unsigned char unIgnoredByte) {
+		const void* const FindSignatureSSE2(const wchar_t* const szModuleName, const std::array<const unsigned char, 8>& SectionName, const char* const szSignature, const unsigned char unIgnoredByte) {
 			return FindSignatureSSE2W(szModuleName, SectionName, szSignature, unIgnoredByte);
 		}
 
@@ -666,7 +666,7 @@ namespace Detours {
 			return FindSignatureSSE2A(szModuleName, szSignature, unIgnoredByte);
 		}
 
-		const void* const FindSignatureSSE2(const char* const szModuleName, const std::array<unsigned char, 8>& SectionName, const char* const szSignature, const unsigned char unIgnoredByte) {
+		const void* const FindSignatureSSE2(const char* const szModuleName, const std::array<const unsigned char, 8>& SectionName, const char* const szSignature, const unsigned char unIgnoredByte) {
 			return FindSignatureSSE2A(szModuleName, SectionName, szSignature, unIgnoredByte);
 		}
 
@@ -755,7 +755,7 @@ namespace Detours {
 			return FindSignatureAVX(reinterpret_cast<void*>(hModule), static_cast<size_t>(pOH->SizeOfImage) - 1, szSignature, unIgnoredByte);
 		}
 
-		const void* const FindSignatureAVX(const HMODULE hModule, const std::array<unsigned char, 8>& SectionName, const char* const szSignature, const unsigned char unIgnoredByte) {
+		const void* const FindSignatureAVX(const HMODULE hModule, const std::array<const unsigned char, 8>& SectionName, const char* const szSignature, const unsigned char unIgnoredByte) {
 			if (!hModule) {
 				return nullptr;
 			}
@@ -812,7 +812,7 @@ namespace Detours {
 			return FindSignatureAVX(hMod, szSignature, unIgnoredByte);
 		}
 
-		const void* const FindSignatureAVXA(const char* const szModuleName, const std::array<unsigned char, 8>& SectionName, const char* const szSignature, const unsigned char unIgnoredByte) {
+		const void* const FindSignatureAVXA(const char* const szModuleName, const std::array<const unsigned char, 8>& SectionName, const char* const szSignature, const unsigned char unIgnoredByte) {
 			if (!szModuleName) {
 				return nullptr;
 			}
@@ -867,7 +867,7 @@ namespace Detours {
 			return FindSignatureAVX(hMod, szSignature, unIgnoredByte);
 		}
 
-		const void* const FindSignatureAVXW(const wchar_t* const szModuleName, const std::array<unsigned char, 8>& SectionName, const char* const szSignature, const unsigned char unIgnoredByte) {
+		const void* const FindSignatureAVXW(const wchar_t* const szModuleName, const std::array<const unsigned char, 8>& SectionName, const char* const szSignature, const unsigned char unIgnoredByte) {
 			if (!szModuleName) {
 				return nullptr;
 			}
@@ -910,7 +910,7 @@ namespace Detours {
 			return FindSignatureAVXW(szModuleName, szSignature, unIgnoredByte);
 		}
 
-		const void* const FindSignatureAVX(const wchar_t* const szModuleName, const std::array<unsigned char, 8>& SectionName, const char* const szSignature, const unsigned char unIgnoredByte) {
+		const void* const FindSignatureAVX(const wchar_t* const szModuleName, const std::array<const unsigned char, 8>& SectionName, const char* const szSignature, const unsigned char unIgnoredByte) {
 			return FindSignatureAVXW(szModuleName, SectionName, szSignature, unIgnoredByte);
 		}
 
@@ -922,7 +922,7 @@ namespace Detours {
 			return FindSignatureAVXA(szModuleName, szSignature, unIgnoredByte);
 		}
 
-		const void* const FindSignatureAVX(const char* const szModuleName, const std::array<unsigned char, 8>& SectionName, const char* const szSignature, const unsigned char unIgnoredByte) {
+		const void* const FindSignatureAVX(const char* const szModuleName, const std::array<const unsigned char, 8>& SectionName, const char* const szSignature, const unsigned char unIgnoredByte) {
 			return FindSignatureAVXA(szModuleName, SectionName, szSignature, unIgnoredByte);
 		}
 
@@ -1008,7 +1008,7 @@ namespace Detours {
 			return FindSignatureAVX2(reinterpret_cast<void*>(hModule), static_cast<size_t>(pOH->SizeOfImage) - 1, szSignature, unIgnoredByte);
 		}
 
-		const void* const FindSignatureAVX2(const HMODULE hModule, const std::array<unsigned char, 8>& SectionName, const char* const szSignature, const unsigned char unIgnoredByte) {
+		const void* const FindSignatureAVX2(const HMODULE hModule, const std::array<const unsigned char, 8>& SectionName, const char* const szSignature, const unsigned char unIgnoredByte) {
 			if (!hModule) {
 				return nullptr;
 			}
@@ -1065,7 +1065,7 @@ namespace Detours {
 			return FindSignatureAVX2(hMod, szSignature, unIgnoredByte);
 		}
 
-		const void* const FindSignatureAVX2A(const char* const szModuleName, const std::array<unsigned char, 8>& SectionName, const char* const szSignature, const unsigned char unIgnoredByte) {
+		const void* const FindSignatureAVX2A(const char* const szModuleName, const std::array<const unsigned char, 8>& SectionName, const char* const szSignature, const unsigned char unIgnoredByte) {
 			if (!szModuleName) {
 				return nullptr;
 			}
@@ -1120,7 +1120,7 @@ namespace Detours {
 			return FindSignatureAVX2(hMod, szSignature, unIgnoredByte);
 		}
 
-		const void* const FindSignatureAVX2W(const wchar_t* const szModuleName, const std::array<unsigned char, 8>& SectionName, const char* const szSignature, const unsigned char unIgnoredByte) {
+		const void* const FindSignatureAVX2W(const wchar_t* const szModuleName, const std::array<const unsigned char, 8>& SectionName, const char* const szSignature, const unsigned char unIgnoredByte) {
 			if (!szModuleName) {
 				return nullptr;
 			}
@@ -1163,7 +1163,7 @@ namespace Detours {
 			return FindSignatureAVX2W(szModuleName, szSignature, unIgnoredByte);
 		}
 
-		const void* const FindSignatureAVX2(const wchar_t* const szModuleName, const std::array<unsigned char, 8>& SectionName, const char* const szSignature, const unsigned char unIgnoredByte) {
+		const void* const FindSignatureAVX2(const wchar_t* const szModuleName, const std::array<const unsigned char, 8>& SectionName, const char* const szSignature, const unsigned char unIgnoredByte) {
 			return FindSignatureAVX2W(szModuleName, SectionName, szSignature, unIgnoredByte);
 		}
 
@@ -1175,7 +1175,7 @@ namespace Detours {
 			return FindSignatureAVX2A(szModuleName, szSignature, unIgnoredByte);
 		}
 
-		const void* const FindSignatureAVX2(const char* const szModuleName, const std::array<unsigned char, 8>& SectionName, const char* const szSignature, const unsigned char unIgnoredByte) {
+		const void* const FindSignatureAVX2(const char* const szModuleName, const std::array<const unsigned char, 8>& SectionName, const char* const szSignature, const unsigned char unIgnoredByte) {
 			return FindSignatureAVX2A(szModuleName, SectionName, szSignature, unIgnoredByte);
 		}
 
@@ -1259,7 +1259,7 @@ namespace Detours {
 			return FindSignatureAVX512(reinterpret_cast<void*>(hModule), static_cast<size_t>(pOH->SizeOfImage) - 1, szSignature, unIgnoredByte);
 		}
 
-		const void* const FindSignatureAVX512(const HMODULE hModule, const std::array<unsigned char, 8>& SectionName, const char* const szSignature, const unsigned char unIgnoredByte) {
+		const void* const FindSignatureAVX512(const HMODULE hModule, const std::array<const unsigned char, 8>& SectionName, const char* const szSignature, const unsigned char unIgnoredByte) {
 			if (!hModule) {
 				return nullptr;
 			}
@@ -1317,7 +1317,7 @@ namespace Detours {
 			return FindSignatureAVX512(hMod, szSignature, unIgnoredByte);
 		}
 
-		const void* const FindSignatureAVX512A(const char* const szModuleName, const std::array<unsigned char, 8>& SectionName, const char* const szSignature, const unsigned char unIgnoredByte) {
+		const void* const FindSignatureAVX512A(const char* const szModuleName, const std::array<const unsigned char, 8>& SectionName, const char* const szSignature, const unsigned char unIgnoredByte) {
 			if (!szModuleName) {
 				return nullptr;
 			}
@@ -1372,7 +1372,7 @@ namespace Detours {
 			return FindSignatureAVX512(hMod, szSignature, unIgnoredByte);
 		}
 
-		const void* const FindSignatureAVX512W(const wchar_t* const szModuleName, const std::array<unsigned char, 8>& SectionName, const char* const szSignature, const unsigned char unIgnoredByte) {
+		const void* const FindSignatureAVX512W(const wchar_t* const szModuleName, const std::array<const unsigned char, 8>& SectionName, const char* const szSignature, const unsigned char unIgnoredByte) {
 			if (!szModuleName) {
 				return nullptr;
 			}
@@ -1415,7 +1415,7 @@ namespace Detours {
 			return FindSignatureAVX512W(szModuleName, szSignature, unIgnoredByte);
 		}
 
-		const void* const FindSignatureAVX512(const wchar_t* const szModuleName, const std::array<unsigned char, 8>& SectionName, const char* const szSignature, const unsigned char unIgnoredByte) {
+		const void* const FindSignatureAVX512(const wchar_t* const szModuleName, const std::array<const unsigned char, 8>& SectionName, const char* const szSignature, const unsigned char unIgnoredByte) {
 			return FindSignatureAVX512W(szModuleName, SectionName, szSignature, unIgnoredByte);
 		}
 
@@ -1427,7 +1427,7 @@ namespace Detours {
 			return FindSignatureAVX512A(szModuleName, szSignature, unIgnoredByte);
 		}
 
-		const void* const FindSignatureAVX512(const char* const szModuleName, const std::array<unsigned char, 8>& SectionName, const char* const szSignature, const unsigned char unIgnoredByte) {
+		const void* const FindSignatureAVX512(const char* const szModuleName, const std::array<const unsigned char, 8>& SectionName, const char* const szSignature, const unsigned char unIgnoredByte) {
 			return FindSignatureAVX512A(szModuleName, SectionName, szSignature, unIgnoredByte);
 		}
 
@@ -1494,7 +1494,7 @@ namespace Detours {
 			return FindSignature(reinterpret_cast<void*>(hModule), static_cast<size_t>(pOH->SizeOfImage) - 1, szSignature, unIgnoredByte);
 		}
 
-		const void* const FindSignature(const HMODULE hModule, const std::array<unsigned char, 8>& SectionName, const char* const szSignature, const unsigned char unIgnoredByte) {
+		const void* const FindSignature(const HMODULE hModule, const std::array<const unsigned char, 8>& SectionName, const char* const szSignature, const unsigned char unIgnoredByte) {
 			if (!hModule) {
 				return nullptr;
 			}
@@ -1551,7 +1551,7 @@ namespace Detours {
 			return FindSignature(hMod, szSignature, unIgnoredByte);
 		}
 
-		const void* const FindSignatureA(const char* const szModuleName, const std::array<unsigned char, 8>& SectionName, const char* const szSignature, const unsigned char unIgnoredByte) {
+		const void* const FindSignatureA(const char* const szModuleName, const std::array<const unsigned char, 8>& SectionName, const char* const szSignature, const unsigned char unIgnoredByte) {
 			if (!szModuleName) {
 				return nullptr;
 			}
@@ -1606,7 +1606,7 @@ namespace Detours {
 			return FindSignature(hMod, szSignature, unIgnoredByte);
 		}
 
-		const void* const FindSignatureW(const wchar_t* const szModuleName, const std::array<unsigned char, 8>& SectionName, const char* const szSignature, const unsigned char unIgnoredByte) {
+		const void* const FindSignatureW(const wchar_t* const szModuleName, const std::array<const unsigned char, 8>& SectionName, const char* const szSignature, const unsigned char unIgnoredByte) {
 			if (!szModuleName) {
 				return nullptr;
 			}
@@ -1649,7 +1649,7 @@ namespace Detours {
 			return FindSignatureW(szModuleName, szSignature, unIgnoredByte);
 		}
 
-		const void* const FindSignature(const wchar_t* const szModuleName, const std::array<unsigned char, 8>& SectionName, const char* const szSignature, const unsigned char unIgnoredByte) {
+		const void* const FindSignature(const wchar_t* const szModuleName, const std::array<const unsigned char, 8>& SectionName, const char* const szSignature, const unsigned char unIgnoredByte) {
 			return FindSignatureW(szModuleName, SectionName, szSignature, unIgnoredByte);
 		}
 
@@ -1661,7 +1661,7 @@ namespace Detours {
 			return FindSignatureA(szModuleName, szSignature, unIgnoredByte);
 		}
 
-		const void* const FindSignature(const char* const szModuleName, const std::array<unsigned char, 8>& SectionName, const char* const szSignature, const unsigned char unIgnoredByte) {
+		const void* const FindSignature(const char* const szModuleName, const std::array<const unsigned char, 8>& SectionName, const char* const szSignature, const unsigned char unIgnoredByte) {
 			return FindSignatureA(szModuleName, SectionName, szSignature, unIgnoredByte);
 		}
 
@@ -1732,7 +1732,7 @@ namespace Detours {
 			return FindDataNative(reinterpret_cast<void*>(hModule), static_cast<size_t>(pOH->SizeOfImage) - 1, pData, unDataSize);
 		}
 
-		const void* const FindDataNative(const HMODULE hModule, const std::array<unsigned char, 8>& SectionName, const unsigned char* const pData, const size_t unDataSize) {
+		const void* const FindDataNative(const HMODULE hModule, const std::array<const unsigned char, 8>& SectionName, const unsigned char* const pData, const size_t unDataSize) {
 			if (!hModule) {
 				return nullptr;
 			}
@@ -1801,7 +1801,7 @@ namespace Detours {
 			return FindDataNative(hMod, pData, unDataSize);
 		}
 
-		const void* const FindDataNativeA(const char* const szModuleName, const std::array<unsigned char, 8>& SectionName, const unsigned char* const pData, const size_t unDataSize) {
+		const void* const FindDataNativeA(const char* const szModuleName, const std::array<const unsigned char, 8>& SectionName, const unsigned char* const pData, const size_t unDataSize) {
 			if (!szModuleName) {
 				return nullptr;
 			}
@@ -1868,7 +1868,7 @@ namespace Detours {
 			return FindDataNative(hMod, pData, unDataSize);
 		}
 
-		const void* const FindDataNativeW(const wchar_t* const szModuleName, const std::array<unsigned char, 8>& SectionName, const unsigned char* const pData, const size_t unDataSize) {
+		const void* const FindDataNativeW(const wchar_t* const szModuleName, const std::array<const unsigned char, 8>& SectionName, const unsigned char* const pData, const size_t unDataSize) {
 			if (!szModuleName) {
 				return nullptr;
 			}
@@ -1919,7 +1919,7 @@ namespace Detours {
 			return FindDataNativeW(szModuleName, pData, unDataSize);
 		}
 
-		const void* const FindDataNative(const wchar_t* const szModuleName, const std::array<unsigned char, 8>& SectionName, const unsigned char* const pData, const size_t unDataSize) {
+		const void* const FindDataNative(const wchar_t* const szModuleName, const std::array<const unsigned char, 8>& SectionName, const unsigned char* const pData, const size_t unDataSize) {
 			return FindDataNativeW(szModuleName, SectionName, pData, unDataSize);
 		}
 
@@ -1931,7 +1931,7 @@ namespace Detours {
 			return FindDataNativeA(szModuleName, pData, unDataSize);
 		}
 
-		const void* const FindDataNative(const char* const szModuleName, const std::array<unsigned char, 8>& SectionName, const unsigned char* const pData, const size_t unDataSize) {
+		const void* const FindDataNative(const char* const szModuleName, const std::array<const unsigned char, 8>& SectionName, const unsigned char* const pData, const size_t unDataSize) {
 			return FindDataNativeA(szModuleName, SectionName, pData, unDataSize);
 		}
 
@@ -2014,7 +2014,7 @@ namespace Detours {
 			return FindDataSSE2(reinterpret_cast<void*>(hModule), static_cast<size_t>(pOH->SizeOfImage) - 1, pData, unDataSize);
 		}
 
-		const void* const FindDataSSE2(const HMODULE hModule, const std::array<unsigned char, 8>& SectionName, const unsigned char* const pData, const size_t unDataSize) {
+		const void* const FindDataSSE2(const HMODULE hModule, const std::array<const unsigned char, 8>& SectionName, const unsigned char* const pData, const size_t unDataSize) {
 			if (!hModule) {
 				return nullptr;
 			}
@@ -2083,7 +2083,7 @@ namespace Detours {
 			return FindDataSSE2(hMod, pData, unDataSize);
 		}
 
-		const void* const FindDataSSE2A(const char* const szModuleName, const std::array<unsigned char, 8>& SectionName, const unsigned char* const pData, const size_t unDataSize) {
+		const void* const FindDataSSE2A(const char* const szModuleName, const std::array<const unsigned char, 8>& SectionName, const unsigned char* const pData, const size_t unDataSize) {
 			if (!szModuleName) {
 				return nullptr;
 			}
@@ -2150,7 +2150,7 @@ namespace Detours {
 			return FindDataSSE2(hMod, pData, unDataSize);
 		}
 
-		const void* const FindDataSSE2W(const wchar_t* const szModuleName, const std::array<unsigned char, 8>& SectionName, const unsigned char* const pData, const size_t unDataSize) {
+		const void* const FindDataSSE2W(const wchar_t* const szModuleName, const std::array<const unsigned char, 8>& SectionName, const unsigned char* const pData, const size_t unDataSize) {
 			if (!szModuleName) {
 				return nullptr;
 			}
@@ -2201,7 +2201,7 @@ namespace Detours {
 			return FindDataSSE2W(szModuleName, pData, unDataSize);
 		}
 
-		const void* const FindDataSSE2(const wchar_t* const szModuleName, const std::array<unsigned char, 8>& SectionName, const unsigned char* const pData, const size_t unDataSize) {
+		const void* const FindDataSSE2(const wchar_t* const szModuleName, const std::array<const unsigned char, 8>& SectionName, const unsigned char* const pData, const size_t unDataSize) {
 			return FindDataSSE2W(szModuleName, SectionName, pData, unDataSize);
 		}
 
@@ -2213,7 +2213,7 @@ namespace Detours {
 			return FindDataSSE2A(szModuleName, pData, unDataSize);
 		}
 
-		const void* const FindDataSSE2(const char* const szModuleName, const std::array<unsigned char, 8>& SectionName, const unsigned char* const pData, const size_t unDataSize) {
+		const void* const FindDataSSE2(const char* const szModuleName, const std::array<const unsigned char, 8>& SectionName, const unsigned char* const pData, const size_t unDataSize) {
 			return FindDataSSE2A(szModuleName, SectionName, pData, unDataSize);
 		}
 
@@ -2299,7 +2299,7 @@ namespace Detours {
 			return FindDataAVX(reinterpret_cast<void*>(hModule), static_cast<size_t>(pOH->SizeOfImage) - 1, pData, unDataSize);
 		}
 
-		const void* const FindDataAVX(const HMODULE hModule, const std::array<unsigned char, 8>& SectionName, const unsigned char* const pData, const size_t unDataSize) {
+		const void* const FindDataAVX(const HMODULE hModule, const std::array<const unsigned char, 8>& SectionName, const unsigned char* const pData, const size_t unDataSize) {
 			if (!hModule) {
 				return nullptr;
 			}
@@ -2368,7 +2368,7 @@ namespace Detours {
 			return FindDataAVX(hMod, pData, unDataSize);
 		}
 
-		const void* const FindDataAVXA(const char* const szModuleName, const std::array<unsigned char, 8>& SectionName, const unsigned char* const pData, const size_t unDataSize) {
+		const void* const FindDataAVXA(const char* const szModuleName, const std::array<const unsigned char, 8>& SectionName, const unsigned char* const pData, const size_t unDataSize) {
 			if (!szModuleName) {
 				return nullptr;
 			}
@@ -2435,7 +2435,7 @@ namespace Detours {
 			return FindDataAVX(hMod, pData, unDataSize);
 		}
 
-		const void* const FindDataAVXW(const wchar_t* const szModuleName, const std::array<unsigned char, 8>& SectionName, const unsigned char* const pData, const size_t unDataSize) {
+		const void* const FindDataAVXW(const wchar_t* const szModuleName, const std::array<const unsigned char, 8>& SectionName, const unsigned char* const pData, const size_t unDataSize) {
 			if (!szModuleName) {
 				return nullptr;
 			}
@@ -2486,7 +2486,7 @@ namespace Detours {
 			return FindDataAVXW(szModuleName, pData, unDataSize);
 		}
 
-		const void* const FindDataAVX(const wchar_t* const szModuleName, const std::array<unsigned char, 8>& SectionName, const unsigned char* const pData, const size_t unDataSize) {
+		const void* const FindDataAVX(const wchar_t* const szModuleName, const std::array<const unsigned char, 8>& SectionName, const unsigned char* const pData, const size_t unDataSize) {
 			return FindDataAVXW(szModuleName, SectionName, pData, unDataSize);
 		}
 
@@ -2498,7 +2498,7 @@ namespace Detours {
 			return FindDataAVXA(szModuleName, pData, unDataSize);
 		}
 
-		const void* const FindDataAVX(const char* const szModuleName, const std::array<unsigned char, 8>& SectionName, const unsigned char* const pData, const size_t unDataSize) {
+		const void* const FindDataAVX(const char* const szModuleName, const std::array<const unsigned char, 8>& SectionName, const unsigned char* const pData, const size_t unDataSize) {
 			return FindDataAVXA(szModuleName, SectionName, pData, unDataSize);
 		}
 
@@ -2581,7 +2581,7 @@ namespace Detours {
 			return FindDataAVX2(reinterpret_cast<void*>(hModule), static_cast<size_t>(pOH->SizeOfImage) - 1, pData, unDataSize);
 		}
 
-		const void* const FindDataAVX2(const HMODULE hModule, const std::array<unsigned char, 8>& SectionName, const unsigned char* const pData, const size_t unDataSize) {
+		const void* const FindDataAVX2(const HMODULE hModule, const std::array<const unsigned char, 8>& SectionName, const unsigned char* const pData, const size_t unDataSize) {
 			if (!hModule) {
 				return nullptr;
 			}
@@ -2650,7 +2650,7 @@ namespace Detours {
 			return FindDataAVX2(hMod, pData, unDataSize);
 		}
 
-		const void* const FindDataAVX2A(const char* const szModuleName, const std::array<unsigned char, 8>& SectionName, const unsigned char* const pData, const size_t unDataSize) {
+		const void* const FindDataAVX2A(const char* const szModuleName, const std::array<const unsigned char, 8>& SectionName, const unsigned char* const pData, const size_t unDataSize) {
 			if (!szModuleName) {
 				return nullptr;
 			}
@@ -2717,7 +2717,7 @@ namespace Detours {
 			return FindDataAVX2(hMod, pData, unDataSize);
 		}
 
-		const void* const FindDataAVX2W(const wchar_t* const szModuleName, const std::array<unsigned char, 8>& SectionName, const unsigned char* const pData, const size_t unDataSize) {
+		const void* const FindDataAVX2W(const wchar_t* const szModuleName, const std::array<const unsigned char, 8>& SectionName, const unsigned char* const pData, const size_t unDataSize) {
 			if (!szModuleName) {
 				return nullptr;
 			}
@@ -2768,7 +2768,7 @@ namespace Detours {
 			return FindDataAVX2W(szModuleName, pData, unDataSize);
 		}
 
-		const void* const FindDataAVX2(const wchar_t* const szModuleName, const std::array<unsigned char, 8>& SectionName, const unsigned char* const pData, const size_t unDataSize) {
+		const void* const FindDataAVX2(const wchar_t* const szModuleName, const std::array<const unsigned char, 8>& SectionName, const unsigned char* const pData, const size_t unDataSize) {
 			return FindDataAVX2W(szModuleName, SectionName, pData, unDataSize);
 		}
 
@@ -2780,7 +2780,7 @@ namespace Detours {
 			return FindDataAVX2A(szModuleName, pData, unDataSize);
 		}
 
-		const void* const FindDataAVX2(const char* const szModuleName, const std::array<unsigned char, 8>& SectionName, const unsigned char* const pData, const size_t unDataSize) {
+		const void* const FindDataAVX2(const char* const szModuleName, const std::array<const unsigned char, 8>& SectionName, const unsigned char* const pData, const size_t unDataSize) {
 			return FindDataAVX2A(szModuleName, SectionName, pData, unDataSize);
 		}
 
@@ -2861,7 +2861,7 @@ namespace Detours {
 			return FindDataAVX512(reinterpret_cast<void*>(hModule), static_cast<size_t>(pOH->SizeOfImage) - 1, pData, unDataSize);
 		}
 
-		const void* const FindDataAVX512(const HMODULE hModule, const std::array<unsigned char, 8>& SectionName, const unsigned char* const pData, const size_t unDataSize) {
+		const void* const FindDataAVX512(const HMODULE hModule, const std::array<const unsigned char, 8>& SectionName, const unsigned char* const pData, const size_t unDataSize) {
 			if (!hModule) {
 				return nullptr;
 			}
@@ -2930,7 +2930,7 @@ namespace Detours {
 			return FindDataAVX512(hMod, pData, unDataSize);
 		}
 
-		const void* const FindDataAVX512A(const char* const szModuleName, const std::array<unsigned char, 8>& SectionName, const unsigned char* const pData, const size_t unDataSize) {
+		const void* const FindDataAVX512A(const char* const szModuleName, const std::array<const unsigned char, 8>& SectionName, const unsigned char* const pData, const size_t unDataSize) {
 			if (!szModuleName) {
 				return nullptr;
 			}
@@ -2997,7 +2997,7 @@ namespace Detours {
 			return FindDataAVX512(hMod, pData, unDataSize);
 		}
 
-		const void* const FindDataAVX512W(const wchar_t* const szModuleName, const std::array<unsigned char, 8>& SectionName, const unsigned char* const pData, const size_t unDataSize) {
+		const void* const FindDataAVX512W(const wchar_t* const szModuleName, const std::array<const unsigned char, 8>& SectionName, const unsigned char* const pData, const size_t unDataSize) {
 			if (!szModuleName) {
 				return nullptr;
 			}
@@ -3048,7 +3048,7 @@ namespace Detours {
 			return FindDataAVX512W(szModuleName, pData, unDataSize);
 		}
 
-		const void* const FindDataAVX512(const wchar_t* const szModuleName, const std::array<unsigned char, 8>& SectionName, const unsigned char* const pData, const size_t unDataSize) {
+		const void* const FindDataAVX512(const wchar_t* const szModuleName, const std::array<const unsigned char, 8>& SectionName, const unsigned char* const pData, const size_t unDataSize) {
 			return FindDataAVX512W(szModuleName, SectionName, pData, unDataSize);
 		}
 
@@ -3060,7 +3060,7 @@ namespace Detours {
 			return FindDataAVX512A(szModuleName, pData, unDataSize);
 		}
 
-		const void* const FindDataAVX512(const char* const szModuleName, const std::array<unsigned char, 8>& SectionName, const unsigned char* const pData, const size_t unDataSize) {
+		const void* const FindDataAVX512(const char* const szModuleName, const std::array<const unsigned char, 8>& SectionName, const unsigned char* const pData, const size_t unDataSize) {
 			return FindDataAVX512A(szModuleName, SectionName, pData, unDataSize);
 		}
 
@@ -3125,7 +3125,7 @@ namespace Detours {
 			return FindData(reinterpret_cast<void*>(hModule), static_cast<size_t>(pOH->SizeOfImage) - 1, pData, unDataSize);
 		}
 
-		const void* const FindData(const HMODULE hModule, const std::array<unsigned char, 8>& SectionName, const unsigned char* const pData, const size_t unDataSize) {
+		const void* const FindData(const HMODULE hModule, const std::array<const unsigned char, 8>& SectionName, const unsigned char* const pData, const size_t unDataSize) {
 			if (!hModule) {
 				return nullptr;
 			}
@@ -3190,7 +3190,7 @@ namespace Detours {
 			return FindData(hMod, pData, unDataSize);
 		}
 
-		const void* const FindDataA(const char* const szModuleName, const std::array<unsigned char, 8>& SectionName, const unsigned char* const pData, const size_t unDataSize) {
+		const void* const FindDataA(const char* const szModuleName, const std::array<const unsigned char, 8>& SectionName, const unsigned char* const pData, const size_t unDataSize) {
 			if (!szModuleName) {
 				return nullptr;
 			}
@@ -3257,7 +3257,7 @@ namespace Detours {
 			return FindData(hMod, pData, unDataSize);
 		}
 
-		const void* const FindDataW(const wchar_t* const szModuleName, const std::array<unsigned char, 8>& SectionName, const unsigned char* const pData, const size_t unDataSize) {
+		const void* const FindDataW(const wchar_t* const szModuleName, const std::array<const unsigned char, 8>& SectionName, const unsigned char* const pData, const size_t unDataSize) {
 			if (!szModuleName) {
 				return nullptr;
 			}
@@ -3308,7 +3308,7 @@ namespace Detours {
 			return FindDataW(szModuleName, pData, unDataSize);
 		}
 
-		const void* const FindData(const wchar_t* const szModuleName, const std::array<unsigned char, 8>& SectionName, const unsigned char* const pData, const size_t unDataSize) {
+		const void* const FindData(const wchar_t* const szModuleName, const std::array<const unsigned char, 8>& SectionName, const unsigned char* const pData, const size_t unDataSize) {
 			return FindDataW(szModuleName, SectionName, pData, unDataSize);
 		}
 
@@ -3320,7 +3320,7 @@ namespace Detours {
 			return FindDataA(szModuleName, pData, unDataSize);
 		}
 
-		const void* const FindData(const char* const szModuleName, const std::array<unsigned char, 8>& SectionName, const unsigned char* const pData, const size_t unDataSize) {
+		const void* const FindData(const char* const szModuleName, const std::array<const unsigned char, 8>& SectionName, const unsigned char* const pData, const size_t unDataSize) {
 			return FindDataA(szModuleName, SectionName, pData, unDataSize);
 		}
 

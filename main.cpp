@@ -91,9 +91,9 @@ int _tmain() {
 
 	_tprintf_s(_T("FindSignature Example\n"));
 #ifdef _M_X64
-	printf("Sleep = 0x%016llX\n", reinterpret_cast<size_t>(Detours::Scan::FindSignature(_T("kernelbase.dll"), "\x33\xD2\xE9\x2A\x2A\x2A\x2A\xCC\x71\x28")));
+	printf("Sleep = 0x%016llX\n", reinterpret_cast<size_t>(Detours::Scan::FindSignature(_T("kernelbase.dll"), DECLARE_SECTOR_NAME('.', 't', 'e', 'x', 't', 0, 0, 0), "\x33\xD2\xE9\x2A\x2A\x2A\x2A\xCC\x71\x28")));
 #elif _M_IX86
-	printf("Sleep = 0x%08X\n", reinterpret_cast<size_t>(Detours::Scan::FindSignature(_T("kernelbase.dll"), "\x8B\xFF\x55\x8B\xEC\x6A\x2A\xFF\x75\x08\xE8\x2A\x2A\x2A\x2A\x5D\xC2")));
+	printf("Sleep = 0x%08X\n", reinterpret_cast<size_t>(Detours::Scan::FindSignature(_T("kernelbase.dll"), DECLARE_SECTOR_NAME('.', 't', 'e', 'x', 't', 0, 0, 0), "\x8B\xFF\x55\x8B\xEC\x6A\x2A\xFF\x75\x08\xE8\x2A\x2A\x2A\x2A\x5D\xC2")));
 #endif
 	_tprintf_s(_T("\n"));
 
