@@ -122,6 +122,7 @@ int _tmain() {
 #endif
 	if (pVTable) {
 
+		// __fastcall - 1st arg = ecx, 2nd arg = edx
 		typedef bool(__fastcall* fnFoo)(void* pThis, void* /* unused */);
 		typedef bool(__fastcall* fnBoo)(void* pThis, void* /* unused */);
 
@@ -147,12 +148,14 @@ int _tmain() {
 
 	_tprintf_s(_T("UnHookImport = %d\n"), Detours::Hook::UnHookImport(Sleep_Hook));
 
+#ifdef _M_IX86
 	_tprintf_s(_T("HookExport = %d\n"), Detours::Hook::HookExport(hKernel, "Sleep", Sleep_Hook));
 
 	fnSleep fSleep = reinterpret_cast<fnSleep>(GetProcAddress(hKernel, "Sleep"));
 	fSleep(1000);
 
 	_tprintf_s(_T("UnHookExport = %d\n"), Detours::Hook::UnHookExport(Sleep_Hook));
+#endif
 
 	_tprintf_s(_T("\n"));
 
@@ -199,6 +202,47 @@ int _tmain() {
 	_tprintf_s(_T("Sleeping 1200 ms...\n")); Sleep(1200);
 
 	_tprintf_s(_T("ElapsedTime = %lu ms\n"), (Detours::KUserSharedData.SystemTime.LowPart - unLowPartTime) / 10000);
+
+	_tprintf_s(_T("\n"));
+
+	// ----------------------------------------------------------------
+	// PEB & TEB
+	// ----------------------------------------------------------------
+
+	_tprintf_s(_T("PEB & TEB Example\n"));
+
+	auto pPEB = Detours::GetPEB();
+	if (!pPEB) {
+		return -1;
+	}
+
+	auto pTEB = Detours::GetTEB();
+	if (!pTEB) {
+		return -1;
+	}
+
+	auto pProcessParameters = pPEB->ProcessParameters;
+	if (pProcessParameters) {
+		if (pProcessParameters->CommandLine.Length) {
+			_tprintf_s(_T("CommandLine = `%s`\n"), pPEB->ProcessParameters->CommandLine.Buffer);
+		}
+	}
+
+#ifdef _M_X64
+	_tprintf_s(_T("Process ID = %llu\n"), pTEB->ClientId.UniqueProcess);
+	_tprintf_s(_T("Thread  ID = %llu\n"), pTEB->ClientId.UniqueThread);
+	_tprintf_s(_T("Real Process ID = %llu\n"), pTEB->RealClientId.UniqueProcess);
+	_tprintf_s(_T("Real Thread  ID = %llu\n"), pTEB->RealClientId.UniqueThread);
+#elif _M_IX86
+	_tprintf_s(_T("Process ID = %lu\n"), pTEB->ClientId.UniqueProcess);
+	_tprintf_s(_T("Thread  ID = %lu\n"), pTEB->ClientId.UniqueThread);
+	_tprintf_s(_T("Real Process ID = %lu\n"), pTEB->RealClientId.UniqueProcess);
+	_tprintf_s(_T("Real Thread  ID = %lu\n"), pTEB->RealClientId.UniqueThread);
+#endif
+
+	SetLastError(0x11223344);
+
+	_tprintf_s(_T("LastError = 0x%08X\n"), pTEB->LastErrorValue);
 
 	_tprintf_s(_T("\n"));
 

@@ -43,6 +43,30 @@ namespace Detours {
 	const KUSER_SHARED_DATA& KUserSharedData = *reinterpret_cast<PKUSER_SHARED_DATA>(0x7FFE0000);
 
 	// ----------------------------------------------------------------
+	// PEB
+	// ----------------------------------------------------------------
+
+	const PPEB GetPEB() {
+#ifdef _M_X64
+		return reinterpret_cast<PPEB>(__readgsqword(0x60));
+#elif _M_IX86
+		return reinterpret_cast<PPEB>(__readfsdword(0x30));
+#endif
+	}
+
+	// ----------------------------------------------------------------
+	// TEB
+	// ----------------------------------------------------------------
+
+	const PTEB GetTEB() {
+#ifdef _M_X64
+		return reinterpret_cast<PTEB>(__readgsqword(0x30));
+#elif _M_IX86
+		return reinterpret_cast<PTEB>(__readfsdword(0x18));
+#endif
+	}
+
+	// ----------------------------------------------------------------
 	// Scan
 	// ----------------------------------------------------------------
 
@@ -4180,7 +4204,7 @@ namespace Detours {
 			}
 
 			const size_t unNewAddress = reinterpret_cast<size_t>(pHookAddress) - reinterpret_cast<size_t>(m_hModule);
-#ifdef _WIN64
+#ifdef _M_X64
 			if (unNewAddress >= 0xFFFFFFFFui32) {
 				return false;
 			}
