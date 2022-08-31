@@ -194,6 +194,7 @@ int _tmain() {
 
 	_tprintf_s(_T("Kernel-User Shared Data Example\n"));
 
+	_tprintf_s(_T("SystemCall = 0x%08X\n"), Detours::KUserSharedData.SystemCall);
 	_tprintf_s(_T("Cookie = 0x%08X\n"), Detours::KUserSharedData.Cookie);
 
 	const ULONG unLowPartTime = Detours::KUserSharedData.SystemTime.LowPart;

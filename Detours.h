@@ -642,7 +642,7 @@ namespace Detours {
 	// ----------------------------------------------------------------
 	// Scan
 	// ----------------------------------------------------------------
-	// TODO: Add multiple finding and fix FindRTTI performance.
+	// TODO: Add multiple finding.
 
 	namespace Scan {
 
@@ -2803,7 +2803,6 @@ namespace Detours {
 	// ----------------------------------------------------------------
 	// Hook
 	// ----------------------------------------------------------------
-	// TODO: Add SystemCallHook, InlineHook (Without dependencies)
 
 	namespace Hook {
 
