@@ -23,6 +23,16 @@
 // Macro to declare a const 8-byte array.
 #define DECLARE_SECTOR_NAME(...) std::array<const unsigned char, 8>({ __VA_ARGS__ })
 
+#ifdef _MSC_VER
+// Macro to force a function to be included by the linker.
+#define INCLUDE(SYMBOL_NAME) __pragma(comment(linker, "/INCLUDE:" SYMBOL_NAME))
+#define SELF_INCLUDE INCLUDE(__FUNCDNAME__)
+
+// Macro to declare an alias for the exported function.
+#define EXPORT(SYMBOL_NAME, ALIAS_NAME) __pragma(comment(linker, "/EXPORT:" ALIAS_NAME "=" SYMBOL_NAME))
+#define SELF_EXPORT(ALIAS_NAME) EXPORT(__FUNCDNAME__, ALIAS_NAME)
+#endif
+
 // ----------------------------------------------------------------
 // Checking platform
 // ----------------------------------------------------------------

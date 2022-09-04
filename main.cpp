@@ -17,6 +17,18 @@
 extern "C" void _int7D();
 extern "C" void _int7E();
 
+#ifdef _MSC_VER
+int unused_function() {
+	SELF_INCLUDE; // Function compilation guarantee.
+	return -1;
+}
+
+int exported_function() {
+	SELF_EXPORT("some_export"); // The function will be exported using the given name.
+	return 0;
+}
+#endif
+
 class TestingRTTI {
 public:
 	TestingRTTI() {
