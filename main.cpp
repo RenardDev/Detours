@@ -17,18 +17,6 @@
 extern "C" void _int7D();
 extern "C" void _int7E();
 
-#ifdef _MSC_VER
-int unused_function() {
-	SELF_INCLUDE; // Function compilation guarantee.
-	return -1;
-}
-
-int exported_function() {
-	SELF_EXPORT("some_export"); // The function will be exported using the given name.
-	return 0;
-}
-#endif
-
 class TestingRTTI {
 public:
 	TestingRTTI() {
@@ -103,9 +91,9 @@ int _tmain() {
 
 	_tprintf_s(_T("FindSignature Example\n"));
 #ifdef _M_X64
-	printf("Sleep = 0x%016llX\n", reinterpret_cast<size_t>(Detours::Scan::FindSignature(_T("kernelbase.dll"), DECLARE_SECTOR_NAME('.', 't', 'e', 'x', 't', 0, 0, 0), "\x33\xD2\xE9\x2A\x2A\x2A\x2A\xCC\x71\x28")));
+	printf("Sleep = 0x%016llX\n", reinterpret_cast<size_t>(Detours::Scan::FindSignature(_T("kernelbase.dll"), DECLARE_SECTION_NAME('.', 't', 'e', 'x', 't', 0, 0, 0), "\x33\xD2\xE9\x2A\x2A\x2A\x2A\xCC\x71\x28")));
 #elif _M_IX86
-	printf("Sleep = 0x%08X\n", reinterpret_cast<size_t>(Detours::Scan::FindSignature(_T("kernelbase.dll"), DECLARE_SECTOR_NAME('.', 't', 'e', 'x', 't', 0, 0, 0), "\x8B\xFF\x55\x8B\xEC\x6A\x2A\xFF\x75\x08\xE8\x2A\x2A\x2A\x2A\x5D\xC2")));
+	printf("Sleep = 0x%08X\n", reinterpret_cast<size_t>(Detours::Scan::FindSignature(_T("kernelbase.dll"), DECLARE_SECTION_NAME('.', 't', 'e', 'x', 't', 0, 0, 0), "\x8B\xFF\x55\x8B\xEC\x6A\x2A\xFF\x75\x08\xE8\x2A\x2A\x2A\x2A\x5D\xC2")));
 #endif
 	_tprintf_s(_T("\n"));
 
@@ -147,7 +135,7 @@ int _tmain() {
 	// Hook Import/Export
 	// ----------------------------------------------------------------
 
-	_tprintf_s(_T("Hook Import/Export Example\n"));
+	_tprintf_s(_T("Hook Import Example\n"));
 
 	HMODULE hKernel = GetModuleHandle(_T("kernel32.dll"));
 	if (!hKernel) {
@@ -159,15 +147,6 @@ int _tmain() {
 	Sleep(1000);
 
 	_tprintf_s(_T("UnHookImport = %d\n"), Detours::Hook::UnHookImport(Sleep_Hook));
-
-#ifdef _M_IX86
-	_tprintf_s(_T("HookExport = %d\n"), Detours::Hook::HookExport(hKernel, "Sleep", Sleep_Hook));
-
-	fnSleep fSleep = reinterpret_cast<fnSleep>(GetProcAddress(hKernel, "Sleep"));
-	fSleep(1000);
-
-	_tprintf_s(_T("UnHookExport = %d\n"), Detours::Hook::UnHookExport(Sleep_Hook));
-#endif
 
 	_tprintf_s(_T("\n"));
 
@@ -191,12 +170,12 @@ int _tmain() {
 
 	_tprintf_s(_T("Global Exception Example\n"));
 
-	_tprintf_s(_T("AddCallBack = %d\n"), Detours::Exception::AddCallBack(OnException));
+	_tprintf_s(_T("AddCallBack = %d\n"), Detours::Exception::g_ExceptionListener.AddCallBack(OnException));
 
 	_int7D();
 	_int7E();
 
-	_tprintf_s(_T("RemoveCallBack = %d\n"), Detours::Exception::RemoveCallBack(OnException));
+	_tprintf_s(_T("RemoveCallBack = %d\n"), Detours::Exception::g_ExceptionListener.RemoveCallBack(OnException));
 
 	_tprintf_s(_T("\n"));
 

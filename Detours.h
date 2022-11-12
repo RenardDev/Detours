@@ -11,39 +11,42 @@
 
 // STL
 #include <array>
+#include <vector>
 
 // ----------------------------------------------------------------
 // General definitions
 // ----------------------------------------------------------------
 
-#ifndef DETOURS_MAX_STRSIZE
-#define DETOURS_MAX_STRSIZE 0x1000 // 4 KiB
-#endif // !DETOURS_MAX_SIZE
+#ifndef PROCESSOR_FEATURE_MAX
+#define PROCESSOR_FEATURE_MAX 64
+#endif // !PROCESSOR_FEATURE_MAX
 
-// Macro to declare a const 8-byte array.
-#define DECLARE_SECTOR_NAME(...) std::array<const unsigned char, 8>({ __VA_ARGS__ })
+#ifndef RTL_MAX_DRIVE_LETTERS
+#define RTL_MAX_DRIVE_LETTERS 32
+#endif // !RTL_MAX_DRIVE_LETTERS
 
-#ifdef _MSC_VER
-// Macro to force a function to be included by the linker.
-#define INCLUDE(SYMBOL_NAME) __pragma(comment(linker, "/INCLUDE:" SYMBOL_NAME))
-#define SELF_INCLUDE INCLUDE(__FUNCDNAME__)
+#ifndef GDI_HANDLE_BUFFER_SIZE32
+#define GDI_HANDLE_BUFFER_SIZE32 34
+#endif // !GDI_HANDLE_BUFFER_SIZE32
 
-// Macro to declare an alias for the exported function.
-#define EXPORT(SYMBOL_NAME, ALIAS_NAME) __pragma(comment(linker, "/EXPORT:" ALIAS_NAME "=" SYMBOL_NAME))
-#define SELF_EXPORT(ALIAS_NAME) EXPORT(__FUNCDNAME__, ALIAS_NAME)
+#ifndef GDI_HANDLE_BUFFER_SIZE64
+#define GDI_HANDLE_BUFFER_SIZE64 60
+#endif // !GDI_HANDLE_BUFFER_SIZE64
+
+#ifndef GDI_BATCH_BUFFER_SIZE
+#define GDI_BATCH_BUFFER_SIZE 310
+#endif // !GDI_BATCH_BUFFER_SIZE
+
+#ifdef _M_X64
+#define GDI_HANDLE_BUFFER_SIZE GDI_HANDLE_BUFFER_SIZE32
+#elif _M_IX86
+#define GDI_HANDLE_BUFFER_SIZE GDI_HANDLE_BUFFER_SIZE64
+#else
+#error Only x86 and x86_64 platforms are supported.
 #endif
 
-// ----------------------------------------------------------------
-// Checking platform
-// ----------------------------------------------------------------
-
-#if !defined(_M_IX86) && !defined(_M_X64)
-#error Only x86 and x86_64 platforms are supported.
-#endif // !_M_IX86 && !_M_X64
-
-#if !defined(_WIN32) && !defined(_WIN64)
-#error Only Windows platform are supported.
-#endif // !_WIN32 && !_WIN64
+// Macro to declare a const 8-byte array.
+#define DECLARE_SECTION_NAME(...) std::array<const unsigned char, 8>({ __VA_ARGS__ })
 
 // ----------------------------------------------------------------
 // Detours
@@ -55,24 +58,23 @@ namespace Detours {
 	// KUSER_SHARED_DATA
 	// ----------------------------------------------------------------
 
-#pragma pack(push, 4)
+	typedef enum _NT_PRODUCT_TYPE {
+		NtProductWinNt = 1,
+		NtProductLanManNt,
+		NtProductServer
+	} NT_PRODUCT_TYPE, *PNT_PRODUCT_TYPE;
+
+	typedef enum _ALTERNATIVE_ARCHITECTURE_TYPE {
+		StandardDesign,
+		NEC98x86,
+		EndAlternatives
+	} ALTERNATIVE_ARCHITECTURE_TYPE, *PALTERNATIVE_ARCHITECTURE_TYPE;
+
 	typedef struct _KSYSTEM_TIME {
 		ULONG LowPart;
 		LONG High1Time;
 		LONG High2Time;
 	} KSYSTEM_TIME, *PKSYSTEM_TIME;
-
-	typedef enum _NT_PRODUCT_TYPE : unsigned int {
-		NtProductWinNt = 1,
-		NtProductLanManNt = 2,
-		NtProductServer = 3
-	} NT_PRODUCT_TYPE;
-
-	typedef enum _ALTERNATIVE_ARCHITECTURE_TYPE : unsigned int {
-		StandardDesign = 0,
-		NEC98x86 = 1,
-		EndAlternatives = 2
-	} ALTERNATIVE_ARCHITECTURE_TYPE;
 
 	typedef struct _KUSER_SHARED_DATA {
 		ULONG TickCountLowDeprecated;
@@ -91,15 +93,15 @@ namespace Detours {
 		ULONG AppCompatFlag;
 		ULONGLONG RNGSeedVersion;
 		ULONG GlobalValidationRunlevel;
-		LONG TimeZoneBiasStamp;
+		volatile LONG TimeZoneBiasStamp;
 		ULONG NtBuildNumber;
 		NT_PRODUCT_TYPE NtProductType;
 		BOOLEAN ProductTypeIsValid;
-		UCHAR Reserved0[1];
+		BOOLEAN Reserved0[1];
 		USHORT NativeProcessorArchitecture;
 		ULONG NtMajorVersion;
 		ULONG NtMinorVersion;
-		BOOLEAN ProcessorFeatures[64];
+		BOOLEAN ProcessorFeatures[PROCESSOR_FEATURE_MAX];
 		ULONG Reserved1;
 		ULONG Reserved3;
 		volatile ULONG TimeSlip;
@@ -147,15 +149,7 @@ namespace Detours {
 		ULONGLONG TestRetInstruction;
 		LONGLONG QpcFrequency;
 		ULONG SystemCall;
-		union {
-			ULONG AllFlags;
-			struct {
-				ULONG Win32Process : 1;
-				ULONG Sgx2Enclave : 1;
-				ULONG VbsBasicEnclave : 1;
-				ULONG SpareBits : 29;
-			};
-		} UserCetAvailableEnvironments;
+		ULONG Reserved2;
 		ULONGLONG SystemCallPad[2];
 		union {
 			volatile KSYSTEM_TIME TickCount;
@@ -190,8 +184,8 @@ namespace Detours {
 		union {
 			USHORT QpcData;
 			struct {
-				volatile UCHAR QpcBypassEnabled : 1;
-				UCHAR QpcShift : 1;
+				volatile UCHAR QpcBypassEnabled;
+				UCHAR QpcShift;
 			};
 		};
 		LARGE_INTEGER TimeZoneBiasEffectiveStart;
@@ -199,8 +193,8 @@ namespace Detours {
 		XSTATE_CONFIGURATION XState;
 		KSYSTEM_TIME FeatureConfigurationChangeStamp;
 		ULONG Spare;
+		ULONG64 UserPointerAuthMask;
 	} KUSER_SHARED_DATA, *PKUSER_SHARED_DATA;
-#pragma pack(pop)
 
 	extern const KUSER_SHARED_DATA& KUserSharedData;
 
@@ -208,7 +202,6 @@ namespace Detours {
 	// PEB
 	// ----------------------------------------------------------------
 
-#pragma pack(push, 8)
 	typedef struct _PEB_LDR_DATA {
 		ULONG Length;
 		BOOLEAN Initialized;
@@ -221,10 +214,10 @@ namespace Detours {
 		HANDLE ShutdownThreadId;
 	} PEB_LDR_DATA, *PPEB_LDR_DATA;
 
-	typedef struct _UNICODE_STRING {
+	typedef struct _UNICODE_STRING{
 		USHORT Length;
 		USHORT MaximumLength;
-		PWCHAR Buffer;
+		PWCH Buffer;
 	} UNICODE_STRING, *PUNICODE_STRING;
 
 	typedef struct _CURDIR {
@@ -273,7 +266,7 @@ namespace Detours {
 		UNICODE_STRING DesktopInfo;
 		UNICODE_STRING ShellInfo;
 		UNICODE_STRING RuntimeData;
-		RTL_DRIVE_LETTER_CURDIR CurrentDirectories[32];
+		RTL_DRIVE_LETTER_CURDIR CurrentDirectories[RTL_MAX_DRIVE_LETTERS];
 		ULONG_PTR EnvironmentSize;
 		ULONG_PTR EnvironmentVersion;
 		PVOID PackageDependencyData;
@@ -283,6 +276,7 @@ namespace Detours {
 		UNICODE_STRING HeapPartitionName;
 		ULONG_PTR DefaultThreadpoolCpuSetMasks;
 		ULONG DefaultThreadpoolCpuSetMaskCount;
+		ULONG DefaultThreadpoolThreadMaximum;
 	} RTL_USER_PROCESS_PARAMETERS, *PRTL_USER_PROCESS_PARAMETERS;
 
 	typedef struct _API_SET_NAMESPACE {
@@ -295,11 +289,9 @@ namespace Detours {
 		ULONG HashFactor;
 	} API_SET_NAMESPACE, *PAPI_SET_NAMESPACE;
 
-	typedef struct _LEAP_SECOND_DATA {
-		UCHAR Enabled;
-		ULONG Count;
-		LARGE_INTEGER Data[1];
-	} LEAP_SECOND_DATA, *PLEAP_SECOND_DATA;
+	typedef ULONG GDI_HANDLE_BUFFER[GDI_HANDLE_BUFFER_SIZE];
+	typedef ULONG GDI_HANDLE_BUFFER32[GDI_HANDLE_BUFFER_SIZE32];
+	typedef ULONG GDI_HANDLE_BUFFER64[GDI_HANDLE_BUFFER_SIZE64];
 
 	typedef struct _PEB {
 		BOOLEAN InheritedAddressSpace;
@@ -337,7 +329,7 @@ namespace Detours {
 				ULONG ProcessUsingFTH : 1;
 				ULONG ProcessPreviouslyThrottled : 1;
 				ULONG ProcessCurrentlyThrottled : 1;
-				ULONG ProcessImagesHotPatched : 1;
+				ULONG ProcessImagesHotPatched : 1; // REDSTONE5
 				ULONG ReservedBits0 : 24;
 			};
 		};
@@ -380,11 +372,7 @@ namespace Detours {
 		ULONG ImageSubsystemMajorVersion;
 		ULONG ImageSubsystemMinorVersion;
 		KAFFINITY ActiveProcessAffinityMask;
-#ifdef _M_X64
-		ULONG GdiHandleBuffer[60];
-#elif _M_IX86
-		ULONG GdiHandleBuffer[34];
-#endif
+		GDI_HANDLE_BUFFER GdiHandleBuffer;
 		PVOID PostProcessInitRoutine;
 		PVOID TlsExpansionBitmap;
 		ULONG TlsExpansionBitmapBits[32];
@@ -401,7 +389,7 @@ namespace Detours {
 		SIZE_T MinimumStackCommit;
 		PVOID SparePointers[2];
 		PVOID PatchLoaderData;
-		PVOID ChpeV2ProcessInfo;
+		PVOID ChpeV2ProcessInfo; // _CHPEV2_PROCESS_INFO
 		ULONG AppModelFeatureState;
 		ULONG SpareUlongs[2];
 		USHORT ActiveCodePage;
@@ -410,7 +398,11 @@ namespace Detours {
 		USHORT UnusedNlsField;
 		PVOID WerRegistrationData;
 		PVOID WerShipAssertPtr;
-		PVOID EcCodeBitMap;
+		union {
+			PVOID pContextData;
+			PVOID pUnused;
+			PVOID EcCodeBitMap;
+		};
 		PVOID pImageHeaderHash;
 		union {
 			ULONG TracingFlags;
@@ -430,7 +422,7 @@ namespace Detours {
 		ULONG CloudFileDiagFlags;
 		CHAR PlaceholderCompatibilityMode;
 		CHAR PlaceholderCompatibilityModeReserved[7];
-		PLEAP_SECOND_DATA LeapSecondData;
+		struct _LEAP_SECOND_DATA* LeapSecondData;
 		union {
 			ULONG LeapSecondFlags;
 			struct {
@@ -441,7 +433,6 @@ namespace Detours {
 		ULONG NtGlobalFlag2;
 		ULONGLONG ExtendedFeatureDisableMask;
 	} PEB, *PPEB;
-#pragma pack(pop)
 
 	const PPEB GetPEB();
 
@@ -449,27 +440,24 @@ namespace Detours {
 	// TEB
 	// ----------------------------------------------------------------
 
-#pragma pack(push, 8)
-#ifdef _M_X64
-	typedef struct _CLIENT_ID {
-		ULONGLONG UniqueProcess;
-		ULONGLONG UniqueThread;
-	} CLIENT_ID, *PCLIENT_ID;
-#elif _M_IX86
-	typedef struct _CLIENT_ID {
+	typedef struct _CLIENT_ID32 {
 		ULONG UniqueProcess;
 		ULONG UniqueThread;
-	} CLIENT_ID, *PCLIENT_ID;
+	} CLIENT_ID32, *PCLIENT_ID32;
+
+	typedef struct _CLIENT_ID64 {
+		ULONGLONG UniqueProcess;
+		ULONGLONG UniqueThread;
+	} CLIENT_ID64, *PCLIENT_ID64;
+
+#ifdef _M_X64
+	typedef CLIENT_ID64 CLIENT_ID;
+#elif _M_IX86
+	typedef CLIENT_ID32 CLIENT_ID;
 #endif
 
-	typedef struct _RTL_ACTIVATION_CONTEXT_STACK_FRAME {
-		struct _RTL_ACTIVATION_CONTEXT_STACK_FRAME* Previous;
-		struct _ACTIVATION_CONTEXT* ActivationContext;
-		ULONG Flags;
-	} RTL_ACTIVATION_CONTEXT_STACK_FRAME, *PRTL_ACTIVATION_CONTEXT_STACK_FRAME;
-
 	typedef struct _ACTIVATION_CONTEXT_STACK {
-		PRTL_ACTIVATION_CONTEXT_STACK_FRAME ActiveFrame;
+		struct _RTL_ACTIVATION_CONTEXT_STACK_FRAME* ActiveFrame;
 		LIST_ENTRY FrameListCache;
 		ULONG Flags;
 		ULONG NextCookieSequenceNumber;
@@ -479,7 +467,7 @@ namespace Detours {
 	typedef struct _GDI_TEB_BATCH {
 		ULONG Offset;
 		ULONG_PTR HDC;
-		ULONG Buffer[310];
+		ULONG Buffer[GDI_BATCH_BUFFER_SIZE];
 	} GDI_TEB_BATCH, *PGDI_TEB_BATCH;
 
 	typedef struct _TEB_ACTIVE_FRAME_CONTEXT {
@@ -645,203 +633,72 @@ namespace Detours {
 		ULONG SpinCallCount;
 		ULONGLONG ExtendedFeatureDisableMask;
 	} TEB, *PTEB;
-#pragma pack(pop)
 
 	const PTEB GetTEB();
 
 	// ----------------------------------------------------------------
 	// Scan
 	// ----------------------------------------------------------------
-	// TODO: Add multiple finding.
 
 	namespace Scan {
 
 		// ----------------------------------------------------------------
-		// FindSection
+		// FindMultipleSections
 		// ----------------------------------------------------------------
 
-		/// <summary>
-		/// Finding section in module.
-		/// </summary>
-		/// <param name='hModule'>Module handle.</param>
-		/// <param name='SectionName'>Section name.</param>
-		/// <param name='pAddress'>Section address.</param>
-		/// <param name='pSize'>Section size.</param>
-		/// <returns>Returns True on success, False otherwise.</returns>
-		bool FindSection(const HMODULE hModule, const std::array<const unsigned char, 8>& SectionName, void** pAddress, size_t* pSize);
+		typedef struct _MULTIPLE_SECTIONS {
+			std::array<unsigned char, 8> m_SectionName;
+			void* m_pAddress;
+			size_t m_pSize;
+		} MULTIPLE_SECTIONS, *PMULTIPLE_SECTIONS;
+
+		bool FindMultipleSections(const HMODULE hModule, const PMULTIPLE_SECTIONS pSections, const size_t unSectionsCount);
+
+		// ----------------------------------------------------------------
+		// FindMultipleSections
+		// ----------------------------------------------------------------
+
+		bool FindSection(const HMODULE hModule, const std::array<const unsigned char, 8>& SectionName, const void** pAddress, const size_t* pSize);
+
+		// ----------------------------------------------------------------
+		// FindMultipleSectionsPOGO
+		// ----------------------------------------------------------------
+
+		typedef struct _MULTIPLE_POGO_SECTIONS {
+			const char* m_szSectionName;
+			void* m_pAddress;
+			size_t m_pSize;
+		} MULTIPLE_POGO_SECTIONS, *PMULTIPLE_POGO_SECTIONS;
+
+		bool FindMultipleSectionsPOGO(const HMODULE hModule, const PMULTIPLE_POGO_SECTIONS pSections, const size_t unSectionsCount);
 
 		// ----------------------------------------------------------------
 		// FindSectionPOGO
 		// ----------------------------------------------------------------
 
-		/// <summary>
-		/// Finding section in module.
-		/// </summary>
-		/// <param name='hModule'>Module handle.</param>
-		/// <param name='SectionName'>Section name.</param>
-		/// <param name='pAddress'>Section address.</param>
-		/// <param name='pSize'>Section size.</param>
-		/// <returns>Returns True on success, False otherwise.</returns>
-		bool FindSectionPOGO(const HMODULE hModule, const char* const szSectionName, void** pAddress, const size_t* pSize);
+		bool FindSectionPOGO(const HMODULE hModule, const char* const szSectionName, const void** pAddress, const size_t* pSize);
 
 		// ----------------------------------------------------------------
 		// FindSignature (Native)
 		// ----------------------------------------------------------------
 
-		/// <summary>
-		/// Finding signature in data without SIMD by address and size.
-		/// </summary>
-		/// <param name='pAddress'>Data address.</param>
-		/// <param name='unSize'>The size of the data in bytes.</param>
-		/// <param name='szSignature'>Desired data signature.</param>
-		/// <param name='unIgnoredByte'>Byte to ignore in signature.</param>
-		/// <returns>Returns address of data from signature on success, null otherwise.</returns>
 		const void* const FindSignatureNative(const void* const pAddress, const size_t unSize, const char* const szSignature, const unsigned char unIgnoredByte = 0x2A);
-
-		/// <summary>
-		/// Finding signature in data without SIMD by module handle.
-		/// </summary>
-		/// <param name='hModule'>Module handle.</param>
-		/// <param name='szSignature'>Desired data signature.</param>
-		/// <param name='unIgnoredByte'>Byte to ignore in signature.</param>
-		/// <returns>Returns address of data from signature on success, null otherwise.</returns>
 		const void* const FindSignatureNative(const HMODULE hModule, const char* const szSignature, const unsigned char unIgnoredByte = 0x2A);
-
-		/// <summary>
-		/// Finding signature in data without SIMD by module handle and section name.
-		/// </summary>
-		/// <param name='hModule'>Module handle.</param>
-		/// <param name='SectionName'>Section name.</param>
-		/// <param name='szSignature'>Desired data signature.</param>
-		/// <param name='unIgnoredByte'>Byte to ignore in signature.</param>
-		/// <returns>Returns address of data from signature on success, null otherwise.</returns>
 		const void* const FindSignatureNative(const HMODULE hModule, const std::array<const unsigned char, 8>& SectionName, const char* const szSignature, const unsigned char unIgnoredByte = 0x2A);
-
-		/// <summary>
-		/// Finding signature in data without SIMD by module handle and POGO section name.
-		/// </summary>
-		/// <param name='hModule'>Module handle.</param>
-		/// <param name='szSectionName'>Section name.</param>
-		/// <param name='szSignature'>Desired data signature.</param>
-		/// <param name='unIgnoredByte'>Byte to ignore in signature.</param>
-		/// <returns>Returns address of data from signature on success, null otherwise.</returns>
 		const void* const FindSignatureNative(const HMODULE hModule, const char* const szSectionName, const char* const szSignature, const unsigned char unIgnoredByte = 0x2A);
-
-		/// <summary>
-		/// Finding signature in data without SIMD by module name.
-		/// </summary>
-		/// <param name='szModuleName'>Module name.</param>
-		/// <param name='szSignature'>Desired data signature.</param>
-		/// <param name='unIgnoredByte'>Byte to ignore in signature.</param>
-		/// <returns>Returns address of data from signature on success, null otherwise.</returns>
 		const void* const FindSignatureNativeA(const char* const szModuleName, const char* const szSignature, const unsigned char unIgnoredByte = 0x2A);
-
-		/// <summary>
-		/// Finding signature in data without SIMD by module name and section name.
-		/// </summary>
-		/// <param name='szModuleName'>Module name.</param>
-		/// <param name='SectionName'>Section name.</param>
-		/// <param name='szSignature'>Desired data signature.</param>
-		/// <param name='unIgnoredByte'>Byte to ignore in signature.</param>
-		/// <returns>Returns address of data from signature on success, null otherwise.</returns>
 		const void* const FindSignatureNativeA(const char* const szModuleName, const std::array<const unsigned char, 8>& SectionName, const char* const szSignature, const unsigned char unIgnoredByte = 0x2A);
-
-		/// <summary>
-		/// Finding signature in data without SIMD by module name and POGO section name.
-		/// </summary>
-		/// <param name='szModuleName'>Module name.</param>
-		/// <param name='szSectionName'>Section name.</param>
-		/// <param name='szSignature'>Desired data signature.</param>
-		/// <param name='unIgnoredByte'>Byte to ignore in signature.</param>
-		/// <returns>Returns address of data from signature on success, null otherwise.</returns>
 		const void* const FindSignatureNativeA(const char* const szModuleName, const char* const szSectionName, const char* const szSignature, const unsigned char unIgnoredByte = 0x2A);
-
-		/// <summary>
-		/// Finding signature in data without SIMD by module name.
-		/// </summary>
-		/// <param name='szModuleName'>Module name.</param>
-		/// <param name='szSignature'>Desired data signature.</param>
-		/// <param name='unIgnoredByte'>Byte to ignore in signature.</param>
-		/// <returns>Returns address of data from signature on success, null otherwise.</returns>
 		const void* const FindSignatureNativeW(const wchar_t* const szModuleName, const char* const szSignature, const unsigned char unIgnoredByte = 0x2A);
-
-		/// <summary>
-		/// Finding signature in data without SIMD by module name and section name.
-		/// </summary>
-		/// <param name='szModuleName'>Module name.</param>
-		/// <param name='SectionName'>Section name.</param>
-		/// <param name='szSignature'>Desired data signature.</param>
-		/// <param name='unIgnoredByte'>Byte to ignore in signature.</param>
-		/// <returns>Returns address of data from signature on success, null otherwise.</returns>
 		const void* const FindSignatureNativeW(const wchar_t* const szModuleName, const std::array<const unsigned char, 8>& SectionName, const char* const szSignature, const unsigned char unIgnoredByte = 0x2A);
-
-		/// <summary>
-		/// Finding signature in data without SIMD by module name and POGO section name.
-		/// </summary>
-		/// <param name='szModuleName'>Module name.</param>
-		/// <param name='szSectionName'>Section name.</param>
-		/// <param name='szSignature'>Desired data signature.</param>
-		/// <param name='unIgnoredByte'>Byte to ignore in signature.</param>
-		/// <returns>Returns address of data from signature on success, null otherwise.</returns>
 		const void* const FindSignatureNativeW(const wchar_t* const szModuleName, const char* const szSectionName, const char* const szSignature, const unsigned char unIgnoredByte = 0x2A);
-
 #ifdef UNICODE
-		/// <summary>
-		/// Finding signature in data without SIMD by module name.
-		/// </summary>
-		/// <param name='szModuleName'>Module name.</param>
-		/// <param name='szSignature'>Desired data signature.</param>
-		/// <param name='unIgnoredByte'>Byte to ignore in signature.</param>
-		/// <returns>Returns address of data from signature on success, null otherwise.</returns>
 		const void* const FindSignatureNative(const wchar_t* const szModuleName, const char* const szSignature, const unsigned char unIgnoredByte = 0x2A);
-
-		/// <summary>
-		/// Finding signature in data without SIMD by module name and section name.
-		/// </summary>
-		/// <param name='szModuleName'>Module name.</param>
-		/// <param name='SectionName'>Section name.</param>
-		/// <param name='szSignature'>Desired data signature.</param>
-		/// <param name='unIgnoredByte'>Byte to ignore in signature.</param>
-		/// <returns>Returns address of data from signature on success, null otherwise.</returns>
 		const void* const FindSignatureNative(const wchar_t* const szModuleName, const std::array<const unsigned char, 8>& SectionName, const char* const szSignature, const unsigned char unIgnoredByte = 0x2A);
-
-		/// <summary>
-		/// Finding signature in data without SIMD by module name and POGO section name.
-		/// </summary>
-		/// <param name='szModuleName'>Module name.</param>
-		/// <param name='szSectionName'>Section name.</param>
-		/// <param name='szSignature'>Desired data signature.</param>
-		/// <param name='unIgnoredByte'>Byte to ignore in signature.</param>
-		/// <returns>Returns address of data from signature on success, null otherwise.</returns>
 		const void* const FindSignatureNative(const wchar_t* const szModuleName, const char* const szSectionName, const char* const szSignature, const unsigned char unIgnoredByte = 0x2A);
 #else
-		/// <summary>
-		/// Finding signature in data without SIMD by module name.
-		/// </summary>
-		/// <param name='szModuleName'>Module name.</param>
-		/// <param name='szSignature'>Desired data signature.</param>
-		/// <param name='unIgnoredByte'>Byte to ignore in signature.</param>
-		/// <returns>Returns address of data from signature on success, null otherwise.</returns>
 		const void* const FindSignatureNative(const char* const szModuleName, const char* const szSignature, const unsigned char unIgnoredByte = 0x2A);
-
-		/// <summary>
-		/// Finding signature in data without SIMD by module name and section name.
-		/// </summary>
-		/// <param name='szModuleName'>Module name.</param>
-		/// <param name='SectionName'>Section name.</param>
-		/// <param name='szSignature'>Desired data signature.</param>
-		/// <param name='unIgnoredByte'>Byte to ignore in signature.</param>
-		/// <returns>Returns address of data from signature on success, null otherwise.</returns>
 		const void* const FindSignatureNative(const char* const szModuleName, const std::array<const unsigned char, 8>& SectionName, const char* const szSignature, const unsigned char unIgnoredByte = 0x2A);
-
-		/// <summary>
-		/// Finding signature in data without SIMD by module name and POGO section name.
-		/// </summary>
-		/// <param name='szModuleName'>Module name.</param>
-		/// <param name='szSectionName'>Section name.</param>
-		/// <param name='szSignature'>Desired data signature.</param>
-		/// <param name='unIgnoredByte'>Byte to ignore in signature.</param>
-		/// <returns>Returns address of data from signature on success, null otherwise.</returns>
 		const void* const FindSignatureNative(const char* const szModuleName, const char* const szSectionName, const char* const szSignature, const unsigned char unIgnoredByte = 0x2A);
 #endif
 
@@ -849,160 +706,23 @@ namespace Detours {
 		// FindSignature (SSE2)
 		// ----------------------------------------------------------------
 
-		/// <summary>
-		/// Finding signature in data with SIMD (SSE2) by address and size.
-		/// </summary>
-		/// <param name='pAddress'>Data address.</param>
-		/// <param name='unSize'>The size of the data in bytes.</param>
-		/// <param name='szSignature'>Desired data signature.</param>
-		/// <param name='unIgnoredByte'>Byte to ignore in signature.</param>
-		/// <returns>Returns address of data from signature on success, null otherwise.</returns>
 		const void* const FindSignatureSSE2(const void* const pAddress, const size_t unSize, const char* const szSignature, const unsigned char unIgnoredByte = 0x2A);
-
-		/// <summary>
-		/// Finding signature in data with SIMD (SSE2) by module handle.
-		/// </summary>
-		/// <param name='hModule'>Module handle.</param>
-		/// <param name='szSignature'>Desired data signature.</param>
-		/// <param name='unIgnoredByte'>Byte to ignore in signature.</param>
-		/// <returns>Returns address of data from signature on success, null otherwise.</returns>
 		const void* const FindSignatureSSE2(const HMODULE hModule, const char* const szSignature, const unsigned char unIgnoredByte = 0x2A);
-
-		/// <summary>
-		/// Finding signature in data with SIMD (SSE2) by module handle and section name.
-		/// </summary>
-		/// <param name='hModule'>Module handle.</param>
-		/// <param name='SectionName'>Section name.</param>
-		/// <param name='szSignature'>Desired data signature.</param>
-		/// <param name='unIgnoredByte'>Byte to ignore in signature.</param>
-		/// <returns>Returns address of data from signature on success, null otherwise.</returns>
 		const void* const FindSignatureSSE2(const HMODULE hModule, const std::array<const unsigned char, 8>& SectionName, const char* const szSignature, const unsigned char unIgnoredByte = 0x2A);
-
-		/// <summary>
-		/// Finding signature in data with SIMD (SSE2) by module handle and POGO section name.
-		/// </summary>
-		/// <param name='hModule'>Module handle.</param>
-		/// <param name='szSectionName'>Section name.</param>
-		/// <param name='szSignature'>Desired data signature.</param>
-		/// <param name='unIgnoredByte'>Byte to ignore in signature.</param>
-		/// <returns>Returns address of data from signature on success, null otherwise.</returns>
 		const void* const FindSignatureSSE2(const HMODULE hModule, const char* const szSectionName, const char* const szSignature, const unsigned char unIgnoredByte = 0x2A);
-
-		/// <summary>
-		/// Finding signature in data with SIMD (SSE2) by module name.
-		/// </summary>
-		/// <param name='szModuleName'>Module name.</param>
-		/// <param name='szSignature'>Desired data signature.</param>
-		/// <param name='unIgnoredByte'>Byte to ignore in signature.</param>
-		/// <returns>Returns address of data from signature on success, null otherwise.</returns>
 		const void* const FindSignatureSSE2A(const char* const szModuleName, const char* const szSignature, const unsigned char unIgnoredByte = 0x2A);
-
-		/// <summary>
-		/// Finding signature in data with SIMD (SSE2) by module name and section name.
-		/// </summary>
-		/// <param name='szModuleName'>Module name.</param>
-		/// <param name='SectionName'>Section name.</param>
-		/// <param name='szSignature'>Desired data signature.</param>
-		/// <param name='unIgnoredByte'>Byte to ignore in signature.</param>
-		/// <returns>Returns address of data from signature on success, null otherwise.</returns>
 		const void* const FindSignatureSSE2A(const char* const szModuleName, const std::array<const unsigned char, 8>& SectionName, const char* const szSignature, const unsigned char unIgnoredByte = 0x2A);
-
-		/// <summary>
-		/// Finding signature in data with SIMD (SSE2) by module name and POGO section name.
-		/// </summary>
-		/// <param name='szModuleName'>Module name.</param>
-		/// <param name='szSectionName'>Section name.</param>
-		/// <param name='szSignature'>Desired data signature.</param>
-		/// <param name='unIgnoredByte'>Byte to ignore in signature.</param>
-		/// <returns>Returns address of data from signature on success, null otherwise.</returns>
 		const void* const FindSignatureSSE2A(const char* const szModuleName, const char* const szSectionName, const char* const szSignature, const unsigned char unIgnoredByte = 0x2A);
-
-		/// <summary>
-		/// Finding signature in data with SIMD (SSE2) by module name.
-		/// </summary>
-		/// <param name='szModuleName'>Module name.</param>
-		/// <param name='szSignature'>Desired data signature.</param>
-		/// <param name='unIgnoredByte'>Byte to ignore in signature.</param>
-		/// <returns>Returns address of data from signature on success, null otherwise.</returns>
 		const void* const FindSignatureSSE2W(const wchar_t* const szModuleName, const char* const szSignature, const unsigned char unIgnoredByte = 0x2A);
-
-		/// <summary>
-		/// Finding signature in data with SIMD (SSE2) by module name and section name.
-		/// </summary>
-		/// <param name='szModuleName'>Module name.</param>
-		/// <param name='SectionName'>Section name.</param>
-		/// <param name='szSignature'>Desired data signature.</param>
-		/// <param name='unIgnoredByte'>Byte to ignore in signature.</param>
-		/// <returns>Returns address of data from signature on success, null otherwise.</returns>
 		const void* const FindSignatureSSE2W(const wchar_t* const szModuleName, const std::array<const unsigned char, 8>& SectionName, const char* const szSignature, const unsigned char unIgnoredByte = 0x2A);
-
-		/// <summary>
-		/// Finding signature in data with SIMD (SSE2) by module name and POGO section name.
-		/// </summary>
-		/// <param name='szModuleName'>Module name.</param>
-		/// <param name='szSectionName'>Section name.</param>
-		/// <param name='szSignature'>Desired data signature.</param>
-		/// <param name='unIgnoredByte'>Byte to ignore in signature.</param>
-		/// <returns>Returns address of data from signature on success, null otherwise.</returns>
 		const void* const FindSignatureSSE2W(const wchar_t* const szModuleName, const char* const szSectionName, const char* const szSignature, const unsigned char unIgnoredByte = 0x2A);
-
 #ifdef UNICODE
-		/// <summary>
-		/// Finding signature in data with SIMD (SSE2) by module name.
-		/// </summary>
-		/// <param name='szModuleName'>Module name.</param>
-		/// <param name='szSignature'>Desired data signature.</param>
-		/// <param name='unIgnoredByte'>Byte to ignore in signature.</param>
-		/// <returns>Returns address of data from signature on success, null otherwise.</returns>
 		const void* const FindSignatureSSE2(const wchar_t* const szModuleName, const char* const szSignature, const unsigned char unIgnoredByte = 0x2A);
-
-		/// <summary>
-		/// Finding signature in data with SIMD (SSE2) by module name and section name.
-		/// </summary>
-		/// <param name='szModuleName'>Module name.</param>
-		/// <param name='SectionName'>Section name.</param>
-		/// <param name='szSignature'>Desired data signature.</param>
-		/// <param name='unIgnoredByte'>Byte to ignore in signature.</param>
-		/// <returns>Returns address of data from signature on success, null otherwise.</returns>
-
 		const void* const FindSignatureSSE2(const wchar_t* const szModuleName, const std::array<const unsigned char, 8>& SectionName, const char* const szSignature, const unsigned char unIgnoredByte = 0x2A);
-		/// <summary>
-		/// Finding signature in data with SIMD (SSE2) by module name and POGO section name.
-		/// </summary>
-		/// <param name='szModuleName'>Module name.</param>
-		/// <param name='szSectionName'>Section name.</param>
-		/// <param name='szSignature'>Desired data signature.</param>
-		/// <param name='unIgnoredByte'>Byte to ignore in signature.</param>
-		/// <returns>Returns address of data from signature on success, null otherwise.</returns>
 		const void* const FindSignatureSSE2(const wchar_t* const szModuleName, const char* const szSectionName, const char* const szSignature, const unsigned char unIgnoredByte = 0x2A);
 #else
-		/// <summary>
-		/// Finding signature in data with SIMD (SSE2) by module name.
-		/// </summary>
-		/// <param name='szModuleName'>Module name.</param>
-		/// <param name='szSignature'>Desired data signature.</param>
-		/// <param name='unIgnoredByte'>Byte to ignore in signature.</param>
-		/// <returns>Returns address of data from signature on success, null otherwise.</returns>
 		const void* const FindSignatureSSE2(const char* const szModuleName, const char* const szSignature, const unsigned char unIgnoredByte = 0x2A);
-
-		/// <summary>
-		/// Finding signature in data with SIMD (SSE2) by module name and section name.
-		/// </summary>
-		/// <param name='szModuleName'>Module name.</param>
-		/// <param name='SectionName'>Section name.</param>
-		/// <param name='szSignature'>Desired data signature.</param>
-		/// <param name='unIgnoredByte'>Byte to ignore in signature.</param>
-		/// <returns>Returns address of data from signature on success, null otherwise.</returns>
 		const void* const FindSignatureSSE2(const char* const szModuleName, const std::array<const unsigned char, 8>& SectionName, const char* const szSignature, const unsigned char unIgnoredByte = 0x2A);
-
-		/// <summary>
-		/// Finding signature in data with SIMD (SSE2) by module name and POGO section name.
-		/// </summary>
-		/// <param name='szModuleName'>Module name.</param>
-		/// <param name='szSectionName'>Section name.</param>
-		/// <param name='szSignature'>Desired data signature.</param>
-		/// <param name='unIgnoredByte'>Byte to ignore in signature.</param>
-		/// <returns>Returns address of data from signature on success, null otherwise.</returns>
 		const void* const FindSignatureSSE2(const char* const szModuleName, const char* const szSectionName, const char* const szSignature, const unsigned char unIgnoredByte = 0x2A);
 #endif
 
@@ -1010,160 +730,23 @@ namespace Detours {
 		// FindSignature (AVX)
 		// ----------------------------------------------------------------
 
-		/// <summary>
-		/// Finding signature in data with SIMD (AVX) by address and size.
-		/// </summary>
-		/// <param name='pAddress'>Data address.</param>
-		/// <param name='unSize'>The size of the data in bytes.</param>
-		/// <param name='szSignature'>Desired data signature.</param>
-		/// <param name='unIgnoredByte'>Byte to ignore in signature.</param>
-		/// <returns>Returns address of data from signature on success, null otherwise.</returns>
 		const void* const FindSignatureAVX(const void* const pAddress, const size_t unSize, const char* const szSignature, const unsigned char unIgnoredByte = 0x2A);
-
-		/// <summary>
-		/// Finding signature in data with SIMD (AVX) by module handle.
-		/// </summary>
-		/// <param name='hModule'>Module handle.</param>
-		/// <param name='szSignature'>Desired data signature.</param>
-		/// <param name='unIgnoredByte'>Byte to ignore in signature.</param>
-		/// <returns>Returns address of data from signature on success, null otherwise.</returns>
 		const void* const FindSignatureAVX(const HMODULE hModule, const char* const szSignature, const unsigned char unIgnoredByte = 0x2A);
-
-		/// <summary>
-		/// Finding signature in data with SIMD (AVX) by module handle and section name.
-		/// </summary>
-		/// <param name='hModule'>Module handle.</param>
-		/// <param name='SectionName'>Section name.</param>
-		/// <param name='szSignature'>Desired data signature.</param>
-		/// <param name='unIgnoredByte'>Byte to ignore in signature.</param>
-		/// <returns>Returns address of data from signature on success, null otherwise.</returns>
 		const void* const FindSignatureAVX(const HMODULE hModule, const std::array<const unsigned char, 8>& SectionName, const char* const szSignature, const unsigned char unIgnoredByte = 0x2A);
-
-		/// <summary>
-		/// Finding signature in data with SIMD (AVX) by module handle and POGO section name.
-		/// </summary>
-		/// <param name='hModule'>Module handle.</param>
-		/// <param name='szSectionName'>Section name.</param>
-		/// <param name='szSignature'>Desired data signature.</param>
-		/// <param name='unIgnoredByte'>Byte to ignore in signature.</param>
-		/// <returns>Returns address of data from signature on success, null otherwise.</returns>
 		const void* const FindSignatureAVX(const HMODULE hModule, const char* const szSectionName, const char* const szSignature, const unsigned char unIgnoredByte = 0x2A);
-
-		/// <summary>
-		/// Finding signature in data with SIMD (AVX) by module name.
-		/// </summary>
-		/// <param name='szModuleName'>Module name.</param>
-		/// <param name='szSignature'>Desired data signature.</param>
-		/// <param name='unIgnoredByte'>Byte to ignore in signature.</param>
-		/// <returns>Returns address of data from signature on success, null otherwise.</returns>
 		const void* const FindSignatureAVXA(const char* const szModuleName, const char* const szSignature, const unsigned char unIgnoredByte = 0x2A);
-
-		/// <summary>
-		/// Finding signature in data with SIMD (AVX) by module name and section name.
-		/// </summary>
-		/// <param name='szModuleName'>Module name.</param>
-		/// <param name='SectionName'>Section name.</param>
-		/// <param name='szSignature'>Desired data signature.</param>
-		/// <param name='unIgnoredByte'>Byte to ignore in signature.</param>
-		/// <returns>Returns address of data from signature on success, null otherwise.</returns>
 		const void* const FindSignatureAVXA(const char* const szModuleName, const std::array<const unsigned char, 8>& SectionName, const char* const szSignature, const unsigned char unIgnoredByte = 0x2A);
-
-		/// <summary>
-		/// Finding signature in data with SIMD (AVX) by module name and POGO section name.
-		/// </summary>
-		/// <param name='szModuleName'>Module name.</param>
-		/// <param name='szSectionName'>Section name.</param>
-		/// <param name='szSignature'>Desired data signature.</param>
-		/// <param name='unIgnoredByte'>Byte to ignore in signature.</param>
-		/// <returns>Returns address of data from signature on success, null otherwise.</returns>
 		const void* const FindSignatureAVXA(const char* const szModuleName, const char* const szSectionName, const char* const szSignature, const unsigned char unIgnoredByte = 0x2A);
-
-		/// <summary>
-		/// Finding signature in data with SIMD (AVX) by module name.
-		/// </summary>
-		/// <param name='szModuleName'>Module name.</param>
-		/// <param name='szSignature'>Desired data signature.</param>
-		/// <param name='unIgnoredByte'>Byte to ignore in signature.</param>
-		/// <returns>Returns address of data from signature on success, null otherwise.</returns>
 		const void* const FindSignatureAVXW(const wchar_t* const szModuleName, const char* const szSignature, const unsigned char unIgnoredByte = 0x2A);
-
-		/// <summary>
-		/// Finding signature in data with SIMD (AVX) by module name and section name.
-		/// </summary>
-		/// <param name='szModuleName'>Module name.</param>
-		/// <param name='SectionName'>Section name.</param>
-		/// <param name='szSignature'>Desired data signature.</param>
-		/// <param name='unIgnoredByte'>Byte to ignore in signature.</param>
-		/// <returns>Returns address of data from signature on success, null otherwise.</returns>
 		const void* const FindSignatureAVXW(const wchar_t* const szModuleName, const std::array<const unsigned char, 8>& SectionName, const char* const szSignature, const unsigned char unIgnoredByte = 0x2A);
-
-		/// <summary>
-		/// Finding signature in data with SIMD (AVX) by module name and POGO section name.
-		/// </summary>
-		/// <param name='szModuleName'>Module name.</param>
-		/// <param name='szSectionName'>Section name.</param>
-		/// <param name='szSignature'>Desired data signature.</param>
-		/// <param name='unIgnoredByte'>Byte to ignore in signature.</param>
-		/// <returns>Returns address of data from signature on success, null otherwise.</returns>
 		const void* const FindSignatureAVXW(const wchar_t* const szModuleName, const char* const szSectionName, const char* const szSignature, const unsigned char unIgnoredByte = 0x2A);
-
 #ifdef UNICODE
-		/// <summary>
-		/// Finding signature in data with SIMD (AVX) by module name.
-		/// </summary>
-		/// <param name='szModuleName'>Module name.</param>
-		/// <param name='szSignature'>Desired data signature.</param>
-		/// <param name='unIgnoredByte'>Byte to ignore in signature.</param>
-		/// <returns>Returns address of data from signature on success, null otherwise.</returns>
 		const void* const FindSignatureAVX(const wchar_t* const szModuleName, const char* const szSignature, const unsigned char unIgnoredByte = 0x2A);
-
-		/// <summary>
-		/// Finding signature in data with SIMD (AVX) by module name and section name.
-		/// </summary>
-		/// <param name='szModuleName'>Module name.</param>
-		/// <param name='SectionName'>Section name.</param>
-		/// <param name='szSignature'>Desired data signature.</param>
-		/// <param name='unIgnoredByte'>Byte to ignore in signature.</param>
-		/// <returns>Returns address of data from signature on success, null otherwise.</returns>
 		const void* const FindSignatureAVX(const wchar_t* const szModuleName, const std::array<const unsigned char, 8>& SectionName, const char* const szSignature, const unsigned char unIgnoredByte = 0x2A);
-
-		/// <summary>
-		/// Finding signature in data with SIMD (AVX) by module name and POGO section name.
-		/// </summary>
-		/// <param name='szModuleName'>Module name.</param>
-		/// <param name='szSectionName'>Section name.</param>
-		/// <param name='szSignature'>Desired data signature.</param>
-		/// <param name='unIgnoredByte'>Byte to ignore in signature.</param>
-		/// <returns>Returns address of data from signature on success, null otherwise.</returns>
 		const void* const FindSignatureAVX(const wchar_t* const szModuleName, const char* const szSectionName, const char* const szSignature, const unsigned char unIgnoredByte = 0x2A);
 #else
-		/// <summary>
-		/// Finding signature in data with SIMD (AVX) by module name.
-		/// </summary>
-		/// <param name='szModuleName'>Module name.</param>
-		/// <param name='szSignature'>Desired data signature.</param>
-		/// <param name='unIgnoredByte'>Byte to ignore in signature.</param>
-		/// <returns>Returns address of data from signature on success, null otherwise.</returns>
 		const void* const FindSignatureAVX(const char* const szModuleName, const char* const szSignature, const unsigned char unIgnoredByte = 0x2A);
-
-		/// <summary>
-		/// Finding signature in data with SIMD (AVX) by module name and section name.
-		/// </summary>
-		/// <param name='szModuleName'>Module name.</param>
-		/// <param name='SectionName'>Section name.</param>
-		/// <param name='szSignature'>Desired data signature.</param>
-		/// <param name='unIgnoredByte'>Byte to ignore in signature.</param>
-		/// <returns>Returns address of data from signature on success, null otherwise.</returns>
 		const void* const FindSignatureAVX(const char* const szModuleName, const std::array<const unsigned char, 8>& SectionName, const char* const szSignature, const unsigned char unIgnoredByte = 0x2A);
-
-		/// <summary>
-		/// Finding signature in data with SIMD (AVX) by module name and POGO section name.
-		/// </summary>
-		/// <param name='szModuleName'>Module name.</param>
-		/// <param name='szSectionName'>Section name.</param>
-		/// <param name='szSignature'>Desired data signature.</param>
-		/// <param name='unIgnoredByte'>Byte to ignore in signature.</param>
-		/// <returns>Returns address of data from signature on success, null otherwise.</returns>
 		const void* const FindSignatureAVX(const char* const szModuleName, const char* const szSectionName, const char* const szSignature, const unsigned char unIgnoredByte = 0x2A);
 #endif
 
@@ -1171,160 +754,23 @@ namespace Detours {
 		// FindSignature (AVX2)
 		// ----------------------------------------------------------------
 
-		/// <summary>
-		/// Finding signature in data with SIMD (AVX2) by address and size.
-		/// </summary>
-		/// <param name='pAddress'>Data address.</param>
-		/// <param name='unSize'>The size of the data in bytes.</param>
-		/// <param name='szSignature'>Desired data signature.</param>
-		/// <param name='unIgnoredByte'>Byte to ignore in signature.</param>
-		/// <returns>Returns address of data from signature on success, null otherwise.</returns>
 		const void* const FindSignatureAVX2(const void* const pAddress, const size_t unSize, const char* const szSignature, const unsigned char unIgnoredByte = 0x2A);
-
-		/// <summary>
-		/// Finding signature in data with SIMD (AVX2) by module handle.
-		/// </summary>
-		/// <param name='hModule'>Module handle.</param>
-		/// <param name='szSignature'>Desired data signature.</param>
-		/// <param name='unIgnoredByte'>Byte to ignore in signature.</param>
-		/// <returns>Returns address of data from signature on success, null otherwise.</returns>
 		const void* const FindSignatureAVX2(const HMODULE hModule, const char* const szSignature, const unsigned char unIgnoredByte = 0x2A);
-		
-		/// <summary>
-		/// Finding signature in data with SIMD (AVX2) by module handle and section name.
-		/// </summary>
-		/// <param name='hModule'>Module handle.</param>
-		/// <param name='SectionName'>Section name.</param>
-		/// <param name='szSignature'>Desired data signature.</param>
-		/// <param name='unIgnoredByte'>Byte to ignore in signature.</param>
-		/// <returns>Returns address of data from signature on success, null otherwise.</returns>
 		const void* const FindSignatureAVX2(const HMODULE hModule, const std::array<const unsigned char, 8>& SectionName, const char* const szSignature, const unsigned char unIgnoredByte = 0x2A);
-		
-		/// <summary>
-		/// Finding signature in data with SIMD (AVX2) by module handle and POGO section name.
-		/// </summary>
-		/// <param name='hModule'>Module handle.</param>
-		/// <param name='szSectionName'>Section name.</param>
-		/// <param name='szSignature'>Desired data signature.</param>
-		/// <param name='unIgnoredByte'>Byte to ignore in signature.</param>
-		/// <returns>Returns address of data from signature on success, null otherwise.</returns>
 		const void* const FindSignatureAVX2(const HMODULE hModule, const char* const szSectionName, const char* const szSignature, const unsigned char unIgnoredByte = 0x2A);
-
-		/// <summary>
-		/// Finding signature in data with SIMD (AVX2) by module name.
-		/// </summary>
-		/// <param name='szModuleName'>Module name.</param>
-		/// <param name='szSignature'>Desired data signature.</param>
-		/// <param name='unIgnoredByte'>Byte to ignore in signature.</param>
-		/// <returns>Returns address of data from signature on success, null otherwise.</returns>
 		const void* const FindSignatureAVX2A(const char* const szModuleName, const char* const szSignature, const unsigned char unIgnoredByte = 0x2A);
-
-		/// <summary>
-		/// Finding signature in data with SIMD (AVX2) by module name and section name.
-		/// </summary>
-		/// <param name='szModuleName'>Module name.</param>
-		/// <param name='SectionName'>Section name.</param>
-		/// <param name='szSignature'>Desired data signature.</param>
-		/// <param name='unIgnoredByte'>Byte to ignore in signature.</param>
-		/// <returns>Returns address of data from signature on success, null otherwise.</returns>
 		const void* const FindSignatureAVX2A(const char* const szModuleName, const std::array<const unsigned char, 8>& SectionName, const char* const szSignature, const unsigned char unIgnoredByte = 0x2A);
-
-		/// <summary>
-		/// Finding signature in data with SIMD (AVX2) by module name and POGO section name.
-		/// </summary>
-		/// <param name='szModuleName'>Module name.</param>
-		/// <param name='szSectionName'>Section name.</param>
-		/// <param name='szSignature'>Desired data signature.</param>
-		/// <param name='unIgnoredByte'>Byte to ignore in signature.</param>
-		/// <returns>Returns address of data from signature on success, null otherwise.</returns>
 		const void* const FindSignatureAVX2A(const char* const szModuleName, const char* const szSectionName, const char* const szSignature, const unsigned char unIgnoredByte = 0x2A);
-
-		/// <summary>
-		/// Finding signature in data with SIMD (AVX2) by module name.
-		/// </summary>
-		/// <param name='szModuleName'>Module name.</param>
-		/// <param name='szSignature'>Desired data signature.</param>
-		/// <param name='unIgnoredByte'>Byte to ignore in signature.</param>
-		/// <returns>Returns address of data from signature on success, null otherwise.</returns>
 		const void* const FindSignatureAVX2W(const wchar_t* const szModuleName, const char* const szSignature, const unsigned char unIgnoredByte = 0x2A);
-
-		/// <summary>
-		/// Finding signature in data with SIMD (AVX2) by module name and section name.
-		/// </summary>
-		/// <param name='szModuleName'>Module name.</param>
-		/// <param name='SectionName'>Section name.</param>
-		/// <param name='szSignature'>Desired data signature.</param>
-		/// <param name='unIgnoredByte'>Byte to ignore in signature.</param>
-		/// <returns>Returns address of data from signature on success, null otherwise.</returns>
 		const void* const FindSignatureAVX2W(const wchar_t* const szModuleName, const std::array<const unsigned char, 8>& SectionName, const char* const szSignature, const unsigned char unIgnoredByte = 0x2A);
-
-		/// <summary>
-		/// Finding signature in data with SIMD (AVX2) by module name and POGO section name.
-		/// </summary>
-		/// <param name='szModuleName'>Module name.</param>
-		/// <param name='szSectionName'>Section name.</param>
-		/// <param name='szSignature'>Desired data signature.</param>
-		/// <param name='unIgnoredByte'>Byte to ignore in signature.</param>
-		/// <returns>Returns address of data from signature on success, null otherwise.</returns>
 		const void* const FindSignatureAVX2W(const wchar_t* const szModuleName, const char* const szSectionName, const char* const szSignature, const unsigned char unIgnoredByte = 0x2A);
-
 #ifdef UNICODE
-		/// <summary>
-		/// Finding signature in data with SIMD (AVX2) by module name.
-		/// </summary>
-		/// <param name='szModuleName'>Module name.</param>
-		/// <param name='szSignature'>Desired data signature.</param>
-		/// <param name='unIgnoredByte'>Byte to ignore in signature.</param>
-		/// <returns>Returns address of data from signature on success, null otherwise.</returns>
 		const void* const FindSignatureAVX2(const wchar_t* const szModuleName, const char* const szSignature, const unsigned char unIgnoredByte = 0x2A);
-
-		/// <summary>
-		/// Finding signature in data with SIMD (AVX2) by module name and section name.
-		/// </summary>
-		/// <param name='szModuleName'>Module name.</param>
-		/// <param name='SectionName'>Section name.</param>
-		/// <param name='szSignature'>Desired data signature.</param>
-		/// <param name='unIgnoredByte'>Byte to ignore in signature.</param>
-		/// <returns>Returns address of data from signature on success, null otherwise.</returns>
 		const void* const FindSignatureAVX2(const wchar_t* const szModuleName, const std::array<const unsigned char, 8>& SectionName, const char* const szSignature, const unsigned char unIgnoredByte = 0x2A);
-
-		/// <summary>
-		/// Finding signature in data with SIMD (AVX2) by module name and POGO section name.
-		/// </summary>
-		/// <param name='szModuleName'>Module name.</param>
-		/// <param name='szSectionName'>Section name.</param>
-		/// <param name='szSignature'>Desired data signature.</param>
-		/// <param name='unIgnoredByte'>Byte to ignore in signature.</param>
-		/// <returns>Returns address of data from signature on success, null otherwise.</returns>
 		const void* const FindSignatureAVX2(const wchar_t* const szModuleName, const char* const szSectionName, const char* const szSignature, const unsigned char unIgnoredByte = 0x2A);
 #else
-		/// <summary>
-		/// Finding signature in data with SIMD (AVX2) by module name.
-		/// </summary>
-		/// <param name='szModuleName'>Module name.</param>
-		/// <param name='szSignature'>Desired data signature.</param>
-		/// <param name='unIgnoredByte'>Byte to ignore in signature.</param>
-		/// <returns>Returns address of data from signature on success, null otherwise.</returns>
 		const void* const FindSignatureAVX2(const char* const szModuleName, const char* const szSignature, const unsigned char unIgnoredByte = 0x2A);
-
-		/// <summary>
-		/// Finding signature in data with SIMD (AVX2) by module name and section name.
-		/// </summary>
-		/// <param name='szModuleName'>Module name.</param>
-		/// <param name='SectionName'>Section name.</param>
-		/// <param name='szSignature'>Desired data signature.</param>
-		/// <param name='unIgnoredByte'>Byte to ignore in signature.</param>
-		/// <returns>Returns address of data from signature on success, null otherwise.</returns>
 		const void* const FindSignatureAVX2(const char* const szModuleName, const std::array<const unsigned char, 8>& SectionName, const char* const szSignature, const unsigned char unIgnoredByte = 0x2A);
-
-		/// <summary>
-		/// Finding signature in data with SIMD (AVX2) by module name and POGO section name.
-		/// </summary>
-		/// <param name='szModuleName'>Module name.</param>
-		/// <param name='szSectionName'>Section name.</param>
-		/// <param name='szSignature'>Desired data signature.</param>
-		/// <param name='unIgnoredByte'>Byte to ignore in signature.</param>
-		/// <returns>Returns address of data from signature on success, null otherwise.</returns>
 		const void* const FindSignatureAVX2(const char* const szModuleName, const char* const szSectionName, const char* const szSignature, const unsigned char unIgnoredByte = 0x2A);
 #endif
 
@@ -1332,160 +778,23 @@ namespace Detours {
 		// FindSignature (AVX512) [AVX512BW]
 		// ----------------------------------------------------------------
 
-		/// <summary>
-		/// Finding signature in data with SIMD (AVX512) by address and size.
-		/// </summary>
-		/// <param name='pAddress'>Data address.</param>
-		/// <param name='unSize'>The size of the data in bytes.</param>
-		/// <param name='szSignature'>Desired data signature.</param>
-		/// <param name='unIgnoredByte'>Byte to ignore in signature.</param>
-		/// <returns>Returns address of data from signature on success, null otherwise.</returns>
 		const void* const FindSignatureAVX512(const void* const pAddress, const size_t unSize, const char* const szSignature, const unsigned char unIgnoredByte = 0x2A);
-
-		/// <summary>
-		/// Finding signature in data with SIMD (AVX512) by module handle.
-		/// </summary>
-		/// <param name='hModule'>Module handle.</param>
-		/// <param name='szSignature'>Desired data signature.</param>
-		/// <param name='unIgnoredByte'>Byte to ignore in signature.</param>
-		/// <returns>Returns address of data from signature on success, null otherwise.</returns>
 		const void* const FindSignatureAVX512(const HMODULE hModule, const char* const szSignature, const unsigned char unIgnoredByte = 0x2A);
-
-		/// <summary>
-		/// Finding signature in data with SIMD (AVX512) by module handle and section name.
-		/// </summary>
-		/// <param name='hModule'>Module handle.</param>
-		/// <param name='SectionName'>Section name.</param>
-		/// <param name='szSignature'>Desired data signature.</param>
-		/// <param name='unIgnoredByte'>Byte to ignore in signature.</param>
-		/// <returns>Returns address of data from signature on success, null otherwise.</returns>
 		const void* const FindSignatureAVX512(const HMODULE hModule, const std::array<const unsigned char, 8>& SectionName, const char* const szSignature, const unsigned char unIgnoredByte = 0x2A);
-
-		/// <summary>
-		/// Finding signature in data with SIMD (AVX512) by module handle and POGO section name.
-		/// </summary>
-		/// <param name='hModule'>Module handle.</param>
-		/// <param name='szSectionName'>Section name.</param>
-		/// <param name='szSignature'>Desired data signature.</param>
-		/// <param name='unIgnoredByte'>Byte to ignore in signature.</param>
-		/// <returns>Returns address of data from signature on success, null otherwise.</returns>
 		const void* const FindSignatureAVX512(const HMODULE hModule, const char* const szSectionName, const char* const szSignature, const unsigned char unIgnoredByte = 0x2A);
-
-		/// <summary>
-		/// Finding signature in data with SIMD (AVX512) by module name.
-		/// </summary>
-		/// <param name='szModuleName'>Module name.</param>
-		/// <param name='szSignature'>Desired data signature.</param>
-		/// <param name='unIgnoredByte'>Byte to ignore in signature.</param>
-		/// <returns>Returns address of data from signature on success, null otherwise.</returns>
 		const void* const FindSignatureAVX512A(const char* const szModuleName, const char* const szSignature, const unsigned char unIgnoredByte = 0x2A);
-
-		/// <summary>
-		/// Finding signature in data with SIMD (AVX512) by module name and section name.
-		/// </summary>
-		/// <param name='szModuleName'>Module name.</param>
-		/// <param name='SectionName'>Section name.</param>
-		/// <param name='szSignature'>Desired data signature.</param>
-		/// <param name='unIgnoredByte'>Byte to ignore in signature.</param>
-		/// <returns>Returns address of data from signature on success, null otherwise.</returns>
 		const void* const FindSignatureAVX512A(const char* const szModuleName, const std::array<const unsigned char, 8>& SectionName, const char* const szSignature, const unsigned char unIgnoredByte = 0x2A);
-
-		/// <summary>
-		/// Finding signature in data with SIMD (AVX512) by module name and POGO section name.
-		/// </summary>
-		/// <param name='szModuleName'>Module name.</param>
-		/// <param name='szSectionName'>Section name.</param>
-		/// <param name='szSignature'>Desired data signature.</param>
-		/// <param name='unIgnoredByte'>Byte to ignore in signature.</param>
-		/// <returns>Returns address of data from signature on success, null otherwise.</returns>
 		const void* const FindSignatureAVX512A(const char* const szModuleName, const char* const szSectionName, const char* const szSignature, const unsigned char unIgnoredByte = 0x2A);
-
-		/// <summary>
-		/// Finding signature in data with SIMD (AVX512) by module name.
-		/// </summary>
-		/// <param name='szModuleName'>Module name.</param>
-		/// <param name='szSignature'>Desired data signature.</param>
-		/// <param name='unIgnoredByte'>Byte to ignore in signature.</param>
-		/// <returns>Returns address of data from signature on success, null otherwise.</returns>
 		const void* const FindSignatureAVX512W(const wchar_t* const szModuleName, const char* const szSignature, const unsigned char unIgnoredByte = 0x2A);
-
-		/// <summary>
-		/// Finding signature in data with SIMD (AVX512) by module name and section name.
-		/// </summary>
-		/// <param name='szModuleName'>Module name.</param>
-		/// <param name='SectionName'>Section name.</param>
-		/// <param name='szSignature'>Desired data signature.</param>
-		/// <param name='unIgnoredByte'>Byte to ignore in signature.</param>
-		/// <returns>Returns address of data from signature on success, null otherwise.</returns>
 		const void* const FindSignatureAVX512W(const wchar_t* const szModuleName, const std::array<const unsigned char, 8>& SectionName, const char* const szSignature, const unsigned char unIgnoredByte = 0x2A);
-
-		/// <summary>
-		/// Finding signature in data with SIMD (AVX512) by module name and POGO section name.
-		/// </summary>
-		/// <param name='szModuleName'>Module name.</param>
-		/// <param name='szSectionName'>Section name.</param>
-		/// <param name='szSignature'>Desired data signature.</param>
-		/// <param name='unIgnoredByte'>Byte to ignore in signature.</param>
-		/// <returns>Returns address of data from signature on success, null otherwise.</returns>
 		const void* const FindSignatureAVX512W(const wchar_t* const szModuleName, const char* const szSectionName, const char* const szSignature, const unsigned char unIgnoredByte = 0x2A);
-
 #ifdef UNICODE
-		/// <summary>
-		/// Finding signature in data with SIMD (AVX512) by module name.
-		/// </summary>
-		/// <param name='szModuleName'>Module name.</param>
-		/// <param name='szSignature'>Desired data signature.</param>
-		/// <param name='unIgnoredByte'>Byte to ignore in signature.</param>
-		/// <returns>Returns address of data from signature on success, null otherwise.</returns>
 		const void* const FindSignatureAVX512(const wchar_t* const szModuleName, const char* const szSignature, const unsigned char unIgnoredByte = 0x2A);
-
-		/// <summary>
-		/// Finding signature in data with SIMD (AVX512) by module name and section name.
-		/// </summary>
-		/// <param name='szModuleName'>Module name.</param>
-		/// <param name='SectionName'>Section name.</param>
-		/// <param name='szSignature'>Desired data signature.</param>
-		/// <param name='unIgnoredByte'>Byte to ignore in signature.</param>
-		/// <returns>Returns address of data from signature on success, null otherwise.</returns>
 		const void* const FindSignatureAVX512(const wchar_t* const szModuleName, const std::array<const unsigned char, 8>& SectionName, const char* const szSignature, const unsigned char unIgnoredByte = 0x2A);
-
-		/// <summary>
-		/// Finding signature in data with SIMD (AVX512) by module name and POGO section name.
-		/// </summary>
-		/// <param name='szModuleName'>Module name.</param>
-		/// <param name='szSectionName'>Section name.</param>
-		/// <param name='szSignature'>Desired data signature.</param>
-		/// <param name='unIgnoredByte'>Byte to ignore in signature.</param>
-		/// <returns>Returns address of data from signature on success, null otherwise.</returns>
 		const void* const FindSignatureAVX512(const wchar_t* const szModuleName, const char* const szSectionName, const char* const szSignature, const unsigned char unIgnoredByte = 0x2A);
 #else
-		/// <summary>
-		/// Finding signature in data with SIMD (AVX512) by module name.
-		/// </summary>
-		/// <param name='szModuleName'>Module name.</param>
-		/// <param name='szSignature'>Desired data signature.</param>
-		/// <param name='unIgnoredByte'>Byte to ignore in signature.</param>
-		/// <returns>Returns address of data from signature on success, null otherwise.</returns>
 		const void* const FindSignatureAVX512(const char* const szModuleName, const char* const szSignature, const unsigned char unIgnoredByte = 0x2A);
-
-		/// <summary>
-		/// Finding signature in data with SIMD (AVX512) by module name and section name.
-		/// </summary>
-		/// <param name='szModuleName'>Module name.</param>
-		/// <param name='SectionName'>Section name.</param>
-		/// <param name='szSignature'>Desired data signature.</param>
-		/// <param name='unIgnoredByte'>Byte to ignore in signature.</param>
-		/// <returns>Returns address of data from signature on success, null otherwise.</returns>
 		const void* const FindSignatureAVX512(const char* const szModuleName, const std::array<const unsigned char, 8>& SectionName, const char* const szSignature, const unsigned char unIgnoredByte = 0x2A);
-
-		/// <summary>
-		/// Finding signature in data with SIMD (AVX512) by module name and POGO section name.
-		/// </summary>
-		/// <param name='szModuleName'>Module name.</param>
-		/// <param name='szSectionName'>Section name.</param>
-		/// <param name='szSignature'>Desired data signature.</param>
-		/// <param name='unIgnoredByte'>Byte to ignore in signature.</param>
-		/// <returns>Returns address of data from signature on success, null otherwise.</returns>
 		const void* const FindSignatureAVX512(const char* const szModuleName, const char* const szSectionName, const char* const szSignature, const unsigned char unIgnoredByte = 0x2A);
 #endif
 
@@ -1493,160 +802,23 @@ namespace Detours {
 		// FindSignature (Auto)
 		// ----------------------------------------------------------------
 
-		/// <summary>
-		/// Finding signature in data without/with SIMD by address and size.
-		/// </summary>
-		/// <param name='pAddress'>Data address.</param>
-		/// <param name='unSize'>The size of the data in bytes.</param>
-		/// <param name='szSignature'>Desired data signature.</param>
-		/// <param name='unIgnoredByte'>Byte to ignore in signature.</param>
-		/// <returns>Returns address of data from signature on success, null otherwise.</returns>
 		const void* const FindSignature(const void* const pAddress, const size_t unSize, const char* const szSignature, const unsigned char unIgnoredByte = 0x2A);
-
-		/// <summary>
-		/// Finding signature in data without/with SIMD by module handle.
-		/// </summary>
-		/// <param name='hModule'>Module handle.</param>
-		/// <param name='szSignature'>Desired data signature.</param>
-		/// <param name='unIgnoredByte'>Byte to ignore in signature.</param>
-		/// <returns>Returns address of data from signature on success, null otherwise.</returns>
 		const void* const FindSignature(const HMODULE hModule, const char* const szSignature, const unsigned char unIgnoredByte = 0x2A);
-		
-		/// <summary>
-		/// Finding signature in data without/with SIMD by module handle and section name.
-		/// </summary>
-		/// <param name='hModule'>Module handle.</param>
-		/// <param name='SectionName'>Section name.</param>
-		/// <param name='szSignature'>Desired data signature.</param>
-		/// <param name='unIgnoredByte'>Byte to ignore in signature.</param>
-		/// <returns>Returns address of data from signature on success, null otherwise.</returns>
 		const void* const FindSignature(const HMODULE hModule, const std::array<const unsigned char, 8>& SectionName, const char* const szSignature, const unsigned char unIgnoredByte = 0x2A);
-		
-		/// <summary>
-		/// Finding signature in data without/with SIMD by module handle and POGO section name.
-		/// </summary>
-		/// <param name='hModule'>Module handle.</param>
-		/// <param name='szSectionName'>Section name.</param>
-		/// <param name='szSignature'>Desired data signature.</param>
-		/// <param name='unIgnoredByte'>Byte to ignore in signature.</param>
-		/// <returns>Returns address of data from signature on success, null otherwise.</returns>
 		const void* const FindSignature(const HMODULE hModule, const char* const szSectionName, const char* const szSignature, const unsigned char unIgnoredByte = 0x2A);
-
-		/// <summary>
-		/// Finding signature in data without/with SIMD by module name.
-		/// </summary>
-		/// <param name='szModuleName'>Module name.</param>
-		/// <param name='szSignature'>Desired data signature.</param>
-		/// <param name='unIgnoredByte'>Byte to ignore in signature.</param>
-		/// <returns>Returns address of data from signature on success, null otherwise.</returns>
 		const void* const FindSignatureA(const char* const szModuleName, const char* const szSignature, const unsigned char unIgnoredByte = 0x2A);
-
-		/// <summary>
-		/// Finding signature in data without/with SIMD by module name and section name.
-		/// </summary>
-		/// <param name='szModuleName'>Module name.</param>
-		/// <param name='SectionName'>Section name.</param>
-		/// <param name='szSignature'>Desired data signature.</param>
-		/// <param name='unIgnoredByte'>Byte to ignore in signature.</param>
-		/// <returns>Returns address of data from signature on success, null otherwise.</returns>
 		const void* const FindSignatureA(const char* const szModuleName, const std::array<const unsigned char, 8>& SectionName, const char* const szSignature, const unsigned char unIgnoredByte = 0x2A);
-
-		/// <summary>
-		/// Finding signature in data without/with SIMD by module name and POGO section name.
-		/// </summary>
-		/// <param name='szModuleName'>Module name.</param>
-		/// <param name='szSectionName'>Section name.</param>
-		/// <param name='szSignature'>Desired data signature.</param>
-		/// <param name='unIgnoredByte'>Byte to ignore in signature.</param>
-		/// <returns>Returns address of data from signature on success, null otherwise.</returns>
 		const void* const FindSignatureA(const char* const szModuleName, const char* const szSectionName, const char* const szSignature, const unsigned char unIgnoredByte = 0x2A);
-
-		/// <summary>
-		/// Finding signature in data without/with SIMD by module name.
-		/// </summary>
-		/// <param name='szModuleName'>Module name.</param>
-		/// <param name='szSignature'>Desired data signature.</param>
-		/// <param name='unIgnoredByte'>Byte to ignore in signature.</param>
-		/// <returns>Returns address of data from signature on success, null otherwise.</returns>
 		const void* const FindSignatureW(const wchar_t* const szModuleName, const char* const szSignature, const unsigned char unIgnoredByte = 0x2A);
-
-		/// <summary>
-		/// Finding signature in data without/with SIMD by module name and section name.
-		/// </summary>
-		/// <param name='szModuleName'>Module name.</param>
-		/// <param name='SectionName'>Section name.</param>
-		/// <param name='szSignature'>Desired data signature.</param>
-		/// <param name='unIgnoredByte'>Byte to ignore in signature.</param>
-		/// <returns>Returns address of data from signature on success, null otherwise.</returns>
 		const void* const FindSignatureW(const wchar_t* const szModuleName, const std::array<const unsigned char, 8>& SectionName, const char* const szSignature, const unsigned char unIgnoredByte = 0x2A);
-
-		/// <summary>
-		/// Finding signature in data without/with SIMD by module name and POGO section name.
-		/// </summary>
-		/// <param name='szModuleName'>Module name.</param>
-		/// <param name='szSectionName'>Section name.</param>
-		/// <param name='szSignature'>Desired data signature.</param>
-		/// <param name='unIgnoredByte'>Byte to ignore in signature.</param>
-		/// <returns>Returns address of data from signature on success, null otherwise.</returns>
 		const void* const FindSignatureW(const wchar_t* const szModuleName, const char* const szSectionName, const char* const szSignature, const unsigned char unIgnoredByte = 0x2A);
-
 #ifdef UNICODE
-		/// <summary>
-		/// Finding signature in data without/with SIMD by module name.
-		/// </summary>
-		/// <param name='szModuleName'>Module name.</param>
-		/// <param name='szSignature'>Desired data signature.</param>
-		/// <param name='unIgnoredByte'>Byte to ignore in signature.</param>
-		/// <returns>Returns address of data from signature on success, null otherwise.</returns>
 		const void* const FindSignature(const wchar_t* const szModuleName, const char* const szSignature, const unsigned char unIgnoredByte = 0x2A);
-
-		/// <summary>
-		/// Finding signature in data without/with SIMD by module name and section name.
-		/// </summary>
-		/// <param name='szModuleName'>Module name.</param>
-		/// <param name='SectionName'>Section name.</param>
-		/// <param name='szSignature'>Desired data signature.</param>
-		/// <param name='unIgnoredByte'>Byte to ignore in signature.</param>
-		/// <returns>Returns address of data from signature on success, null otherwise.</returns>
 		const void* const FindSignature(const wchar_t* const szModuleName, const std::array<const unsigned char, 8>& SectionName, const char* const szSignature, const unsigned char unIgnoredByte = 0x2A);
-
-		/// <summary>
-		/// Finding signature in data without/with SIMD by module name and POGO section name.
-		/// </summary>
-		/// <param name='szModuleName'>Module name.</param>
-		/// <param name='szSectionName'>Section name.</param>
-		/// <param name='szSignature'>Desired data signature.</param>
-		/// <param name='unIgnoredByte'>Byte to ignore in signature.</param>
-		/// <returns>Returns address of data from signature on success, null otherwise.</returns>
 		const void* const FindSignature(const wchar_t* const szModuleName, const char* const szSectionName, const char* const szSignature, const unsigned char unIgnoredByte = 0x2A);
 #else
-		/// <summary>
-		/// Finding signature in data without/with SIMD by module name.
-		/// </summary>
-		/// <param name='szModuleName'>Module name.</param>
-		/// <param name='szSignature'>Desired data signature.</param>
-		/// <param name='unIgnoredByte'>Byte to ignore in signature.</param>
-		/// <returns>Returns address of data from signature on success, null otherwise.</returns>
 		const void* const FindSignature(const char* const szModuleName, const char* const szSignature, const unsigned char unIgnoredByte = 0x2A);
-
-		/// <summary>
-		/// Finding signature in data without/with SIMD by module name and section name.
-		/// </summary>
-		/// <param name='szModuleName'>Module name.</param>
-		/// <param name='SectionName'>Section name.</param>
-		/// <param name='szSignature'>Desired data signature.</param>
-		/// <param name='unIgnoredByte'>Byte to ignore in signature.</param>
-		/// <returns>Returns address of data from signature on success, null otherwise.</returns>
 		const void* const FindSignature(const char* const szModuleName, const std::array<const unsigned char, 8>& SectionName, const char* const szSignature, const unsigned char unIgnoredByte = 0x2A);
-
-		/// <summary>
-		/// Finding signature in data without/with SIMD by module name and POGO section name.
-		/// </summary>
-		/// <param name='szModuleName'>Module name.</param>
-		/// <param name='szSectionName'>Section name.</param>
-		/// <param name='szSignature'>Desired data signature.</param>
-		/// <param name='unIgnoredByte'>Byte to ignore in signature.</param>
-		/// <returns>Returns address of data from signature on success, null otherwise.</returns>
 		const void* const FindSignature(const char* const szModuleName, const char* const szSectionName, const char* const szSignature, const unsigned char unIgnoredByte = 0x2A);
 #endif
 
@@ -1654,160 +826,23 @@ namespace Detours {
 		// FindData (Native)
 		// ----------------------------------------------------------------
 
-		/// <summary>
-		/// Finding data-in-data without SIMD by address and size.
-		/// </summary>
-		/// <param name='pAddress'>Data address.</param>
-		/// <param name='unSize'>The size of the data in bytes.</param>
-		/// <param name='pData'>Desired data.</param>
-		/// <param name='unDataSize'>Size of desired data in bytes</param>
-		/// <returns>Returns address of data from data on success, null otherwise.</returns>
 		const void* const FindDataNative(const void* const pAddress, const size_t unSize, const unsigned char* const pData, const size_t unDataSize);
-
-		/// <summary>
-		/// Finding data-in-data without SIMD by module handle.
-		/// </summary>
-		/// <param name='hModule'>Module handle.</param>
-		/// <param name='pData'>Desired data.</param>
-		/// <param name='unDataSize'>Size of desired data in bytes</param>
-		/// <returns>Returns address of data from data on success, null otherwise.</returns>
 		const void* const FindDataNative(const HMODULE hModule, const unsigned char* const pData, const size_t unDataSize);
-
-		/// <summary>
-		/// Finding data-in-data without SIMD by module handle and section name.
-		/// </summary>
-		/// <param name='hModule'>Module handle.</param>
-		/// <param name='SectionName'>Section name.</param>
-		/// <param name='pData'>Desired data.</param>
-		/// <param name='unDataSize'>Size of desired data in bytes</param>
-		/// <returns>Returns address of data from data on success, null otherwise.</returns>
 		const void* const FindDataNative(const HMODULE hModule, const std::array<const unsigned char, 8>& SectionName, const unsigned char* const pData, const size_t unDataSize);
-
-		/// <summary>
-		/// Finding data-in-data without SIMD by module handle and POGO section name.
-		/// </summary>
-		/// <param name='hModule'>Module handle.</param>
-		/// <param name='szSectionName'>Section name.</param>
-		/// <param name='pData'>Desired data.</param>
-		/// <param name='unDataSize'>Size of desired data in bytes</param>
-		/// <returns>Returns address of data from data on success, null otherwise.</returns>
 		const void* const FindDataNative(const HMODULE hModule, const char* const szSectionName, const unsigned char* const pData, const size_t unDataSize);
-
-		/// <summary>
-		/// Finding data-in-data without SIMD by module name.
-		/// </summary>
-		/// <param name='szModuleName'>Module name.</param>
-		/// <param name='pData'>Desired data.</param>
-		/// <param name='unDataSize'>Size of desired data in bytes</param>
-		/// <returns>Returns address of data from data on success, null otherwise.</returns>
 		const void* const FindDataNativeA(const char* const szModuleName, const unsigned char* const pData, const size_t unDataSize);
-
-		/// <summary>
-		/// Finding data-in-data without SIMD by module name and section name.
-		/// </summary>
-		/// <param name='szModuleName'>Module name.</param>
-		/// <param name='SectionName'>Section name.</param>
-		/// <param name='pData'>Desired data.</param>
-		/// <param name='unDataSize'>Size of desired data in bytes</param>
-		/// <returns>Returns address of data from data on success, null otherwise.</returns>
 		const void* const FindDataNativeA(const char* const szModuleName, const std::array<const unsigned char, 8>& SectionName, const unsigned char* const pData, const size_t unDataSize);
-
-		/// <summary>
-		/// Finding data-in-data without SIMD by module name and POGO section name.
-		/// </summary>
-		/// <param name='szModuleName'>Module name.</param>
-		/// <param name='szSectionName'>Section name.</param>
-		/// <param name='pData'>Desired data.</param>
-		/// <param name='unDataSize'>Size of desired data in bytes</param>
-		/// <returns>Returns address of data from data on success, null otherwise.</returns>
 		const void* const FindDataNativeA(const char* const szModuleName, const char* const szSectionName, const unsigned char* const pData, const size_t unDataSize);
-
-		/// <summary>
-		/// Finding data-in-data without SIMD by module name.
-		/// </summary>
-		/// <param name='szModuleName'>Module name.</param>
-		/// <param name='pData'>Desired data.</param>
-		/// <param name='unDataSize'>Size of desired data in bytes</param>
-		/// <returns>Returns address of data from data on success, null otherwise.</returns>
 		const void* const FindDataNativeW(const wchar_t* const szModuleName, const unsigned char* const pData, const size_t unDataSize);
-
-		/// <summary>
-		/// Finding data-in-data without SIMD by module name and section name.
-		/// </summary>
-		/// <param name='szModuleName'>Module name.</param>
-		/// <param name='SectionName'>Section name.</param>
-		/// <param name='pData'>Desired data.</param>
-		/// <param name='unDataSize'>Size of desired data in bytes</param>
-		/// <returns>Returns address of data from data on success, null otherwise.</returns>
 		const void* const FindDataNativeW(const wchar_t* const szModuleName, const std::array<const unsigned char, 8>& SectionName, const unsigned char* const pData, const size_t unDataSize);
-
-		/// <summary>
-		/// Finding data-in-data without SIMD by module name POGO section name.
-		/// </summary>
-		/// <param name='szModuleName'>Module name.</param>
-		/// <param name='szSectionName'>Section name.</param>
-		/// <param name='pData'>Desired data.</param>
-		/// <param name='unDataSize'>Size of desired data in bytes</param>
-		/// <returns>Returns address of data from data on success, null otherwise.</returns>
 		const void* const FindDataNativeW(const wchar_t* const szModuleName, const char* const szSectionName, const unsigned char* const pData, const size_t unDataSize);
-
 #ifdef UNICODE
-		/// <summary>
-		/// Finding data-in-data without SIMD by module name.
-		/// </summary>
-		/// <param name='szModuleName'>Module name.</param>
-		/// <param name='pData'>Desired data.</param>
-		/// <param name='unDataSize'>Size of desired data in bytes</param>
-		/// <returns>Returns address of data from data on success, null otherwise.</returns>
 		const void* const FindDataNative(const wchar_t* const szModuleName, const unsigned char* const pData, const size_t unDataSize);
-
-		/// <summary>
-		/// Finding data-in-data without SIMD by module name and section name.
-		/// </summary>
-		/// <param name='szModuleName'>Module name.</param>
-		/// <param name='SectionName'>Section name.</param>
-		/// <param name='pData'>Desired data.</param>
-		/// <param name='unDataSize'>Size of desired data in bytes</param>
-		/// <returns>Returns address of data from data on success, null otherwise.</returns>
 		const void* const FindDataNative(const wchar_t* const szModuleName, const std::array<const unsigned char, 8>& SectionName, const unsigned char* const pData, const size_t unDataSize);
-
-		/// <summary>
-		/// Finding data-in-data without SIMD by module name and POGO section name.
-		/// </summary>
-		/// <param name='szModuleName'>Module name.</param>
-		/// <param name='szSectionName'>Section name.</param>
-		/// <param name='pData'>Desired data.</param>
-		/// <param name='unDataSize'>Size of desired data in bytes</param>
-		/// <returns>Returns address of data from data on success, null otherwise.</returns>
 		const void* const FindDataNative(const wchar_t* const szModuleName, const char* const szSectionName, const unsigned char* const pData, const size_t unDataSize);
 #else
-		/// <summary>
-		/// Finding data-in-data without SIMD by module name.
-		/// </summary>
-		/// <param name='szModuleName'>Module name.</param>
-		/// <param name='pData'>Desired data.</param>
-		/// <param name='unDataSize'>Size of desired data in bytes</param>
-		/// <returns>Returns address of data from data on success, null otherwise.</returns>
 		const void* const FindDataNative(const char* const szModuleName, const unsigned char* const pData, const size_t unDataSize);
-
-		/// <summary>
-		/// Finding data-in-data without SIMD by module name and section name.
-		/// </summary>
-		/// <param name='szModuleName'>Module name.</param>
-		/// <param name='SectionName'>Section name.</param>
-		/// <param name='pData'>Desired data.</param>
-		/// <param name='unDataSize'>Size of desired data in bytes</param>
-		/// <returns>Returns address of data from data on success, null otherwise.</returns>
 		const void* const FindDataNative(const char* const szModuleName, const std::array<const unsigned char, 8>& SectionName, const unsigned char* const pData, const size_t unDataSize);
-
-		/// <summary>
-		/// Finding data-in-data without SIMD by module name and POGO section name.
-		/// </summary>
-		/// <param name='szModuleName'>Module name.</param>
-		/// <param name='szSectionName'>Section name.</param>
-		/// <param name='pData'>Desired data.</param>
-		/// <param name='unDataSize'>Size of desired data in bytes</param>
-		/// <returns>Returns address of data from data on success, null otherwise.</returns>
 		const void* const FindDataNative(const char* const szModuleName, const char* const szSectionName, const unsigned char* const pData, const size_t unDataSize);
 #endif
 
@@ -1815,160 +850,23 @@ namespace Detours {
 		// FindData (SSE2)
 		// ----------------------------------------------------------------
 
-		/// <summary>
-		/// Finding data-in-data with SIMD (SSE2) by address and size.
-		/// </summary>
-		/// <param name='pAddress'>Data address.</param>
-		/// <param name='unSize'>The size of the data in bytes.</param>
-		/// <param name='pData'>Desired data.</param>
-		/// <param name='unDataSize'>Size of desired data in bytes</param>
-		/// <returns>Returns address of data from data on success, null otherwise.</returns>
 		const void* const FindDataSSE2(const void* const pAddress, const size_t unSize, const unsigned char* const pData, const size_t unDataSize);
-
-		/// <summary>
-		/// Finding data-in-data with SIMD (SSE2) by module handle.
-		/// </summary>
-		/// <param name='hModule'>Module handle.</param>
-		/// <param name='pData'>Desired data.</param>
-		/// <param name='unDataSize'>Size of desired data in bytes</param>
-		/// <returns>Returns address of data from data on success, null otherwise.</returns>
 		const void* const FindDataSSE2(const HMODULE hModule, const unsigned char* const pData, const size_t unDataSize);
-
-		/// <summary>
-		/// Finding data-in-data with SIMD (SSE2) by module handle and section name.
-		/// </summary>
-		/// <param name='hModule'>Module handle.</param>
-		/// <param name='SectionName'>Section name.</param>
-		/// <param name='pData'>Desired data.</param>
-		/// <param name='unDataSize'>Size of desired data in bytes</param>
-		/// <returns>Returns address of data from data on success, null otherwise.</returns>
 		const void* const FindDataSSE2(const HMODULE hModule, const std::array<const unsigned char, 8>& SectionName, const unsigned char* const pData, const size_t unDataSize);
-
-		/// <summary>
-		/// Finding data-in-data with SIMD (SSE2) by module handle and POGO section name.
-		/// </summary>
-		/// <param name='hModule'>Module handle.</param>
-		/// <param name='szSectionName'>Section name.</param>
-		/// <param name='pData'>Desired data.</param>
-		/// <param name='unDataSize'>Size of desired data in bytes</param>
-		/// <returns>Returns address of data from data on success, null otherwise.</returns>
 		const void* const FindDataSSE2(const HMODULE hModule, const char* const szSectionName, const unsigned char* const pData, const size_t unDataSize);
-
-		/// <summary>
-		/// Finding data-in-data with SIMD (SSE2) by module name.
-		/// </summary>
-		/// <param name='szModuleName'>Module name.</param>
-		/// <param name='pData'>Desired data.</param>
-		/// <param name='unDataSize'>Size of desired data in bytes</param>
-		/// <returns>Returns address of data from data on success, null otherwise.</returns>
 		const void* const FindDataSSE2A(const char* const szModuleName, const unsigned char* const pData, const size_t unDataSize);
-
-		/// <summary>
-		/// Finding data-in-data with SIMD (SSE2) by module name and section name.
-		/// </summary>
-		/// <param name='szModuleName'>Module name.</param>
-		/// <param name='SectionName'>Section name.</param>
-		/// <param name='pData'>Desired data.</param>
-		/// <param name='unDataSize'>Size of desired data in bytes</param>
-		/// <returns>Returns address of data from data on success, null otherwise.</returns>
 		const void* const FindDataSSE2A(const char* const szModuleName, const std::array<const unsigned char, 8>& SectionName, const unsigned char* const pData, const size_t unDataSize);
-
-		/// <summary>
-		/// Finding data-in-data with SIMD (SSE2) by module name and POGO section name.
-		/// </summary>
-		/// <param name='szModuleName'>Module name.</param>
-		/// <param name='szSectionName'>Section name.</param>
-		/// <param name='pData'>Desired data.</param>
-		/// <param name='unDataSize'>Size of desired data in bytes</param>
-		/// <returns>Returns address of data from data on success, null otherwise.</returns>
 		const void* const FindDataSSE2A(const char* const szModuleName, const char* const szSectionName, const unsigned char* const pData, const size_t unDataSize);
-
-		/// <summary>
-		/// Finding data-in-data with SIMD (SSE2) by module name.
-		/// </summary>
-		/// <param name='szModuleName'>Module name.</param>
-		/// <param name='pData'>Desired data.</param>
-		/// <param name='unDataSize'>Size of desired data in bytes</param>
-		/// <returns>Returns address of data from data on success, null otherwise.</returns>
 		const void* const FindDataSSE2W(const wchar_t* const szModuleName, const unsigned char* const pData, const size_t unDataSize);
-
-		/// <summary>
-		/// Finding data-in-data with SIMD (SSE2) by module name and section name.
-		/// </summary>
-		/// <param name='szModuleName'>Module name.</param>
-		/// <param name='SectionName'>Section name.</param>
-		/// <param name='pData'>Desired data.</param>
-		/// <param name='unDataSize'>Size of desired data in bytes</param>
-		/// <returns>Returns address of data from data on success, null otherwise.</returns>
 		const void* const FindDataSSE2W(const wchar_t* const szModuleName, const std::array<const unsigned char, 8>& SectionName, const unsigned char* const pData, const size_t unDataSize);
-
-		/// <summary>
-		/// Finding data-in-data with SIMD (SSE2) by module name and POGO section name.
-		/// </summary>
-		/// <param name='szModuleName'>Module name.</param>
-		/// <param name='szSectionName'>Section name.</param>
-		/// <param name='pData'>Desired data.</param>
-		/// <param name='unDataSize'>Size of desired data in bytes</param>
-		/// <returns>Returns address of data from data on success, null otherwise.</returns>
 		const void* const FindDataSSE2W(const wchar_t* const szModuleName, const char* const szSectionName, const unsigned char* const pData, const size_t unDataSize);
-
 #ifdef UNICODE
-		/// <summary>
-		/// Finding data-in-data with SIMD (SSE2) by module name.
-		/// </summary>
-		/// <param name='szModuleName'>Module name.</param>
-		/// <param name='pData'>Desired data.</param>
-		/// <param name='unDataSize'>Size of desired data in bytes</param>
-		/// <returns>Returns address of data from data on success, null otherwise.</returns>
 		const void* const FindDataSSE2(const wchar_t* const szModuleName, const unsigned char* const pData, const size_t unDataSize);
-
-		/// <summary>
-		/// Finding data-in-data with SIMD (SSE2) by module name and section name.
-		/// </summary>
-		/// <param name='szModuleName'>Module name.</param>
-		/// <param name='SectionName'>Section name.</param>
-		/// <param name='pData'>Desired data.</param>
-		/// <param name='unDataSize'>Size of desired data in bytes</param>
-		/// <returns>Returns address of data from data on success, null otherwise.</returns>
 		const void* const FindDataSSE2(const wchar_t* const szModuleName, const std::array<const unsigned char, 8>& SectionName, const unsigned char* const pData, const size_t unDataSize);
-
-		/// <summary>
-		/// Finding data-in-data with SIMD (SSE2) by module name and POGO section name.
-		/// </summary>
-		/// <param name='szModuleName'>Module name.</param>
-		/// <param name='szSectionName'>Section name.</param>
-		/// <param name='pData'>Desired data.</param>
-		/// <param name='unDataSize'>Size of desired data in bytes</param>
-		/// <returns>Returns address of data from data on success, null otherwise.</returns>
 		const void* const FindDataSSE2(const wchar_t* const szModuleName, const char* const szSectionName, const unsigned char* const pData, const size_t unDataSize);
 #else
-		/// <summary>
-		/// Finding data-in-data with SIMD (SSE2) by module name.
-		/// </summary>
-		/// <param name='szModuleName'>Module name.</param>
-		/// <param name='pData'>Desired data.</param>
-		/// <param name='unDataSize'>Size of desired data in bytes</param>
-		/// <returns>Returns address of data from data on success, null otherwise.</returns>
 		const void* const FindDataSSE2(const char* const szModuleName, const unsigned char* const pData, const size_t unDataSize);
-
-		/// <summary>
-		/// Finding data-in-data with SIMD (SSE2) by module name and section name.
-		/// </summary>
-		/// <param name='szModuleName'>Module name.</param>
-		/// <param name='SectionName'>Section name.</param>
-		/// <param name='pData'>Desired data.</param>
-		/// <param name='unDataSize'>Size of desired data in bytes</param>
-		/// <returns>Returns address of data from data on success, null otherwise.</returns>
 		const void* const FindDataSSE2(const char* const szModuleName, const std::array<const unsigned char, 8>& SectionName, const unsigned char* const pData, const size_t unDataSize);
-
-		/// <summary>
-		/// Finding data-in-data with SIMD (SSE2) by module name and POGO section name.
-		/// </summary>
-		/// <param name='szModuleName'>Module name.</param>
-		/// <param name='szSectionName'>Section name.</param>
-		/// <param name='pData'>Desired data.</param>
-		/// <param name='unDataSize'>Size of desired data in bytes</param>
-		/// <returns>Returns address of data from data on success, null otherwise.</returns>
 		const void* const FindDataSSE2(const char* const szModuleName, const char* const szSectionName, const unsigned char* const pData, const size_t unDataSize);
 #endif
 
@@ -1976,160 +874,23 @@ namespace Detours {
 		// FindData (AVX)
 		// ----------------------------------------------------------------
 
-		/// <summary>
-		/// Finding data-in-data with SIMD (AVX) by address and size.
-		/// </summary>
-		/// <param name='pAddress'>Data address.</param>
-		/// <param name='unSize'>The size of the data in bytes.</param>
-		/// <param name='pData'>Desired data.</param>
-		/// <param name='unDataSize'>Size of desired data in bytes</param>
-		/// <returns>Returns address of data from data on success, null otherwise.</returns>
 		const void* const FindDataAVX(const void* const pAddress, const size_t unSize, const unsigned char* const pData, const size_t unDataSize);
-
-		/// <summary>
-		/// Finding data-in-data with SIMD (AVX) by module handle.
-		/// </summary>
-		/// <param name='hModule'>Module handle.</param>
-		/// <param name='pData'>Desired data.</param>
-		/// <param name='unDataSize'>Size of desired data in bytes</param>
-		/// <returns>Returns address of data from data on success, null otherwise.</returns>
 		const void* const FindDataAVX(const HMODULE hModule, const unsigned char* const pData, const size_t unDataSize);
-		
-		/// <summary>
-		/// Finding data-in-data with SIMD (AVX) by module handle and section name.
-		/// </summary>
-		/// <param name='hModule'>Module handle.</param>
-		/// <param name='SectionName'>Section name.</param>
-		/// <param name='pData'>Desired data.</param>
-		/// <param name='unDataSize'>Size of desired data in bytes</param>
-		/// <returns>Returns address of data from data on success, null otherwise.</returns>
 		const void* const FindDataAVX(const HMODULE hModule, const std::array<const unsigned char, 8>& SectionName, const unsigned char* const pData, const size_t unDataSize);
-		
-		/// <summary>
-		/// Finding data-in-data with SIMD (AVX) by module handle and POGO section name.
-		/// </summary>
-		/// <param name='hModule'>Module handle.</param>
-		/// <param name='szSectionName'>Section name.</param>
-		/// <param name='pData'>Desired data.</param>
-		/// <param name='unDataSize'>Size of desired data in bytes</param>
-		/// <returns>Returns address of data from data on success, null otherwise.</returns>
 		const void* const FindDataAVX(const HMODULE hModule, const char* const szSectionName, const unsigned char* const pData, const size_t unDataSize);
-
-		/// <summary>
-		/// Finding data-in-data with SIMD (AVX) by module name.
-		/// </summary>
-		/// <param name='szModuleName'>Module name.</param>
-		/// <param name='pData'>Desired data.</param>
-		/// <param name='unDataSize'>Size of desired data in bytes</param>
-		/// <returns>Returns address of data from data on success, null otherwise.</returns>
 		const void* const FindDataAVXA(const char* const szModuleName, const unsigned char* const pData, const size_t unDataSize);
-
-		/// <summary>
-		/// Finding data-in-data with SIMD (AVX) by module name and section name.
-		/// </summary>
-		/// <param name='szModuleName'>Module name.</param>
-		/// <param name='SectionName'>Section name.</param>
-		/// <param name='pData'>Desired data.</param>
-		/// <param name='unDataSize'>Size of desired data in bytes</param>
-		/// <returns>Returns address of data from data on success, null otherwise.</returns>
 		const void* const FindDataAVXA(const char* const szModuleName, const std::array<const unsigned char, 8>& SectionName, const unsigned char* const pData, const size_t unDataSize);
-
-		/// <summary>
-		/// Finding data-in-data with SIMD (AVX) by module name and POGO section name.
-		/// </summary>
-		/// <param name='szModuleName'>Module name.</param>
-		/// <param name='szSectionName'>Section name.</param>
-		/// <param name='pData'>Desired data.</param>
-		/// <param name='unDataSize'>Size of desired data in bytes</param>
-		/// <returns>Returns address of data from data on success, null otherwise.</returns>
 		const void* const FindDataAVXA(const char* const szModuleName, const char* const szSectionName, const unsigned char* const pData, const size_t unDataSize);
-
-		/// <summary>
-		/// Finding data-in-data with SIMD (AVX) by module name.
-		/// </summary>
-		/// <param name='szModuleName'>Module name.</param>
-		/// <param name='pData'>Desired data.</param>
-		/// <param name='unDataSize'>Size of desired data in bytes</param>
-		/// <returns>Returns address of data from data on success, null otherwise.</returns>
 		const void* const FindDataAVXW(const wchar_t* const szModuleName, const unsigned char* const pData, const size_t unDataSize);
-
-		/// <summary>
-		/// Finding data-in-data with SIMD (AVX) by module name and section name.
-		/// </summary>
-		/// <param name='szModuleName'>Module name.</param>
-		/// <param name='SectionName'>Section name.</param>
-		/// <param name='pData'>Desired data.</param>
-		/// <param name='unDataSize'>Size of desired data in bytes</param>
-		/// <returns>Returns address of data from data on success, null otherwise.</returns>
 		const void* const FindDataAVXW(const wchar_t* const szModuleName, const std::array<const unsigned char, 8>& SectionName, const unsigned char* const pData, const size_t unDataSize);
-
-		/// <summary>
-		/// Finding data-in-data with SIMD (AVX) by module name and POGO section name.
-		/// </summary>
-		/// <param name='szModuleName'>Module name.</param>
-		/// <param name='szSectionName'>Section name.</param>
-		/// <param name='pData'>Desired data.</param>
-		/// <param name='unDataSize'>Size of desired data in bytes</param>
-		/// <returns>Returns address of data from data on success, null otherwise.</returns>
 		const void* const FindDataAVXW(const wchar_t* const szModuleName, const char* const szSectionName, const unsigned char* const pData, const size_t unDataSize);
-
 #ifdef UNICODE
-		/// <summary>
-		/// Finding data-in-data with SIMD (AVX) by module name.
-		/// </summary>
-		/// <param name='szModuleName'>Module name.</param>
-		/// <param name='pData'>Desired data.</param>
-		/// <param name='unDataSize'>Size of desired data in bytes</param>
-		/// <returns>Returns address of data from data on success, null otherwise.</returns>
 		const void* const FindDataAVX(const wchar_t* const szModuleName, const unsigned char* const pData, const size_t unDataSize);
-
-		/// <summary>
-		/// Finding data-in-data with SIMD (AVX) by module name and section name.
-		/// </summary>
-		/// <param name='szModuleName'>Module name.</param>
-		/// <param name='SectionName'>Section name.</param>
-		/// <param name='pData'>Desired data.</param>
-		/// <param name='unDataSize'>Size of desired data in bytes</param>
-		/// <returns>Returns address of data from data on success, null otherwise.</returns>
 		const void* const FindDataAVX(const wchar_t* const szModuleName, const std::array<const unsigned char, 8>& SectionName, const unsigned char* const pData, const size_t unDataSize);
-
-		/// <summary>
-		/// Finding data-in-data with SIMD (AVX) by module name and POGO section name.
-		/// </summary>
-		/// <param name='szModuleName'>Module name.</param>
-		/// <param name='szSectionName'>Section name.</param>
-		/// <param name='pData'>Desired data.</param>
-		/// <param name='unDataSize'>Size of desired data in bytes</param>
-		/// <returns>Returns address of data from data on success, null otherwise.</returns>
 		const void* const FindDataAVX(const wchar_t* const szModuleName, const char* const szSectionName, const unsigned char* const pData, const size_t unDataSize);
 #else
-		/// <summary>
-		/// Finding data-in-data with SIMD (AVX) by module name.
-		/// </summary>
-		/// <param name='szModuleName'>Module name.</param>
-		/// <param name='pData'>Desired data.</param>
-		/// <param name='unDataSize'>Size of desired data in bytes</param>
-		/// <returns>Returns address of data from data on success, null otherwise.</returns>
 		const void* const FindDataAVX(const char* const szModuleName, const unsigned char* const pData, const size_t unDataSize);
-
-		/// <summary>
-		/// Finding data-in-data with SIMD (AVX) by module name and section name.
-		/// </summary>
-		/// <param name='szModuleName'>Module name.</param>
-		/// <param name='SectionName'>Section name.</param>
-		/// <param name='pData'>Desired data.</param>
-		/// <param name='unDataSize'>Size of desired data in bytes</param>
-		/// <returns>Returns address of data from data on success, null otherwise.</returns>
 		const void* const FindDataAVX(const char* const szModuleName, const std::array<const unsigned char, 8>& SectionName, const unsigned char* const pData, const size_t unDataSize);
-
-		/// <summary>
-		/// Finding data-in-data with SIMD (AVX) by module name and POGO section name.
-		/// </summary>
-		/// <param name='szModuleName'>Module name.</param>
-		/// <param name='szSectionName'>Section name.</param>
-		/// <param name='pData'>Desired data.</param>
-		/// <param name='unDataSize'>Size of desired data in bytes</param>
-		/// <returns>Returns address of data from data on success, null otherwise.</returns>
 		const void* const FindDataAVX(const char* const szModuleName, const char* const szSectionName, const unsigned char* const pData, const size_t unDataSize);
 #endif
 
@@ -2137,160 +898,23 @@ namespace Detours {
 		// FindData (AVX2)
 		// ----------------------------------------------------------------
 
-		/// <summary>
-		/// Finding data-in-data with SIMD (AVX2) by address and size.
-		/// </summary>
-		/// <param name='pAddress'>Data address.</param>
-		/// <param name='unSize'>The size of the data in bytes.</param>
-		/// <param name='pData'>Desired data.</param>
-		/// <param name='unDataSize'>Size of desired data in bytes</param>
-		/// <returns>Returns address of data from data on success, null otherwise.</returns>
 		const void* const FindDataAVX2(const void* const pAddress, const size_t unSize, const unsigned char* const pData, const size_t unDataSize);
-
-		/// <summary>
-		/// Finding data-in-data with SIMD (AVX2) by module handle.
-		/// </summary>
-		/// <param name='hModule'>Module handle.</param>
-		/// <param name='pData'>Desired data.</param>
-		/// <param name='unDataSize'>Size of desired data in bytes</param>
-		/// <returns>Returns address of data from data on success, null otherwise.</returns>
 		const void* const FindDataAVX2(const HMODULE hModule, const unsigned char* const pData, const size_t unDataSize);
-
-		/// <summary>
-		/// Finding data-in-data with SIMD (AVX2) by module handle and section name.
-		/// </summary>
-		/// <param name='hModule'>Module handle.</param>
-		/// <param name='SectionName'>Section name.</param>
-		/// <param name='pData'>Desired data.</param>
-		/// <param name='unDataSize'>Size of desired data in bytes</param>
-		/// <returns>Returns address of data from data on success, null otherwise.</returns>
 		const void* const FindDataAVX2(const HMODULE hModule, const std::array<const unsigned char, 8>& SectionName, const unsigned char* const pData, const size_t unDataSize);
-
-		/// <summary>
-		/// Finding data-in-data with SIMD (AVX2) by module handle and POGO section name.
-		/// </summary>
-		/// <param name='hModule'>Module handle.</param>
-		/// <param name='szSectionName'>Section name.</param>
-		/// <param name='pData'>Desired data.</param>
-		/// <param name='unDataSize'>Size of desired data in bytes</param>
-		/// <returns>Returns address of data from data on success, null otherwise.</returns>
 		const void* const FindDataAVX2(const HMODULE hModule, const char* const szSectionName, const unsigned char* const pData, const size_t unDataSize);
-
-		/// <summary>
-		/// Finding data-in-data with SIMD (AVX2) by module name.
-		/// </summary>
-		/// <param name='szModuleName'>Module name.</param>
-		/// <param name='pData'>Desired data.</param>
-		/// <param name='unDataSize'>Size of desired data in bytes</param>
-		/// <returns>Returns address of data from data on success, null otherwise.</returns>
 		const void* const FindDataAVX2A(const char* const szModuleName, const unsigned char* const pData, const size_t unDataSize);
-
-		/// <summary>
-		/// Finding data-in-data with SIMD (AVX2) by module name.
-		/// </summary>
-		/// <param name='szModuleName'>Module name.</param>
-		/// <param name='SectionName'>Section name.</param>
-		/// <param name='pData'>Desired data.</param>
-		/// <param name='unDataSize'>Size of desired data in bytes</param>
-		/// <returns>Returns address of data from data on success, null otherwise.</returns>
 		const void* const FindDataAVX2A(const char* const szModuleName, const std::array<const unsigned char, 8>& SectionName, const unsigned char* const pData, const size_t unDataSize);
-
-		/// <summary>
-		/// Finding data-in-data with SIMD (AVX2) by module name.
-		/// </summary>
-		/// <param name='szModuleName'>Module name.</param>
-		/// <param name='szSectionName'>Section name.</param>
-		/// <param name='pData'>Desired data.</param>
-		/// <param name='unDataSize'>Size of desired data in bytes</param>
-		/// <returns>Returns address of data from data on success, null otherwise.</returns>
 		const void* const FindDataAVX2A(const char* const szModuleName, const char* const szSectionName, const unsigned char* const pData, const size_t unDataSize);
-
-		/// <summary>
-		/// Finding data-in-data with SIMD (AVX2) by module name.
-		/// </summary>
-		/// <param name='szModuleName'>Module name.</param>
-		/// <param name='pData'>Desired data.</param>
-		/// <param name='unDataSize'>Size of desired data in bytes</param>
-		/// <returns>Returns address of data from data on success, null otherwise.</returns>
 		const void* const FindDataAVX2W(const wchar_t* const szModuleName, const unsigned char* const pData, const size_t unDataSize);
-
-		/// <summary>
-		/// Finding data-in-data with SIMD (AVX2) by module name.
-		/// </summary>
-		/// <param name='szModuleName'>Module name.</param>
-		/// <param name='SectionName'>Section name.</param>
-		/// <param name='pData'>Desired data.</param>
-		/// <param name='unDataSize'>Size of desired data in bytes</param>
-		/// <returns>Returns address of data from data on success, null otherwise.</returns>
 		const void* const FindDataAVX2W(const wchar_t* const szModuleName, const std::array<const unsigned char, 8>& SectionName, const unsigned char* const pData, const size_t unDataSize);
-
-		/// <summary>
-		/// Finding data-in-data with SIMD (AVX2) by module name.
-		/// </summary>
-		/// <param name='szModuleName'>Module name.</param>
-		/// <param name='szSectionName'>Section name.</param>
-		/// <param name='pData'>Desired data.</param>
-		/// <param name='unDataSize'>Size of desired data in bytes</param>
-		/// <returns>Returns address of data from data on success, null otherwise.</returns>
 		const void* const FindDataAVX2W(const wchar_t* const szModuleName, const char* const szSectionName, const unsigned char* const pData, const size_t unDataSize);
-
 #ifdef UNICODE
-		/// <summary>
-		/// Finding data-in-data with SIMD (AVX2) by module name.
-		/// </summary>
-		/// <param name='szModuleName'>Module name.</param>
-		/// <param name='pData'>Desired data.</param>
-		/// <param name='unDataSize'>Size of desired data in bytes</param>
-		/// <returns>Returns address of data from data on success, null otherwise.</returns>
 		const void* const FindDataAVX2(const wchar_t* const szModuleName, const unsigned char* const pData, const size_t unDataSize);
-
-		/// <summary>
-		/// Finding data-in-data with SIMD (AVX2) by module name.
-		/// </summary>
-		/// <param name='szModuleName'>Module name.</param>
-		/// <param name='SectionName'>Section name.</param>
-		/// <param name='pData'>Desired data.</param>
-		/// <param name='unDataSize'>Size of desired data in bytes</param>
-		/// <returns>Returns address of data from data on success, null otherwise.</returns>
 		const void* const FindDataAVX2(const wchar_t* const szModuleName, const std::array<const unsigned char, 8>& SectionName, const unsigned char* const pData, const size_t unDataSize);
-
-		/// <summary>
-		/// Finding data-in-data with SIMD (AVX2) by module name.
-		/// </summary>
-		/// <param name='szModuleName'>Module name.</param>
-		/// <param name='szSectionName'>Section name.</param>
-		/// <param name='pData'>Desired data.</param>
-		/// <param name='unDataSize'>Size of desired data in bytes</param>
-		/// <returns>Returns address of data from data on success, null otherwise.</returns>
 		const void* const FindDataAVX2(const wchar_t* const szModuleName, const char* const szSectionName, const unsigned char* const pData, const size_t unDataSize);
 #else
-		/// <summary>
-		/// Finding data-in-data with SIMD (AVX2) by module name.
-		/// </summary>
-		/// <param name='szModuleName'>Module name.</param>
-		/// <param name='pData'>Desired data.</param>
-		/// <param name='unDataSize'>Size of desired data in bytes</param>
-		/// <returns>Returns address of data from data on success, null otherwise.</returns>
 		const void* const FindDataAVX2(const char* const szModuleName, const unsigned char* const pData, const size_t unDataSize);
-
-		/// <summary>
-		/// Finding data-in-data with SIMD (AVX2) by module name.
-		/// </summary>
-		/// <param name='szModuleName'>Module name.</param>
-		/// <param name='SectionName'>Section name.</param>
-		/// <param name='pData'>Desired data.</param>
-		/// <param name='unDataSize'>Size of desired data in bytes</param>
-		/// <returns>Returns address of data from data on success, null otherwise.</returns>
 		const void* const FindDataAVX2(const char* const szModuleName, const std::array<const unsigned char, 8>& SectionName, const unsigned char* const pData, const size_t unDataSize);
-
-		/// <summary>
-		/// Finding data-in-data with SIMD (AVX2) by module name.
-		/// </summary>
-		/// <param name='szModuleName'>Module name.</param>
-		/// <param name='szSectionName'>Section name.</param>
-		/// <param name='pData'>Desired data.</param>
-		/// <param name='unDataSize'>Size of desired data in bytes</param>
-		/// <returns>Returns address of data from data on success, null otherwise.</returns>
 		const void* const FindDataAVX2(const char* const szModuleName, const char* const szSectionName, const unsigned char* const pData, const size_t unDataSize);
 #endif
 
@@ -2298,160 +922,23 @@ namespace Detours {
 		// FindData (AVX512) [AVX512BW]
 		// ----------------------------------------------------------------
 
-		/// <summary>
-		/// Finding data-in-data with SIMD (AVX512) by address and size.
-		/// </summary>
-		/// <param name='pAddress'>Data address.</param>
-		/// <param name='unSize'>The size of the data in bytes.</param>
-		/// <param name='pData'>Desired data.</param>
-		/// <param name='unDataSize'>Size of desired data in bytes</param>
-		/// <returns>Returns address of data from data on success, null otherwise.</returns>
 		const void* const FindDataAVX512(const void* const pAddress, const size_t unSize, const unsigned char* const pData, const size_t unDataSize);
-
-		/// <summary>
-		/// Finding data-in-data with SIMD (AVX512) by module handle.
-		/// </summary>
-		/// <param name='hModule'>Module handle.</param>
-		/// <param name='pData'>Desired data.</param>
-		/// <param name='unDataSize'>Size of desired data in bytes</param>
-		/// <returns>Returns address of data from data on success, null otherwise.</returns>
 		const void* const FindDataAVX512(const HMODULE hModule, const unsigned char* const pData, const size_t unDataSize);
-		
-		/// <summary>
-		/// Finding data-in-data with SIMD (AVX512) by module handle and section name.
-		/// </summary>
-		/// <param name='hModule'>Module handle.</param>
-		/// <param name='SectionName'>Section name.</param>
-		/// <param name='pData'>Desired data.</param>
-		/// <param name='unDataSize'>Size of desired data in bytes</param>
-		/// <returns>Returns address of data from data on success, null otherwise.</returns>
 		const void* const FindDataAVX512(const HMODULE hModule, const std::array<const unsigned char, 8>& SectionName, const unsigned char* const pData, const size_t unDataSize);
-		
-		/// <summary>
-		/// Finding data-in-data with SIMD (AVX512) by module handle and POGO section name.
-		/// </summary>
-		/// <param name='hModule'>Module handle.</param>
-		/// <param name='szSectionName'>Section name.</param>
-		/// <param name='pData'>Desired data.</param>
-		/// <param name='unDataSize'>Size of desired data in bytes</param>
-		/// <returns>Returns address of data from data on success, null otherwise.</returns>
 		const void* const FindDataAVX512(const HMODULE hModule, const char* const szSectionName, const unsigned char* const pData, const size_t unDataSize);
-
-		/// <summary>
-		/// Finding data-in-data with SIMD (AVX512) by module name.
-		/// </summary>
-		/// <param name='szModuleName'>Module name.</param>
-		/// <param name='pData'>Desired data.</param>
-		/// <param name='unDataSize'>Size of desired data in bytes</param>
-		/// <returns>Returns address of data from data on success, null otherwise.</returns>
 		const void* const FindDataAVX512A(const char* const szModuleName, const unsigned char* const pData, const size_t unDataSize);
-		
-		/// <summary>
-		/// Finding data-in-data with SIMD (AVX512) by module name and section name.
-		/// </summary>
-		/// <param name='szModuleName'>Module name.</param>
-		/// <param name='SectionName'>Section name.</param>
-		/// <param name='pData'>Desired data.</param>
-		/// <param name='unDataSize'>Size of desired data in bytes</param>
-		/// <returns>Returns address of data from data on success, null otherwise.</returns>
 		const void* const FindDataAVX512A(const char* const szModuleName, const std::array<const unsigned char, 8>& SectionName, const unsigned char* const pData, const size_t unDataSize);
-		
-		/// <summary>
-		/// Finding data-in-data with SIMD (AVX512) by module name and POGO section name.
-		/// </summary>
-		/// <param name='szModuleName'>Module name.</param>
-		/// <param name='szSectionName'>Section name.</param>
-		/// <param name='pData'>Desired data.</param>
-		/// <param name='unDataSize'>Size of desired data in bytes</param>
-		/// <returns>Returns address of data from data on success, null otherwise.</returns>
 		const void* const FindDataAVX512A(const char* const szModuleName, const char* const szSectionName, const unsigned char* const pData, const size_t unDataSize);
-
-		/// <summary>
-		/// Finding data-in-data with SIMD (AVX512) by module name.
-		/// </summary>
-		/// <param name='szModuleName'>Module name.</param>
-		/// <param name='pData'>Desired data.</param>
-		/// <param name='unDataSize'>Size of desired data in bytes</param>
-		/// <returns>Returns address of data from data on success, null otherwise.</returns>
 		const void* const FindDataAVX512W(const wchar_t* const szModuleName, const unsigned char* const pData, const size_t unDataSize);
-		
-		/// <summary>
-		/// Finding data-in-data with SIMD (AVX512) by module name and section name.
-		/// </summary>
-		/// <param name='szModuleName'>Module name.</param>
-		/// <param name='SectionName'>Section name.</param>
-		/// <param name='pData'>Desired data.</param>
-		/// <param name='unDataSize'>Size of desired data in bytes</param>
-		/// <returns>Returns address of data from data on success, null otherwise.</returns>
 		const void* const FindDataAVX512W(const wchar_t* const szModuleName, const std::array<const unsigned char, 8>& SectionName, const unsigned char* const pData, const size_t unDataSize);
-		
-		/// <summary>
-		/// Finding data-in-data with SIMD (AVX512) by module name and POGO section name.
-		/// </summary>
-		/// <param name='szModuleName'>Module name.</param>
-		/// <param name='szSectionName'>Section name.</param>
-		/// <param name='pData'>Desired data.</param>
-		/// <param name='unDataSize'>Size of desired data in bytes</param>
-		/// <returns>Returns address of data from data on success, null otherwise.</returns>
 		const void* const FindDataAVX512W(const wchar_t* const szModuleName, const char* const szSectionName, const unsigned char* const pData, const size_t unDataSize);
-
 #ifdef UNICODE
-		/// <summary>
-		/// Finding data-in-data with SIMD (AVX512) by module name.
-		/// </summary>
-		/// <param name='szModuleName'>Module name.</param>
-		/// <param name='pData'>Desired data.</param>
-		/// <param name='unDataSize'>Size of desired data in bytes</param>
-		/// <returns>Returns address of data from data on success, null otherwise.</returns>
 		const void* const FindDataAVX512(const wchar_t* const szModuleName, const unsigned char* const pData, const size_t unDataSize);
-
-		/// <summary>
-		/// Finding data-in-data with SIMD (AVX512) by module name and section name.
-		/// </summary>
-		/// <param name='szModuleName'>Module name.</param>
-		/// <param name='SectionName'>Section name.</param>
-		/// <param name='pData'>Desired data.</param>
-		/// <param name='unDataSize'>Size of desired data in bytes</param>
-		/// <returns>Returns address of data from data on success, null otherwise.</returns>
 		const void* const FindDataAVX512(const wchar_t* const szModuleName, const std::array<const unsigned char, 8>& SectionName, const unsigned char* const pData, const size_t unDataSize);
-
-		/// <summary>
-		/// Finding data-in-data with SIMD (AVX512) by module name and POGO section name.
-		/// </summary>
-		/// <param name='szModuleName'>Module name.</param>
-		/// <param name='szSectionName'>Section name.</param>
-		/// <param name='pData'>Desired data.</param>
-		/// <param name='unDataSize'>Size of desired data in bytes</param>
-		/// <returns>Returns address of data from data on success, null otherwise.</returns>
 		const void* const FindDataAVX512(const wchar_t* const szModuleName, const char* const szSectionName, const unsigned char* const pData, const size_t unDataSize);
 #else
-		/// <summary>
-		/// Finding data-in-data with SIMD (AVX512) by module name.
-		/// </summary>
-		/// <param name='szModuleName'>Module name.</param>
-		/// <param name='pData'>Desired data.</param>
-		/// <param name='unDataSize'>Size of desired data in bytes</param>
-		/// <returns>Returns address of data from data on success, null otherwise.</returns>
 		const void* const FindDataAVX512(const char* const szModuleName, const unsigned char* const pData, const size_t unDataSize);
-
-		/// <summary>
-		/// Finding data-in-data with SIMD (AVX512) by module name and section name.
-		/// </summary>
-		/// <param name='szModuleName'>Module name.</param>
-		/// <param name='SectionName'>Section name.</param>
-		/// <param name='pData'>Desired data.</param>
-		/// <param name='unDataSize'>Size of desired data in bytes</param>
-		/// <returns>Returns address of data from data on success, null otherwise.</returns>
 		const void* const FindDataAVX512(const char* const szModuleName, const std::array<const unsigned char, 8>& SectionName, const unsigned char* const pData, const size_t unDataSize);
-
-		/// <summary>
-		/// Finding data-in-data with SIMD (AVX512) by module name and POGO section name.
-		/// </summary>
-		/// <param name='szModuleName'>Module name.</param>
-		/// <param name='szSectionName'>Section name.</param>
-		/// <param name='pData'>Desired data.</param>
-		/// <param name='unDataSize'>Size of desired data in bytes</param>
-		/// <returns>Returns address of data from data on success, null otherwise.</returns>
 		const void* const FindDataAVX512(const char* const szModuleName, const char* const szSectionName, const unsigned char* const pData, const size_t unDataSize);
 #endif
 
@@ -2459,160 +946,23 @@ namespace Detours {
 		// FindData (Auto)
 		// ----------------------------------------------------------------
 
-		/// <summary>
-		/// Finding data-in-data without/with SIMD by address and size.
-		/// </summary>
-		/// <param name='pAddress'>Data address.</param>
-		/// <param name='unSize'>The size of the data in bytes.</param>
-		/// <param name='pData'>Desired data.</param>
-		/// <param name='unDataSize'>Size of desired data in bytes</param>
-		/// <returns>Returns address of data from data on success, null otherwise.</returns>
 		const void* const FindData(const void* const pAddress, const size_t unSize, const unsigned char* const pData, const size_t unDataSize);
-
-		/// <summary>
-		/// Finding data-in-data without/with SIMD by module handle.
-		/// </summary>
-		/// <param name='hModule'>Module handle.</param>
-		/// <param name='pData'>Desired data.</param>
-		/// <param name='unDataSize'>Size of desired data in bytes</param>
-		/// <returns>Returns address of data from data on success, null otherwise.</returns>
 		const void* const FindData(const HMODULE hModule, const unsigned char* const pData, const size_t unDataSize);
-		
-		/// <summary>
-		/// Finding data-in-data without/with SIMD by module handle and section name.
-		/// </summary>
-		/// <param name='hModule'>Module handle.</param>
-		/// <param name='SectionName'>Section name.</param>
-		/// <param name='pData'>Desired data.</param>
-		/// <param name='unDataSize'>Size of desired data in bytes</param>
-		/// <returns>Returns address of data from data on success, null otherwise.</returns>
 		const void* const FindData(const HMODULE hModule, const std::array<const unsigned char, 8>& SectionName, const unsigned char* const pData, const size_t unDataSize);
-		
-		/// <summary>
-		/// Finding data-in-data without/with SIMD by module handle and POGO section name.
-		/// </summary>
-		/// <param name='hModule'>Module handle.</param>
-		/// <param name='szSectionName'>Section name.</param>
-		/// <param name='pData'>Desired data.</param>
-		/// <param name='unDataSize'>Size of desired data in bytes</param>
-		/// <returns>Returns address of data from data on success, null otherwise.</returns>
 		const void* const FindData(const HMODULE hModule, const char* const szSectionName, const unsigned char* const pData, const size_t unDataSize);
-
-		/// <summary>
-		/// Finding data-in-data without/with SIMD by module name.
-		/// </summary>
-		/// <param name='szModuleName'>Module name.</param>
-		/// <param name='pData'>Desired data.</param>
-		/// <param name='unDataSize'>Size of desired data in bytes</param>
-		/// <returns>Returns address of data from data on success, null otherwise.</returns>
 		const void* const FindDataA(const char* const szModuleName, const unsigned char* const pData, const size_t unDataSize);
-		
-		/// <summary>
-		/// Finding data-in-data without/with SIMD by module name and section name.
-		/// </summary>
-		/// <param name='szModuleName'>Module name.</param>
-		/// <param name='SectionName'>Section name.</param>
-		/// <param name='pData'>Desired data.</param>
-		/// <param name='unDataSize'>Size of desired data in bytes</param>
-		/// <returns>Returns address of data from data on success, null otherwise.</returns>
 		const void* const FindDataA(const char* const szModuleName, const std::array<const unsigned char, 8>& SectionName, const unsigned char* const pData, const size_t unDataSize);
-		
-		/// <summary>
-		/// Finding data-in-data without/with SIMD by module name and POGO section name.
-		/// </summary>
-		/// <param name='szModuleName'>Module name.</param>
-		/// <param name='szSectionName'>Section name.</param>
-		/// <param name='pData'>Desired data.</param>
-		/// <param name='unDataSize'>Size of desired data in bytes</param>
-		/// <returns>Returns address of data from data on success, null otherwise.</returns>
 		const void* const FindDataA(const char* const szModuleName, const char* const szSectionName, const unsigned char* const pData, const size_t unDataSize);
-
-		/// <summary>
-		/// Finding data-in-data without/with SIMD by module name.
-		/// </summary>
-		/// <param name='szModuleName'>Module name.</param>
-		/// <param name='pData'>Desired data.</param>
-		/// <param name='unDataSize'>Size of desired data in bytes</param>
-		/// <returns>Returns address of data from data on success, null otherwise.</returns>
 		const void* const FindDataW(const wchar_t* const szModuleName, const unsigned char* const pData, const size_t unDataSize);
-		
-		/// <summary>
-		/// Finding data-in-data without/with SIMD by module name and section name.
-		/// </summary>
-		/// <param name='szModuleName'>Module name.</param>
-		/// <param name='SectionName'>Section name.</param>
-		/// <param name='pData'>Desired data.</param>
-		/// <param name='unDataSize'>Size of desired data in bytes</param>
-		/// <returns>Returns address of data from data on success, null otherwise.</returns>
 		const void* const FindDataW(const wchar_t* const szModuleName, const std::array<const unsigned char, 8>& SectionName, const unsigned char* const pData, const size_t unDataSize);
-		
-		/// <summary>
-		/// Finding data-in-data without/with SIMD by module name and POGO section name.
-		/// </summary>
-		/// <param name='szModuleName'>Module name.</param>
-		/// <param name='szSectionName'>Section name.</param>
-		/// <param name='pData'>Desired data.</param>
-		/// <param name='unDataSize'>Size of desired data in bytes</param>
-		/// <returns>Returns address of data from data on success, null otherwise.</returns>
 		const void* const FindDataW(const wchar_t* const szModuleName, const char* const szSectionName, const unsigned char* const pData, const size_t unDataSize);
-
 #ifdef UNICODE
-		/// <summary>
-		/// Finding data-in-data without/with SIMD by module name.
-		/// </summary>
-		/// <param name='szModuleName'>Module name.</param>
-		/// <param name='pData'>Desired data.</param>
-		/// <param name='unDataSize'>Size of desired data in bytes</param>
-		/// <returns>Returns address of data from data on success, null otherwise.</returns>
 		const void* const FindData(const wchar_t* const szModuleName, const unsigned char* const pData, const size_t unDataSize);
-
-		/// <summary>
-		/// Finding data-in-data without/with SIMD by module name and seciton name.
-		/// </summary>
-		/// <param name='szModuleName'>Module name.</param>
-		/// <param name='SectionName'>Section name.</param>
-		/// <param name='pData'>Desired data.</param>
-		/// <param name='unDataSize'>Size of desired data in bytes</param>
-		/// <returns>Returns address of data from data on success, null otherwise.</returns>
 		const void* const FindData(const wchar_t* const szModuleName, const std::array<const unsigned char, 8>& SectionName, const unsigned char* const pData, const size_t unDataSize);
-
-		/// <summary>
-		/// Finding data-in-data without/with SIMD by module name and POGO section name.
-		/// </summary>
-		/// <param name='szModuleName'>Module name.</param>
-		/// <param name='szSectionName'>Section name.</param>
-		/// <param name='pData'>Desired data.</param>
-		/// <param name='unDataSize'>Size of desired data in bytes</param>
-		/// <returns>Returns address of data from data on success, null otherwise.</returns>
 		const void* const FindData(const wchar_t* const szModuleName, const char* const szSectionName, const unsigned char* const pData, const size_t unDataSize);
 #else
-		/// <summary>
-		/// Finding data-in-data without/with SIMD by module name.
-		/// </summary>
-		/// <param name='szModuleName'>Module name.</param>
-		/// <param name='pData'>Desired data.</param>
-		/// <param name='unDataSize'>Size of desired data in bytes</param>
-		/// <returns>Returns address of data from data on success, null otherwise.</returns>
 		const void* const FindData(const char* const szModuleName, const unsigned char* const pData, const size_t unDataSize);
-
-		/// <summary>
-		/// Finding data-in-data without/with SIMD by module name and section name.
-		/// </summary>
-		/// <param name='szModuleName'>Module name.</param>
-		/// <param name='SectionName'>Section name.</param>
-		/// <param name='pData'>Desired data.</param>
-		/// <param name='unDataSize'>Size of desired data in bytes</param>
-		/// <returns>Returns address of data from data on success, null otherwise.</returns>
 		const void* const FindData(const char* const szModuleName, const std::array<const unsigned char, 8>& SectionName, const unsigned char* const pData, const size_t unDataSize);
-
-		/// <summary>
-		/// Finding data-in-data without/with SIMD by module name and POGO section name.
-		/// </summary>
-		/// <param name='szModuleName'>Module name.</param>
-		/// <param name='szSectionName'>Section name.</param>
-		/// <param name='pData'>Desired data.</param>
-		/// <param name='unDataSize'>Size of desired data in bytes</param>
-		/// <returns>Returns address of data from data on success, null otherwise.</returns>
 		const void* const FindData(const char* const szModuleName, const char* const szSectionName, const unsigned char* const pData, const size_t unDataSize);
 #endif
 
@@ -2620,54 +970,14 @@ namespace Detours {
 		// FindRTTI
 		// ----------------------------------------------------------------
 
-		/// <summary>
-		/// Finding for a virtual table in run-time type information without/with SIMD by address and size.
-		/// </summary>
-		/// <param name='pAddress'>Data address.</param>
-		/// <param name='unSize'>The size of the data in bytes.</param>
-		/// <param name='szRTTI'>Desired virtual table from run-time type information.</param>
-		/// <returns>Returns address of virtual table from run-time type information on success, null otherwise.</returns>
+		const void* const FindRTTI(const void* const pBaseAddress, const void* const pAddress, const size_t unSize, const char* const szRTTI);
 		const void* const FindRTTI(const void* const pBaseAddress, const size_t unSize, const char* const szRTTI);
-
-		/// <summary>
-		/// Finding for a virtual table in run-time type information without/with SIMD by module handle.
-		/// </summary>
-		/// <param name='hModule'>Module handle.</param>
-		/// <param name='szRTTI'>Desired virtual table from run-time type information.</param>
-		/// <returns>Returns address of virtual table from run-time type information on success, null otherwise.</returns>
 		const void* const FindRTTI(const HMODULE hModule, const char* const szRTTI);
-
-		/// <summary>
-		/// Finding for a virtual table in run-time type information without/with SIMD by module name.
-		/// </summary>
-		/// <param name='szModuleName'>Module name.</param>
-		/// <param name='szRTTI'>Desired virtual table from run-time type information.</param>
-		/// <returns>Returns address of virtual table from run-time type information on success, null otherwise.</returns>
 		const void* const FindRTTIA(const char* const szModuleName, const char* const szRTTI);
-
-		/// <summary>
-		/// Finding for a virtual table in run-time type information without/with SIMD by module name.
-		/// </summary>
-		/// <param name='szModuleName'>Module name.</param>
-		/// <param name='szRTTI'>Desired virtual table from run-time type information.</param>
-		/// <returns>Returns address of virtual table from run-time type information on success, null otherwise.</returns>
 		const void* const FindRTTIW(const wchar_t* const szModuleName, const char* const szRTTI);
-
 #ifdef UNICODE
-		/// <summary>
-		/// Finding for a virtual table in run-time type information without/with SIMD by module name.
-		/// </summary>
-		/// <param name='szModuleName'>Module name.</param>
-		/// <param name='szRTTI'>Desired virtual table from run-time type information.</param>
-		/// <returns>Returns address of virtual table from run-time type information on success, null otherwise.</returns>
 		const void* const FindRTTI(const wchar_t* const szModuleName, const char* const szRTTI);
 #else
-		/// <summary>
-		/// Finding for a virtual table in run-time type information without/with SIMD by module name.
-		/// </summary>
-		/// <param name='szModuleName'>Module name.</param>
-		/// <param name='szRTTI'>Desired virtual table from run-time type information.</param>
-		/// <returns>Returns address of virtual table from run-time type information on success, null otherwise.</returns>
 		const void* const FindRTTI(const char* const szModuleName, const char* const szRTTI);
 #endif
 	}
@@ -2720,48 +1030,19 @@ namespace Detours {
 		// Protection
 		// ----------------------------------------------------------------
 
-		/// <summary>
-		/// Memory protection that automatically restores protection.
-		/// </summary>
 		class Protection {
 		public:
-			/// <summary>
-			/// Memory protection that automatically restores protection.
-			/// </summary>
-			/// <param name='pAddress'>Memory address.</param>
-			/// <param name='unSize'>Memory size.</param>
 			Protection(const void* const pAddress, const size_t unSize);
 			~Protection();
 
 		public:
-			/// <summary>
-			/// Get current memory protection.</returns>
-			/// </summary>
-			/// <param name='pProtection'>Recording address.</param>
-			/// <returns>Returns True on success, False otherwise.</returns>
 			bool GetProtection(const PDWORD pProtection);
-
-			/// <summary>
-			/// Change memory protection.
-			/// </summary>
-			/// <param name='unFlag'>Memory protection flag.</param>
-			/// <returns>Returns True on success, False otherwise.</returns>
 			bool ChangeProtection(const DWORD unNewProtection);
-
-			/// <summary>
-			/// Restore memory protection.
-			/// </summary>
-			/// <returns>Returns True on success, False otherwise.</returns>
 			bool RestoreProtection();
 
 		public:
-			/// <returns>Returns memory address.</returns>
 			const void* const GetAddress();
-
-			/// <returns>Returns memory size.</returns>
 			const size_t GetSize();
-
-			/// <returns>Returns original memory protection.</returns>
 			DWORD GetOriginalProtection();
 
 		private:
@@ -2774,19 +1055,7 @@ namespace Detours {
 		// Simple Protection
 		// ----------------------------------------------------------------
 
-		/// <summary>
-		/// Change memory protection.
-		/// </summary>
-		/// <param name='pAddress'>Memory address.</param>
-		/// <param name='unSize'>Memory size.</param>
-		/// <param name='unFlag'>Memory protection flag.</param>
-		/// <returns>Returns True on success, False otherwise.</returns>
 		bool ChangeProtection(const void* const pAddress, const size_t unSize, const DWORD unNewProtection);
-
-		/// <summary>
-		/// Restore memory protection.
-		/// </summary>
-		/// <param name='pAddress'>Memory address.</param>
 		bool RestoreProtection(const void* const pAddress);
 	}
 
@@ -2803,11 +1072,30 @@ namespace Detours {
 		typedef bool(__fastcall* fnExceptionCallBack)(const EXCEPTION_RECORD Exception, const PCONTEXT pCTX);
 
 		// ----------------------------------------------------------------
-		// Exception
+		// ExceptionListener
 		// ----------------------------------------------------------------
 
-		bool AddCallBack(const fnExceptionCallBack pCallBack);
-		bool RemoveCallBack(const fnExceptionCallBack pCallBack);
+		class ExceptionListener {
+		public:
+			ExceptionListener();
+			~ExceptionListener();
+
+		public:
+			bool EnableHandler();
+			bool DisableHandler();
+			bool RefreshHandler();
+			bool AddCallBack(const fnExceptionCallBack pCallBack);
+			bool RemoveCallBack(const fnExceptionCallBack pCallBack);
+
+		public:
+			std::vector<fnExceptionCallBack>& GetCallBacks();
+
+		private:
+			PVOID m_pVEH;
+			std::vector<fnExceptionCallBack> m_vecCallBacks;
+		};
+
+		extern ExceptionListener g_ExceptionListener;
 	}
 
 	// ----------------------------------------------------------------
@@ -2820,37 +1108,17 @@ namespace Detours {
 		// Import Hook
 		// ----------------------------------------------------------------
 
-		/// <summary>
-		/// Hook that automatically unhooking.
-		/// </summary>
 		class ImportHook {
 		public:
-			/// <summary>
-			/// Hook that automatically unhooking.
-			/// </summary>
-			/// <param name='szModuleName'>Module name.</param>
-			/// <param name='szExportName'>Importing name.</param>
-			/// <param name='szImportModuleName'>Importing module name.</param>
 			ImportHook(const HMODULE hModule, const char* const szImportName, const char* const szImportModuleName = nullptr);
 			~ImportHook();
 
 		public:
-			/// <summary>
-			/// Hook with a specific address.
-			/// </summary>
-			/// <param name='pHookAddress'>Hook address.</param>
 			bool Hook(const void* const pHookAddress);
-
-			/// <summary>
-			/// UnHook.
-			/// </summary>
 			bool UnHook();
 
 		public:
-			/// <returns>Returns original address.</returns>
 			const void* GetOriginalAddress();
-
-			/// <returns>Returns hook address.</returns>
 			const void* GetHookAddress();
 
 		private:
@@ -2863,82 +1131,8 @@ namespace Detours {
 		// Simple Import Hook
 		// ----------------------------------------------------------------
 
-		/// <summary>
-		/// Hook with a specific address.
-		/// </summary>
-		/// <param name='hModule'>Module handle.</param>
-		/// <param name='szImportName'>Importing name.</param>
-		/// <param name='pHookAddress'>Hook address.</param>
-		/// <returns>Returns True on success, False otherwise.</returns>
 		bool HookImport(const HMODULE hModule, const char* const szImportName, const void* const pHookAddress);
-
-		/// <summary>
-		/// UnHook.
-		/// </summary>
-		/// <param name='pHookAddress'>Hook address.</param>
 		bool UnHookImport(const void* const pHookAddress);
-
-		// ----------------------------------------------------------------
-		// Export Hook
-		// ----------------------------------------------------------------
-
-		/// <summary>
-		/// Hook that automatically unhooking.
-		/// </summary>
-		class ExportHook {
-		public:
-			/// <summary>
-			/// Hook that automatically unhooking.
-			/// </summary>
-			/// <param name='szModuleName'>Module name.</param>
-			/// <param name='szExportName'>Exporting name.</param>
-			ExportHook(const HMODULE hModule, const char* const szExportName);
-			~ExportHook();
-
-		public:
-			/// <summary>
-			/// Hook with a specific address.
-			/// </summary>
-			/// <param name='pHookAddress'>Hook address.</param>
-			bool Hook(const void* const pHookAddress);
-
-			/// <summary>
-			/// UnHook.
-			/// </summary>
-			bool UnHook();
-
-		public:
-			/// <returns>Returns original address.</returns>
-			const void* GetOriginalAddress();
-
-			/// <returns>Returns hook address.</returns>
-			const void* GetHookAddress();
-
-		private:
-			HMODULE m_hModule;
-			PDWORD m_pAddress;
-			DWORD m_unOriginalAddress;
-			const void* m_pHookAddress;
-		};
-
-		// ----------------------------------------------------------------
-		// Simple Export Hook
-		// ----------------------------------------------------------------
-
-		/// <summary>
-		/// Hook with a specific address.
-		/// </summary>
-		/// <param name='hModule'>Module handle.</param>
-		/// <param name='szExportName'>Exporting name.</param>
-		/// <param name='pHookAddress'>Hook address.</param>
-		/// <returns>Returns True on success, False otherwise.</returns>
-		bool HookExport(const HMODULE hModule, const char* const szExportName, const void* const pHookAddress);
-
-		/// <summary>
-		/// UnHook.
-		/// </summary>
-		/// <param name='pHookAddress'>Hook address.</param>
-		bool UnHookExport(const void* const pHookAddress);
 
 		// ----------------------------------------------------------------
 		// Memory Hook CallBack
@@ -2950,55 +1144,23 @@ namespace Detours {
 		// Memory Hook
 		// ----------------------------------------------------------------
 
-		/// <summary>
-		/// Hook that automatically unhooking.
-		/// </summary>
 		class MemoryHook {
 		public:
-			/// <summary>
-			/// Hook that automatically unhooking.
-			/// </summary>
-			/// <param name='pAddress'>Memory address.</param>
-			/// <param name='unSize'>Memory size.</param>
 			MemoryHook(const void* const pAddress, const size_t unSize = 1, bool bAutoDisable = false);
 			~MemoryHook();
 
 		public:
-			/// <summary>
-			/// Hook with a specific address.
-			/// </summary>
-			/// <param name='pCallBack'>Callback address.</param>
 			bool Hook(const fnMemoryHookCallBack pCallBack);
-
-			/// <summary>
-			/// UnHook.
-			/// </summary>
 			bool UnHook();
 
 		public:
-			/// <summary>
-			/// Enable hook.
-			/// </summary>
-			/// <returns>Returns True on success, False otherwise.</returns>
 			bool Enable();
-
-			/// <summary>
-			/// Disable hook.
-			/// </summary>
-			/// <returns>Returns True on success, False otherwise.</returns>
 			bool Disable();
 
 		public:
-			/// <returns>Returns memory address.</returns>
 			const void* const GetAddress();
-
-			/// <returns>Returns memory size.</returns>
 			const size_t GetSize();
-
-			/// <returns>Returns auto disable param.</returns>
 			bool IsAutoDisable();
-
-			/// <returns>Returns callback address.</returns>
 			fnMemoryHookCallBack GetCallBack();
 
 		private:
@@ -3012,32 +1174,9 @@ namespace Detours {
 		// Simple Memory Hook
 		// ----------------------------------------------------------------
 
-		/// <summary>
-		/// Hook with a specific address.
-		/// </summary>
-		/// <param name='pAddress'>Memory address.</param>
-		/// <param name='pCallBack'>Callback address.</param>
-		/// <returns>Returns True on success, False otherwise.</returns>
 		bool HookMemory(const void* const pAddress, const fnMemoryHookCallBack pCallBack, bool bAutoDisable = false);
-
-		/// <summary>
-		/// UnHook.
-		/// </summary>
-		/// <param name='pCallBack'>Callback address.</param>
 		bool UnHookMemory(const fnMemoryHookCallBack pCallBack);
-
-		/// <summary>
-		/// Enable hook.
-		/// </summary>
-		/// <param name='pCallBack'>Callback address.</param>
-		/// <returns>Returns True on success, False otherwise.</returns>
 		bool EnableHookMemory(const fnMemoryHookCallBack pCallBack);
-
-		/// <summary>
-		/// Disable hook.
-		/// </summary>
-		/// <param name='pCallBack'>Callback address.</param>
-		/// <returns>Returns True on success, False otherwise.</returns>
 		bool DisableHookMemory(const fnMemoryHookCallBack pCallBack);
 	}
 }

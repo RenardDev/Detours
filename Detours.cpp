@@ -31,9 +31,7 @@ namespace Detours {
 	// ----------------------------------------------------------------
 
 	static std::unordered_map<void*, std::unique_ptr<Protection>> g_Protections;
-	static std::vector<fnExceptionCallBack> g_ExceptionCallBacks;
 	static std::unordered_map<void*, std::unique_ptr<ImportHook>> g_ImportHooks;
-	static std::unordered_map<void*, std::unique_ptr<ExportHook>> g_ExportHooks;
 	static std::unordered_map<void*, std::unique_ptr<MemoryHook>> g_MemoryHooks;
 
 	// ----------------------------------------------------------------
@@ -73,11 +71,11 @@ namespace Detours {
 	namespace Scan {
 
 		// ----------------------------------------------------------------
-		// P2ALIGNUP
+		// __p2au
 		// ----------------------------------------------------------------
 
 		template <typename T>
-		static const T inline P2ALIGNUP(T unSize, T unAlignment) {
+		static const T inline __p2au(const T unSize, const T unAlignment) {
 			if ((unSize % unAlignment) == 0) {
 				return unSize;
 			} else {
@@ -86,17 +84,63 @@ namespace Detours {
 		};
 
 		// ----------------------------------------------------------------
-		// Bit scan
+		// __bsf
 		// ----------------------------------------------------------------
 
 		template <typename T>
 		static const T inline __bsf(const T unValue) {
-			for (unsigned char i = 0; i < (sizeof(T) * 8); ++i) {
+			for (unsigned char i = 0; i < (sizeof(T) * CHAR_BIT); ++i) {
 				if (((unValue >> i) & 1) != 0) {
 					return i;
 				}
 			}
-			return sizeof(T) * 8;
+			return sizeof(T) * CHAR_BIT;
+		}
+
+		// ----------------------------------------------------------------
+		// FindMultipleSections
+		// ----------------------------------------------------------------
+
+		bool FindMultipleSections(const HMODULE hModule, const PMULTIPLE_SECTIONS pSections, const size_t unSectionsCount) {
+			if (!hModule) {
+				return false;
+			}
+
+			if (!pSections) {
+				return false;
+			}
+
+			if (!unSectionsCount) {
+				return false;
+			}
+
+			const PIMAGE_DOS_HEADER pDH = reinterpret_cast<PIMAGE_DOS_HEADER>(hModule);
+			const PIMAGE_NT_HEADERS pNTHs = reinterpret_cast<PIMAGE_NT_HEADERS>(reinterpret_cast<char*>(hModule) + pDH->e_lfanew);
+			const PIMAGE_FILE_HEADER pFH = &(pNTHs->FileHeader);
+			const PIMAGE_OPTIONAL_HEADER pOH = &(pNTHs->OptionalHeader);
+
+			const PIMAGE_SECTION_HEADER pFirstSection = reinterpret_cast<PIMAGE_SECTION_HEADER>(reinterpret_cast<char*>(pOH) + pFH->SizeOfOptionalHeader);
+			const WORD unNumberOfSections = pFH->NumberOfSections;
+			const size_t unSectionAlignment = static_cast<size_t>(pOH->SectionAlignment);
+			size_t unValidSections = 0;
+			for (WORD i = 0; i < unNumberOfSections; ++i) {
+				for (size_t k = 0; k < unSectionsCount; ++k) {
+					if (pSections[k].m_pAddress) {
+						continue;
+					}
+					if (memcmp(pSections[k].m_SectionName.data(), pFirstSection[i].Name, 8) == 0) {
+						pSections[k].m_pAddress = reinterpret_cast<void*>(reinterpret_cast<char*>(hModule) + pFirstSection[i].VirtualAddress);
+						pSections[k].m_pSize = __p2au(static_cast<size_t>(pFirstSection[i].SizeOfRawData), unSectionAlignment);;
+						++unValidSections;
+					}
+				}
+			}
+
+			if (unValidSections == unSectionsCount) {
+				return true;
+			}
+
+			return false;
 		}
 
 		// ----------------------------------------------------------------
@@ -116,7 +160,6 @@ namespace Detours {
 			const PIMAGE_SECTION_HEADER pFirstSection = reinterpret_cast<PIMAGE_SECTION_HEADER>(reinterpret_cast<char*>(pOH) + pFH->SizeOfOptionalHeader);
 			const WORD unNumberOfSections = pFH->NumberOfSections;
 			const size_t unSectionAlignment = static_cast<size_t>(pOH->SectionAlignment);
-			size_t unValidSections = 0;
 			for (WORD i = 0; i < unNumberOfSections; ++i) {
 				if (memcmp(SectionName.data(), pFirstSection[i].Name, 8) == 0) {
 					if (pAddress) {
@@ -124,11 +167,91 @@ namespace Detours {
 					}
 
 					if (pSize) {
-						*pSize = P2ALIGNUP(static_cast<size_t>(pFirstSection[i].SizeOfRawData), unSectionAlignment);;
+						*pSize = __p2au(static_cast<size_t>(pFirstSection[i].SizeOfRawData), unSectionAlignment);;
 					}
 
 					return true;
 				}
+			}
+
+			return false;
+		}
+
+		// ----------------------------------------------------------------
+		// FindMultipleSectionsPOGO
+		// ----------------------------------------------------------------
+
+		bool FindMultipleSectionsPOGO(const HMODULE hModule, const PMULTIPLE_POGO_SECTIONS pSections, const size_t unSectionsCount) {
+			if (!hModule) {
+				return false;
+			}
+
+			if (!pSections) {
+				return false;
+			}
+
+			if (!unSectionsCount) {
+				return false;
+			}
+
+			const PIMAGE_DOS_HEADER pDH = reinterpret_cast<PIMAGE_DOS_HEADER>(hModule);
+			const PIMAGE_NT_HEADERS pNTHs = reinterpret_cast<PIMAGE_NT_HEADERS>(reinterpret_cast<char*>(hModule) + pDH->e_lfanew);
+			const PIMAGE_OPTIONAL_HEADER pOH = &(pNTHs->OptionalHeader);
+
+			const IMAGE_DATA_DIRECTORY DebugDD = pOH->DataDirectory[IMAGE_DIRECTORY_ENTRY_DEBUG];
+			if (!DebugDD.Size) {
+				return false;
+			}
+
+			const DWORD unCount = DebugDD.Size / sizeof(IMAGE_DEBUG_DIRECTORY);
+			const PIMAGE_DEBUG_DIRECTORY pDebugDirectory = reinterpret_cast<PIMAGE_DEBUG_DIRECTORY>(reinterpret_cast<char*>(hModule) + DebugDD.VirtualAddress);
+			size_t unValidSections = 0;
+			for (DWORD i = 0; i < unCount; ++i) {
+				if (pDebugDirectory[i].Type != IMAGE_DEBUG_TYPE_POGO) {
+					continue;
+				}
+
+				typedef struct _IMAGE_POGO_BLOCK {
+					DWORD unRVA;
+					DWORD unSize;
+					char Name[1];
+				} IMAGE_POGO_BLOCK, *PIMAGE_POGO_BLOCK;
+
+				typedef struct _IMAGE_POGO_INFO {
+					DWORD Signature; // 0x4C544347 = 'LTCG'
+					IMAGE_POGO_BLOCK Blocks[1];
+				} IMAGE_POGO_INFO, *PIMAGE_POGO_INFO;
+
+				const PIMAGE_POGO_INFO pPI = reinterpret_cast<PIMAGE_POGO_INFO>(reinterpret_cast<char*>(hModule) + pDebugDirectory[i].AddressOfRawData);
+				if (pPI->Signature != 0x4C544347) {
+					continue;
+				}
+
+				PIMAGE_POGO_BLOCK pBlock = pPI->Blocks;
+				while (pBlock->unRVA != 0) {
+					const size_t unNameLength = strnlen_s(pBlock->Name, 0x1000) + 1;
+					size_t unBlockSize = sizeof(DWORD) * 2 + unNameLength;
+					if (unBlockSize & 3) {
+						unBlockSize += (4 - (unBlockSize & 3));
+					}
+
+					for (size_t k = 0; k < unSectionsCount; ++k) {
+						if (pSections[k].m_pAddress) {
+							continue;
+						}
+						if (strncmp(pSections[k].m_szSectionName, pBlock->Name, 0x1000) == 0) {
+							pSections[k].m_pAddress = reinterpret_cast<void*>(reinterpret_cast<char*>(hModule) + pBlock->unRVA);
+							pSections[k].m_pSize = static_cast<size_t>(pBlock->unSize);
+							++unValidSections;
+						}
+					}
+
+					pBlock = reinterpret_cast<PIMAGE_POGO_BLOCK>(reinterpret_cast<char*>(pBlock) + unBlockSize);
+				}
+			}
+
+			if (unValidSections == unSectionsCount) {
+				return true;
 			}
 
 			return false;
@@ -158,8 +281,8 @@ namespace Detours {
 
 			const DWORD unCount = DebugDD.Size / sizeof(IMAGE_DEBUG_DIRECTORY);
 			const PIMAGE_DEBUG_DIRECTORY pDebugDirectory = reinterpret_cast<PIMAGE_DEBUG_DIRECTORY>(reinterpret_cast<char*>(hModule) + DebugDD.VirtualAddress);
-			for (DWORD k = 0; k < unCount; ++k) {
-				if (pDebugDirectory[k].Type != IMAGE_DEBUG_TYPE_POGO) {
+			for (DWORD i = 0; i < unCount; ++i) {
+				if (pDebugDirectory[i].Type != IMAGE_DEBUG_TYPE_POGO) {
 					continue;
 				}
 
@@ -174,21 +297,20 @@ namespace Detours {
 					IMAGE_POGO_BLOCK Blocks[1];
 				} IMAGE_POGO_INFO, *PIMAGE_POGO_INFO;
 
-				const PIMAGE_POGO_INFO pPI = reinterpret_cast<PIMAGE_POGO_INFO>(reinterpret_cast<char*>(hModule) + pDebugDirectory[k].AddressOfRawData);
+				const PIMAGE_POGO_INFO pPI = reinterpret_cast<PIMAGE_POGO_INFO>(reinterpret_cast<char*>(hModule) + pDebugDirectory[i].AddressOfRawData);
 				if (pPI->Signature != 0x4C544347) {
 					continue;
 				}
 
 				PIMAGE_POGO_BLOCK pBlock = pPI->Blocks;
-				size_t unValidSections = 0;
 				while (pBlock->unRVA != 0) {
-					const size_t unNameLength = strlen(pBlock->Name) + 1;
+					const size_t unNameLength = strnlen_s(pBlock->Name, 0x1000) + 1;
 					size_t unBlockSize = sizeof(DWORD) * 2 + unNameLength;
 					if (unBlockSize & 3) {
 						unBlockSize += (4 - (unBlockSize & 3));
 					}
 
-					if (strcmp(szSectionName, pBlock->Name) == 0) {
+					if (strncmp(szSectionName, pBlock->Name, 0x1000) == 0) {
 						if (pAddress) {
 							*pAddress = reinterpret_cast<void*>(reinterpret_cast<char*>(hModule) + pBlock->unRVA);
 						}
@@ -224,7 +346,7 @@ namespace Detours {
 				return nullptr;
 			}
 
-			const size_t unSignatureLength = strnlen_s(szSignature, DETOURS_MAX_STRSIZE);
+			const size_t unSignatureLength = strnlen_s(szSignature, 0x1000);
 			if (!unSignatureLength) {
 				return nullptr;
 			}
@@ -463,7 +585,7 @@ namespace Detours {
 				return nullptr;
 			}
 
-			const size_t unSignatureLength = strnlen_s(szSignature, DETOURS_MAX_STRSIZE);
+			const size_t unSignatureLength = strnlen_s(szSignature, 0x1000);
 			if (!unSignatureLength) {
 				return nullptr;
 			}
@@ -716,7 +838,7 @@ namespace Detours {
 				return nullptr;
 			}
 
-			const size_t unSignatureLength = strnlen_s(szSignature, DETOURS_MAX_STRSIZE);
+			const size_t unSignatureLength = strnlen_s(szSignature, 0x1000);
 			if (!unSignatureLength) {
 				return nullptr;
 			}
@@ -972,7 +1094,7 @@ namespace Detours {
 				return nullptr;
 			}
 
-			const size_t unSignatureLength = strnlen_s(szSignature, DETOURS_MAX_STRSIZE);
+			const size_t unSignatureLength = strnlen_s(szSignature, 0x1000);
 			if (!unSignatureLength) {
 				return nullptr;
 			}
@@ -1225,7 +1347,7 @@ namespace Detours {
 				return nullptr;
 			}
 
-			const size_t unSignatureLength = strnlen_s(szSignature, DETOURS_MAX_STRSIZE);
+			const size_t unSignatureLength = strnlen_s(szSignature, 0x1000);
 			if (!unSignatureLength) {
 				return nullptr;
 			}
@@ -3418,7 +3540,7 @@ namespace Detours {
 		// FindRTTI
 		// ----------------------------------------------------------------
 
-		static const void* const _FindRTTI(const void* const pBaseAddress, const size_t unSize, const char* const szRTTI) {
+		static const void* const _FindRTTI(const void* const pBaseAddress, const void* const pAddress, const size_t unSize, const char* const szRTTI) {
 			if (!pBaseAddress) {
 				return nullptr;
 			}
@@ -3431,7 +3553,7 @@ namespace Detours {
 				return nullptr;
 			}
 
-			const size_t unRTTILength = strnlen_s(szRTTI, DETOURS_MAX_STRSIZE);
+			const size_t unRTTILength = strnlen_s(szRTTI, 0x1000);
 			if (!unRTTILength) {
 				return nullptr;
 			}
@@ -3440,8 +3562,8 @@ namespace Detours {
 				return nullptr;
 			}
 
-			void* pReference = const_cast<void*>(pBaseAddress);
-			void* pEndAddress = reinterpret_cast<char*>(const_cast<void*>(pBaseAddress)) + unSize;
+			void* pReference = const_cast<void*>(pAddress);
+			void* pEndAddress = reinterpret_cast<char*>(const_cast<void*>(pAddress)) + unSize;
 			while (pReference && (pReference < pEndAddress)) {
 				pReference = const_cast<void*>(FindData(pReference, reinterpret_cast<size_t>(pEndAddress) - reinterpret_cast<size_t>(pReference), reinterpret_cast<const unsigned char* const>(szRTTI), unRTTILength));
 				if (!pReference) {
@@ -3458,7 +3580,7 @@ namespace Detours {
 					continue;
 				}
 
-				void* pTypeDescriptorReference = const_cast<void*>(pBaseAddress);
+				void* pTypeDescriptorReference = const_cast<void*>(pAddress);
 				while (pTypeDescriptorReference && (pTypeDescriptorReference < pEndAddress)) {
 #ifdef _M_X64
 					const size_t unTypeDescriptorOffsetTemp = reinterpret_cast<size_t>(pTypeDescriptor) - reinterpret_cast<size_t>(pBaseAddress);
@@ -3515,7 +3637,7 @@ namespace Detours {
 #elif _M_IX86
 						if (pBaseClassDescriptor->m_pTypeDescriptor == pTypeDescriptor) {
 #endif
-							const void* const pCompleteObject = FindData(pBaseAddress, unSize, reinterpret_cast<const unsigned char* const>(&pCompleteObjectLocation), sizeof(void*));
+							const void* const pCompleteObject = FindData(pAddress, unSize, reinterpret_cast<const unsigned char* const>(&pCompleteObjectLocation), sizeof(void*));
 							if (!pCompleteObject) {
 								return nullptr;
 							}
@@ -3533,8 +3655,12 @@ namespace Detours {
 		}
 
 		// Ren: Fixes bug with Visual Studio static code analyzer...
+		const void* const FindRTTI(const void* const pBaseAddress, const void* const pAddress, const size_t unSize, const char* const szRTTI) {
+			return _FindRTTI(pBaseAddress, pAddress, unSize, szRTTI);
+		}
+
 		const void* const FindRTTI(const void* const pBaseAddress, const size_t unSize, const char* const szRTTI) {
-			return _FindRTTI(pBaseAddress, unSize, szRTTI);
+			return _FindRTTI(pBaseAddress, pBaseAddress, unSize, szRTTI);
 		}
 
 		const void* const FindRTTI(const HMODULE hModule, const char* const szRTTI) {
@@ -3549,6 +3675,26 @@ namespace Detours {
 			const PIMAGE_DOS_HEADER pDH = reinterpret_cast<PIMAGE_DOS_HEADER>(hModule);
 			const PIMAGE_NT_HEADERS pNTHs = reinterpret_cast<PIMAGE_NT_HEADERS>(reinterpret_cast<char*>(hModule) + pDH->e_lfanew);
 			const PIMAGE_OPTIONAL_HEADER pOH = &(pNTHs->OptionalHeader);
+
+			MULTIPLE_POGO_SECTIONS SectionsPOGO[2];
+			memset(SectionsPOGO, 0, sizeof(SectionsPOGO));
+
+			SectionsPOGO[0].m_szSectionName = ".rdata";
+			SectionsPOGO[1].m_szSectionName = ".data$rs";
+
+			if (FindMultipleSectionsPOGO(hModule, SectionsPOGO, 2)) {
+				return FindRTTI(reinterpret_cast<void*>(hModule), SectionsPOGO[0].m_pAddress, reinterpret_cast<size_t>(SectionsPOGO[1].m_pAddress) - reinterpret_cast<size_t>(SectionsPOGO[0].m_pAddress) + SectionsPOGO[1].m_pSize, szRTTI);
+			}
+
+			MULTIPLE_SECTIONS Sections[2];
+			memset(Sections, 0, sizeof(Sections));
+
+			Sections[0].m_SectionName = std::array<unsigned char, 8>({ '.', 'r', 'd', 'a', 't', 'a', 0, 0 });
+			Sections[1].m_SectionName = std::array<unsigned char, 8>({ '.', 'd', 'a', 't', 'a', 0, 0, 0 });
+
+			if (FindMultipleSections(hModule, Sections, 2)) {
+				return FindRTTI(reinterpret_cast<void*>(hModule), Sections[0].m_pAddress, reinterpret_cast<size_t>(Sections[1].m_pAddress) - reinterpret_cast<size_t>(Sections[0].m_pAddress) + Sections[1].m_pSize, szRTTI);
+			}
 
 			return FindRTTI(reinterpret_cast<void*>(hModule), static_cast<size_t>(pOH->SizeOfImage) - 1, szRTTI);
 		}
@@ -3890,18 +4036,25 @@ namespace Detours {
 			// MemoryHook
 			auto Hook = g_MemoryHooks.find(pException->ExceptionAddress);
 			if (Hook != g_MemoryHooks.end()) {
-				auto& pMemoryHook = Hook->second;
-				if (pMemoryHook) {
-					Hook::MemoryHook* pHook = pMemoryHook.get();
-					if (pHook) {
-						if (pHook->IsAutoDisable()) {
-							pHook->Disable();
-						}
+				void* pAddress = Hook->first;
+#ifdef _M_X64
+				if ((pAddress == reinterpret_cast<void*>(pException->ExceptionAddress)) || (pAddress == reinterpret_cast<void*>(pCTX->Rip))) {
+#elif _M_IX86
+				if ((pAddress == reinterpret_cast<void*>(pException->ExceptionAddress)) || (pAddress == reinterpret_cast<void*>(pCTX->Eip))) {
+#endif
+					auto& pMemoryHook = Hook->second;
+					if (pMemoryHook) {
+						MemoryHook* pHook = pMemoryHook.get();
+						if (pHook) {
+							if (pHook->IsAutoDisable()) {
+								pHook->Disable();
+							}
 
-						const Hook::fnMemoryHookCallBack pCallBack = pHook->GetCallBack();
-						if (pCallBack) {
-							if (pCallBack(pHook, pCTX)) {
-								return EXCEPTION_CONTINUE_EXECUTION;
+							const fnMemoryHookCallBack pCallBack = pHook->GetCallBack();
+							if (pCallBack) {
+								if (pCallBack(pHook, pCTX)) {
+									return EXCEPTION_CONTINUE_EXECUTION;
+								}
 							}
 						}
 					}
@@ -3909,12 +4062,9 @@ namespace Detours {
 			}
 
 			const EXCEPTION_RECORD Exception = *pException;
-			for (auto it = g_ExceptionCallBacks.begin(); it != g_ExceptionCallBacks.end(); ++it) {
-				const fnExceptionCallBack pCallBack = *it;
-				if (!pCallBack) {
-					continue;
-				}
-
+			auto& vecCallBacks = g_ExceptionListener.GetCallBacks();
+			for (auto CallBack = vecCallBacks.begin(); CallBack != vecCallBacks.end(); ++CallBack) {
+				const fnExceptionCallBack pCallBack = *CallBack;
 				if (pCallBack(Exception, pCTX)) {
 					return EXCEPTION_CONTINUE_EXECUTION;
 				}
@@ -3924,67 +4074,85 @@ namespace Detours {
 		}
 
 		// ----------------------------------------------------------------
-		// Exception
+		// ExceptionListener
 		// ----------------------------------------------------------------
 
-		class Exception {
-		public:
-			Exception();
-			~Exception();
-
-		public:
-			PVOID m_pVEH;
-		};
-
-		Exception::Exception() {
+		ExceptionListener::ExceptionListener() {
 			m_pVEH = AddVectoredExceptionHandler(TRUE, ExceptionHandler);
 		}
 
-		Exception::~Exception() {
+		ExceptionListener::~ExceptionListener() {
 			if (m_pVEH) {
 				RemoveVectoredExceptionHandler(m_pVEH);
 			}
 		}
 
-		static Exception g_Exception;
+		bool ExceptionListener::EnableHandler() {
+			if (m_pVEH) {
+				return false;
+			}
 
-		bool AddCallBack(const fnExceptionCallBack pCallBack) {
+			m_pVEH = AddVectoredExceptionHandler(TRUE, ExceptionHandler);
+			return true;
+		}
+
+		bool ExceptionListener::DisableHandler() {
+			if (!m_pVEH) {
+				return false;
+			}
+
+			RemoveVectoredExceptionHandler(m_pVEH);
+			m_pVEH = nullptr;
+			return true;
+		}
+
+		bool ExceptionListener::RefreshHandler() {
+			if (!DisableHandler()) {
+				return false;
+			}
+
+			if (!EnableHandler()) {
+				return false;
+			}
+
+			return true;
+		}
+
+		bool ExceptionListener::AddCallBack(const fnExceptionCallBack pCallBack) {
 			if (!pCallBack) {
 				return false;
 			}
 
-			if (!g_Exception.m_pVEH) {
-				return false;
-			}
-
-			for (auto it = g_ExceptionCallBacks.begin(); it != g_ExceptionCallBacks.end(); ++it) {
+			for (auto it = m_vecCallBacks.begin(); it != m_vecCallBacks.end(); ++it) {
 				if (pCallBack == *it) {
 					return false;
 				}
 			}
 
-			g_ExceptionCallBacks.push_back(pCallBack);
+			m_vecCallBacks.push_back(pCallBack);
 			return true;
 		}
 
-		bool RemoveCallBack(const fnExceptionCallBack pCallBack) {
+		bool ExceptionListener::RemoveCallBack(const fnExceptionCallBack pCallBack) {
 			if (!pCallBack) {
 				return false;
 			}
 
-			if (!g_Exception.m_pVEH) {
-				return false;
-			}
-
-			for (auto it = g_ExceptionCallBacks.begin(); it != g_ExceptionCallBacks.end(); ++it) {
+			for (auto it = m_vecCallBacks.begin(); it != m_vecCallBacks.end(); ++it) {
 				if (pCallBack == *it) {
-					g_ExceptionCallBacks.erase(it);
+					m_vecCallBacks.erase(it);
 					return true;
 				}
 			}
 
 			return false;
 		}
+
+		std::vector<fnExceptionCallBack>& ExceptionListener::GetCallBacks() {
+			return m_vecCallBacks;
+		}
+
+		ExceptionListener g_ExceptionListener;
 	}
 
 	// ----------------------------------------------------------------
@@ -4146,171 +4314,6 @@ namespace Detours {
 		}
 
 		// ----------------------------------------------------------------
-		// Export Hook
-		// ----------------------------------------------------------------
-
-		ExportHook::ExportHook(const HMODULE hModule, const char* const szExportName) {
-			m_hModule = nullptr;
-			m_pAddress = nullptr;
-			m_unOriginalAddress = 0;
-			m_pHookAddress = nullptr;
-
-			if (!hModule) {
-				return;
-			}
-
-			m_hModule = hModule;
-
-			if (!szExportName) {
-				return;
-			}
-
-			const PIMAGE_DOS_HEADER pDH = reinterpret_cast<PIMAGE_DOS_HEADER>(hModule);
-			const PIMAGE_NT_HEADERS pNTHs = reinterpret_cast<PIMAGE_NT_HEADERS>(reinterpret_cast<char*>(hModule) + pDH->e_lfanew);
-			const PIMAGE_OPTIONAL_HEADER pOH = &(pNTHs->OptionalHeader);
-
-			const PIMAGE_DATA_DIRECTORY pExportDD = &(pOH->DataDirectory[IMAGE_DIRECTORY_ENTRY_EXPORT]);
-			const PIMAGE_EXPORT_DIRECTORY pExportDirectory = reinterpret_cast<PIMAGE_EXPORT_DIRECTORY>(reinterpret_cast<char*>(hModule) + pExportDD->VirtualAddress);
-
-			const PDWORD pExportAddresses = reinterpret_cast<PDWORD>(reinterpret_cast<char*>(hModule) + pExportDirectory->AddressOfFunctions);
-			const PWORD pExportOrdinals = reinterpret_cast<PWORD>(reinterpret_cast<char*>(hModule) + pExportDirectory->AddressOfNameOrdinals);
-			const PDWORD pExportNames = reinterpret_cast<PDWORD>(reinterpret_cast<char*>(hModule) + pExportDirectory->AddressOfNames);
-
-			const size_t unAddressOfFunctions = pExportDirectory->NumberOfFunctions;
-			for (size_t i = 0; i < unAddressOfFunctions; ++i) {
-				if (strncmp(szExportName, reinterpret_cast<char*>(hModule) + pExportNames[i], 0x7FF) == 0) {
-					m_pAddress = reinterpret_cast<PDWORD>(&(pExportAddresses[pExportOrdinals[i]]));
-					m_unOriginalAddress = *m_pAddress;
-				}
-			}
-
-		}
-
-		ExportHook::~ExportHook() {
-			UnHook();
-		}
-
-		bool ExportHook::Hook(const void* const pHookAddress) {
-			if (!m_hModule) {
-				return false;
-			}
-
-			if (!m_pAddress) {
-				return false;
-			}
-
-			if (*m_pAddress != m_unOriginalAddress) {
-				return false;
-			}
-
-			const size_t unNewAddress = reinterpret_cast<size_t>(pHookAddress) - reinterpret_cast<size_t>(m_hModule);
-#ifdef _M_X64
-			if (unNewAddress >= 0xFFFFFFFFui32) {
-				return false;
-			}
-#endif
-
-			Protection Memory(m_pAddress, sizeof(DWORD));
-			if (Memory.ChangeProtection(PAGE_READWRITE)) {
-				*m_pAddress = static_cast<DWORD>(unNewAddress);
-				m_pHookAddress = pHookAddress;
-				return true;
-			}
-
-			return false;
-		}
-
-		bool ExportHook::UnHook() {
-			if (!m_hModule) {
-				return false;
-			}
-
-			if (!m_pAddress) {
-				return false;
-			}
-
-			if (*m_pAddress == m_unOriginalAddress) {
-				return false;
-			}
-
-			Protection Memory(m_pAddress, sizeof(DWORD));
-			if (Memory.ChangeProtection(PAGE_READWRITE)) {
-				*m_pAddress = m_unOriginalAddress;
-				m_pHookAddress = nullptr;
-				return true;
-			}
-
-			return false;
-		}
-
-		const void* ExportHook::GetOriginalAddress() {
-			if (!m_hModule) {
-				return nullptr;
-			}
-			return reinterpret_cast<const void*>(reinterpret_cast<char*>(m_hModule) + m_unOriginalAddress);
-		}
-
-		const void* ExportHook::GetHookAddress() {
-			return m_pHookAddress;
-		}
-
-		// ----------------------------------------------------------------
-		// Simple Export Hook
-		// ----------------------------------------------------------------
-
-		bool HookExport(const HMODULE hModule, const char* const szExportName, const void* const pHookAddress) {
-			if (!hModule) {
-				return false;
-			}
-
-			if (!szExportName) {
-				return false;
-			}
-
-			if (!pHookAddress) {
-				return false;
-			}
-
-			auto pHook = std::make_unique<ExportHook>(hModule, szExportName);
-			if (!pHook) {
-				return false;
-			}
-
-			const void* const pOriginalAddress = pHook->GetOriginalAddress();
-			auto pExportHook = g_ExportHooks.find(const_cast<void*>(pOriginalAddress));
-			if (pExportHook != g_ExportHooks.end()) {
-				return false;
-			}
-
-			if (!pHook->Hook(pHookAddress)) {
-				return false;
-			}
-
-			g_ExportHooks.insert(std::pair<void*, std::unique_ptr<ExportHook>>(const_cast<void*>(pOriginalAddress), std::move(pHook)));
-			return true;
-		}
-
-		bool UnHookExport(const void* const pHookAddress) {
-			if (!pHookAddress) {
-				return false;
-			}
-
-			for (auto it = g_ExportHooks.begin(); it != g_ExportHooks.end(); ++it) {
-				auto& pExportHook = it->second;
-				if (!pExportHook) {
-					continue;
-				}
-
-				if (pHookAddress == pExportHook->GetHookAddress()) {
-					g_ExportHooks.erase(it);
-					return true;
-				}
-			}
-
-			return false;
-		}
-
-		// ----------------------------------------------------------------
 		// Memory Hook
 		// ----------------------------------------------------------------
 
@@ -4414,7 +4417,7 @@ namespace Detours {
 				return false;
 			}
 
-			g_Protections.insert(std::pair<void*, std::unique_ptr<Protection>>(const_cast<void*>(pMemoryAddress), std::move(pMemory)));
+			g_Protections.emplace(const_cast<void*>(pMemoryAddress), std::move(pMemory));
 			return true;
 		}
 
@@ -4549,7 +4552,7 @@ namespace Detours {
 				return false;
 			}
 
-			g_MemoryHooks.insert(std::pair<void*, std::unique_ptr<MemoryHook>>(const_cast<void*>(pAddress), std::move(pHook)));
+			g_MemoryHooks.emplace(const_cast<void*>(pAddress), std::move(pHook));
 			return true;
 		}
 
