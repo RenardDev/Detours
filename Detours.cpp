@@ -3776,9 +3776,9 @@ namespace Detours {
 				_stprintf_s(szMap, _T("Local\\%s"), m_szSessionName);
 			}
 
-			m_hMap = CreateFileMapping(INVALID_HANDLE_VALUE, nullptr, PAGE_READWRITE, 0, unMemorySize & 0xFFFFFFFF, szMap);
+			m_hMap = CreateFileMapping(INVALID_HANDLE_VALUE, nullptr, PAGE_READWRITE, 0, unMemorySize & 0xFFFFFFFFi32, szMap);
 			if (m_hMap && (m_hMap != INVALID_HANDLE_VALUE)) {
-				m_pAddress = MapViewOfFile(m_hMap, FILE_MAP_ALL_ACCESS, 0, 0, unMemorySize);
+				m_pAddress = MapViewOfFile(m_hMap, FILE_MAP_ALL_ACCESS, 0, 0, unMemorySize & 0xFFFFFFFFi32);
 			}
 		}
 
@@ -3832,7 +3832,7 @@ namespace Detours {
 
 			m_hMap = OpenFileMapping(FILE_MAP_ALL_ACCESS, FALSE, szMap);
 			if (m_hMap && (m_hMap != INVALID_HANDLE_VALUE)) {
-				m_pAddress = MapViewOfFile(m_hMap, FILE_MAP_ALL_ACCESS, 0, 0, unMemorySize);
+				m_pAddress = MapViewOfFile(m_hMap, FILE_MAP_ALL_ACCESS, 0, 0, unMemorySize & 0xFFFFFFFFi32);
 			}
 		}
 
