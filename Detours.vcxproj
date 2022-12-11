@@ -120,7 +120,6 @@
       <OptimizeForWindowsApplication>true</OptimizeForWindowsApplication>
       <StringPooling>true</StringPooling>
       <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
-      <ControlFlowGuard>Guard</ControlFlowGuard>
       <RuntimeTypeInfo>true</RuntimeTypeInfo>
       <OpenMP>GenerateParallelCode</OpenMP>
       <FloatingPointModel>Fast</FloatingPointModel>
@@ -173,7 +172,6 @@
       <OptimizeForWindowsApplication>true</OptimizeForWindowsApplication>
       <StringPooling>true</StringPooling>
       <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
-      <ControlFlowGuard>Guard</ControlFlowGuard>
       <RuntimeTypeInfo>true</RuntimeTypeInfo>
       <OpenMP>GenerateParallelCode</OpenMP>
       <FloatingPointModel>Fast</FloatingPointModel>

@@ -12,6 +12,7 @@
 // STL
 #include <array>
 #include <vector>
+#include <memory>
 
 // ----------------------------------------------------------------
 // General definitions
@@ -45,8 +46,24 @@
 #error Only x86 and x86_64 platforms are supported.
 #endif
 
-// Macro to declare a const 8-byte array.
-#define DECLARE_SECTION_NAME(...) std::array<const unsigned char, 8>({ __VA_ARGS__ })
+#ifndef NT_SUCCESS
+#define NT_SUCCESS(x) (x >= 0)
+#endif
+
+// MSVC - Linker
+#define LINKER_OPTION(OPTION) __pragma(comment(linker, OPTION))
+
+// MSVC - Symbols
+#define INCLUDE(SYMBOL_NAME) LINKER_OPTION("/INCLUDE:" SYMBOL_NAME)
+#define SELF_INCLUDE INCLUDE(__FUNCDNAME__)
+#define EXPORT(SYMBOL_NAME, ALIAS_NAME) LINKER_OPTION("/EXPORT:" ALIAS_NAME "=" SYMBOL_NAME)
+#define SELF_EXPORT(ALIAS_NAME) EXPORT(__FUNCDNAME__, ALIAS_NAME)
+
+// MSVC - Sections
+#define CODE_SECTION_BEGIN(IDENTIFIER, SECTION_NAME) __pragma(code_seg(push, IDENTIFIER, SECTION_NAME))
+#define CODE_SECTION_END(IDENTIFIER) __pragma(code_seg(pop, IDENTIFIER))
+#define DATA_SECTION_BEGIN(IDENTIFIER, SECTION_NAME) __pragma(data_seg(push, IDENTIFIER, SECTION_NAME))
+#define DATA_SECTION_END(IDENTIFIER) __pragma(data_seg(pop, IDENTIFIER))
 
 // ----------------------------------------------------------------
 // Detours
@@ -196,7 +213,7 @@ namespace Detours {
 		ULONG64 UserPointerAuthMask;
 	} KUSER_SHARED_DATA, *PKUSER_SHARED_DATA;
 
-	extern const KUSER_SHARED_DATA& KUserSharedData;
+	extern const volatile KUSER_SHARED_DATA& KUserSharedData;
 
 	// ----------------------------------------------------------------
 	// PEB
@@ -214,7 +231,7 @@ namespace Detours {
 		HANDLE ShutdownThreadId;
 	} PEB_LDR_DATA, *PPEB_LDR_DATA;
 
-	typedef struct _UNICODE_STRING{
+	typedef struct _UNICODE_STRING {
 		USHORT Length;
 		USHORT MaximumLength;
 		PWCH Buffer;
@@ -289,9 +306,9 @@ namespace Detours {
 		ULONG HashFactor;
 	} API_SET_NAMESPACE, *PAPI_SET_NAMESPACE;
 
-	typedef ULONG GDI_HANDLE_BUFFER[GDI_HANDLE_BUFFER_SIZE];
-	typedef ULONG GDI_HANDLE_BUFFER32[GDI_HANDLE_BUFFER_SIZE32];
-	typedef ULONG GDI_HANDLE_BUFFER64[GDI_HANDLE_BUFFER_SIZE64];
+	using GDI_HANDLE_BUFFER = ULONG[GDI_HANDLE_BUFFER_SIZE];
+	using GDI_HANDLE_BUFFER32 = ULONG[GDI_HANDLE_BUFFER_SIZE32];
+	using GDI_HANDLE_BUFFER64 = ULONG[GDI_HANDLE_BUFFER_SIZE64];
 
 	typedef struct _PEB {
 		BOOLEAN InheritedAddressSpace;
@@ -329,7 +346,7 @@ namespace Detours {
 				ULONG ProcessUsingFTH : 1;
 				ULONG ProcessPreviouslyThrottled : 1;
 				ULONG ProcessCurrentlyThrottled : 1;
-				ULONG ProcessImagesHotPatched : 1; // REDSTONE5
+				ULONG ProcessImagesHotPatched : 1;
 				ULONG ReservedBits0 : 24;
 			};
 		};
@@ -389,7 +406,7 @@ namespace Detours {
 		SIZE_T MinimumStackCommit;
 		PVOID SparePointers[2];
 		PVOID PatchLoaderData;
-		PVOID ChpeV2ProcessInfo; // _CHPEV2_PROCESS_INFO
+		PVOID ChpeV2ProcessInfo;
 		ULONG AppModelFeatureState;
 		ULONG SpareUlongs[2];
 		USHORT ActiveCodePage;
@@ -989,6 +1006,12 @@ namespace Detours {
 	namespace Memory {
 
 		// ----------------------------------------------------------------
+		// Definitions
+		// ----------------------------------------------------------------
+
+		using fnVirtualProtect = BOOL(WINAPI*)(LPVOID lpAddress, SIZE_T dwSize, DWORD flNewProtect, PDWORD lpflOldProtect);
+
+		// ----------------------------------------------------------------
 		// Server
 		// ----------------------------------------------------------------
 
@@ -1048,6 +1071,7 @@ namespace Detours {
 		private:
 			const void* const m_pAddress;
 			const size_t m_unSize;
+			fnVirtualProtect m_VirtualProtect;
 			DWORD m_unOriginalProtection;
 		};
 
@@ -1069,7 +1093,7 @@ namespace Detours {
 		// ExceptionCallBack
 		// ----------------------------------------------------------------
 
-		typedef bool(__fastcall* fnExceptionCallBack)(const EXCEPTION_RECORD Exception, const PCONTEXT pCTX);
+		using fnExceptionCallBack = bool(__fastcall*)(const EXCEPTION_RECORD& pException, const PCONTEXT pCTX);
 
 		// ----------------------------------------------------------------
 		// ExceptionListener
@@ -1105,40 +1129,10 @@ namespace Detours {
 	namespace Hook {
 
 		// ----------------------------------------------------------------
-		// Import Hook
-		// ----------------------------------------------------------------
-
-		class ImportHook {
-		public:
-			ImportHook(const HMODULE hModule, const char* const szImportName, const char* const szImportModuleName = nullptr);
-			~ImportHook();
-
-		public:
-			bool Hook(const void* const pHookAddress);
-			bool UnHook();
-
-		public:
-			const void* GetOriginalAddress();
-			const void* GetHookAddress();
-
-		private:
-			const void** m_pAddress;
-			const void* m_pOriginalAddress;
-			const void* m_pHookAddress;
-		};
-
-		// ----------------------------------------------------------------
-		// Simple Import Hook
-		// ----------------------------------------------------------------
-
-		bool HookImport(const HMODULE hModule, const char* const szImportName, const void* const pHookAddress);
-		bool UnHookImport(const void* const pHookAddress);
-
-		// ----------------------------------------------------------------
 		// Memory Hook CallBack
 		// ----------------------------------------------------------------
 
-		typedef bool(__fastcall* fnMemoryHookCallBack)(class MemoryHook* pHook, PCONTEXT pCTX);
+		using fnMemoryHookCallBack = bool(__fastcall*)(std::unique_ptr<class MemoryHook>& pHook, const PCONTEXT pCTX);
 
 		// ----------------------------------------------------------------
 		// Memory Hook

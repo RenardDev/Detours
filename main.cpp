@@ -17,6 +17,10 @@
 extern "C" void _int7D();
 extern "C" void _int7E();
 
+// ----------------------------------------------------------------
+// General definitions
+// ----------------------------------------------------------------
+
 class TestingRTTI {
 public:
 	TestingRTTI() {
@@ -32,29 +36,23 @@ private:
 	bool m_bBoo;
 };
 
+DATA_SECTION_BEGIN(r1, ".dat");
 __declspec(dllexport) TestingRTTI* g_pTestingRTTI = nullptr;
+DATA_SECTION_END(r1);
 
-typedef void(WINAPI* fnSleep)(DWORD dwMilliseconds);
-void WINAPI Sleep_Hook(DWORD dwMilliseconds) {
+bool __fastcall Sleep_MemoryHook(std::unique_ptr<Detours::Hook::MemoryHook>& pHook, const PCONTEXT pCTX) {
 	_tprintf_s(_T("[Hook] Called!\n"));
-}
-
-bool __fastcall Sleep_MemoryHook(Detours::Hook::MemoryHook* pHook, PCONTEXT pCTX) {
-	_tprintf_s(_T("[Hook] Called!\n"));
-#ifdef _WIN64
+#ifdef _M_X64
 	pCTX->Rip = *reinterpret_cast<PDWORD64>(pCTX->Rsp); // [SP] = RETURN ADDRESS
 	pCTX->Rsp += 8; // Clearing stack (RETURN ADDRESS)
-#elif _WIN32
+#elif _M_IX86
 	pCTX->Eip = *reinterpret_cast<PDWORD>(pCTX->Esp); // [SP] = RETURN ADDRESS
-	pCTX->Esp += 4; // Clearing stack (RETURN ADDRESS)
-#else
-#error Unknown platform
+	pCTX->Esp += 8; // Clearing stack (RETURN ADDRESS + ARGUMENT)
 #endif
-	pHook->Enable();
 	return true;
 }
 
-bool __fastcall OnException(const EXCEPTION_RECORD Exception, const PCONTEXT pCTX) {
+bool __fastcall OnException(const EXCEPTION_RECORD& Exception, const PCONTEXT pCTX) {
 	if (Exception.ExceptionCode != EXCEPTION_ACCESS_VIOLATION) {
 		return false;
 	}
@@ -90,23 +88,27 @@ int _tmain() {
 	// ----------------------------------------------------------------
 
 	_tprintf_s(_T("FindSignature Example\n"));
+
 #ifdef _M_X64
-	printf("Sleep = 0x%016llX\n", reinterpret_cast<size_t>(Detours::Scan::FindSignature(_T("kernelbase.dll"), DECLARE_SECTION_NAME('.', 't', 'e', 'x', 't', 0, 0, 0), "\x33\xD2\xE9\x2A\x2A\x2A\x2A\xCC\x71\x28")));
+	_tprintf_s(_T("48 8B 41 10 33 D2 4C 8B C1 48 85 C0 75 [.text] = 0x%016llX\n"), reinterpret_cast<size_t>(Detours::Scan::FindSignature(_T("ntdll.dll"), { '.', 't', 'e', 'x', 't', 0, 0, 0 }, "\x48\x8B\x41\x10\x33\xD2\x4C\x8B\xC1\x48\x85\xC0\x75")));
 #elif _M_IX86
-	printf("Sleep = 0x%08X\n", reinterpret_cast<size_t>(Detours::Scan::FindSignature(_T("kernelbase.dll"), DECLARE_SECTION_NAME('.', 't', 'e', 'x', 't', 0, 0, 0), "\x8B\xFF\x55\x8B\xEC\x6A\x2A\xFF\x75\x08\xE8\x2A\x2A\x2A\x2A\x5D\xC2")));
+	_tprintf_s(_T("8B D1 8B 42 08 [.text] = 0x%08X\n"), reinterpret_cast<size_t>(Detours::Scan::FindSignature(_T("ntdll.dll"), { '.', 't', 'e', 'x', 't', 0, 0, 0 }, "\x8B\xD1\x8B\x42\x08")));
 #endif
+
 	_tprintf_s(_T("\n"));
 
 	// ----------------------------------------------------------------
 	// FindData
 	// ----------------------------------------------------------------
 
-	_tprintf_s(_T("FindData Example\n"));
+	_tprintf_s(_T("FindData Example\n"));	
+
 #ifdef _M_X64
-	printf("Sleep = 0x%016llX\n", reinterpret_cast<size_t>(Detours::Scan::FindData(_T("kernelbase.dll"), reinterpret_cast<const unsigned char* const>("\x55\x90"), 2)));
+	_tprintf_s(_T("48 8B 41 10 33 D2 4C 8B C1 48 85 C0 75 = 0x%016llX\n"), reinterpret_cast<size_t>(Detours::Scan::FindData(_T("ntdll.dll"), reinterpret_cast<const unsigned char* const>("\x48\x8B\x41\x10\x33\xD2\x4C\x8B\xC1\x48\x85\xC0\x75"), 13)));
 #elif _M_IX86
-	printf("Sleep = 0x%08X\n", reinterpret_cast<size_t>(Detours::Scan::FindData(_T("kernelbase.dll"), reinterpret_cast < const unsigned char* const>("\x55\x90"), 2)));
+	_tprintf_s(_T("8B D1 8B 42 08 = 0x%08X\n"), reinterpret_cast<size_t>(Detours::Scan::FindData(_T("ntdll.dll"), reinterpret_cast<const unsigned char* const>("\x8B\xD1\x8B\x42\x08"), 5)));
 #endif
+
 	_tprintf_s(_T("\n"));
 
 	// ----------------------------------------------------------------
@@ -114,39 +116,30 @@ int _tmain() {
 	// ----------------------------------------------------------------
 
 	_tprintf_s(_T("FindRTTI Example\n"));
+
 	void** pVTable = reinterpret_cast<void**>(const_cast<void*>(Detours::Scan::FindRTTI(_T("Detours.exe"), ".?AVTestingRTTI@@")));
 #ifdef _M_X64
-	printf("'%s' = 0x%016llX\n", typeid(TestingRTTI).raw_name(), reinterpret_cast<size_t>(pVTable));
+#ifdef UNICODE
+	_tprintf_s(_T("> '%hs' = 0x%016llX\n"), typeid(TestingRTTI).raw_name(), reinterpret_cast<size_t>(pVTable));
+#else
+	_tprintf_s(_T("> '%s' = 0x%016llX\n"), typeid(TestingRTTI).raw_name(), reinterpret_cast<size_t>(pVTable));
+#endif
 #elif _M_IX86
-	printf("'%s' = 0x%08X\n", typeid(TestingRTTI).raw_name(), reinterpret_cast<size_t>(pVTable));
+#ifdef UNICODE
+	_tprintf_s(_T("> '%hs' = 0x%08X\n"), typeid(TestingRTTI).raw_name(), reinterpret_cast<size_t>(pVTable));
+#else
+	_tprintf_s(_T("> '%s' = 0x%08X\n"), typeid(TestingRTTI).raw_name(), reinterpret_cast<size_t>(pVTable));
+#endif
+
 #endif
 	if (pVTable) {
-
 		// __fastcall - 1st arg = ecx, 2nd arg = edx
-		typedef bool(__fastcall* fnFoo)(void* pThis, void* /* unused */);
-		typedef bool(__fastcall* fnBoo)(void* pThis, void* /* unused */);
+		using fnFoo = bool(__fastcall*)(void* pThis, void* /* unused */);
+		using fnBoo = bool(__fastcall*)(void* pThis, void* /* unused */);
 
-		_tprintf_s(_T("foo() = %d\n"), reinterpret_cast<fnFoo>(pVTable[0])(g_pTestingRTTI, nullptr));
-		_tprintf_s(_T("boo() = %d\n"), reinterpret_cast<fnBoo>(pVTable[1])(g_pTestingRTTI, nullptr));
+		_tprintf_s(_T("  > foo() = %d\n"), reinterpret_cast<fnFoo>(pVTable[0])(g_pTestingRTTI, nullptr));
+		_tprintf_s(_T("  > boo() = %d\n"), reinterpret_cast<fnBoo>(pVTable[1])(g_pTestingRTTI, nullptr));
 	}
-	_tprintf_s(_T("\n"));
-
-	// ----------------------------------------------------------------
-	// Hook Import/Export
-	// ----------------------------------------------------------------
-
-	_tprintf_s(_T("Hook Import Example\n"));
-
-	HMODULE hKernel = GetModuleHandle(_T("kernel32.dll"));
-	if (!hKernel) {
-		return -1;
-	}
-
-	_tprintf_s(_T("HookImport = %d\n"), Detours::Hook::HookImport(hKernel, "Sleep", Sleep_Hook));
-
-	Sleep(1000);
-
-	_tprintf_s(_T("UnHookImport = %d\n"), Detours::Hook::UnHookImport(Sleep_Hook));
 
 	_tprintf_s(_T("\n"));
 
@@ -156,7 +149,7 @@ int _tmain() {
 
 	_tprintf_s(_T("Hook Memory Example\n"));
 
-	_tprintf_s(_T("HookMemory = %d\n"), Detours::Hook::HookMemory(Sleep, Sleep_MemoryHook, true));
+	_tprintf_s(_T("HookMemory = %d\n"), Detours::Hook::HookMemory(Sleep, Sleep_MemoryHook));
 
 	Sleep(1000);
 
@@ -194,6 +187,8 @@ int _tmain() {
 	_tprintf_s(_T("Sleeping 1200 ms...\n")); Sleep(1200);
 
 	_tprintf_s(_T("ElapsedTime = %lu ms\n"), (Detours::KUserSharedData.SystemTime.LowPart - unLowPartTime) / 10000);
+	_tprintf_s(_T("DbgSecureBootEnabled = %lu\n"), Detours::KUserSharedData.DbgSecureBootEnabled); // Secure Boot
+	_tprintf_s(_T("ActiveProcessorCount = %lu\n"), Detours::KUserSharedData.ActiveProcessorCount); // CPU threads
 
 	_tprintf_s(_T("\n"));
 
@@ -216,7 +211,11 @@ int _tmain() {
 	auto pProcessParameters = pPEB->ProcessParameters;
 	if (pProcessParameters) {
 		if (pProcessParameters->CommandLine.Length) {
+#ifdef UNICODE
 			_tprintf_s(_T("CommandLine = `%s`\n"), pPEB->ProcessParameters->CommandLine.Buffer);
+#else
+			_tprintf_s(_T("CommandLine = `%ws`\n"), pPEB->ProcessParameters->CommandLine.Buffer);
+#endif
 		}
 	}
 
