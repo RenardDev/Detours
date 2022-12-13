@@ -3609,7 +3609,7 @@ namespace Detours {
 		// Server
 		// ----------------------------------------------------------------
 
-		Server::Server(const size_t unMemorySize, bool bIsGlobal) : m_unMemorySize(unMemorySize) {
+		Server::Server(const size_t unMemorySize, bool bIsGlobal) {
 			memset(m_szSessionName, 0, sizeof(m_szSessionName));
 			m_hMap = nullptr;
 			m_pAddress = nullptr;
@@ -3621,7 +3621,7 @@ namespace Detours {
 			const DWORD unPID = GetCurrentProcessId();
 			const DWORD unTID = GetCurrentThreadId();
 			const DWORD64 unCycle = __rdtsc();
-			_stprintf_s(m_szSessionName, _T("GLOBAL:%08X:%08X:%08X%08X"), 0xFFFFFFFF - unPID, 0xFFFFFFFF - unTID, static_cast<DWORD>(unCycle & 0xFFFFFFFF), static_cast<DWORD>((unCycle >> 32) & 0xFFFFFFFF));
+			_stprintf_s(m_szSessionName, _T("GLOBAL:%08X:%08X:%08X%08X"), 0xFFFFFFFFi32 - unPID, 0xFFFFFFFFi32 - unTID, static_cast<DWORD>(unCycle & 0xFFFFFFFFi32), static_cast<DWORD>((unCycle >> 32) & 0xFFFFFFFFi32));
 
 			TCHAR szMap[64];
 			memset(szMap, 0, sizeof(szMap));
@@ -3631,9 +3631,13 @@ namespace Detours {
 				_stprintf_s(szMap, _T("Local\\%s"), m_szSessionName);
 			}
 
-			m_hMap = CreateFileMapping(INVALID_HANDLE_VALUE, nullptr, PAGE_READWRITE, 0, unMemorySize & 0xFFFFFFFFi32, szMap);
+#ifdef _M_X64
+			m_hMap = CreateFileMapping(INVALID_HANDLE_VALUE, nullptr, PAGE_EXECUTE_READWRITE, static_cast<DWORD>((unMemorySize >> 32) & 0xFFFFFFFFi32), static_cast<DWORD>(unMemorySize & 0xFFFFFFFFi32), szMap);
+#elif _M_IX86
+			m_hMap = CreateFileMapping(INVALID_HANDLE_VALUE, nullptr, PAGE_EXECUTE_READWRITE, NULL, static_cast<DWORD>(unMemorySize & 0xFFFFFFFFi32), szMap);
+#endif
 			if (m_hMap && (m_hMap != INVALID_HANDLE_VALUE)) {
-				m_pAddress = MapViewOfFile(m_hMap, FILE_MAP_ALL_ACCESS, 0, 0, unMemorySize & 0xFFFFFFFFi32);
+				m_pAddress = MapViewOfFile(m_hMap, FILE_MAP_WRITE | FILE_MAP_READ | FILE_MAP_EXECUTE, NULL, NULL, NULL);
 			}
 		}
 
@@ -3665,13 +3669,9 @@ namespace Detours {
 		// Client
 		// ----------------------------------------------------------------
 
-		Client::Client(const size_t unMemorySize, TCHAR szSessionName[64], bool bIsGlobal) : m_unMemorySize(unMemorySize) {
+		Client::Client(TCHAR szSessionName[64], bool bIsGlobal) {
 			m_hMap = nullptr;
 			m_pAddress = nullptr;
-
-			if (!unMemorySize) {
-				return;
-			}
 
 			if (!szSessionName) {
 				return;
@@ -3685,9 +3685,9 @@ namespace Detours {
 				_stprintf_s(szMap, _T("Local\\%s"), szSessionName);
 			}
 
-			m_hMap = OpenFileMapping(FILE_MAP_ALL_ACCESS, FALSE, szMap);
+			m_hMap = OpenFileMapping(FILE_MAP_WRITE | FILE_MAP_READ | FILE_MAP_EXECUTE, FALSE, szMap);
 			if (m_hMap && (m_hMap != INVALID_HANDLE_VALUE)) {
-				m_pAddress = MapViewOfFile(m_hMap, FILE_MAP_ALL_ACCESS, 0, 0, unMemorySize & 0xFFFFFFFFi32);
+				m_pAddress = MapViewOfFile(m_hMap, FILE_MAP_WRITE | FILE_MAP_READ | FILE_MAP_EXECUTE, NULL, NULL, NULL);
 			}
 		}
 

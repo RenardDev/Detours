@@ -83,6 +83,67 @@ int _tmain(int nArguments, PTCHAR* pArguments) {
 		return -1;
 	}
 
+	if (nArguments > 1) {
+		for (int i = 0; i < nArguments; ++i) {
+			PTCHAR pArgument = pArguments[i];
+			if (_tcscmp(pArgument, _T("/sv")) == 0) {
+				Detours::Memory::Server sv(GetLargePageMinimum());
+				PDWORD pMemory = reinterpret_cast<PDWORD>(sv.GetAddress());
+				if (!pMemory) {
+					return -1;
+				}
+
+#ifdef _M_X64
+				_tprintf_s(_T("Memory: 0x%016llX\n"), reinterpret_cast<size_t>(pMemory));
+#elif _M_IX86
+				_tprintf_s(_T("Memory: 0x%08X\n"), reinterpret_cast<size_t>(pMemory));
+#endif
+
+				TCHAR szSessionName[64];
+				if (!sv.GetSessionName(szSessionName)) {
+					return -1;
+				}
+
+				_tprintf_s(_T("Server Session: %s\n"), szSessionName);
+
+				while (true) {
+					*pMemory = GetTickCount64() & 0xFFFFFFFFi32;
+					Sleep(5);
+				}
+
+				return 0;
+			}
+
+			if ((nArguments > 2) && (_tcscmp(pArgument, _T("/cl")) == 0)) {
+				PTCHAR pSessionName = pArguments[i + 1];
+				if (_tcslen(pSessionName) != 41) {
+					return -1;
+				}
+
+				_tprintf_s(_T("Connecting to `%s`\n"), pSessionName);
+
+				Detours::Memory::Client cl(pSessionName);
+				PDWORD pMemory = reinterpret_cast<PDWORD>(cl.GetAddress());
+				if (!pMemory) {
+					return -1;
+				}
+
+#ifdef _M_X64
+				_tprintf_s(_T("Memory: 0x%016llX\n"), reinterpret_cast<size_t>(pMemory));
+#elif _M_IX86
+				_tprintf_s(_T("Memory: 0x%08X\n"), reinterpret_cast<size_t>(pMemory));
+#endif
+
+				while (true) {
+					_tprintf_s(_T("Tick: %lu\n"), *pMemory);
+					Sleep(10);
+				}
+
+				return 0;
+			}
+		}
+	}
+
 	// ----------------------------------------------------------------
 	// FindSignature
 	// ----------------------------------------------------------------

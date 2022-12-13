@@ -1001,7 +1001,6 @@ namespace Detours {
 			void* GetAddress();
 
 		private:
-			const size_t m_unMemorySize;
 			TCHAR m_szSessionName[64];
 			HANDLE m_hMap;
 			void* m_pAddress;
@@ -1013,14 +1012,13 @@ namespace Detours {
 
 		class Client {
 		public:
-			Client(const size_t unMemorySize, TCHAR szSessionName[64], bool bIsGlobal = false);
+			Client(TCHAR szSessionName[64], bool bIsGlobal = false);
 			~Client();
 
 		public:
 			void* GetAddress();
 
 		private:
-			const size_t m_unMemorySize;
 			HANDLE m_hMap;
 			void* m_pAddress;
 		};
