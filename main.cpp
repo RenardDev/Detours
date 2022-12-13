@@ -83,6 +83,10 @@ int _tmain(int nArguments, PTCHAR* pArguments) {
 		return -1;
 	}
 
+	// ----------------------------------------------------------------
+	// Memory Server & Client
+	// ----------------------------------------------------------------
+
 	if (nArguments > 1) {
 		for (int i = 0; i < nArguments; ++i) {
 			PTCHAR pArgument = pArguments[i];
