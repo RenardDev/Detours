@@ -77,7 +77,7 @@ bool __fastcall OnException(const EXCEPTION_RECORD& Exception, const PCONTEXT pC
 	return true;
 }
 
-int _tmain() {
+int _tmain(int nArguments, PTCHAR* pArguments) {
 	g_pTestingRTTI = new TestingRTTI();
 	if (!g_pTestingRTTI) {
 		return -1;

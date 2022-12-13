@@ -131,6 +131,7 @@
       <EnableParallelCodeGeneration>true</EnableParallelCodeGeneration>
       <TreatWarningAsError>true</TreatWarningAsError>
       <EnableFiberSafeOptimizations>true</EnableFiberSafeOptimizations>
+      <ControlFlowGuard>Guard</ControlFlowGuard>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -183,6 +184,7 @@
       <EnableParallelCodeGeneration>true</EnableParallelCodeGeneration>
       <TreatWarningAsError>true</TreatWarningAsError>
       <EnableFiberSafeOptimizations>true</EnableFiberSafeOptimizations>
+      <ControlFlowGuard>Guard</ControlFlowGuard>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>

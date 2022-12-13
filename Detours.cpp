@@ -91,52 +91,6 @@ namespace Detours {
 		}
 
 		// ----------------------------------------------------------------
-		// FindMultipleSections
-		// ----------------------------------------------------------------
-
-		bool FindMultipleSections(const HMODULE hModule, const PMULTIPLE_SECTIONS pSections, const size_t unSectionsCount) {
-			if (!hModule) {
-				return false;
-			}
-
-			if (!pSections) {
-				return false;
-			}
-
-			if (!unSectionsCount) {
-				return false;
-			}
-
-			const PIMAGE_DOS_HEADER pDH = reinterpret_cast<PIMAGE_DOS_HEADER>(hModule);
-			const PIMAGE_NT_HEADERS pNTHs = reinterpret_cast<PIMAGE_NT_HEADERS>(reinterpret_cast<char*>(hModule) + pDH->e_lfanew);
-			const PIMAGE_FILE_HEADER pFH = &(pNTHs->FileHeader);
-			const PIMAGE_OPTIONAL_HEADER pOH = &(pNTHs->OptionalHeader);
-
-			const PIMAGE_SECTION_HEADER pFirstSection = reinterpret_cast<PIMAGE_SECTION_HEADER>(reinterpret_cast<char*>(pOH) + pFH->SizeOfOptionalHeader);
-			const WORD unNumberOfSections = pFH->NumberOfSections;
-			const size_t unFileAlignment = static_cast<size_t>(pOH->FileAlignment);
-			size_t unValidSections = 0;
-			for (WORD i = 0; i < unNumberOfSections; ++i) {
-				for (size_t k = 0; k < unSectionsCount; ++k) {
-					if (pSections[k].m_pAddress) {
-						continue;
-					}
-					if (memcmp(pSections[k].m_SectionName.data(), pFirstSection[i].Name, 8) == 0) {
-						pSections[k].m_pAddress = reinterpret_cast<void*>(reinterpret_cast<char*>(hModule) + pFirstSection[i].VirtualAddress);
-						pSections[k].m_pSize = __align_up(static_cast<size_t>(pFirstSection[i].SizeOfRawData), unFileAlignment);
-						++unValidSections;
-					}
-				}
-			}
-
-			if (unValidSections == unSectionsCount) {
-				return true;
-			}
-
-			return false;
-		}
-
-		// ----------------------------------------------------------------
 		// FindSection
 		// ----------------------------------------------------------------
 
@@ -165,86 +119,6 @@ namespace Detours {
 
 					return true;
 				}
-			}
-
-			return false;
-		}
-
-		// ----------------------------------------------------------------
-		// FindMultipleSectionsPOGO
-		// ----------------------------------------------------------------
-
-		bool FindMultipleSectionsPOGO(const HMODULE hModule, const PMULTIPLE_POGO_SECTIONS pSections, const size_t unSectionsCount) {
-			if (!hModule) {
-				return false;
-			}
-
-			if (!pSections) {
-				return false;
-			}
-
-			if (!unSectionsCount) {
-				return false;
-			}
-
-			const PIMAGE_DOS_HEADER pDH = reinterpret_cast<PIMAGE_DOS_HEADER>(hModule);
-			const PIMAGE_NT_HEADERS pNTHs = reinterpret_cast<PIMAGE_NT_HEADERS>(reinterpret_cast<char*>(hModule) + pDH->e_lfanew);
-			const PIMAGE_OPTIONAL_HEADER pOH = &(pNTHs->OptionalHeader);
-
-			const IMAGE_DATA_DIRECTORY DebugDD = pOH->DataDirectory[IMAGE_DIRECTORY_ENTRY_DEBUG];
-			if (!DebugDD.Size) {
-				return false;
-			}
-
-			const DWORD unCount = DebugDD.Size / sizeof(IMAGE_DEBUG_DIRECTORY);
-			const PIMAGE_DEBUG_DIRECTORY pDebugDirectory = reinterpret_cast<PIMAGE_DEBUG_DIRECTORY>(reinterpret_cast<char*>(hModule) + DebugDD.VirtualAddress);
-			size_t unValidSections = 0;
-			for (DWORD i = 0; i < unCount; ++i) {
-				if (pDebugDirectory[i].Type != IMAGE_DEBUG_TYPE_POGO) {
-					continue;
-				}
-
-				typedef struct _IMAGE_POGO_BLOCK {
-					DWORD unRVA;
-					DWORD unSize;
-					char Name[1];
-				} IMAGE_POGO_BLOCK, *PIMAGE_POGO_BLOCK;
-
-				typedef struct _IMAGE_POGO_INFO {
-					DWORD Signature; // 0x4C544347 = 'LTCG'
-					IMAGE_POGO_BLOCK Blocks[1];
-				} IMAGE_POGO_INFO, *PIMAGE_POGO_INFO;
-
-				const PIMAGE_POGO_INFO pPI = reinterpret_cast<PIMAGE_POGO_INFO>(reinterpret_cast<char*>(hModule) + pDebugDirectory[i].AddressOfRawData);
-				if (pPI->Signature != 0x4C544347) {
-					continue;
-				}
-
-				PIMAGE_POGO_BLOCK pBlock = pPI->Blocks;
-				while (pBlock->unRVA != 0) {
-					const size_t unNameLength = strnlen_s(pBlock->Name, 0x1000) + 1;
-					size_t unBlockSize = sizeof(DWORD) * 2 + unNameLength;
-					if (unBlockSize & 3) {
-						unBlockSize += (4 - (unBlockSize & 3));
-					}
-
-					for (size_t k = 0; k < unSectionsCount; ++k) {
-						if (pSections[k].m_pAddress) {
-							continue;
-						}
-						if (strncmp(pSections[k].m_szSectionName, pBlock->Name, 0x1000) == 0) {
-							pSections[k].m_pAddress = reinterpret_cast<void*>(reinterpret_cast<char*>(hModule) + pBlock->unRVA);
-							pSections[k].m_pSize = static_cast<size_t>(pBlock->unSize);
-							++unValidSections;
-						}
-					}
-
-					pBlock = reinterpret_cast<PIMAGE_POGO_BLOCK>(reinterpret_cast<char*>(pBlock) + unBlockSize);
-				}
-			}
-
-			if (unValidSections == unSectionsCount) {
-				return true;
 			}
 
 			return false;
@@ -3664,24 +3538,17 @@ namespace Detours {
 			const PIMAGE_NT_HEADERS pNTHs = reinterpret_cast<PIMAGE_NT_HEADERS>(reinterpret_cast<char*>(hModule) + pDH->e_lfanew);
 			const PIMAGE_OPTIONAL_HEADER pOH = &(pNTHs->OptionalHeader);
 
-			MULTIPLE_POGO_SECTIONS SectionsPOGO[2];
-			memset(SectionsPOGO, 0, sizeof(SectionsPOGO));
+			void* pFirstSection = nullptr;
+			size_t unFirstSectionSize = 0;
+			void* pSecondSection = nullptr;
+			size_t unSecondSectionSize = 0;
 
-			SectionsPOGO[0].m_szSectionName = ".rdata";
-			SectionsPOGO[1].m_szSectionName = ".data$rs";
-
-			if (FindMultipleSectionsPOGO(hModule, SectionsPOGO, 2)) {
-				return FindRTTI(reinterpret_cast<void*>(hModule), SectionsPOGO[0].m_pAddress, reinterpret_cast<size_t>(SectionsPOGO[1].m_pAddress) - reinterpret_cast<size_t>(SectionsPOGO[0].m_pAddress) + SectionsPOGO[1].m_pSize, szRTTI);
+			if (FindSectionPOGO(hModule, ".rdata", &pFirstSection, &unFirstSectionSize) && FindSectionPOGO(hModule, ".data$rs", &pSecondSection, &unSecondSectionSize)) {
+				return FindRTTI(reinterpret_cast<void*>(hModule), pFirstSection, reinterpret_cast<size_t>(pSecondSection) - reinterpret_cast<size_t>(pFirstSection) + unSecondSectionSize, szRTTI);
 			}
 
-			MULTIPLE_SECTIONS Sections[2];
-			memset(Sections, 0, sizeof(Sections));
-
-			Sections[0].m_SectionName = { '.', 'r', 'd', 'a', 't', 'a', 0, 0 }; // .rdata
-			Sections[1].m_SectionName = { '.', 'd', 'a', 't', 'a',   0, 0, 0 }; // .data
-
-			if (FindMultipleSections(hModule, Sections, 2)) {
-				return FindRTTI(reinterpret_cast<void*>(hModule), Sections[0].m_pAddress, reinterpret_cast<size_t>(Sections[1].m_pAddress) - reinterpret_cast<size_t>(Sections[0].m_pAddress) + Sections[1].m_pSize, szRTTI);
+			if (FindSection(hModule, { '.', 'r', 'd', 'a', 't', 'a', 0, 0 }, &pFirstSection, &unFirstSectionSize) && FindSection(hModule, { '.', 'd', 'a', 't', 'a',   0, 0, 0 }, &pSecondSection, &unSecondSectionSize)) {
+				return FindRTTI(reinterpret_cast<void*>(hModule), pFirstSection, reinterpret_cast<size_t>(pSecondSection) - reinterpret_cast<size_t>(pFirstSection) + unSecondSectionSize, szRTTI);
 			}
 
 			return FindRTTI(reinterpret_cast<void*>(hModule), static_cast<size_t>(pOH->SizeOfImage) - 1, szRTTI);

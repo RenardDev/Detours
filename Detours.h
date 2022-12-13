@@ -660,34 +660,10 @@ namespace Detours {
 	namespace Scan {
 
 		// ----------------------------------------------------------------
-		// FindMultipleSections
-		// ----------------------------------------------------------------
-
-		typedef struct _MULTIPLE_SECTIONS {
-			std::array<unsigned char, 8> m_SectionName;
-			void* m_pAddress;
-			size_t m_pSize;
-		} MULTIPLE_SECTIONS, *PMULTIPLE_SECTIONS;
-
-		bool FindMultipleSections(const HMODULE hModule, const PMULTIPLE_SECTIONS pSections, const size_t unSectionsCount);
-
-		// ----------------------------------------------------------------
-		// FindMultipleSections
+		// FindSection
 		// ----------------------------------------------------------------
 
 		bool FindSection(const HMODULE hModule, const std::array<const unsigned char, 8>& SectionName, const void** pAddress, const size_t* pSize);
-
-		// ----------------------------------------------------------------
-		// FindMultipleSectionsPOGO
-		// ----------------------------------------------------------------
-
-		typedef struct _MULTIPLE_POGO_SECTIONS {
-			const char* m_szSectionName;
-			void* m_pAddress;
-			size_t m_pSize;
-		} MULTIPLE_POGO_SECTIONS, *PMULTIPLE_POGO_SECTIONS;
-
-		bool FindMultipleSectionsPOGO(const HMODULE hModule, const PMULTIPLE_POGO_SECTIONS pSections, const size_t unSectionsCount);
 
 		// ----------------------------------------------------------------
 		// FindSectionPOGO
