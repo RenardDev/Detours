@@ -21,6 +21,11 @@ extern "C" void _int7E();
 // General definitions
 // ----------------------------------------------------------------
 
+typedef struct _SHARED_MEMORY {
+	bool m_bStop;
+	DWORD m_unTick;
+} SHARED_MEMORY, *PSHARED_MEMORY;
+
 class TestingRTTI {
 public:
 	TestingRTTI() {
@@ -92,7 +97,7 @@ int _tmain(int nArguments, PTCHAR* pArguments) {
 			PTCHAR pArgument = pArguments[i];
 			if (_tcscmp(pArgument, _T("/sv")) == 0) {
 				Detours::Memory::Server sv(GetLargePageMinimum());
-				PDWORD pMemory = reinterpret_cast<PDWORD>(sv.GetAddress());
+				PSHARED_MEMORY pMemory = reinterpret_cast<PSHARED_MEMORY>(sv.GetAddress());
 				if (!pMemory) {
 					return -1;
 				}
@@ -110,10 +115,12 @@ int _tmain(int nArguments, PTCHAR* pArguments) {
 
 				_tprintf_s(_T("Server Session: %s\n"), szSessionName);
 
-				while (true) {
-					*pMemory = GetTickCount64() & 0xFFFFFFFFi32;
-					Sleep(5);
+				while (!pMemory->m_bStop) {
+					pMemory->m_unTick = GetTickCount64() & 0xFFFFFFFFi32;
+					Sleep(1);
 				}
+
+				_tprintf_s(_T("Stopped\n"));
 
 				return 0;
 			}
@@ -127,7 +134,7 @@ int _tmain(int nArguments, PTCHAR* pArguments) {
 				_tprintf_s(_T("Connecting to `%s`\n"), pSessionName);
 
 				Detours::Memory::Client cl(pSessionName);
-				PDWORD pMemory = reinterpret_cast<PDWORD>(cl.GetAddress());
+				PSHARED_MEMORY pMemory = reinterpret_cast<PSHARED_MEMORY>(cl.GetAddress());
 				if (!pMemory) {
 					return -1;
 				}
@@ -138,10 +145,14 @@ int _tmain(int nArguments, PTCHAR* pArguments) {
 				_tprintf_s(_T("Memory: 0x%08X\n"), reinterpret_cast<size_t>(pMemory));
 #endif
 
-				while (true) {
-					_tprintf_s(_T("Tick: %lu\n"), *pMemory);
-					Sleep(10);
+				DWORD unTick = pMemory->m_unTick + 5000;
+				while (pMemory->m_unTick < unTick) {
+					_tprintf_s(_T("Tick: %lu\n"), pMemory->m_unTick);
+					Sleep(5);
 				}
+
+				pMemory->m_bStop = true;
+				_tprintf_s(_T("Stopped\n"));
 
 				return 0;
 			}
