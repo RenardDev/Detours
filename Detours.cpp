@@ -3721,7 +3721,7 @@ namespace Detours {
 				return;
 			}
 
-			HMODULE hKernelBase = GetModuleHandle(_T("KernelBase.dll"));
+			const HMODULE hKernelBase = GetModuleHandle(_T("KernelBase.dll"));
 			if (!hKernelBase) {
 				return;
 			}

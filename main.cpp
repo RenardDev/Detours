@@ -82,6 +82,27 @@ bool __fastcall OnException(const EXCEPTION_RECORD& Exception, const PCONTEXT pC
 	return true;
 }
 
+DWORD GetUBR() {
+	HKEY hKey = nullptr;
+	if (RegOpenKey(HKEY_LOCAL_MACHINE, _T("Software\\Microsoft\\Windows NT\\CurrentVersion"), &hKey)) {
+		return 0;
+	}
+
+	if (!hKey) {
+		return 0;
+	}
+
+	DWORD unUBR = 0;
+	DWORD unLengthUBR = sizeof(unUBR);
+	if (RegQueryValueEx(hKey, _T("UBR"), nullptr, nullptr, reinterpret_cast<LPBYTE>(&unUBR), &unLengthUBR)) {
+		RegCloseKey(hKey);
+		return 0;
+	}
+
+	RegCloseKey(hKey);
+	return unUBR;
+}
+
 int _tmain(int nArguments, PTCHAR* pArguments) {
 	g_pTestingRTTI = new TestingRTTI();
 	if (!g_pTestingRTTI) {
@@ -283,6 +304,8 @@ int _tmain(int nArguments, PTCHAR* pArguments) {
 	if (!pTEB) {
 		return -1;
 	}
+
+	_tprintf_s(_T("Microsoft Windows [Version %lu.%lu.%05lu.%lu]\n"), pPEB->OSMajorVersion, pPEB->OSMinorVersion, pPEB->OSBuildNumber, GetUBR());
 
 	auto pProcessParameters = pPEB->ProcessParameters;
 	if (pProcessParameters) {
