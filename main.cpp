@@ -181,6 +181,88 @@ int _tmain(int nArguments, PTCHAR* pArguments) {
 	}
 
 	// ----------------------------------------------------------------
+	// Codec
+	// ----------------------------------------------------------------
+
+	_tprintf_s(_T("Codec Example\n"));
+
+	int nEncodeSize = Detours::Codec::Encode(CP_UTF8, "Hello, World!");
+	if (nEncodeSize > 0) {
+		HANDLE hHeap = GetProcessHeap();
+		if (!hHeap || (hHeap == INVALID_HANDLE_VALUE)) {
+			return -1;
+		}
+
+		wchar_t* pBuffer = reinterpret_cast<wchar_t*>(HeapAlloc(hHeap, HEAP_ZERO_MEMORY, static_cast<size_t>(nEncodeSize) * sizeof(wchar_t) + sizeof(wchar_t)));
+		if (!pBuffer) {
+			return -1;
+		}
+
+		memset(pBuffer, 0, static_cast<size_t>(nEncodeSize) * sizeof(wchar_t) + sizeof(wchar_t));
+
+		if (Detours::Codec::Encode(CP_UTF8, "Hello, World!", pBuffer, nEncodeSize) <= 0) {
+			return -1;
+		}
+
+#ifdef UNICODE
+		_tprintf_s(_T("Encode: `%s`\n"), pBuffer);
+#else
+		_tprintf_s(_T("Encode: `%ws`\n"), pBuffer);
+#endif
+
+		HeapFree(hHeap, NULL, pBuffer);
+	}
+
+	int nDecodeSize = Detours::Codec::Decode(CP_UTF8, L"Hello, World!");
+	if (nDecodeSize > 0) {
+		HANDLE hHeap = GetProcessHeap();
+		if (!hHeap || (hHeap == INVALID_HANDLE_VALUE)) {
+			return -1;
+		}
+
+		char* pBuffer = reinterpret_cast<char*>(HeapAlloc(hHeap, HEAP_ZERO_MEMORY, static_cast<size_t>(nDecodeSize) * sizeof(char) + sizeof(char)));
+		if (!pBuffer) {
+			return -1;
+		}
+
+		memset(pBuffer, 0, static_cast<size_t>(nDecodeSize) * sizeof(char) + sizeof(char));
+
+		if (Detours::Codec::Decode(CP_UTF8, L"Hello, World!", pBuffer, nDecodeSize) <= 0) {
+			return -1;
+		}
+
+		_tprintf_s(_T("Decode: `%hs`\n"), pBuffer);
+
+		HeapFree(hHeap, NULL, pBuffer);
+	}
+
+	_tprintf_s(_T("\n"));
+
+	// ----------------------------------------------------------------
+	// Hexadecimal
+	// ----------------------------------------------------------------
+
+	_tprintf_s(_T("Hexadecimal Example\n"));
+
+	TCHAR szHex[32];
+	memset(szHex, 0, sizeof(szHex));
+	if (Detours::Hexadecimal::Encode(reinterpret_cast<const void* const>("Hello, World!"), 14, szHex)) {
+		_tprintf_s(_T("Encode: `%s`\n"), szHex);
+	}
+
+	char szData[16];
+	memset(szData, 0, sizeof(szData));
+	if (Detours::Hexadecimal::Decode(szHex, reinterpret_cast<void*>(szData))) {
+#ifdef UNICODE
+		_tprintf_s(_T("Decode: `%hs`\n"), szData);
+#else
+		_tprintf_s(_T("Decode: `%s`\n"), szData);
+#endif
+	}
+
+	_tprintf_s(_T("\n"));
+
+	// ----------------------------------------------------------------
 	// FindSignature
 	// ----------------------------------------------------------------
 

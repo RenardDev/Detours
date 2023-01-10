@@ -11,7 +11,7 @@
 
 // STL
 #include <array>
-#include <vector>
+#include <deque>
 #include <memory>
 
 // ----------------------------------------------------------------
@@ -654,8 +654,54 @@ namespace Detours {
 	const PTEB GetTEB();
 
 	// ----------------------------------------------------------------
-	// Scan
+	// Codec
 	// ----------------------------------------------------------------
+
+	namespace Codec {
+
+		// ----------------------------------------------------------------
+		// Encode
+		// ----------------------------------------------------------------
+
+		int Encode(unsigned short unCodePage, const char* const szText, wchar_t* szBuffer = nullptr, const int nBufferSize = 0);
+
+		// ----------------------------------------------------------------
+		// Decode
+		// ----------------------------------------------------------------
+
+		int Decode(unsigned short unCodePage, const wchar_t* const szText, char* szBuffer = nullptr, const int nBufferSize = 0);
+	}
+
+	// ----------------------------------------------------------------
+	// Hexadecimal
+	// ----------------------------------------------------------------
+
+	namespace Hexadecimal {
+
+		// ----------------------------------------------------------------
+		// Encode
+		// ----------------------------------------------------------------
+
+		bool EncodeA(const void* const pData, const size_t unSize, char* szHex, const unsigned char unIgnoredByte = 0x2A);
+		bool EncodeW(const void* const pData, const size_t unSize, wchar_t* szHex, const unsigned char unIgnoredByte = 0x2A);
+#ifdef UNICODE
+		bool Encode(const void* const pData, const size_t unSize, wchar_t* szHex, const unsigned char unIgnoredByte = 0x2A);
+#else
+		bool Encode(const void* const pData, const size_t unSize, char* szHex, const unsigned char unIgnoredByte = 0x2A);
+#endif
+
+		// ----------------------------------------------------------------
+		// Decode
+		// ----------------------------------------------------------------
+
+		bool DecodeA(const char* const szHex, void* pData, const unsigned char unIgnoredByte = 0x2A);
+		bool DecodeW(const wchar_t* const szHex, void* pData, const unsigned char unIgnoredByte = 0x2A);
+#ifdef UNICODE
+		bool Decode(const wchar_t* const szHex, void* pData, const unsigned char unIgnoredByte = 0x2A);
+#else
+		bool Decode(const char* const szHex, void* pData, const unsigned char unIgnoredByte = 0x2A);
+#endif
+	}
 
 	namespace Scan {
 
@@ -1086,11 +1132,11 @@ namespace Detours {
 			bool RemoveCallBack(const fnExceptionCallBack pCallBack);
 
 		public:
-			std::vector<fnExceptionCallBack>& GetCallBacks();
+			std::deque<fnExceptionCallBack>& GetCallBacks();
 
 		private:
 			PVOID m_pVEH;
-			std::vector<fnExceptionCallBack> m_vecCallBacks;
+			std::deque<fnExceptionCallBack> m_vecCallBacks;
 		};
 
 		extern ExceptionListener g_ExceptionListener;
