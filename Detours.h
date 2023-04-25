@@ -6,9 +6,6 @@
 // Default
 #include <Windows.h>
 
-// C++
-#include <cstdlib>
-
 // STL
 #include <array>
 #include <deque>
@@ -1006,8 +1003,13 @@ namespace Detours {
 #endif
 
 		// ----------------------------------------------------------------
-		// FindRTTI
+		// RTTI
 		// ----------------------------------------------------------------
+
+		class RTTI {
+		public:
+
+		};
 
 		const void* const FindRTTI(const void* const pBaseAddress, const void* const pAddress, const size_t unSize, const char* const szRTTI);
 		const void* const FindRTTI(const void* const pBaseAddress, const size_t unSize, const char* const szRTTI);
@@ -1152,7 +1154,7 @@ namespace Detours {
 		// Memory Hook CallBack
 		// ----------------------------------------------------------------
 
-		using fnMemoryHookCallBack = bool(__fastcall*)(std::unique_ptr<class MemoryHook>& pHook, const PCONTEXT pCTX);
+		using fnMemoryHookCallBack = bool(__fastcall*)(const std::unique_ptr<class MemoryHook>& pHook, const PCONTEXT pCTX);
 
 		// ----------------------------------------------------------------
 		// Memory Hook

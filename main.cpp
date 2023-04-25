@@ -45,7 +45,7 @@ DATA_SECTION_BEGIN(r1, ".dat");
 __declspec(dllexport) TestingRTTI* g_pTestingRTTI = nullptr;
 DATA_SECTION_END(r1);
 
-bool __fastcall Sleep_MemoryHook(std::unique_ptr<Detours::Hook::MemoryHook>& pHook, const PCONTEXT pCTX) {
+bool __fastcall Sleep_MemoryHook(const std::unique_ptr<Detours::Hook::MemoryHook>& pHook, const PCONTEXT pCTX) {
 	_tprintf_s(_T("[Hook] Called!\n"));
 #ifdef _M_X64
 	pCTX->Rip = *reinterpret_cast<PDWORD64>(pCTX->Rsp); // [SP] = RETURN ADDRESS
@@ -105,9 +105,6 @@ DWORD GetUBR() {
 
 int _tmain(int nArguments, PTCHAR* pArguments) {
 	g_pTestingRTTI = new TestingRTTI();
-	if (!g_pTestingRTTI) {
-		return -1;
-	}
 
 	// ----------------------------------------------------------------
 	// Memory Server & Client
@@ -418,7 +415,6 @@ int _tmain(int nArguments, PTCHAR* pArguments) {
 
 	_tprintf_s(_T("\n"));
 
-	delete g_pTestingRTTI;
 	_tprintf_s(_T("[ OK ]\n"));
 	return 0;
 }

@@ -19,6 +19,8 @@ namespace Detours {
 	// Namespaces
 	// ----------------------------------------------------------------
 
+	using namespace Codec;
+	using namespace Hexadecimal;
 	using namespace Scan;
 	using namespace Memory;
 	using namespace Exception;
@@ -165,7 +167,7 @@ namespace Detours {
 				}
 
 				*szHex++ = g_pEncodeTable[unByte >> 4];
-				*szHex++ = g_pEncodeTable[unByte & 0xF];
+				*szHex++ = g_pEncodeTable[unByte & 15];
 			}
 
 			return true;
@@ -191,7 +193,7 @@ namespace Detours {
 				}
 
 				*szHex++ = static_cast<wchar_t>(g_pEncodeTable[unByte >> 4]);
-				*szHex++ = static_cast<wchar_t>(g_pEncodeTable[unByte & 0xF]);
+				*szHex++ = static_cast<wchar_t>(g_pEncodeTable[unByte & 15]);
 			}
 
 			return true;
@@ -295,7 +297,6 @@ namespace Detours {
 				return false;
 			}
 
-			size_t unBack = 0;
 			for (size_t i = 0; i < unHexLength; i += 2) {
 				const unsigned char unHigh = szHex[i];
 				const unsigned char unLow = szHex[i + 1];
@@ -325,8 +326,8 @@ namespace Detours {
 			}
 
 			for (size_t i = 0; i < unHexLength; i += 2) {
-				const unsigned char unHigh = szHex[i] & 0xFF;
-				const unsigned char unLow = szHex[i + 1] & 0xFF;
+				const unsigned char unHigh = static_cast<unsigned char>(szHex[i] & 0xFF);
+				const unsigned char unLow = static_cast<unsigned char>(szHex[i + 1] & 0xFF);
 				const unsigned char unByte = g_pDecodeTableHigh[unHigh] | g_pDecodeTableLow[unLow];
 				if (unByte == unIgnoredByte) {
 					i += 2;
@@ -416,6 +417,17 @@ namespace Detours {
 		// FindSectionPOGO
 		// ----------------------------------------------------------------
 
+		typedef struct _IMAGE_POGO_BLOCK {
+			DWORD m_unRVA;
+			DWORD m_unSize;
+			char m_pName[1];
+		} IMAGE_POGO_BLOCK, *PIMAGE_POGO_BLOCK;
+
+		typedef struct _IMAGE_POGO_INFO {
+			DWORD m_Signature; // 0x4C544347 = 'LTCG'
+			IMAGE_POGO_BLOCK m_pBlocks[1];
+		} IMAGE_POGO_INFO, *PIMAGE_POGO_INFO;
+
 		bool FindSectionPOGO(const HMODULE hModule, const char* const szSectionName, void** pAddress, size_t* pSize) {
 			if (!hModule) {
 				return false;
@@ -441,37 +453,26 @@ namespace Detours {
 					continue;
 				}
 
-				typedef struct _IMAGE_POGO_BLOCK {
-					DWORD unRVA;
-					DWORD unSize;
-					char Name[1];
-				} IMAGE_POGO_BLOCK, *PIMAGE_POGO_BLOCK;
-
-				typedef struct _IMAGE_POGO_INFO {
-					DWORD Signature; // 0x4C544347 = 'LTCG'
-					IMAGE_POGO_BLOCK Blocks[1];
-				} IMAGE_POGO_INFO, *PIMAGE_POGO_INFO;
-
 				const PIMAGE_POGO_INFO pPI = reinterpret_cast<PIMAGE_POGO_INFO>(reinterpret_cast<char*>(hModule) + pDebugDirectory[i].AddressOfRawData);
-				if (pPI->Signature != 0x4C544347) {
+				if (pPI->m_Signature != 0x4C544347) {
 					continue;
 				}
 
-				PIMAGE_POGO_BLOCK pBlock = pPI->Blocks;
-				while (pBlock->unRVA != 0) {
-					const size_t unNameLength = strnlen_s(pBlock->Name, 0x1000) + 1;
+				PIMAGE_POGO_BLOCK pBlock = pPI->m_pBlocks;
+				while (pBlock->m_unRVA != 0) {
+					const size_t unNameLength = strnlen_s(pBlock->m_pName, 0x1000) + 1; // FIXME: Unsafe.
 					size_t unBlockSize = sizeof(DWORD) * 2 + unNameLength;
 					if (unBlockSize & 3) {
 						unBlockSize += (4 - (unBlockSize & 3));
 					}
 
-					if (strncmp(szSectionName, pBlock->Name, 0x1000) == 0) {
+					if (strncmp(szSectionName, pBlock->m_pName, 0x1000) == 0) {  // FIXME: Unsafe.
 						if (pAddress) {
-							*pAddress = reinterpret_cast<void*>(reinterpret_cast<char*>(hModule) + pBlock->unRVA);
+							*pAddress = reinterpret_cast<void*>(reinterpret_cast<char*>(hModule) + pBlock->m_unRVA);
 						}
 
 						if (pSize) {
-							*pSize = static_cast<size_t>(pBlock->unSize);
+							*pSize = static_cast<size_t>(pBlock->m_unSize);
 						}
 
 						return true;
@@ -4140,7 +4141,7 @@ namespace Detours {
 				return false;
 			}
 
-			auto it = g_Protections.find(const_cast<void*>(pAddress));
+			const auto& it = g_Protections.find(const_cast<void*>(pAddress));
 			if (it != g_Protections.end()) {
 				return false;
 			}
@@ -4169,7 +4170,7 @@ namespace Detours {
 				return false;
 			}
 
-			auto it = g_Protections.find(const_cast<void*>(pAddress));
+			const auto& it = g_Protections.find(const_cast<void*>(pAddress));
 			if (it == g_Protections.end()) {
 				return false;
 			}
@@ -4208,7 +4209,7 @@ namespace Detours {
 			const EXCEPTION_RECORD Exception = *pException;
 			auto& vecCallBacks = g_ExceptionListener.GetCallBacks();
 			for (auto it = vecCallBacks.begin(); it != vecCallBacks.end(); ++it) {
-				const auto CallBack = (*it);
+				const auto& CallBack = (*it);
 				if (!CallBack) {
 					vecCallBacks.erase(it);
 					continue;
@@ -4228,7 +4229,7 @@ namespace Detours {
 
 		static bool __fastcall MemoryHookCallBack(const EXCEPTION_RECORD& Exception, const PCONTEXT pCTX) {
 			for (auto it = g_MemoryHooks.begin(); it != g_MemoryHooks.end(); ++it) {
-				auto& pHook = it->second;
+				const auto& pHook = it->second;
 				if (!pHook) {
 					continue;
 				}
@@ -4241,7 +4242,7 @@ namespace Detours {
 					pHook->Disable();
 				}
 
-				const auto pCallBack = pHook->GetCallBack();
+				const auto& pCallBack = pHook->GetCallBack();
 				if (!pCallBack) {
 					return false;
 				}
@@ -4376,7 +4377,7 @@ namespace Detours {
 
 			m_pCallBack = pCallBack;
 
-			auto it = g_Protections.find(const_cast<void*>(m_pAddress));
+			const auto& it = g_Protections.find(const_cast<void*>(m_pAddress));
 			if (it != g_Protections.end()) {
 				return false;
 			}
@@ -4429,12 +4430,12 @@ namespace Detours {
 				return false;
 			}
 
-			auto it = g_Protections.find(const_cast<void*>(m_pAddress));
+			const auto& it = g_Protections.find(const_cast<void*>(m_pAddress));
 			if (it == g_Protections.end()) {
 				return false;
 			}
 
-			auto& pProtection = it->second;
+			const auto& pProtection = it->second;
 			if (!pProtection) {
 				return false;
 			}
@@ -4461,12 +4462,12 @@ namespace Detours {
 				return false;
 			}
 
-			auto it = g_Protections.find(const_cast<void*>(m_pAddress));
+			const auto& it = g_Protections.find(const_cast<void*>(m_pAddress));
 			if (it == g_Protections.end()) {
 				return false;
 			}
 
-			auto& pProtection = it->second;
+			const auto& pProtection = it->second;
 			if (!pProtection) {
 				return false;
 			}
@@ -4508,12 +4509,12 @@ namespace Detours {
 				return false;
 			}
 
-			auto it = g_Protections.find(const_cast<void*>(m_pAddress));
+			const auto& it = g_Protections.find(const_cast<void*>(m_pAddress));
 			if (it == g_Protections.end()) {
 				return false;
 			}
 
-			auto& pProtection = it->second;
+			const auto& pProtection = it->second;
 			if (!pProtection) {
 				return false;
 			}
@@ -4550,7 +4551,7 @@ namespace Detours {
 				return false;
 			}
 
-			auto it = g_MemoryHooks.find(pCallBack);
+			const auto& it = g_MemoryHooks.find(pCallBack);
 			if (it != g_MemoryHooks.end()) {
 				return false;
 			}
@@ -4574,12 +4575,12 @@ namespace Detours {
 				return false;
 			}
 
-			auto it = g_MemoryHooks.find(pCallBack);
+			const auto& it = g_MemoryHooks.find(pCallBack);
 			if (it == g_MemoryHooks.end()) {
 				return false;
 			}
 
-			auto& pHook = it->second;
+			const auto& pHook = it->second;
 			if (!pHook) {
 				return false;
 			}
@@ -4592,12 +4593,12 @@ namespace Detours {
 				return false;
 			}
 
-			auto it = g_MemoryHooks.find(pCallBack);
+			const auto& it = g_MemoryHooks.find(pCallBack);
 			if (it == g_MemoryHooks.end()) {
 				return false;
 			}
 
-			auto& pHook = it->second;
+			const auto& pHook = it->second;
 			if (!pHook) {
 				return false;
 			}
@@ -4610,12 +4611,12 @@ namespace Detours {
 				return false;
 			}
 
-			auto it = g_MemoryHooks.find(pCallBack);
+			const auto& it = g_MemoryHooks.find(pCallBack);
 			if (it == g_MemoryHooks.end()) {
 				return false;
 			}
 
-			auto& pHook = it->second;
+			const auto& pHook = it->second;
 			if (!pHook) {
 				return false;
 			}
