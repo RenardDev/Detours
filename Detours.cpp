@@ -74,11 +74,7 @@ namespace Detours {
 		// ----------------------------------------------------------------
 
 		int Encode(unsigned short unCodePage, const char* const szText, wchar_t* szBuffer, const int nBufferSize) {
-			if (!unCodePage) {
-				return -1;
-			}
-
-			if (!szText) {
+			if (!unCodePage || !szText) {
 				return -1;
 			}
 
@@ -104,11 +100,7 @@ namespace Detours {
 		// ----------------------------------------------------------------
 
 		int Decode(unsigned short unCodePage, const wchar_t* const szText, char* szBuffer, const int nBufferSize) {
-			if (!unCodePage) {
-				return -1;
-			}
-
-			if (!szText) {
+			if (!unCodePage || !szText) {
 				return -1;
 			}
 
@@ -148,24 +140,13 @@ namespace Detours {
 		};
 
 		bool EncodeA(const void* const pData, const size_t unSize, char* szHex, const unsigned char unIgnoredByte) {
-			if (!pData) {
+			if (!pData || !unSize || !szHex) {
 				return false;
 			}
 
-			if (!unSize) {
-				return false;
-			}
-
-			if (!szHex) {
-				return false;
-			}
-
+			const unsigned char* pByteData = reinterpret_cast<const unsigned char* const>(pData);
 			for (size_t i = 0; i < unSize; i++) {
-				unsigned char unByte = reinterpret_cast<const unsigned char* const>(pData)[i];
-				if (!unByte) {
-					unByte = unIgnoredByte;
-				}
-
+				const unsigned char unByte = pByteData[i] ? pByteData[i] : unIgnoredByte;
 				*szHex++ = g_pEncodeTable[unByte >> 4];
 				*szHex++ = g_pEncodeTable[unByte & 15];
 			}
@@ -174,24 +155,13 @@ namespace Detours {
 		}
 
 		bool EncodeW(const void* const pData, const size_t unSize, wchar_t* szHex, const unsigned char unIgnoredByte) {
-			if (!pData) {
+			if (!pData || !unSize || !szHex) {
 				return false;
 			}
 
-			if (!unSize) {
-				return false;
-			}
-
-			if (!szHex) {
-				return false;
-			}
-
+			const unsigned char* pByteData = reinterpret_cast<const unsigned char* const>(pData);
 			for (size_t i = 0; i < unSize; i++) {
-				unsigned char unByte = reinterpret_cast<const unsigned char* const>(pData)[i];
-				if (!unByte) {
-					unByte = unIgnoredByte;
-				}
-
+				const unsigned char unByte = pByteData[i] ? pByteData[i] : unIgnoredByte;
 				*szHex++ = static_cast<wchar_t>(g_pEncodeTable[unByte >> 4]);
 				*szHex++ = static_cast<wchar_t>(g_pEncodeTable[unByte & 15]);
 			}
@@ -284,11 +254,7 @@ namespace Detours {
 		};
 
 		bool DecodeA(const char* const szHex, void* pData, const unsigned char unIgnoredByte) {
-			if (!szHex) {
-				return false;
-			}
-
-			if (!pData) {
+			if (!szHex || !pData) {
 				return false;
 			}
 
@@ -312,11 +278,7 @@ namespace Detours {
 		}
 
 		bool DecodeW(const wchar_t* const szHex, void* pData, const unsigned char unIgnoredByte) {
-			if (!szHex) {
-				return false;
-			}
-
-			if (!pData) {
+			if (!szHex || !pData) {
 				return false;
 			}
 
@@ -429,11 +391,7 @@ namespace Detours {
 		} IMAGE_POGO_INFO, *PIMAGE_POGO_INFO;
 
 		bool FindSectionPOGO(const HMODULE hModule, const char* const szSectionName, void** pAddress, size_t* pSize) {
-			if (!hModule) {
-				return false;
-			}
-
-			if (!szSectionName) {
+			if (!hModule || !szSectionName) {
 				return false;
 			}
 
@@ -446,9 +404,8 @@ namespace Detours {
 				return false;
 			}
 
-			const DWORD unCount = DebugDD.Size / sizeof(IMAGE_DEBUG_DIRECTORY);
 			const PIMAGE_DEBUG_DIRECTORY pDebugDirectory = reinterpret_cast<PIMAGE_DEBUG_DIRECTORY>(reinterpret_cast<char*>(hModule) + DebugDD.VirtualAddress);
-			for (DWORD i = 0; i < unCount; ++i) {
+			for (DWORD i = 0; i < DebugDD.Size / sizeof(IMAGE_DEBUG_DIRECTORY); ++i) {
 				if (pDebugDirectory[i].Type != IMAGE_DEBUG_TYPE_POGO) {
 					continue;
 				}
@@ -490,24 +447,12 @@ namespace Detours {
 		// ----------------------------------------------------------------
 
 		const void* const FindSignatureNative(const void* const pAddress, const size_t unSize, const char* const szSignature, const unsigned char unIgnoredByte) {
-			if (!pAddress) {
-				return nullptr;
-			}
-
-			if (!unSize) {
-				return nullptr;
-			}
-
-			if (!szSignature) {
+			if (!pAddress || !unSize || !szSignature) {
 				return nullptr;
 			}
 
 			const size_t unSignatureLength = strnlen_s(szSignature, 0x1000);
-			if (!unSignatureLength) {
-				return nullptr;
-			}
-
-			if (unSize <= unSignatureLength) {
+			if (!unSignatureLength || (unSize <= unSignatureLength)) {
 				return nullptr;
 			}
 
@@ -533,11 +478,7 @@ namespace Detours {
 		}
 
 		const void* const FindSignatureNative(const HMODULE hModule, const char* const szSignature, const unsigned char unIgnoredByte) {
-			if (!hModule) {
-				return nullptr;
-			}
-
-			if (!szSignature) {
+			if (!hModule || !szSignature) {
 				return nullptr;
 			}
 
@@ -549,11 +490,7 @@ namespace Detours {
 		}
 
 		const void* const FindSignatureNative(const HMODULE hModule, const std::array<const unsigned char, 8>& SectionName, const char* const szSignature, const unsigned char unIgnoredByte) {
-			if (!hModule) {
-				return nullptr;
-			}
-
-			if (!szSignature) {
+			if (!hModule || !szSignature) {
 				return nullptr;
 			}
 
@@ -567,15 +504,7 @@ namespace Detours {
 		}
 
 		const void* const FindSignatureNative(const HMODULE hModule, const char* const szSectionName, const char* const szSignature, const unsigned char unIgnoredByte) {
-			if (!hModule) {
-				return nullptr;
-			}
-
-			if (!szSectionName) {
-				return nullptr;
-			}
-
-			if (!szSignature) {
+			if (!hModule || !szSectionName || !szSignature) {
 				return nullptr;
 			}
 
@@ -589,11 +518,7 @@ namespace Detours {
 		}
 
 		const void* const FindSignatureNativeA(const char* const szModuleName, const char* const szSignature, const unsigned char unIgnoredByte) {
-			if (!szModuleName) {
-				return nullptr;
-			}
-
-			if (!szSignature) {
+			if (!szModuleName || !szSignature) {
 				return nullptr;
 			}
 
@@ -606,11 +531,7 @@ namespace Detours {
 		}
 
 		const void* const FindSignatureNativeA(const char* const szModuleName, const std::array<const unsigned char, 8>& SectionName, const char* const szSignature, const unsigned char unIgnoredByte) {
-			if (!szModuleName) {
-				return nullptr;
-			}
-
-			if (!szSignature) {
+			if (!szModuleName || !szSignature) {
 				return nullptr;
 			}
 
@@ -623,15 +544,7 @@ namespace Detours {
 		}
 
 		const void* const FindSignatureNativeA(const char* const szModuleName, const char* const szSectionName, const char* const szSignature, const unsigned char unIgnoredByte) {
-			if (!szModuleName) {
-				return nullptr;
-			}
-
-			if (!szSectionName) {
-				return nullptr;
-			}
-
-			if (!szSignature) {
+			if (!szModuleName || !szSectionName || !szSignature) {
 				return nullptr;
 			}
 
@@ -644,11 +557,7 @@ namespace Detours {
 		}
 
 		const void* const FindSignatureNativeW(const wchar_t* const szModuleName, const char* const szSignature, const unsigned char unIgnoredByte) {
-			if (!szModuleName) {
-				return nullptr;
-			}
-
-			if (!szSignature) {
+			if (!szModuleName || !szSignature) {
 				return nullptr;
 			}
 
@@ -661,11 +570,7 @@ namespace Detours {
 		}
 
 		const void* const FindSignatureNativeW(const wchar_t* const szModuleName, const std::array<const unsigned char, 8>& SectionName, const char* const szSignature, const unsigned char unIgnoredByte) {
-			if (!szModuleName) {
-				return nullptr;
-			}
-
-			if (!szSignature) {
+			if (!szModuleName || !szSignature) {
 				return nullptr;
 			}
 
@@ -678,15 +583,7 @@ namespace Detours {
 		}
 
 		const void* const FindSignatureNativeW(const wchar_t* const szModuleName, const char* const szSectionName, const char* const szSignature, const unsigned char unIgnoredByte) {
-			if (!szModuleName) {
-				return nullptr;
-			}
-
-			if (!szSectionName) {
-				return nullptr;
-			}
-
-			if (!szSignature) {
+			if (!szModuleName || !szSectionName || !szSignature) {
 				return nullptr;
 			}
 
@@ -729,31 +626,19 @@ namespace Detours {
 		// ----------------------------------------------------------------
 
 		const void* const FindSignatureSSE2(const void* const pAddress, const size_t unSize, const char* const szSignature, const unsigned char unIgnoredByte) {
-			if (!pAddress) {
-				return nullptr;
-			}
-
-			if (!unSize) {
-				return nullptr;
-			}
-
-			if (!szSignature) {
+			if (!pAddress || !unSize || !szSignature) {
 				return nullptr;
 			}
 
 			const size_t unSignatureLength = strnlen_s(szSignature, 0x1000);
-			if (!unSignatureLength) {
-				return nullptr;
-			}
-
-			if (unSize < unSignatureLength) {
+			if (!unSignatureLength || (unSize < unSignatureLength)) {
 				return nullptr;
 			}
 
 			const unsigned char* const pData = reinterpret_cast<const unsigned char* const>(pAddress);
 			const unsigned char* const pSignature = reinterpret_cast<const unsigned char* const>(szSignature);
 
-			const size_t unDataBytesCycles = static_cast<size_t>(floor(static_cast<double>(unSize) / 16.0));
+			const size_t unDataBytesCycles = unSize / 16;
 			for (size_t unCycle = 0; unCycle < unDataBytesCycles; ++unCycle) {
 				unsigned __int16 unFound = 0xFFFFui16;
 				for (size_t unSignatureIndex = 0; (unSignatureIndex < unSignatureLength) && (unFound != 0); ++unSignatureIndex) {
@@ -774,7 +659,7 @@ namespace Detours {
 				}
 			}
 
-			const size_t unDataBytesLeft = unSize - unDataBytesCycles * 16;
+			const size_t unDataBytesLeft = unSize % 16;
 			if (unDataBytesLeft) {
 				if (unDataBytesLeft < unSignatureLength) {
 					return FindSignatureNative(pData + unSize - unDataBytesLeft - unSignatureLength, unDataBytesLeft + unSignatureLength, szSignature);
@@ -786,11 +671,7 @@ namespace Detours {
 		}
 
 		const void* const FindSignatureSSE2(const HMODULE hModule, const char* const szSignature, const unsigned char unIgnoredByte) {
-			if (!hModule) {
-				return nullptr;
-			}
-
-			if (!szSignature) {
+			if (!hModule || !szSignature) {
 				return nullptr;
 			}
 
@@ -802,11 +683,7 @@ namespace Detours {
 		}
 
 		const void* const FindSignatureSSE2(const HMODULE hModule, const std::array<const unsigned char, 8>& SectionName, const char* const szSignature, const unsigned char unIgnoredByte) {
-			if (!hModule) {
-				return nullptr;
-			}
-
-			if (!szSignature) {
+			if (!hModule || !szSignature) {
 				return nullptr;
 			}
 
@@ -820,15 +697,7 @@ namespace Detours {
 		}
 
 		const void* const FindSignatureSSE2(const HMODULE hModule, const char* const szSectionName, const char* const szSignature, const unsigned char unIgnoredByte) {
-			if (!hModule) {
-				return nullptr;
-			}
-
-			if (!szSectionName) {
-				return nullptr;
-			}
-
-			if (!szSignature) {
+			if (!hModule || !szSectionName || !szSignature) {
 				return nullptr;
 			}
 
@@ -842,11 +711,7 @@ namespace Detours {
 		}
 
 		const void* const FindSignatureSSE2A(const char* const szModuleName, const char* const szSignature, const unsigned char unIgnoredByte) {
-			if (!szModuleName) {
-				return nullptr;
-			}
-
-			if (!szSignature) {
+			if (!szModuleName || !szSignature) {
 				return nullptr;
 			}
 
@@ -859,11 +724,7 @@ namespace Detours {
 		}
 
 		const void* const FindSignatureSSE2A(const char* const szModuleName, const std::array<const unsigned char, 8>& SectionName, const char* const szSignature, const unsigned char unIgnoredByte) {
-			if (!szModuleName) {
-				return nullptr;
-			}
-
-			if (!szSignature) {
+			if (!szModuleName || !szSignature) {
 				return nullptr;
 			}
 
@@ -876,15 +737,7 @@ namespace Detours {
 		}
 
 		const void* const FindSignatureSSE2A(const char* const szModuleName, const char* const szSectionName, const char* const szSignature, const unsigned char unIgnoredByte) {
-			if (!szModuleName) {
-				return nullptr;
-			}
-
-			if (!szSectionName) {
-				return nullptr;
-			}
-
-			if (!szSignature) {
+			if (!szModuleName || !szSectionName || !szSignature) {
 				return nullptr;
 			}
 
@@ -897,11 +750,7 @@ namespace Detours {
 		}
 
 		const void* const FindSignatureSSE2W(const wchar_t* const szModuleName, const char* const szSignature, const unsigned char unIgnoredByte) {
-			if (!szModuleName) {
-				return nullptr;
-			}
-
-			if (!szSignature) {
+			if (!szModuleName || !szSignature) {
 				return nullptr;
 			}
 
@@ -914,11 +763,7 @@ namespace Detours {
 		}
 
 		const void* const FindSignatureSSE2W(const wchar_t* const szModuleName, const std::array<const unsigned char, 8>& SectionName, const char* const szSignature, const unsigned char unIgnoredByte) {
-			if (!szModuleName) {
-				return nullptr;
-			}
-
-			if (!szSignature) {
+			if (!szModuleName || !szSignature) {
 				return nullptr;
 			}
 
@@ -931,15 +776,7 @@ namespace Detours {
 		}
 
 		const void* const FindSignatureSSE2W(const wchar_t* const szModuleName, const char* const szSectionName, const char* const szSignature, const unsigned char unIgnoredByte) {
-			if (!szModuleName) {
-				return nullptr;
-			}
-
-			if (!szSectionName) {
-				return nullptr;
-			}
-
-			if (!szSignature) {
+			if (!szModuleName || !szSectionName || !szSignature) {
 				return nullptr;
 			}
 
@@ -982,31 +819,19 @@ namespace Detours {
 		// ----------------------------------------------------------------
 
 		const void* const FindSignatureAVX(const void* const pAddress, const size_t unSize, const char* const szSignature, const unsigned char unIgnoredByte) {
-			if (!pAddress) {
-				return nullptr;
-			}
-
-			if (!unSize) {
-				return nullptr;
-			}
-
-			if (!szSignature) {
+			if (!pAddress || !unSize || !szSignature) {
 				return nullptr;
 			}
 
 			const size_t unSignatureLength = strnlen_s(szSignature, 0x1000);
-			if (!unSignatureLength) {
-				return nullptr;
-			}
-
-			if (unSize < unSignatureLength) {
+			if (!unSignatureLength || unSize < unSignatureLength) {
 				return nullptr;
 			}
 
 			const unsigned char* const pData = reinterpret_cast<const unsigned char* const>(pAddress);
 			const unsigned char* const pSignature = reinterpret_cast<const unsigned char* const>(szSignature);
 
-			const size_t unDataBytesCycles = static_cast<size_t>(floor(static_cast<double>(unSize) / 32.0));
+			const size_t unDataBytesCycles = unSize / 32;
 			for (size_t unCycle = 0; unCycle < unDataBytesCycles; ++unCycle) {
 				unsigned __int32 unFound = 0xFFFFFFFFui32;
 				for (size_t unSignatureIndex = 0; (unSignatureIndex < unSignatureLength) && (unFound != 0); ++unSignatureIndex) {
@@ -1030,7 +855,7 @@ namespace Detours {
 				}
 			}
 
-			const size_t unDataBytesLeft = unSize - unDataBytesCycles * 32;
+			const size_t unDataBytesLeft = unSize % 32;
 			if (unDataBytesLeft) {
 				if (unDataBytesLeft < unSignatureLength) {
 					return FindSignatureSSE2(pData + unSize - unDataBytesLeft - unSignatureLength, unDataBytesLeft + unSignatureLength, szSignature);
@@ -1042,11 +867,7 @@ namespace Detours {
 		}
 
 		const void* const FindSignatureAVX(const HMODULE hModule, const char* const szSignature, const unsigned char unIgnoredByte) {
-			if (!hModule) {
-				return nullptr;
-			}
-
-			if (!szSignature) {
+			if (!hModule || !szSignature) {
 				return nullptr;
 			}
 
@@ -1058,11 +879,7 @@ namespace Detours {
 		}
 
 		const void* const FindSignatureAVX(const HMODULE hModule, const std::array<const unsigned char, 8>& SectionName, const char* const szSignature, const unsigned char unIgnoredByte) {
-			if (!hModule) {
-				return nullptr;
-			}
-
-			if (!szSignature) {
+			if (!hModule || !szSignature) {
 				return nullptr;
 			}
 
@@ -1076,15 +893,7 @@ namespace Detours {
 		}
 
 		const void* const FindSignatureAVX(const HMODULE hModule, const char* const szSectionName, const char* const szSignature, const unsigned char unIgnoredByte) {
-			if (!hModule) {
-				return nullptr;
-			}
-
-			if (!szSectionName) {
-				return nullptr;
-			}
-
-			if (!szSignature) {
+			if (!hModule || !szSectionName || !szSignature) {
 				return nullptr;
 			}
 
@@ -1098,11 +907,7 @@ namespace Detours {
 		}
 
 		const void* const FindSignatureAVXA(const char* const szModuleName, const char* const szSignature, const unsigned char unIgnoredByte) {
-			if (!szModuleName) {
-				return nullptr;
-			}
-
-			if (!szSignature) {
+			if (!szModuleName || !szSignature) {
 				return nullptr;
 			}
 
@@ -1115,11 +920,7 @@ namespace Detours {
 		}
 
 		const void* const FindSignatureAVXA(const char* const szModuleName, const std::array<const unsigned char, 8>& SectionName, const char* const szSignature, const unsigned char unIgnoredByte) {
-			if (!szModuleName) {
-				return nullptr;
-			}
-
-			if (!szSignature) {
+			if (!szModuleName || !szSignature) {
 				return nullptr;
 			}
 
@@ -1132,15 +933,7 @@ namespace Detours {
 		}
 
 		const void* const FindSignatureAVXA(const char* const szModuleName, const char* const szSectionName, const char* const szSignature, const unsigned char unIgnoredByte) {
-			if (!szModuleName) {
-				return nullptr;
-			}
-
-			if (!szSectionName) {
-				return nullptr;
-			}
-
-			if (!szSignature) {
+			if (!szModuleName || !szSectionName || !szSignature) {
 				return nullptr;
 			}
 
@@ -1153,11 +946,7 @@ namespace Detours {
 		}
 
 		const void* const FindSignatureAVXW(const wchar_t* const szModuleName, const char* const szSignature, const unsigned char unIgnoredByte) {
-			if (!szModuleName) {
-				return nullptr;
-			}
-
-			if (!szSignature) {
+			if (!szModuleName || !szSignature) {
 				return nullptr;
 			}
 
@@ -1170,11 +959,7 @@ namespace Detours {
 		}
 
 		const void* const FindSignatureAVXW(const wchar_t* const szModuleName, const std::array<const unsigned char, 8>& SectionName, const char* const szSignature, const unsigned char unIgnoredByte) {
-			if (!szModuleName) {
-				return nullptr;
-			}
-
-			if (!szSignature) {
+			if (!szModuleName || !szSignature) {
 				return nullptr;
 			}
 
@@ -1187,15 +972,7 @@ namespace Detours {
 		}
 
 		const void* const FindSignatureAVXW(const wchar_t* const szModuleName, const char* const szSectionName, const char* const szSignature, const unsigned char unIgnoredByte) {
-			if (!szModuleName) {
-				return nullptr;
-			}
-
-			if (!szSectionName) {
-				return nullptr;
-			}
-
-			if (!szSignature) {
+			if (!szModuleName || !szSectionName || !szSignature) {
 				return nullptr;
 			}
 
@@ -1238,31 +1015,19 @@ namespace Detours {
 		// ----------------------------------------------------------------
 
 		const void* const FindSignatureAVX2(const void* const pAddress, const size_t unSize, const char* const szSignature, const unsigned char unIgnoredByte) {
-			if (!pAddress) {
-				return nullptr;
-			}
-
-			if (!unSize) {
-				return nullptr;
-			}
-
-			if (!szSignature) {
+			if (!pAddress || !unSize || !szSignature) {
 				return nullptr;
 			}
 
 			const size_t unSignatureLength = strnlen_s(szSignature, 0x1000);
-			if (!unSignatureLength) {
-				return nullptr;
-			}
-
-			if (unSize < unSignatureLength) {
+			if (!unSignatureLength || unSize < unSignatureLength) {
 				return nullptr;
 			}
 
 			const unsigned char* const pData = reinterpret_cast<const unsigned char* const>(pAddress);
 			const unsigned char* const pSignature = reinterpret_cast<const unsigned char* const>(szSignature);
 
-			const size_t unDataBytesCycles = static_cast<size_t>(floor(static_cast<double>(unSize) / 32.0));
+			const size_t unDataBytesCycles = unSize / 32;
 			for (size_t unCycle = 0; unCycle < unDataBytesCycles; ++unCycle) {
 				unsigned __int32 unFound = 0xFFFFFFFFui32;
 				for (size_t unSignatureIndex = 0; (unSignatureIndex < unSignatureLength) && (unFound != 0); ++unSignatureIndex) {
@@ -1283,7 +1048,7 @@ namespace Detours {
 				}
 			}
 
-			const size_t unDataBytesLeft = unSize - unDataBytesCycles * 32;
+			const size_t unDataBytesLeft = unSize % 32;
 			if (unDataBytesLeft) {
 				if (unDataBytesLeft < unSignatureLength) {
 					return FindSignatureAVX(pData + unSize - unDataBytesLeft - unSignatureLength, unDataBytesLeft + unSignatureLength, szSignature);
@@ -1295,11 +1060,7 @@ namespace Detours {
 		}
 
 		const void* const FindSignatureAVX2(const HMODULE hModule, const char* const szSignature, const unsigned char unIgnoredByte) {
-			if (!hModule) {
-				return nullptr;
-			}
-
-			if (!szSignature) {
+			if (!hModule || !szSignature) {
 				return nullptr;
 			}
 
@@ -1311,11 +1072,7 @@ namespace Detours {
 		}
 
 		const void* const FindSignatureAVX2(const HMODULE hModule, const std::array<const unsigned char, 8>& SectionName, const char* const szSignature, const unsigned char unIgnoredByte) {
-			if (!hModule) {
-				return nullptr;
-			}
-
-			if (!szSignature) {
+			if (!hModule || !szSignature) {
 				return nullptr;
 			}
 
@@ -1329,15 +1086,7 @@ namespace Detours {
 		}
 
 		const void* const FindSignatureAVX2(const HMODULE hModule, const char* const szSectionName, const char* const szSignature, const unsigned char unIgnoredByte) {
-			if (!hModule) {
-				return nullptr;
-			}
-
-			if (!szSectionName) {
-				return nullptr;
-			}
-
-			if (!szSignature) {
+			if (!hModule || !szSectionName || !szSignature) {
 				return nullptr;
 			}
 
@@ -1351,11 +1100,7 @@ namespace Detours {
 		}
 
 		const void* const FindSignatureAVX2A(const char* const szModuleName, const char* const szSignature, const unsigned char unIgnoredByte) {
-			if (!szModuleName) {
-				return nullptr;
-			}
-
-			if (!szSignature) {
+			if (!szModuleName || !szSignature) {
 				return nullptr;
 			}
 
@@ -1368,11 +1113,7 @@ namespace Detours {
 		}
 
 		const void* const FindSignatureAVX2A(const char* const szModuleName, const std::array<const unsigned char, 8>& SectionName, const char* const szSignature, const unsigned char unIgnoredByte) {
-			if (!szModuleName) {
-				return nullptr;
-			}
-
-			if (!szSignature) {
+			if (!szModuleName || !szSignature) {
 				return nullptr;
 			}
 
@@ -1385,15 +1126,7 @@ namespace Detours {
 		}
 
 		const void* const FindSignatureAVX2A(const char* const szModuleName, const char* const szSectionName, const char* const szSignature, const unsigned char unIgnoredByte) {
-			if (!szModuleName) {
-				return nullptr;
-			}
-
-			if (!szSectionName) {
-				return nullptr;
-			}
-
-			if (!szSignature) {
+			if (!szModuleName || !szSectionName || !szSignature) {
 				return nullptr;
 			}
 
@@ -1406,11 +1139,7 @@ namespace Detours {
 		}
 
 		const void* const FindSignatureAVX2W(const wchar_t* const szModuleName, const char* const szSignature, const unsigned char unIgnoredByte) {
-			if (!szModuleName) {
-				return nullptr;
-			}
-
-			if (!szSignature) {
+			if (!szModuleName || !szSignature) {
 				return nullptr;
 			}
 
@@ -1423,11 +1152,7 @@ namespace Detours {
 		}
 
 		const void* const FindSignatureAVX2W(const wchar_t* const szModuleName, const std::array<const unsigned char, 8>& SectionName, const char* const szSignature, const unsigned char unIgnoredByte) {
-			if (!szModuleName) {
-				return nullptr;
-			}
-
-			if (!szSignature) {
+			if (!szModuleName || !szSignature) {
 				return nullptr;
 			}
 
@@ -1440,15 +1165,7 @@ namespace Detours {
 		}
 
 		const void* const FindSignatureAVX2W(const wchar_t* const szModuleName, const char* const szSectionName, const char* const szSignature, const unsigned char unIgnoredByte) {
-			if (!szModuleName) {
-				return nullptr;
-			}
-
-			if (!szSectionName) {
-				return nullptr;
-			}
-
-			if (!szSignature) {
+			if (!szModuleName || !szSectionName || !szSignature) {
 				return nullptr;
 			}
 
@@ -1491,31 +1208,19 @@ namespace Detours {
 		// ----------------------------------------------------------------
 
 		const void* const FindSignatureAVX512(const void* const pAddress, const size_t unSize, const char* const szSignature, const unsigned char unIgnoredByte) {
-			if (!pAddress) {
-				return nullptr;
-			}
-
-			if (!unSize) {
-				return nullptr;
-			}
-
-			if (!szSignature) {
+			if (!pAddress || !unSize || !szSignature) {
 				return nullptr;
 			}
 
 			const size_t unSignatureLength = strnlen_s(szSignature, 0x1000);
-			if (!unSignatureLength) {
-				return nullptr;
-			}
-
-			if (unSize < unSignatureLength) {
+			if (!unSignatureLength || unSize < unSignatureLength) {
 				return nullptr;
 			}
 
 			const unsigned char* const pData = reinterpret_cast<const unsigned char* const>(pAddress);
 			const unsigned char* const pSignature = reinterpret_cast<const unsigned char* const>(szSignature);
 
-			const size_t unDataBytesCycles = static_cast<size_t>(floor(static_cast<double>(unSize) / 64.0));
+			const size_t unDataBytesCycles = unSize / 64;
 			for (size_t unCycle = 0; unCycle < unDataBytesCycles; ++unCycle) {
 				unsigned __int64 unFound = 0xFFFFFFFFFFFFFFFFui64;
 				for (size_t unSignatureIndex = 0; (unSignatureIndex < unSignatureLength) && (unFound != 0); ++unSignatureIndex) {
@@ -1534,7 +1239,7 @@ namespace Detours {
 				}
 			}
 
-			const size_t unDataBytesLeft = unSize - unDataBytesCycles * 64;
+			const size_t unDataBytesLeft = unSize % 64;
 			if (unDataBytesLeft) {
 				if (unDataBytesLeft < unSignatureLength) {
 					return FindSignatureAVX2(pData + unSize - unDataBytesLeft - unSignatureLength, unDataBytesLeft + unSignatureLength, szSignature);
@@ -1546,11 +1251,7 @@ namespace Detours {
 		}
 
 		const void* const FindSignatureAVX512(const HMODULE hModule, const char* const szSignature, const unsigned char unIgnoredByte) {
-			if (!hModule) {
-				return nullptr;
-			}
-
-			if (!szSignature) {
+			if (!hModule || !szSignature) {
 				return nullptr;
 			}
 
@@ -1562,11 +1263,7 @@ namespace Detours {
 		}
 
 		const void* const FindSignatureAVX512(const HMODULE hModule, const std::array<const unsigned char, 8>& SectionName, const char* const szSignature, const unsigned char unIgnoredByte) {
-			if (!hModule) {
-				return nullptr;
-			}
-
-			if (!szSignature) {
+			if (!hModule || !szSignature) {
 				return nullptr;
 			}
 
@@ -1580,15 +1277,7 @@ namespace Detours {
 		}
 
 		const void* const FindSignatureAVX512(const HMODULE hModule, const char* const szSectionName, const char* const szSignature, const unsigned char unIgnoredByte) {
-			if (!hModule) {
-				return nullptr;
-			}
-
-			if (!szSectionName) {
-				return nullptr;
-			}
-
-			if (!szSignature) {
+			if (!hModule || !szSectionName || !szSignature) {
 				return nullptr;
 			}
 
@@ -1603,11 +1292,7 @@ namespace Detours {
 		}
 
 		const void* const FindSignatureAVX512A(const char* const szModuleName, const char* const szSignature, const unsigned char unIgnoredByte) {
-			if (!szModuleName) {
-				return nullptr;
-			}
-
-			if (!szSignature) {
+			if (!szModuleName || !szSignature) {
 				return nullptr;
 			}
 
@@ -1620,11 +1305,7 @@ namespace Detours {
 		}
 
 		const void* const FindSignatureAVX512A(const char* const szModuleName, const std::array<const unsigned char, 8>& SectionName, const char* const szSignature, const unsigned char unIgnoredByte) {
-			if (!szModuleName) {
-				return nullptr;
-			}
-
-			if (!szSignature) {
+			if (!szModuleName || !szSignature) {
 				return nullptr;
 			}
 
@@ -1637,15 +1318,7 @@ namespace Detours {
 		}
 
 		const void* const FindSignatureAVX512A(const char* const szModuleName, const char* const szSectionName, const char* const szSignature, const unsigned char unIgnoredByte) {
-			if (!szModuleName) {
-				return nullptr;
-			}
-
-			if (!szSectionName) {
-				return nullptr;
-			}
-
-			if (!szSignature) {
+			if (!szModuleName || !szSectionName || !szSignature) {
 				return nullptr;
 			}
 
@@ -1658,11 +1331,7 @@ namespace Detours {
 		}
 
 		const void* const FindSignatureAVX512W(const wchar_t* const szModuleName, const char* const szSignature, const unsigned char unIgnoredByte) {
-			if (!szModuleName) {
-				return nullptr;
-			}
-
-			if (!szSignature) {
+			if (!szModuleName || !szSignature) {
 				return nullptr;
 			}
 
@@ -1675,11 +1344,7 @@ namespace Detours {
 		}
 
 		const void* const FindSignatureAVX512W(const wchar_t* const szModuleName, const std::array<const unsigned char, 8>& SectionName, const char* const szSignature, const unsigned char unIgnoredByte) {
-			if (!szModuleName) {
-				return nullptr;
-			}
-
-			if (!szSignature) {
+			if (!szModuleName || !szSignature) {
 				return nullptr;
 			}
 
@@ -1692,15 +1357,7 @@ namespace Detours {
 		}
 
 		const void* const FindSignatureAVX512W(const wchar_t* const szModuleName, const char* const szSectionName, const char* const szSignature, const unsigned char unIgnoredByte) {
-			if (!szModuleName) {
-				return nullptr;
-			}
-
-			if (!szSectionName) {
-				return nullptr;
-			}
-
-			if (!szSignature) {
+			if (!szModuleName || !szSectionName || !szSignature) {
 				return nullptr;
 			}
 
@@ -1781,11 +1438,7 @@ namespace Detours {
 		}
 
 		const void* const FindSignature(const HMODULE hModule, const char* const szSignature, const unsigned char unIgnoredByte) {
-			if (!hModule) {
-				return nullptr;
-			}
-
-			if (!szSignature) {
+			if (!hModule || !szSignature) {
 				return nullptr;
 			}
 
@@ -1797,11 +1450,7 @@ namespace Detours {
 		}
 
 		const void* const FindSignature(const HMODULE hModule, const std::array<const unsigned char, 8>& SectionName, const char* const szSignature, const unsigned char unIgnoredByte) {
-			if (!hModule) {
-				return nullptr;
-			}
-
-			if (!szSignature) {
+			if (!hModule || !szSignature) {
 				return nullptr;
 			}
 
@@ -1815,15 +1464,7 @@ namespace Detours {
 		}
 
 		const void* const FindSignature(const HMODULE hModule, const char* const szSectionName, const char* const szSignature, const unsigned char unIgnoredByte) {
-			if (!hModule) {
-				return nullptr;
-			}
-
-			if (!szSectionName) {
-				return nullptr;
-			}
-
-			if (!szSignature) {
+			if (!hModule || !szSectionName || !szSignature) {
 				return nullptr;
 			}
 
@@ -1837,11 +1478,7 @@ namespace Detours {
 		}
 
 		const void* const FindSignatureA(const char* const szModuleName, const char* const szSignature, const unsigned char unIgnoredByte) {
-			if (!szModuleName) {
-				return nullptr;
-			}
-
-			if (!szSignature) {
+			if (!szModuleName || !szSignature) {
 				return nullptr;
 			}
 
@@ -1854,11 +1491,7 @@ namespace Detours {
 		}
 
 		const void* const FindSignatureA(const char* const szModuleName, const std::array<const unsigned char, 8>& SectionName, const char* const szSignature, const unsigned char unIgnoredByte) {
-			if (!szModuleName) {
-				return nullptr;
-			}
-
-			if (!szSignature) {
+			if (!szModuleName || !szSignature) {
 				return nullptr;
 			}
 
@@ -1871,15 +1504,7 @@ namespace Detours {
 		}
 
 		const void* const FindSignatureA(const char* const szModuleName, const char* const szSectionName,  const char* const szSignature, const unsigned char unIgnoredByte) {
-			if (!szModuleName) {
-				return nullptr;
-			}
-
-			if (!szSectionName) {
-				return nullptr;
-			}
-
-			if (!szSignature) {
+			if (!szModuleName || !szSectionName || !szSignature) {
 				return nullptr;
 			}
 
@@ -1892,11 +1517,7 @@ namespace Detours {
 		}
 
 		const void* const FindSignatureW(const wchar_t* const szModuleName, const char* const szSignature, const unsigned char unIgnoredByte) {
-			if (!szModuleName) {
-				return nullptr;
-			}
-
-			if (!szSignature) {
+			if (!szModuleName || !szSignature) {
 				return nullptr;
 			}
 
@@ -1909,11 +1530,7 @@ namespace Detours {
 		}
 
 		const void* const FindSignatureW(const wchar_t* const szModuleName, const std::array<const unsigned char, 8>& SectionName, const char* const szSignature, const unsigned char unIgnoredByte) {
-			if (!szModuleName) {
-				return nullptr;
-			}
-
-			if (!szSignature) {
+			if (!szModuleName || !szSignature) {
 				return nullptr;
 			}
 
@@ -1926,15 +1543,7 @@ namespace Detours {
 		}
 
 		const void* const FindSignatureW(const wchar_t* const szModuleName, const char* const szSectionName, const char* const szSignature, const unsigned char unIgnoredByte) {
-			if (!szModuleName) {
-				return nullptr;
-			}
-
-			if (!szSectionName) {
-				return nullptr;
-			}
-
-			if (!szSignature) {
+			if (!szModuleName || !szSectionName || !szSignature) {
 				return nullptr;
 			}
 
@@ -1977,23 +1586,7 @@ namespace Detours {
 		// ----------------------------------------------------------------
 
 		const void* const FindDataNative(const void* const pAddress, const size_t unSize, const unsigned char* const pData, const size_t unDataSize) {
-			if (!pAddress) {
-				return nullptr;
-			}
-
-			if (!unSize) {
-				return nullptr;
-			}
-
-			if (!pData) {
-				return nullptr;
-			}
-
-			if (!unDataSize) {
-				return nullptr;
-			}
-
-			if (unSize < unDataSize) {
+			if (!pAddress || !unSize || !pData || !unDataSize || (unSize < unDataSize)) {
 				return nullptr;
 			}
 
@@ -2015,15 +1608,7 @@ namespace Detours {
 		}
 
 		const void* const FindDataNative(const HMODULE hModule, const unsigned char* const pData, const size_t unDataSize) {
-			if (!hModule) {
-				return nullptr;
-			}
-
-			if (!pData) {
-				return nullptr;
-			}
-
-			if (!unDataSize) {
+			if (!hModule || !pData || !unDataSize) {
 				return nullptr;
 			}
 
@@ -2035,15 +1620,7 @@ namespace Detours {
 		}
 
 		const void* const FindDataNative(const HMODULE hModule, const std::array<const unsigned char, 8>& SectionName, const unsigned char* const pData, const size_t unDataSize) {
-			if (!hModule) {
-				return nullptr;
-			}
-
-			if (!pData) {
-				return nullptr;
-			}
-
-			if (!unDataSize) {
+			if (!hModule || !pData || !unDataSize) {
 				return nullptr;
 			}
 
@@ -2057,19 +1634,7 @@ namespace Detours {
 		}
 
 		const void* const FindDataNative(const HMODULE hModule, const char* const szSectionName, const unsigned char* const pData, const size_t unDataSize) {
-			if (!hModule) {
-				return nullptr;
-			}
-
-			if (!szSectionName) {
-				return nullptr;
-			}
-
-			if (!pData) {
-				return nullptr;
-			}
-
-			if (!unDataSize) {
+			if (!hModule || !szSectionName || !pData || !unDataSize) {
 				return nullptr;
 			}
 
@@ -2083,15 +1648,7 @@ namespace Detours {
 		}
 
 		const void* const FindDataNativeA(const char* const szModuleName, const unsigned char* const pData, const size_t unDataSize) {
-			if (!szModuleName) {
-				return nullptr;
-			}
-
-			if (!pData) {
-				return nullptr;
-			}
-
-			if (!unDataSize) {
+			if (!szModuleName || !pData || !unDataSize) {
 				return nullptr;
 			}
 
@@ -2104,15 +1661,7 @@ namespace Detours {
 		}
 
 		const void* const FindDataNativeA(const char* const szModuleName, const std::array<const unsigned char, 8>& SectionName, const unsigned char* const pData, const size_t unDataSize) {
-			if (!szModuleName) {
-				return nullptr;
-			}
-
-			if (!pData) {
-				return nullptr;
-			}
-
-			if (!unDataSize) {
+			if (!szModuleName || !pData || !unDataSize) {
 				return nullptr;
 			}
 
@@ -2125,19 +1674,7 @@ namespace Detours {
 		}
 		
 		const void* const FindDataNativeA(const char* const szModuleName, const char* const szSectionName, const unsigned char* const pData, const size_t unDataSize) {
-			if (!szModuleName) {
-				return nullptr;
-			}
-
-			if (!szSectionName) {
-				return nullptr;
-			}
-
-			if (!pData) {
-				return nullptr;
-			}
-
-			if (!unDataSize) {
+			if (!szModuleName || !szSectionName || !pData || !unDataSize) {
 				return nullptr;
 			}
 
@@ -2150,15 +1687,7 @@ namespace Detours {
 		}
 
 		const void* const FindDataNativeW(const wchar_t* const szModuleName, const unsigned char* const pData, const size_t unDataSize) {
-			if (!szModuleName) {
-				return nullptr;
-			}
-
-			if (!pData) {
-				return nullptr;
-			}
-
-			if (!unDataSize) {
+			if (!szModuleName || !pData || !unDataSize) {
 				return nullptr;
 			}
 
@@ -2171,15 +1700,7 @@ namespace Detours {
 		}
 
 		const void* const FindDataNativeW(const wchar_t* const szModuleName, const std::array<const unsigned char, 8>& SectionName, const unsigned char* const pData, const size_t unDataSize) {
-			if (!szModuleName) {
-				return nullptr;
-			}
-
-			if (!pData) {
-				return nullptr;
-			}
-
-			if (!unDataSize) {
+			if (!szModuleName || !pData || !unDataSize) {
 				return nullptr;
 			}
 
@@ -2192,19 +1713,7 @@ namespace Detours {
 		}
 
 		const void* const FindDataNativeW(const wchar_t* const szModuleName, const char* const szSectionName, const unsigned char* const pData, const size_t unDataSize) {
-			if (!szModuleName) {
-				return nullptr;
-			}
-
-			if (!szSectionName) {
-				return nullptr;
-			}
-
-			if (!pData) {
-				return nullptr;
-			}
-
-			if (!unDataSize) {
+			if (!szModuleName || !szSectionName || !pData || !unDataSize) {
 				return nullptr;
 			}
 
@@ -2247,23 +1756,7 @@ namespace Detours {
 		// ----------------------------------------------------------------
 
 		const void* const FindDataSSE2(const void* const pAddress, const size_t unSize, const unsigned char* const pData, const size_t unDataSize) {
-			if (!pAddress) {
-				return nullptr;
-			}
-
-			if (!unSize) {
-				return nullptr;
-			}
-
-			if (!pData) {
-				return nullptr;
-			}
-
-			if (!unDataSize) {
-				return nullptr;
-			}
-
-			if (unSize < unDataSize) {
+			if (!pAddress || !unSize || !pData || !unDataSize || (unSize < unDataSize)) {
 				return nullptr;
 			}
 
@@ -2297,15 +1790,7 @@ namespace Detours {
 		}
 
 		const void* const FindDataSSE2(const HMODULE hModule, const unsigned char* const pData, const size_t unDataSize) {
-			if (!hModule) {
-				return nullptr;
-			}
-
-			if (!pData) {
-				return nullptr;
-			}
-
-			if (!unDataSize) {
+			if (!hModule || !pData || !unDataSize) {
 				return nullptr;
 			}
 
@@ -2317,15 +1802,7 @@ namespace Detours {
 		}
 
 		const void* const FindDataSSE2(const HMODULE hModule, const std::array<const unsigned char, 8>& SectionName, const unsigned char* const pData, const size_t unDataSize) {
-			if (!hModule) {
-				return nullptr;
-			}
-
-			if (!pData) {
-				return nullptr;
-			}
-
-			if (!unDataSize) {
+			if (!hModule || !pData || !unDataSize) {
 				return nullptr;
 			}
 
@@ -2339,19 +1816,7 @@ namespace Detours {
 		}
 
 		const void* const FindDataSSE2(const HMODULE hModule, const char* const szSectionName, const unsigned char* const pData, const size_t unDataSize) {
-			if (!hModule) {
-				return nullptr;
-			}
-
-			if (!szSectionName) {
-				return nullptr;
-			}
-
-			if (!pData) {
-				return nullptr;
-			}
-
-			if (!unDataSize) {
+			if (!hModule || !szSectionName || !pData || !unDataSize) {
 				return nullptr;
 			}
 
@@ -2365,15 +1830,7 @@ namespace Detours {
 		}
 
 		const void* const FindDataSSE2A(const char* const szModuleName, const unsigned char* const pData, const size_t unDataSize) {
-			if (!szModuleName) {
-				return nullptr;
-			}
-
-			if (!pData) {
-				return nullptr;
-			}
-
-			if (!unDataSize) {
+			if (!szModuleName || !pData || !unDataSize) {
 				return nullptr;
 			}
 
@@ -2386,15 +1843,7 @@ namespace Detours {
 		}
 
 		const void* const FindDataSSE2A(const char* const szModuleName, const std::array<const unsigned char, 8>& SectionName, const unsigned char* const pData, const size_t unDataSize) {
-			if (!szModuleName) {
-				return nullptr;
-			}
-
-			if (!pData) {
-				return nullptr;
-			}
-
-			if (!unDataSize) {
+			if (!szModuleName || !pData || !unDataSize) {
 				return nullptr;
 			}
 
@@ -2407,19 +1856,7 @@ namespace Detours {
 		}
 
 		const void* const FindDataSSE2A(const char* const szModuleName, const char* const szSectionName, const unsigned char* const pData, const size_t unDataSize) {
-			if (!szModuleName) {
-				return nullptr;
-			}
-
-			if (!szSectionName) {
-				return nullptr;
-			}
-
-			if (!pData) {
-				return nullptr;
-			}
-
-			if (!unDataSize) {
+			if (!szModuleName || !szSectionName || !pData || !unDataSize) {
 				return nullptr;
 			}
 
@@ -2432,15 +1869,7 @@ namespace Detours {
 		}
 
 		const void* const FindDataSSE2W(const wchar_t* const szModuleName, const unsigned char* const pData, const size_t unDataSize) {
-			if (!szModuleName) {
-				return nullptr;
-			}
-
-			if (!pData) {
-				return nullptr;
-			}
-
-			if (!unDataSize) {
+			if (!szModuleName || !pData || !unDataSize) {
 				return nullptr;
 			}
 
@@ -2453,15 +1882,7 @@ namespace Detours {
 		}
 
 		const void* const FindDataSSE2W(const wchar_t* const szModuleName, const std::array<const unsigned char, 8>& SectionName, const unsigned char* const pData, const size_t unDataSize) {
-			if (!szModuleName) {
-				return nullptr;
-			}
-
-			if (!pData) {
-				return nullptr;
-			}
-
-			if (!unDataSize) {
+			if (!szModuleName || !pData || !unDataSize) {
 				return nullptr;
 			}
 
@@ -2474,19 +1895,7 @@ namespace Detours {
 		}
 
 		const void* const FindDataSSE2W(const wchar_t* const szModuleName, const char* const szSectionName, const unsigned char* const pData, const size_t unDataSize) {
-			if (!szModuleName) {
-				return nullptr;
-			}
-
-			if (!szSectionName) {
-				return nullptr;
-			}
-
-			if (!pData) {
-				return nullptr;
-			}
-
-			if (!unDataSize) {
+			if (!szModuleName || !szSectionName || !pData || !unDataSize) {
 				return nullptr;
 			}
 
@@ -2529,23 +1938,7 @@ namespace Detours {
 		// ----------------------------------------------------------------
 
 		const void* const FindDataAVX(const void* const pAddress, const size_t unSize, const unsigned char* const pData, const size_t unDataSize) {
-			if (!pAddress) {
-				return nullptr;
-			}
-
-			if (!unSize) {
-				return nullptr;
-			}
-
-			if (!pData) {
-				return nullptr;
-			}
-
-			if (!unDataSize) {
-				return nullptr;
-			}
-
-			if (unSize < unDataSize) {
+			if (!pAddress || !unSize || !pData || !unDataSize || (unSize < unDataSize)) {
 				return nullptr;
 			}
 
@@ -2582,15 +1975,7 @@ namespace Detours {
 		}
 
 		const void* const FindDataAVX(const HMODULE hModule, const unsigned char* const pData, const size_t unDataSize) {
-			if (!hModule) {
-				return nullptr;
-			}
-
-			if (!pData) {
-				return nullptr;
-			}
-
-			if (!unDataSize) {
+			if (!hModule || !pData || !unDataSize) {
 				return nullptr;
 			}
 
@@ -2602,15 +1987,7 @@ namespace Detours {
 		}
 
 		const void* const FindDataAVX(const HMODULE hModule, const std::array<const unsigned char, 8>& SectionName, const unsigned char* const pData, const size_t unDataSize) {
-			if (!hModule) {
-				return nullptr;
-			}
-
-			if (!pData) {
-				return nullptr;
-			}
-
-			if (!unDataSize) {
+			if (!hModule || !pData || !unDataSize) {
 				return nullptr;
 			}
 
@@ -2624,19 +2001,7 @@ namespace Detours {
 		}
 
 		const void* const FindDataAVX(const HMODULE hModule, const char* const szSectionName, const unsigned char* const pData, const size_t unDataSize) {
-			if (!hModule) {
-				return nullptr;
-			}
-
-			if (!szSectionName) {
-				return nullptr;
-			}
-
-			if (!pData) {
-				return nullptr;
-			}
-
-			if (!unDataSize) {
+			if (!hModule || !szSectionName || !pData || !unDataSize) {
 				return nullptr;
 			}
 
@@ -2650,15 +2015,7 @@ namespace Detours {
 		}
 
 		const void* const FindDataAVXA(const char* const szModuleName, const unsigned char* const pData, const size_t unDataSize) {
-			if (!szModuleName) {
-				return nullptr;
-			}
-
-			if (!pData) {
-				return nullptr;
-			}
-
-			if (!unDataSize) {
+			if (!szModuleName || !pData || !unDataSize) {
 				return nullptr;
 			}
 
@@ -2671,15 +2028,7 @@ namespace Detours {
 		}
 
 		const void* const FindDataAVXA(const char* const szModuleName, const std::array<const unsigned char, 8>& SectionName, const unsigned char* const pData, const size_t unDataSize) {
-			if (!szModuleName) {
-				return nullptr;
-			}
-
-			if (!pData) {
-				return nullptr;
-			}
-
-			if (!unDataSize) {
+			if (!szModuleName || !pData || !unDataSize) {
 				return nullptr;
 			}
 
@@ -2692,19 +2041,7 @@ namespace Detours {
 		}
 
 		const void* const FindDataAVXA(const char* const szModuleName, const char* const szSectionName, const unsigned char* const pData, const size_t unDataSize) {
-			if (!szModuleName) {
-				return nullptr;
-			}
-
-			if (!szSectionName) {
-				return nullptr;
-			}
-
-			if (!pData) {
-				return nullptr;
-			}
-
-			if (!unDataSize) {
+			if (!szModuleName || !szSectionName || !pData || !unDataSize) {
 				return nullptr;
 			}
 
@@ -2717,15 +2054,7 @@ namespace Detours {
 		}
 
 		const void* const FindDataAVXW(const wchar_t* const szModuleName, const unsigned char* const pData, const size_t unDataSize) {
-			if (!szModuleName) {
-				return nullptr;
-			}
-
-			if (!pData) {
-				return nullptr;
-			}
-
-			if (!unDataSize) {
+			if (!szModuleName || !pData || !unDataSize) {
 				return nullptr;
 			}
 
@@ -2738,15 +2067,7 @@ namespace Detours {
 		}
 
 		const void* const FindDataAVXW(const wchar_t* const szModuleName, const std::array<const unsigned char, 8>& SectionName, const unsigned char* const pData, const size_t unDataSize) {
-			if (!szModuleName) {
-				return nullptr;
-			}
-
-			if (!pData) {
-				return nullptr;
-			}
-
-			if (!unDataSize) {
+			if (!szModuleName || !pData || !unDataSize) {
 				return nullptr;
 			}
 
@@ -2759,19 +2080,7 @@ namespace Detours {
 		}
 
 		const void* const FindDataAVXW(const wchar_t* const szModuleName, const char* const szSectionName, const unsigned char* const pData, const size_t unDataSize) {
-			if (!szModuleName) {
-				return nullptr;
-			}
-
-			if (!szSectionName) {
-				return nullptr;
-			}
-
-			if (!pData) {
-				return nullptr;
-			}
-
-			if (!unDataSize) {
+			if (!szModuleName || !szSectionName || !pData || !unDataSize) {
 				return nullptr;
 			}
 
@@ -2814,23 +2123,7 @@ namespace Detours {
 		// ----------------------------------------------------------------
 
 		const void* const FindDataAVX2(const void* const pAddress, const size_t unSize, const unsigned char* const pData, const size_t unDataSize) {
-			if (!pAddress) {
-				return nullptr;
-			}
-
-			if (!unSize) {
-				return nullptr;
-			}
-
-			if (!pData) {
-				return nullptr;
-			}
-
-			if (!unDataSize) {
-				return nullptr;
-			}
-
-			if (unSize < unDataSize) {
+			if (!pAddress || !unSize || !pData || !unDataSize || (unSize < unDataSize)) {
 				return nullptr;
 			}
 
@@ -2864,15 +2157,7 @@ namespace Detours {
 		}
 
 		const void* const FindDataAVX2(const HMODULE hModule, const unsigned char* const pData, const size_t unDataSize) {
-			if (!hModule) {
-				return nullptr;
-			}
-
-			if (!pData) {
-				return nullptr;
-			}
-
-			if (!unDataSize) {
+			if (!hModule || !pData || !unDataSize) {
 				return nullptr;
 			}
 
@@ -2884,15 +2169,7 @@ namespace Detours {
 		}
 
 		const void* const FindDataAVX2(const HMODULE hModule, const std::array<const unsigned char, 8>& SectionName, const unsigned char* const pData, const size_t unDataSize) {
-			if (!hModule) {
-				return nullptr;
-			}
-
-			if (!pData) {
-				return nullptr;
-			}
-
-			if (!unDataSize) {
+			if (!hModule || !pData || !unDataSize) {
 				return nullptr;
 			}
 
@@ -2906,19 +2183,7 @@ namespace Detours {
 		}
 
 		const void* const FindDataAVX2(const HMODULE hModule, const char* const szSectionName, const unsigned char* const pData, const size_t unDataSize) {
-			if (!hModule) {
-				return nullptr;
-			}
-
-			if (!szSectionName) {
-				return nullptr;
-			}
-
-			if (!pData) {
-				return nullptr;
-			}
-
-			if (!unDataSize) {
+			if (!hModule || !szSectionName || !pData || !unDataSize) {
 				return nullptr;
 			}
 
@@ -2932,15 +2197,7 @@ namespace Detours {
 		}
 
 		const void* const FindDataAVX2A(const char* const szModuleName, const unsigned char* const pData, const size_t unDataSize) {
-			if (!szModuleName) {
-				return nullptr;
-			}
-
-			if (!pData) {
-				return nullptr;
-			}
-
-			if (!unDataSize) {
+			if (!szModuleName || !pData || !unDataSize) {
 				return nullptr;
 			}
 
@@ -2953,15 +2210,7 @@ namespace Detours {
 		}
 
 		const void* const FindDataAVX2A(const char* const szModuleName, const std::array<const unsigned char, 8>& SectionName, const unsigned char* const pData, const size_t unDataSize) {
-			if (!szModuleName) {
-				return nullptr;
-			}
-
-			if (!pData) {
-				return nullptr;
-			}
-
-			if (!unDataSize) {
+			if (!szModuleName || !pData || !unDataSize) {
 				return nullptr;
 			}
 
@@ -2974,19 +2223,7 @@ namespace Detours {
 		}
 
 		const void* const FindDataAVX2A(const char* const szModuleName, const char* const szSectionName, const unsigned char* const pData, const size_t unDataSize) {
-			if (!szModuleName) {
-				return nullptr;
-			}
-
-			if (!szSectionName) {
-				return nullptr;
-			}
-
-			if (!pData) {
-				return nullptr;
-			}
-
-			if (!unDataSize) {
+			if (!szModuleName || !szSectionName || !pData || !unDataSize) {
 				return nullptr;
 			}
 
@@ -2999,15 +2236,7 @@ namespace Detours {
 		}
 
 		const void* const FindDataAVX2W(const wchar_t* const szModuleName, const unsigned char* const pData, const size_t unDataSize) {
-			if (!szModuleName) {
-				return nullptr;
-			}
-
-			if (!pData) {
-				return nullptr;
-			}
-
-			if (!unDataSize) {
+			if (!szModuleName || !pData || !unDataSize) {
 				return nullptr;
 			}
 
@@ -3020,15 +2249,7 @@ namespace Detours {
 		}
 
 		const void* const FindDataAVX2W(const wchar_t* const szModuleName, const std::array<const unsigned char, 8>& SectionName, const unsigned char* const pData, const size_t unDataSize) {
-			if (!szModuleName) {
-				return nullptr;
-			}
-
-			if (!pData) {
-				return nullptr;
-			}
-
-			if (!unDataSize) {
+			if (!szModuleName || !pData || !unDataSize) {
 				return nullptr;
 			}
 
@@ -3041,19 +2262,7 @@ namespace Detours {
 		}
 
 		const void* const FindDataAVX2W(const wchar_t* const szModuleName, const char* const szSectionName, const unsigned char* const pData, const size_t unDataSize) {
-			if (!szModuleName) {
-				return nullptr;
-			}
-
-			if (!szSectionName) {
-				return nullptr;
-			}
-
-			if (!pData) {
-				return nullptr;
-			}
-
-			if (!unDataSize) {
+			if (!szModuleName || !szSectionName || !pData || !unDataSize) {
 				return nullptr;
 			}
 
@@ -3096,23 +2305,7 @@ namespace Detours {
 		// ----------------------------------------------------------------
 
 		const void* const FindDataAVX512(const void* const pAddress, const size_t unSize, const unsigned char* const pData, const size_t unDataSize) {
-			if (!pAddress) {
-				return nullptr;
-			}
-
-			if (!unSize) {
-				return nullptr;
-			}
-
-			if (!pData) {
-				return nullptr;
-			}
-
-			if (!unDataSize) {
-				return nullptr;
-			}
-
-			if (unSize < unDataSize) {
+			if (!pAddress || !unSize || !pData || !unDataSize || (unSize < unDataSize)) {
 				return nullptr;
 			}
 
@@ -3144,15 +2337,7 @@ namespace Detours {
 		}
 
 		const void* const FindDataAVX512(const HMODULE hModule, const unsigned char* const pData, const size_t unDataSize) {
-			if (!hModule) {
-				return nullptr;
-			}
-
-			if (!pData) {
-				return nullptr;
-			}
-
-			if (!unDataSize) {
+			if (!hModule || !pData || !unDataSize) {
 				return nullptr;
 			}
 
@@ -3164,15 +2349,7 @@ namespace Detours {
 		}
 
 		const void* const FindDataAVX512(const HMODULE hModule, const std::array<const unsigned char, 8>& SectionName, const unsigned char* const pData, const size_t unDataSize) {
-			if (!hModule) {
-				return nullptr;
-			}
-
-			if (!pData) {
-				return nullptr;
-			}
-
-			if (!unDataSize) {
+			if (!hModule || !pData || !unDataSize) {
 				return nullptr;
 			}
 
@@ -3186,19 +2363,7 @@ namespace Detours {
 		}
 
 		const void* const FindDataAVX512(const HMODULE hModule, const char* const szSectionName, const unsigned char* const pData, const size_t unDataSize) {
-			if (!hModule) {
-				return nullptr;
-			}
-
-			if (!szSectionName) {
-				return nullptr;
-			}
-
-			if (!pData) {
-				return nullptr;
-			}
-
-			if (!unDataSize) {
+			if (!hModule || !szSectionName || !pData || !unDataSize) {
 				return nullptr;
 			}
 
@@ -3212,15 +2377,7 @@ namespace Detours {
 		}
 
 		const void* const FindDataAVX512A(const char* const szModuleName, const unsigned char* const pData, const size_t unDataSize) {
-			if (!szModuleName) {
-				return nullptr;
-			}
-
-			if (!pData) {
-				return nullptr;
-			}
-
-			if (!unDataSize) {
+			if (!szModuleName || !pData || !unDataSize) {
 				return nullptr;
 			}
 
@@ -3233,15 +2390,7 @@ namespace Detours {
 		}
 
 		const void* const FindDataAVX512A(const char* const szModuleName, const std::array<const unsigned char, 8>& SectionName, const unsigned char* const pData, const size_t unDataSize) {
-			if (!szModuleName) {
-				return nullptr;
-			}
-
-			if (!pData) {
-				return nullptr;
-			}
-
-			if (!unDataSize) {
+			if (!szModuleName || !pData || !unDataSize) {
 				return nullptr;
 			}
 
@@ -3254,19 +2403,7 @@ namespace Detours {
 		}
 
 		const void* const FindDataAVX512A(const char* const szModuleName, const char* const szSectionName, const unsigned char* const pData, const size_t unDataSize) {
-			if (!szModuleName) {
-				return nullptr;
-			}
-
-			if (!szSectionName) {
-				return nullptr;
-			}
-
-			if (!pData) {
-				return nullptr;
-			}
-
-			if (!unDataSize) {
+			if (!szModuleName || !szSectionName || !pData || !unDataSize) {
 				return nullptr;
 			}
 
@@ -3279,15 +2416,7 @@ namespace Detours {
 		}
 
 		const void* const FindDataAVX512W(const wchar_t* const szModuleName, const unsigned char* const pData, const size_t unDataSize) {
-			if (!szModuleName) {
-				return nullptr;
-			}
-
-			if (!pData) {
-				return nullptr;
-			}
-
-			if (!unDataSize) {
+			if (!szModuleName || !pData || !unDataSize) {
 				return nullptr;
 			}
 
@@ -3300,15 +2429,7 @@ namespace Detours {
 		}
 
 		const void* const FindDataAVX512W(const wchar_t* const szModuleName, const std::array<const unsigned char, 8>& SectionName, const unsigned char* const pData, const size_t unDataSize) {
-			if (!szModuleName) {
-				return nullptr;
-			}
-
-			if (!pData) {
-				return nullptr;
-			}
-
-			if (!unDataSize) {
+			if (!szModuleName || !pData || !unDataSize) {
 				return nullptr;
 			}
 
@@ -3321,19 +2442,7 @@ namespace Detours {
 		}
 
 		const void* const FindDataAVX512W(const wchar_t* const szModuleName, const char* const szSectionName, const unsigned char* const pData, const size_t unDataSize) {
-			if (!szModuleName) {
-				return nullptr;
-			}
-
-			if (!szSectionName) {
-				return nullptr;
-			}
-
-			if (!pData) {
-				return nullptr;
-			}
-
-			if (!unDataSize) {
+			if (!szModuleName || !szSectionName || !pData || !unDataSize) {
 				return nullptr;
 			}
 
@@ -3408,15 +2517,7 @@ namespace Detours {
 		}
 
 		const void* const FindData(const HMODULE hModule, const unsigned char* const pData, const size_t unDataSize) {
-			if (!hModule) {
-				return nullptr;
-			}
-
-			if (!pData) {
-				return nullptr;
-			}
-
-			if (!unDataSize) {
+			if (!hModule || !pData || !unDataSize) {
 				return nullptr;
 			}
 
@@ -3428,15 +2529,7 @@ namespace Detours {
 		}
 
 		const void* const FindData(const HMODULE hModule, const std::array<const unsigned char, 8>& SectionName, const unsigned char* const pData, const size_t unDataSize) {
-			if (!hModule) {
-				return nullptr;
-			}
-
-			if (!pData) {
-				return nullptr;
-			}
-
-			if (!unDataSize) {
+			if (!hModule || !pData || !unDataSize) {
 				return nullptr;
 			}
 
@@ -3450,15 +2543,7 @@ namespace Detours {
 		}
 
 		const void* const FindData(const HMODULE hModule, const char* const szSectionName, const unsigned char* const pData, const size_t unDataSize) {
-			if (!hModule) {
-				return nullptr;
-			}
-
-			if (!pData) {
-				return nullptr;
-			}
-
-			if (!unDataSize) {
+			if (!hModule || !pData || !unDataSize) {
 				return nullptr;
 			}
 
@@ -3472,15 +2557,7 @@ namespace Detours {
 		}
 
 		const void* const FindDataA(const char* const szModuleName, const unsigned char* const pData, const size_t unDataSize) {
-			if (!szModuleName) {
-				return nullptr;
-			}
-
-			if (!pData) {
-				return nullptr;
-			}
-
-			if (!unDataSize) {
+			if (!szModuleName || !pData || !unDataSize) {
 				return nullptr;
 			}
 
@@ -3493,15 +2570,7 @@ namespace Detours {
 		}
 
 		const void* const FindDataA(const char* const szModuleName, const std::array<const unsigned char, 8>& SectionName, const unsigned char* const pData, const size_t unDataSize) {
-			if (!szModuleName) {
-				return nullptr;
-			}
-
-			if (!pData) {
-				return nullptr;
-			}
-
-			if (!unDataSize) {
+			if (!szModuleName || !pData || !unDataSize) {
 				return nullptr;
 			}
 
@@ -3514,19 +2583,7 @@ namespace Detours {
 		}
 
 		const void* const FindDataA(const char* const szModuleName, const char* const szSectionName, const unsigned char* const pData, const size_t unDataSize) {
-			if (!szModuleName) {
-				return nullptr;
-			}
-
-			if (!szSectionName) {
-				return nullptr;
-			}
-
-			if (!pData) {
-				return nullptr;
-			}
-
-			if (!unDataSize) {
+			if (!szModuleName || !szSectionName || !pData || !unDataSize) {
 				return nullptr;
 			}
 
@@ -3539,15 +2596,7 @@ namespace Detours {
 		}
 
 		const void* const FindDataW(const wchar_t* const szModuleName, const unsigned char* const pData, const size_t unDataSize) {
-			if (!szModuleName) {
-				return nullptr;
-			}
-
-			if (!pData) {
-				return nullptr;
-			}
-
-			if (!unDataSize) {
+			if (!szModuleName || !pData || !unDataSize) {
 				return nullptr;
 			}
 
@@ -3560,15 +2609,7 @@ namespace Detours {
 		}
 
 		const void* const FindDataW(const wchar_t* const szModuleName, const std::array<const unsigned char, 8>& SectionName, const unsigned char* const pData, const size_t unDataSize) {
-			if (!szModuleName) {
-				return nullptr;
-			}
-
-			if (!pData) {
-				return nullptr;
-			}
-
-			if (!unDataSize) {
+			if (!szModuleName || !pData || !unDataSize) {
 				return nullptr;
 			}
 
@@ -3581,19 +2622,7 @@ namespace Detours {
 		}
 
 		const void* const FindDataW(const wchar_t* const szModuleName, const char* const szSectionName, const unsigned char* const pData, const size_t unDataSize) {
-			if (!szModuleName) {
-				return nullptr;
-			}
-
-			if (!szSectionName) {
-				return nullptr;
-			}
-
-			if (!pData) {
-				return nullptr;
-			}
-
-			if (!unDataSize) {
+			if (!szModuleName || !szSectionName || !pData || !unDataSize) {
 				return nullptr;
 			}
 
@@ -3697,24 +2726,12 @@ namespace Detours {
 		// ----------------------------------------------------------------
 
 		static const void* const FindRTTI(const void* const pBaseAddress, const void* const pAddress, const size_t unSize, const char* const szRTTI) {
-			if (!pBaseAddress) {
-				return nullptr;
-			}
-
-			if (!unSize) {
-				return nullptr;
-			}
-
-			if (!szRTTI) {
+			if (!pBaseAddress || !unSize || !szRTTI) {
 				return nullptr;
 			}
 
 			const size_t unRTTILength = strnlen_s(szRTTI, 0x1000);
-			if (!unRTTILength) {
-				return nullptr;
-			}
-
-			if (unSize <= unRTTILength) {
+			if (!unRTTILength || (unSize <= unRTTILength)) {
 				return nullptr;
 			}
 
@@ -3815,11 +2832,7 @@ namespace Detours {
 		}
 
 		const void* const FindRTTI(const HMODULE hModule, const char* const szRTTI) {
-			if (!hModule) {
-				return nullptr;
-			}
-
-			if (!szRTTI) {
+			if (!hModule || !szRTTI) {
 				return nullptr;
 			}
 
@@ -3844,11 +2857,7 @@ namespace Detours {
 		}
 
 		const void* const FindRTTIA(const char* const szModuleName, const char* const szRTTI) {
-			if (!szModuleName) {
-				return nullptr;
-			}
-
-			if (!szRTTI) {
+			if (!szModuleName || szRTTI) {
 				return nullptr;
 			}
 
@@ -3861,11 +2870,7 @@ namespace Detours {
 		}
 
 		const void* const FindRTTIW(const wchar_t* const szModuleName, const char* const szRTTI) {
-			if (!szModuleName) {
-				return nullptr;
-			}
-
-			if (!szRTTI) {
+			if (!szModuleName || szRTTI) {
 				return nullptr;
 			}
 
@@ -4002,11 +3007,7 @@ namespace Detours {
 			m_VirtualProtect = nullptr;
 			m_unOriginalProtection = 0;
 
-			if (!pAddress) {
-				return;
-			}
-
-			if (!unSize) {
+			if (!pAddress || !unSize) {
 				return;
 			}
 
@@ -4031,15 +3032,7 @@ namespace Detours {
 		}
 
 		Protection::~Protection() {
-			if (!m_pAddress) {
-				return;
-			}
-
-			if (!m_unSize) {
-				return;
-			}
-
-			if (!m_VirtualProtect) {
+			if (!m_pAddress || !m_unSize || !m_VirtualProtect) {
 				return;
 			}
 
@@ -4048,15 +3041,7 @@ namespace Detours {
 		}
 
 		bool Protection::GetProtection(const PDWORD pProtection) {
-			if (!m_pAddress) {
-				return false;
-			}
-
-			if (!m_unSize) {
-				return false;
-			}
-
-			if (!m_VirtualProtect) {
+			if (!m_pAddress || !m_unSize || !m_VirtualProtect) {
 				return false;
 			}
 
@@ -4075,15 +3060,7 @@ namespace Detours {
 		}
 
 		bool Protection::ChangeProtection(const DWORD unNewProtection) {
-			if (!m_pAddress) {
-				return false;
-			}
-
-			if (!m_unSize) {
-				return false;
-			}
-
-			if (!m_VirtualProtect) {
+			if (!m_pAddress || !m_unSize || !m_VirtualProtect) {
 				return false;
 			}
 
@@ -4096,15 +3073,7 @@ namespace Detours {
 		}
 
 		bool Protection::RestoreProtection() {
-			if (!m_pAddress) {
-				return false;
-			}
-
-			if (!m_unSize) {
-				return false;
-			}
-
-			if (!m_VirtualProtect) {
+			if (!m_pAddress || !m_unSize || !m_VirtualProtect) {
 				return false;
 			}
 
@@ -4133,11 +3102,7 @@ namespace Detours {
 		// ----------------------------------------------------------------
 
 		bool ChangeProtection(const void* const pAddress, const size_t unSize, const DWORD unNewProtection) {
-			if (!pAddress) {
-				return false;
-			}
-
-			if (!unSize) {
+			if (!pAddress || !unSize) {
 				return false;
 			}
 
@@ -4363,15 +3328,7 @@ namespace Detours {
 		}
 
 		bool MemoryHook::Hook(const fnMemoryHookCallBack pCallBack) {
-			if (!m_pAddress) {
-				return false;
-			}
-
-			if (!m_unSize) {
-				return false;
-			}
-
-			if (m_pCallBack) {
+			if (!m_pAddress || !m_unSize || m_pCallBack) {
 				return false;
 			}
 
@@ -4418,15 +3375,7 @@ namespace Detours {
 		}
 
 		bool MemoryHook::UnHook() {
-			if (!m_pAddress) {
-				return false;
-			}
-
-			if (!m_unSize) {
-				return false;
-			}
-
-			if (!m_pCallBack) {
+			if (!m_pAddress || !m_unSize || !m_pCallBack) {
 				return false;
 			}
 
@@ -4450,15 +3399,7 @@ namespace Detours {
 		}
 
 		bool MemoryHook::Enable() {
-			if (!m_pAddress) {
-				return false;
-			}
-
-			if (!m_unSize) {
-				return false;
-			}
-
-			if (!m_pCallBack) {
+			if (!m_pAddress || !m_unSize || !m_pCallBack) {
 				return false;
 			}
 
@@ -4497,15 +3438,7 @@ namespace Detours {
 		}
 
 		bool MemoryHook::Disable() {
-			if (!m_pAddress) {
-				return false;
-			}
-
-			if (!m_unSize) {
-				return false;
-			}
-
-			if (!m_pCallBack) {
+			if (!m_pAddress || !m_unSize || !m_pCallBack) {
 				return false;
 			}
 
@@ -4543,11 +3476,7 @@ namespace Detours {
 		// ----------------------------------------------------------------
 
 		bool HookMemory(const void* const pAddress, const fnMemoryHookCallBack pCallBack, bool bAutoDisable) {
-			if (!pAddress) {
-				return false;
-			}
-
-			if (!pCallBack) {
+			if (!pAddress || !pCallBack) {
 				return false;
 			}
 
