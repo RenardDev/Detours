@@ -243,13 +243,13 @@ int _tmain(int nArguments, PTCHAR* pArguments) {
 
 	TCHAR szHex[32];
 	memset(szHex, 0, sizeof(szHex));
-	if (Detours::Hexadecimal::Encode(reinterpret_cast<const void* const>("Hello, World!"), 14, szHex)) {
+	if (Detours::Hexadecimal::Encode(reinterpret_cast<const void* const>("Hello, World!"), 14, szHex, 0x00)) {
 		_tprintf_s(_T("Encode: `%s`\n"), szHex);
 	}
 
 	char szData[16];
 	memset(szData, 0, sizeof(szData));
-	if (Detours::Hexadecimal::Decode(szHex, reinterpret_cast<void*>(szData))) {
+	if (Detours::Hexadecimal::Decode(szHex, reinterpret_cast<void*>(szData), 0x00)) {
 #ifdef UNICODE
 		_tprintf_s(_T("Decode: `%hs`\n"), szData);
 #else

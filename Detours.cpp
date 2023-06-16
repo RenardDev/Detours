@@ -147,6 +147,7 @@ namespace Detours {
 			const unsigned char* pByteData = reinterpret_cast<const unsigned char* const>(pData);
 			for (size_t i = 0; i < unSize; i++) {
 				const unsigned char unByte = pByteData[i] ? pByteData[i] : unIgnoredByte;
+
 				*szHex++ = g_pEncodeTable[unByte >> 4];
 				*szHex++ = g_pEncodeTable[unByte & 15];
 			}
@@ -162,6 +163,7 @@ namespace Detours {
 			const unsigned char* pByteData = reinterpret_cast<const unsigned char* const>(pData);
 			for (size_t i = 0; i < unSize; i++) {
 				const unsigned char unByte = pByteData[i] ? pByteData[i] : unIgnoredByte;
+
 				*szHex++ = static_cast<wchar_t>(g_pEncodeTable[unByte >> 4]);
 				*szHex++ = static_cast<wchar_t>(g_pEncodeTable[unByte & 15]);
 			}
@@ -267,10 +269,12 @@ namespace Detours {
 				const unsigned char unHigh = szHex[i];
 				const unsigned char unLow = szHex[i + 1];
 				const unsigned char unByte = g_pDecodeTableHigh[unHigh] | g_pDecodeTableLow[unLow];
+
 				if (unByte == unIgnoredByte) {
 					i += 2;
 					continue;
 				}
+
 				reinterpret_cast<unsigned char*>(pData)[i / 2] = unByte;
 			}
 
@@ -291,10 +295,12 @@ namespace Detours {
 				const unsigned char unHigh = static_cast<unsigned char>(szHex[i] & 0xFF);
 				const unsigned char unLow = static_cast<unsigned char>(szHex[i + 1] & 0xFF);
 				const unsigned char unByte = g_pDecodeTableHigh[unHigh] | g_pDecodeTableLow[unLow];
+
 				if (unByte == unIgnoredByte) {
 					i += 2;
 					continue;
 				}
+
 				reinterpret_cast<unsigned char*>(pData)[i / 2] = unByte;
 			}
 
@@ -3029,7 +3035,7 @@ namespace Detours {
 		// ----------------------------------------------------------------
 
 		Protection::Protection(const void* const pAddress, const size_t unSize) : m_pAddress(pAddress), m_unSize(unSize) {
-			m_VirtualProtect = nullptr;
+			m_pVirtualProtect = nullptr;
 			m_unOriginalProtection = 0;
 
 			if (!pAddress || !unSize) {
@@ -3041,8 +3047,8 @@ namespace Detours {
 				return;
 			}
 
-			m_VirtualProtect = reinterpret_cast<fnVirtualProtect>(GetProcAddress(hKernelBase, "VirtualProtect"));
-			if (!m_VirtualProtect) {
+			m_pVirtualProtect = reinterpret_cast<fnVirtualProtect>(GetProcAddress(hKernelBase, "VirtualProtect"));
+			if (!m_pVirtualProtect) {
 				return;
 			}
 
@@ -3057,16 +3063,16 @@ namespace Detours {
 		}
 
 		Protection::~Protection() {
-			if (!m_pAddress || !m_unSize || !m_VirtualProtect) {
+			if (!m_pAddress || !m_unSize || !m_pVirtualProtect) {
 				return;
 			}
 
 			DWORD unProtection = 0;
-			m_VirtualProtect(const_cast<void*>(m_pAddress), m_unSize, m_unOriginalProtection, &unProtection);
+			m_pVirtualProtect(const_cast<void*>(m_pAddress), m_unSize, m_unOriginalProtection, &unProtection);
 		}
 
 		bool Protection::GetProtection(const PDWORD pProtection) {
-			if (!m_pAddress || !m_unSize || !m_VirtualProtect) {
+			if (!m_pAddress || !m_unSize || !m_pVirtualProtect) {
 				return false;
 			}
 
@@ -3085,12 +3091,12 @@ namespace Detours {
 		}
 
 		bool Protection::ChangeProtection(const DWORD unNewProtection) {
-			if (!m_pAddress || !m_unSize || !m_VirtualProtect) {
+			if (!m_pAddress || !m_unSize || !m_pVirtualProtect) {
 				return false;
 			}
 
 			DWORD unProtection = 0;
-			if (!m_VirtualProtect(const_cast<void*>(m_pAddress), m_unSize, unNewProtection, &unProtection)) {
+			if (!m_pVirtualProtect(const_cast<void*>(m_pAddress), m_unSize, unNewProtection, &unProtection)) {
 				return false;
 			}
 
@@ -3098,12 +3104,12 @@ namespace Detours {
 		}
 
 		bool Protection::RestoreProtection() {
-			if (!m_pAddress || !m_unSize || !m_VirtualProtect) {
+			if (!m_pAddress || !m_unSize || !m_pVirtualProtect) {
 				return false;
 			}
 
 			DWORD unProtection = 0;
-			if (!m_VirtualProtect(const_cast<void*>(m_pAddress), m_unSize, m_unOriginalProtection, &unProtection)) {
+			if (!m_pVirtualProtect(const_cast<void*>(m_pAddress), m_unSize, m_unOriginalProtection, &unProtection)) {
 				return false;
 			}
 
@@ -3253,8 +3259,8 @@ namespace Detours {
 			m_pVEH = AddVectoredExceptionHandler(TRUE, ExceptionHandler);
 			if (m_pVEH) {
 
-				// CallBacks
-				AddCallBack(MemoryHookCallBack);
+				// Built-in CallBacks
+				AddCallBack(MemoryHookCallBack); // Memory Hooks
 			}
 		}
 
@@ -3262,8 +3268,8 @@ namespace Detours {
 			if (m_pVEH) {
 				RemoveVectoredExceptionHandler(m_pVEH);
 
-				// CallBacks
-				RemoveCallBack(MemoryHookCallBack);
+				// Built-in CallBacks
+				RemoveCallBack(MemoryHookCallBack); // Memory Hooks
 			}
 		}
 

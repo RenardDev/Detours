@@ -1088,7 +1088,7 @@ namespace Detours {
 		private:
 			const void* const m_pAddress;
 			const size_t m_unSize;
-			fnVirtualProtect m_VirtualProtect;
+			fnVirtualProtect m_pVirtualProtect;
 			DWORD m_unOriginalProtection;
 		};
 
