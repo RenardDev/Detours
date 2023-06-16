@@ -2681,7 +2681,7 @@ namespace Detours {
 #ifdef _M_X64
 			unsigned int m_unTypeDescriptor;
 #elif _M_IX86
-			PTYPE_DESCRIPTOR m_pTypeDescriptor;
+			PRTTI_TYPE_DESCRIPTOR m_pTypeDescriptor;
 #endif
 			unsigned int m_unNumberOfContainedBases;
 			RTTI_PMD m_Where;
@@ -2715,7 +2715,7 @@ namespace Detours {
 			unsigned int m_unTypeDescriptor;
 			unsigned int m_unClassHierarchyDescriptor;
 #elif _M_IX86
-			PTYPE_DESCRIPTOR m_pTypeDescriptor;
+			PRTTI_TYPE_DESCRIPTOR m_pTypeDescriptor;
 			PRTTI_CLASS_HIERARCHY_DESCRIPTOR m_pClassHierarchyDescriptor;
 #endif
 		} RTTI_COMPLETE_OBJECT_LOCATOR, *PRTTI_COMPLETE_OBJECT_LOCATOR;
@@ -2736,7 +2736,7 @@ namespace Detours {
 			}
 
 			void* pReference = const_cast<void*>(pAddress);
-			void* pEndAddress = reinterpret_cast<char*>(const_cast<void*>(pAddress)) + unSize;
+			void* pEndAddress = reinterpret_cast<char*>(const_cast<void*>(pAddress)) + unSize - unRTTILength;
 			while (pReference && (pReference < pEndAddress)) {
 				pReference = const_cast<void*>(FindData(pReference, reinterpret_cast<size_t>(pEndAddress) - reinterpret_cast<size_t>(pReference), reinterpret_cast<const unsigned char* const>(szRTTI), unRTTILength));
 				if (!pReference) {
@@ -2748,6 +2748,7 @@ namespace Detours {
 					pReference = reinterpret_cast<void*>(reinterpret_cast<char*>(pReference) + 1);
 					continue;
 				}
+
 				if (pTypeDescriptor->m_pSpare) {
 					pReference = reinterpret_cast<void*>(reinterpret_cast<char*>(pReference) + 1);
 					continue;
@@ -2860,7 +2861,7 @@ namespace Detours {
 		}
 
 		const void* const FindRTTIA(const char* const szModuleName, const char* const szRTTI) {
-			if (!szModuleName || szRTTI) {
+			if (!szModuleName || !szRTTI) {
 				return nullptr;
 			}
 
@@ -2873,7 +2874,7 @@ namespace Detours {
 		}
 
 		const void* const FindRTTIW(const wchar_t* const szModuleName, const char* const szRTTI) {
-			if (!szModuleName || szRTTI) {
+			if (!szModuleName || !szRTTI) {
 				return nullptr;
 			}
 
