@@ -1762,7 +1762,7 @@ namespace Detours {
 
 			const unsigned char* const pSourceData = reinterpret_cast<const unsigned char* const>(pAddress);
 
-			const size_t unDataBytesCycles = static_cast<size_t>(floor(static_cast<double>(unSize) / 16.0));
+			const size_t unDataBytesCycles = unSize / 16;
 			for (size_t unCycle = 0; unCycle < unDataBytesCycles; ++unCycle) {
 				unsigned __int16 unFound = 0xFFFFui16;
 				for (size_t unDataIndex = 0; (unDataIndex < unDataSize) && (unFound != 0); ++unDataIndex) {
@@ -1778,7 +1778,7 @@ namespace Detours {
 				}
 			}
 
-			const size_t unDataBytesLeft = unSize - unDataBytesCycles * 16;
+			const size_t unDataBytesLeft = unSize % 16;
 			if (unDataBytesLeft) {
 				if (unDataBytesLeft < unDataSize) {
 					return FindDataNative(pSourceData + unSize - unDataBytesLeft - unDataSize, unDataBytesLeft + unDataSize, pData, unDataSize);
@@ -1944,7 +1944,7 @@ namespace Detours {
 
 			const unsigned char* const pSourceData = reinterpret_cast<const unsigned char* const>(pAddress);
 
-			const size_t unDataBytesCycles = static_cast<size_t>(floor(static_cast<double>(unSize) / 32.0));
+			const size_t unDataBytesCycles = unSize / 32;
 			for (size_t unCycle = 0; unCycle < unDataBytesCycles; ++unCycle) {
 				unsigned __int32 unFound = 0xFFFFFFFFui32;
 				for (size_t unDataIndex = 0; (unDataIndex < unDataSize) && (unFound != 0); ++unDataIndex) {
@@ -1963,7 +1963,7 @@ namespace Detours {
 				}
 			}
 
-			const size_t unDataBytesLeft = unSize - unDataBytesCycles * 32;
+			const size_t unDataBytesLeft = unSize % 32;
 			if (unDataBytesLeft) {
 				if (unDataBytesLeft < unDataSize) {
 					return FindDataSSE2(pSourceData + unSize - unDataBytesLeft - unDataSize, unDataBytesLeft + unDataSize, pData, unDataSize);
@@ -2129,7 +2129,7 @@ namespace Detours {
 
 			const unsigned char* const pSourceData = reinterpret_cast<const unsigned char* const>(pAddress);
 
-			const size_t unDataBytesCycles = static_cast<size_t>(floor(static_cast<double>(unSize) / 32.0));
+			const size_t unDataBytesCycles = unSize / 32;
 			for (size_t unCycle = 0; unCycle < unDataBytesCycles; ++unCycle) {
 				unsigned __int32 unFound = 0xFFFFFFFFui32;
 				for (size_t unDataIndex = 0; (unDataIndex < unDataSize) && (unFound != 0); ++unDataIndex) {
@@ -2145,7 +2145,7 @@ namespace Detours {
 				}
 			}
 
-			const size_t unDataBytesLeft = unSize - unDataBytesCycles * 32;
+			const size_t unDataBytesLeft = unSize % 32;
 			if (unDataBytesLeft) {
 				if (unDataBytesLeft < unDataSize) {
 					return FindDataAVX(pSourceData + unSize - unDataBytesLeft - unDataSize, unDataBytesLeft + unDataSize, pData, unDataSize);
@@ -2311,7 +2311,7 @@ namespace Detours {
 
 			const unsigned char* const pSourceData = reinterpret_cast<const unsigned char* const>(pAddress);
 
-			const size_t unDataBytesCycles = static_cast<size_t>(floor(static_cast<double>(unSize) / 64.0));
+			const size_t unDataBytesCycles = unSize / 64;
 			for (size_t unCycle = 0; unCycle < unDataBytesCycles; ++unCycle) {
 				unsigned __int64 unFound = 0xFFFFFFFFFFFFFFFFui64;
 				for (size_t unDataIndex = 0; (unDataIndex < unDataSize) && (unFound != 0); ++unDataIndex) {
@@ -2325,7 +2325,7 @@ namespace Detours {
 				}
 			}
 
-			const size_t unDataBytesLeft = unSize - unDataBytesCycles * 64;
+			const size_t unDataBytesLeft = unSize % 64;
 			if (unDataBytesLeft) {
 				if (unDataBytesLeft < unDataSize) {
 					return FindDataAVX2(pSourceData + unSize - unDataBytesLeft - unDataSize, unDataBytesLeft + unDataSize, pData, unDataSize);
@@ -2665,17 +2665,17 @@ namespace Detours {
 		// ----------------------------------------------------------------
 
 #pragma pack(push, 1)
-		typedef struct _PMD {
+		typedef struct _RTTI_PMD {
 			int m_nMDisp;
 			int m_nPDisp;
 			int m_nVDisp;
-		} PMD, *PPMD;
+		} RTTI_PMD, *PRTTI_PMD;
 
-		typedef struct _TYPE_DESCRIPTOR {
+		typedef struct _RTTI_TYPE_DESCRIPTOR {
 			void* m_pVFTable;
 			void* m_pSpare;
 			char m_szName[1];
-		} TYPE_DESCRIPTOR, *PTYPE_DESCRIPTOR;
+		} RTTI_TYPE_DESCRIPTOR, *PRTTI_TYPE_DESCRIPTOR;
 
 		typedef struct _RTTI_BASE_CLASS_DESCRIPTOR {
 #ifdef _M_X64
@@ -2684,7 +2684,7 @@ namespace Detours {
 			PTYPE_DESCRIPTOR m_pTypeDescriptor;
 #endif
 			unsigned int m_unNumberOfContainedBases;
-			PMD m_Where;
+			RTTI_PMD m_Where;
 			unsigned int m_unAttributes;
 		} RTTI_BASE_CLASS_DESCRIPTOR, *PRTTI_BASE_CLASS_DESCRIPTOR;
 
@@ -2743,7 +2743,7 @@ namespace Detours {
 					break;
 				}
 
-				const PTYPE_DESCRIPTOR pTypeDescriptor = reinterpret_cast<PTYPE_DESCRIPTOR>(reinterpret_cast<char*>(pReference) - sizeof(void*) * 2);
+				const PRTTI_TYPE_DESCRIPTOR pTypeDescriptor = reinterpret_cast<PRTTI_TYPE_DESCRIPTOR>(reinterpret_cast<char*>(pReference) - sizeof(void*) * 2);
 				if ((pTypeDescriptor->m_pVFTable < pBaseAddress) || (pTypeDescriptor->m_pVFTable >= pEndAddress)) {
 					pReference = reinterpret_cast<void*>(reinterpret_cast<char*>(pReference) + 1);
 					continue;
@@ -2840,6 +2840,8 @@ namespace Detours {
 			const PIMAGE_NT_HEADERS pNTHs = reinterpret_cast<PIMAGE_NT_HEADERS>(reinterpret_cast<char*>(hModule) + pDH->e_lfanew);
 			const PIMAGE_OPTIONAL_HEADER pOH = &(pNTHs->OptionalHeader);
 
+			// FIXME: Potentially sections can be in different places.
+			/*
 			void* pFirstSection = nullptr;
 			size_t unFirstSectionSize = 0;
 			void* pSecondSection = nullptr;
@@ -2849,9 +2851,10 @@ namespace Detours {
 				return FindRTTI(reinterpret_cast<void*>(hModule), pFirstSection, reinterpret_cast<size_t>(pSecondSection) - reinterpret_cast<size_t>(pFirstSection) + unSecondSectionSize, szRTTI);
 			}
 
-			if (FindSection(hModule, { '.', 'r', 'd', 'a', 't', 'a', 0, 0 }, &pFirstSection, &unFirstSectionSize) && FindSection(hModule, { '.', 'd', 'a', 't', 'a',   0, 0, 0 }, &pSecondSection, &unSecondSectionSize)) {
+			if (FindSection(hModule, { '.', 'r', 'd', 'a', 't', 'a', 0, 0 }, &pFirstSection, &unFirstSectionSize) && FindSection(hModule, { '.', 'd', 'a', 't', 'a', 0, 0, 0 }, &pSecondSection, &unSecondSectionSize)) {
 				return FindRTTI(reinterpret_cast<void*>(hModule), pFirstSection, reinterpret_cast<size_t>(pSecondSection) - reinterpret_cast<size_t>(pFirstSection) + unSecondSectionSize, szRTTI);
 			}
+			*/
 
 			return FindRTTI(reinterpret_cast<void*>(hModule), static_cast<size_t>(pOH->SizeOfImage) - 1, szRTTI);
 		}
@@ -2915,14 +2918,23 @@ namespace Detours {
 			const DWORD unPID = GetCurrentProcessId();
 			const DWORD unTID = GetCurrentThreadId();
 			const DWORD64 unCycle = __rdtsc();
-			_stprintf_s(m_szSessionName, _T("GLOBAL:%08X:%08X:%08X%08X"), 0xFFFFFFFFi32 - unPID, 0xFFFFFFFFi32 - unTID, static_cast<DWORD>(unCycle & 0xFFFFFFFFi32), static_cast<DWORD>((unCycle >> 32) & 0xFFFFFFFFi32));
+			if (_stprintf_s(m_szSessionName, _T("GLOBAL:%08X:%08X:%08X%08X"), 0xFFFFFFFFi32 - unPID, 0xFFFFFFFFi32 - unTID, static_cast<DWORD>(unCycle & 0xFFFFFFFFi32), static_cast<DWORD>((unCycle >> 32) & 0xFFFFFFFFi32)) == -1) {
+				memset(m_szSessionName, 0, sizeof(m_szSessionName));
+				return;
+			}
 
 			TCHAR szMap[64];
 			memset(szMap, 0, sizeof(szMap));
 			if (bIsGlobal) {
-				_stprintf_s(szMap, _T("Global\\%s"), m_szSessionName);
+				if (_stprintf_s(szMap, _T("Global\\%s"), m_szSessionName) == -1) {
+					memset(m_szSessionName, 0, sizeof(m_szSessionName));
+					return;
+				}
 			} else {
-				_stprintf_s(szMap, _T("Local\\%s"), m_szSessionName);
+				if (_stprintf_s(szMap, _T("Local\\%s"), m_szSessionName) == -1) {
+					memset(m_szSessionName, 0, sizeof(m_szSessionName));
+					return;
+				}
 			}
 
 #ifdef _M_X64
@@ -2930,9 +2942,14 @@ namespace Detours {
 #elif _M_IX86
 			m_hMap = CreateFileMapping(INVALID_HANDLE_VALUE, nullptr, PAGE_EXECUTE_READWRITE, NULL, static_cast<DWORD>(unMemorySize & 0xFFFFFFFFi32), szMap);
 #endif
-			if (m_hMap && (m_hMap != INVALID_HANDLE_VALUE)) {
-				m_pAddress = MapViewOfFile(m_hMap, FILE_MAP_WRITE | FILE_MAP_READ | FILE_MAP_EXECUTE, NULL, NULL, NULL);
+			if (!m_hMap || (m_hMap == INVALID_HANDLE_VALUE)) {
+				memset(m_szSessionName, 0, sizeof(m_szSessionName));
+				m_hMap = nullptr;
+				m_pAddress = nullptr;
+				return;
 			}
+
+			m_pAddress = MapViewOfFile(m_hMap, FILE_MAP_WRITE | FILE_MAP_READ | FILE_MAP_EXECUTE, NULL, NULL, NULL);
 		}
 
 		Server::~Server() {
@@ -2974,15 +2991,22 @@ namespace Detours {
 			TCHAR szMap[64];
 			memset(szMap, 0, sizeof(szMap));
 			if (bIsGlobal) {
-				_stprintf_s(szMap, _T("Global\\%s"), szSessionName);
+				if (_stprintf_s(szMap, _T("Global\\%s"), szSessionName) == -1) {
+					return;
+				}
 			} else {
-				_stprintf_s(szMap, _T("Local\\%s"), szSessionName);
+				if (_stprintf_s(szMap, _T("Local\\%s"), szSessionName) == -1) {
+					return;
+				}
 			}
 
 			m_hMap = OpenFileMapping(FILE_MAP_WRITE | FILE_MAP_READ | FILE_MAP_EXECUTE, FALSE, szMap);
-			if (m_hMap && (m_hMap != INVALID_HANDLE_VALUE)) {
-				m_pAddress = MapViewOfFile(m_hMap, FILE_MAP_WRITE | FILE_MAP_READ | FILE_MAP_EXECUTE, NULL, NULL, NULL);
+			if (!m_hMap || (m_hMap == INVALID_HANDLE_VALUE)) {
+				m_hMap = nullptr;
+				return;
 			}
+
+			m_pAddress = MapViewOfFile(m_hMap, FILE_MAP_WRITE | FILE_MAP_READ | FILE_MAP_EXECUTE, NULL, NULL, NULL);
 		}
 
 		Client::~Client() {
@@ -3173,16 +3197,18 @@ namespace Detours {
 
 			const EXCEPTION_RECORD Exception = *pException;
 			auto& vecCallBacks = g_ExceptionListener.GetCallBacks();
-			for (auto it = vecCallBacks.begin(); it != vecCallBacks.end(); ++it) {
+			for (auto it = vecCallBacks.begin(); it != vecCallBacks.end();) {
 				const auto& CallBack = (*it);
 				if (!CallBack) {
-					vecCallBacks.erase(it);
+					it = vecCallBacks.erase(it);
 					continue;
 				}
 
 				if (CallBack(Exception, pCTX)) {
 					return EXCEPTION_CONTINUE_EXECUTION;
 				}
+
+				++it;
 			}
 
 			return EXCEPTION_CONTINUE_SEARCH;
@@ -3276,13 +3302,13 @@ namespace Detours {
 				return false;
 			}
 
-			for (auto it = m_vecCallBacks.begin(); it != m_vecCallBacks.end(); ++it) {
+			for (auto it = m_CallBacks.begin(); it != m_CallBacks.end(); ++it) {
 				if (pCallBack == *it) {
 					return false;
 				}
 			}
 
-			m_vecCallBacks.push_back(pCallBack);
+			m_CallBacks.push_back(pCallBack);
 			return true;
 		}
 
@@ -3291,9 +3317,9 @@ namespace Detours {
 				return false;
 			}
 
-			for (auto it = m_vecCallBacks.begin(); it != m_vecCallBacks.end(); ++it) {
+			for (auto it = m_CallBacks.begin(); it != m_CallBacks.end(); ++it) {
 				if (pCallBack == *it) {
-					m_vecCallBacks.erase(it);
+					m_CallBacks.erase(it);
 					return true;
 				}
 			}
@@ -3302,7 +3328,7 @@ namespace Detours {
 		}
 
 		std::deque<fnExceptionCallBack>& ExceptionListener::GetCallBacks() {
-			return m_vecCallBacks;
+			return m_CallBacks;
 		}
 
 		ExceptionListener g_ExceptionListener;

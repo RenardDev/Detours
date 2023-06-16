@@ -1006,11 +1006,6 @@ namespace Detours {
 		// RTTI
 		// ----------------------------------------------------------------
 
-		class RTTI {
-		public:
-
-		};
-
 		const void* const FindRTTI(const void* const pBaseAddress, const void* const pAddress, const size_t unSize, const char* const szRTTI);
 		const void* const FindRTTI(const void* const pBaseAddress, const size_t unSize, const char* const szRTTI);
 		const void* const FindRTTI(const HMODULE hModule, const char* const szRTTI);
@@ -1112,13 +1107,13 @@ namespace Detours {
 	namespace Exception {
 
 		// ----------------------------------------------------------------
-		// ExceptionCallBack
+		// Exception CallBack
 		// ----------------------------------------------------------------
 
 		using fnExceptionCallBack = bool(__fastcall*)(const EXCEPTION_RECORD& pException, const PCONTEXT pCTX);
 
 		// ----------------------------------------------------------------
-		// ExceptionListener
+		// Exception Listener
 		// ----------------------------------------------------------------
 
 		class ExceptionListener {
@@ -1138,7 +1133,7 @@ namespace Detours {
 
 		private:
 			PVOID m_pVEH;
-			std::deque<fnExceptionCallBack> m_vecCallBacks;
+			std::deque<fnExceptionCallBack> m_CallBacks;
 		};
 
 		extern ExceptionListener g_ExceptionListener;
