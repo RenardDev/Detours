@@ -3382,17 +3382,7 @@ namespace Detours {
 				return false;
 			}
 
-			if (unProtection & PAGE_EXECUTE) {
-				unProtection &= ~PAGE_EXECUTE;
-			}
-
-			if (unProtection & PAGE_EXECUTE_READ) {
-				unProtection &= ~PAGE_EXECUTE_READ;
-			}
-
-			if (unProtection & PAGE_EXECUTE_READWRITE) {
-				unProtection &= ~PAGE_EXECUTE_READWRITE;
-			}
+			unProtection &= ~(PAGE_EXECUTE | PAGE_EXECUTE_READ | PAGE_EXECUTE_READWRITE);
 
 			if (!unProtection) {
 				unProtection |= PAGE_READONLY;
@@ -3451,17 +3441,7 @@ namespace Detours {
 				return false;
 			}
 
-			if (unProtection & PAGE_EXECUTE) {
-				unProtection &= ~PAGE_EXECUTE;
-			}
-
-			if (unProtection & PAGE_EXECUTE_READ) {
-				unProtection &= ~PAGE_EXECUTE_READ;
-			}
-
-			if (unProtection & PAGE_EXECUTE_READWRITE) {
-				unProtection &= ~PAGE_EXECUTE_READWRITE;
-			}
+			unProtection &= ~(PAGE_EXECUTE | PAGE_EXECUTE_READ | PAGE_EXECUTE_READWRITE);
 
 			if (!unProtection) {
 				unProtection |= PAGE_READONLY;
@@ -3547,7 +3527,11 @@ namespace Detours {
 				return false;
 			}
 
-			return pHook->UnHook();
+			pHook->UnHook();
+
+			g_MemoryHooks.erase(it);
+
+			return true;
 		}
 
 		bool EnableHookMemory(const fnMemoryHookCallBack pCallBack) {
