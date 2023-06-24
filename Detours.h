@@ -1110,7 +1110,7 @@ namespace Detours {
 		// Exception CallBack
 		// ----------------------------------------------------------------
 
-		using fnExceptionCallBack = bool(__fastcall*)(const EXCEPTION_RECORD& pException, const PCONTEXT pCTX);
+		using fnExceptionCallBack = bool(__fastcall*)(const EXCEPTION_RECORD& Exception, const PCONTEXT pCTX);
 
 		// ----------------------------------------------------------------
 		// Exception Listener
