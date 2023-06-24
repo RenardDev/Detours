@@ -70,38 +70,44 @@ bool __fastcall OnException(const EXCEPTION_RECORD& Exception, const PCONTEXT pC
 		return false;
 	}
 
-	if (pAddress[0] == 0xCD) {
-		_tprintf_s(_T("[OnException] Called `int 0x%02X`\n"), pAddress[1]);
-#ifdef _M_X64
-		_tprintf_s(_T("  -> RAX = 0x%016llX\n"), pCTX->Rax);
-		_tprintf_s(_T("  -> RCX = 0x%016llX\n"), pCTX->Rcx);
-		_tprintf_s(_T("  -> RDX = 0x%016llX\n"), pCTX->Rdx);
-		_tprintf_s(_T("  -> RBX = 0x%016llX\n"), pCTX->Rbx);
-		_tprintf_s(_T("  -> RBP = 0x%016llX\n"), pCTX->Rbp);
-		_tprintf_s(_T("  -> RSI = 0x%016llX\n"), pCTX->Rsi);
-		_tprintf_s(_T("  -> RDI = 0x%016llX\n"), pCTX->Rdi);
-		_tprintf_s(_T("  -> R8  = 0x%016llX\n"), pCTX->R8);
-		_tprintf_s(_T("  -> R9  = 0x%016llX\n"), pCTX->R9);
-		_tprintf_s(_T("  -> R10 = 0x%016llX\n"), pCTX->R10);
-		_tprintf_s(_T("  -> R11 = 0x%016llX\n"), pCTX->R11);
-		_tprintf_s(_T("  -> R12 = 0x%016llX\n"), pCTX->R12);
-		_tprintf_s(_T("  -> R13 = 0x%016llX\n"), pCTX->R13);
-		_tprintf_s(_T("  -> R14 = 0x%016llX\n"), pCTX->R14);
-		_tprintf_s(_T("  -> R15 = 0x%016llX\n"), pCTX->R15);
-#elif _M_IX86
-		_tprintf_s(_T("  -> EAX = 0x%08X\n"), pCTX->Eax);
-		_tprintf_s(_T("  -> ECX = 0x%08X\n"), pCTX->Ecx);
-		_tprintf_s(_T("  -> EDX = 0x%08X\n"), pCTX->Edx);
-		_tprintf_s(_T("  -> EBX = 0x%08X\n"), pCTX->Ebx);
-		_tprintf_s(_T("  -> EBP = 0x%08X\n"), pCTX->Ebp);
-		_tprintf_s(_T("  -> ESI = 0x%08X\n"), pCTX->Esi);
-		_tprintf_s(_T("  -> EDI = 0x%08X\n"), pCTX->Edi);
-#endif
+	if (pAddress[0] != 0xCD) {
+		return false;
 	}
 
-#ifdef _WIN64
+	if ((pAddress[1] != 0x7D) && (pAddress[1] != 0x7E)) {
+		return false;
+	}
+
+	_tprintf_s(_T("[OnException] Called `int 0x%02X`\n"), pAddress[1]);
+#ifdef _M_X64
+	_tprintf_s(_T("  -> RAX = 0x%016llX\n"), pCTX->Rax);
+	_tprintf_s(_T("  -> RCX = 0x%016llX\n"), pCTX->Rcx);
+	_tprintf_s(_T("  -> RDX = 0x%016llX\n"), pCTX->Rdx);
+	_tprintf_s(_T("  -> RBX = 0x%016llX\n"), pCTX->Rbx);
+	_tprintf_s(_T("  -> RBP = 0x%016llX\n"), pCTX->Rbp);
+	_tprintf_s(_T("  -> RSI = 0x%016llX\n"), pCTX->Rsi);
+	_tprintf_s(_T("  -> RDI = 0x%016llX\n"), pCTX->Rdi);
+	_tprintf_s(_T("  ->  R8 = 0x%016llX\n"), pCTX->R8);
+	_tprintf_s(_T("  ->  R9 = 0x%016llX\n"), pCTX->R9);
+	_tprintf_s(_T("  -> R10 = 0x%016llX\n"), pCTX->R10);
+	_tprintf_s(_T("  -> R11 = 0x%016llX\n"), pCTX->R11);
+	_tprintf_s(_T("  -> R12 = 0x%016llX\n"), pCTX->R12);
+	_tprintf_s(_T("  -> R13 = 0x%016llX\n"), pCTX->R13);
+	_tprintf_s(_T("  -> R14 = 0x%016llX\n"), pCTX->R14);
+	_tprintf_s(_T("  -> R15 = 0x%016llX\n"), pCTX->R15);
+#elif _M_IX86
+	_tprintf_s(_T("  -> EAX = 0x%08X\n"), pCTX->Eax);
+	_tprintf_s(_T("  -> ECX = 0x%08X\n"), pCTX->Ecx);
+	_tprintf_s(_T("  -> EDX = 0x%08X\n"), pCTX->Edx);
+	_tprintf_s(_T("  -> EBX = 0x%08X\n"), pCTX->Ebx);
+	_tprintf_s(_T("  -> EBP = 0x%08X\n"), pCTX->Ebp);
+	_tprintf_s(_T("  -> ESI = 0x%08X\n"), pCTX->Esi);
+	_tprintf_s(_T("  -> EDI = 0x%08X\n"), pCTX->Edi);
+#endif
+
+#ifdef _M_X64
 	pCTX->Rip += 2;
-#elif _WIN32
+#elif _M_IX86
 	pCTX->Eip += 2;
 #else
 #error Unknown platform
@@ -370,9 +376,9 @@ int _tmain(int nArguments, PTCHAR* pArguments) {
 	_tprintf_s(_T("AddCallBack = %d\n"), Detours::Exception::g_ExceptionListener.AddCallBack(OnException));
 
 #ifdef _M_X64
-	CallInterrupt(0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14);
+	CallInterrupt(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15);
 #elif _M_IX86
-	CallInterrupt(0, 1, 2, 3, 4, 5, 6);
+	CallInterrupt(1, 2, 3, 4, 5, 6, 7);
 #endif
 
 	_tprintf_s(_T("RemoveCallBack = %d\n"), Detours::Exception::g_ExceptionListener.RemoveCallBack(OnException));
