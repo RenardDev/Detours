@@ -706,13 +706,13 @@ namespace Detours {
 		// FindSection
 		// ----------------------------------------------------------------
 
-		bool FindSection(const HMODULE hModule, const std::array<const unsigned char, 8>& SectionName, const void** pAddress, const size_t* pSize);
+		bool FindSection(const HMODULE hModule, const std::array<const unsigned char, 8>& SectionName, void** pAddress, size_t* pSize);
 
 		// ----------------------------------------------------------------
 		// FindSectionPOGO
 		// ----------------------------------------------------------------
 
-		bool FindSectionPOGO(const HMODULE hModule, const char* const szSectionName, const void** pAddress, const size_t* pSize);
+		bool FindSectionPOGO(const HMODULE hModule, const char* const szSectionName, void** pAddress, size_t* pSize);
 
 		// ----------------------------------------------------------------
 		// FindSignature (Native)
