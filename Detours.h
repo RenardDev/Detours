@@ -43,10 +43,6 @@
 #error Only x86 and x86_64 platforms are supported.
 #endif
 
-#ifndef NT_SUCCESS
-#define NT_SUCCESS(x) (x >= 0)
-#endif
-
 // MSVC - Linker
 #define LINKER_OPTION(OPTION) __pragma(comment(linker, OPTION))
 
@@ -523,7 +519,7 @@ namespace Detours {
 		ULONG ProxiedProcessId;
 		ACTIVATION_CONTEXT_STACK ActivationStack;
 		UCHAR WorkingOnBehalfTicket[8];
-		NTSTATUS ExceptionCode;
+		LONG ExceptionCode; // NTSTATUS
 		PACTIVATION_CONTEXT_STACK ActivationContextStackPointer;
 		ULONG_PTR InstrumentationCallbackSp;
 		ULONG_PTR InstrumentationCallbackPreviousPc;
@@ -554,7 +550,7 @@ namespace Detours {
 		PVOID glTable;
 		PVOID glCurrentRC;
 		PVOID glContext;
-		NTSTATUS LastStatusValue;
+		LONG LastStatusValue; // NTSTATUS
 		UNICODE_STRING StaticUnicodeString;
 		WCHAR StaticUnicodeBuffer[261];
 		PVOID DeallocationStack;
