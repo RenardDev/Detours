@@ -4723,7 +4723,7 @@ namespace Detours {
 		// fnNtGetNextThread
 		// ----------------------------------------------------------------
 
-		typedef NTSTATUS(NTAPI* fnNtGetNextThread)(HANDLE ProcessHandle, HANDLE ThreadHandle, ACCESS_MASK DesiredAccess, ULONG HandleAttributes, ULONG Flags, PHANDLE NewThreadHandle);
+		typedef LONG(NTAPI* fnNtGetNextThread)(HANDLE ProcessHandle, HANDLE ThreadHandle, ACCESS_MASK DesiredAccess, ULONG HandleAttributes, ULONG Flags, PHANDLE NewThreadHandle);
 
 		// ----------------------------------------------------------------
 		// Thread Control
