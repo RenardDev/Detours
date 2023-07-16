@@ -193,12 +193,6 @@ bool __fastcall boo_Hook(void* pThis, void* /* unused */) {
 
 Detours::Hook::VTableHook NewTestingRTTIVTable;
 
-bool __fastcall foo_Hook2(void* pThis, void* /* unused */) {
-	using fnType = bool(__fastcall*)(void*, void*);
-	_tprintf_s(_T("[foo_Hook2] Called!\n"));
-	return reinterpret_cast<fnType>(NewTestingRTTIVTable.GetHookingFunctions()[0]->GetOriginal())(pThis, nullptr);
-}
-
 bool __fastcall boo_Hook2(void* pThis, void* /* unused */) {
 	using fnType = bool(__fastcall*)(void*, void*);
 	_tprintf_s(_T("[boo_Hook2] Called!\n"));
@@ -1123,7 +1117,7 @@ int _tmain(int nArguments, PTCHAR* pArguments) {
 		_tprintf_s(_T("booHook.UnHook() = %d\n"), booHook.UnHook());
 
 		void* pNewVTable[2] = {
-			reinterpret_cast<void*>(foo_Hook2),
+			nullptr, // Will be skipped
 			reinterpret_cast<void*>(boo_Hook2)
 		};
 

@@ -116855,7 +116855,9 @@ namespace Detours {
 					return false;
 				}
 
-				m_vecHookingFunctions[unIndex]->Hook(pHookVTable[unIndex]);
+				if (pHookVTable[unIndex]) {
+					m_vecHookingFunctions[unIndex]->Hook(pHookVTable[unIndex]);
+				}
 			}
 
 			return true;
