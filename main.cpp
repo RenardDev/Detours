@@ -233,25 +233,25 @@ bool __cdecl Sleep_RawHook(Detours::Hook::PRAW_HOOK_CONTEXT pCTX) {
 #elif _M_IX86
 	_tprintf_s(_T("  -> EFLAGS = 0x%08X\n"), pCTX->m_unEFLAGS);
 #endif
-	_tprintf_s(_T("     -> CF   = %d\n"), pCTX->m_unCF);
-	_tprintf_s(_T("     -> PF   = %d\n"), pCTX->m_unPF);
-	_tprintf_s(_T("     -> AF   = %d\n"), pCTX->m_unAF);
-	_tprintf_s(_T("     -> ZF   = %d\n"), pCTX->m_unZF);
-	_tprintf_s(_T("     -> SF   = %d\n"), pCTX->m_unSF);
-	_tprintf_s(_T("     -> TF   = %d\n"), pCTX->m_unTF);
-	_tprintf_s(_T("     -> IF   = %d\n"), pCTX->m_unIF);
-	_tprintf_s(_T("     -> DF   = %d\n"), pCTX->m_unDF);
-	_tprintf_s(_T("     -> OF   = %d\n"), pCTX->m_unOF);
-	_tprintf_s(_T("     -> IOPL = %d\n"), pCTX->m_unIOPL);
-	_tprintf_s(_T("     -> NT   = %d\n"), pCTX->m_unNT);
-	_tprintf_s(_T("     -> MD   = %d\n"), pCTX->m_unMD);
-	_tprintf_s(_T("     -> RF   = %d\n"), pCTX->m_unRF);
-	_tprintf_s(_T("     -> VM   = %d\n"), pCTX->m_unVM);
-	_tprintf_s(_T("     -> AC   = %d\n"), pCTX->m_unAC);
-	_tprintf_s(_T("     -> VIF  = %d\n"), pCTX->m_unVIF);
-	_tprintf_s(_T("     -> VIP  = %d\n"), pCTX->m_unVIP);
-	_tprintf_s(_T("     -> ID   = %d\n"), pCTX->m_unID);
-	_tprintf_s(_T("     -> AI   = %d\n"), pCTX->m_unAI);
+	_tprintf_s(_T("     -> CF   = %hhu\n"), pCTX->m_unCF);
+	_tprintf_s(_T("     -> PF   = %hhu\n"), pCTX->m_unPF);
+	_tprintf_s(_T("     -> AF   = %hhu\n"), pCTX->m_unAF);
+	_tprintf_s(_T("     -> ZF   = %hhu\n"), pCTX->m_unZF);
+	_tprintf_s(_T("     -> SF   = %hhu\n"), pCTX->m_unSF);
+	_tprintf_s(_T("     -> TF   = %hhu\n"), pCTX->m_unTF);
+	_tprintf_s(_T("     -> IF   = %hhu\n"), pCTX->m_unIF);
+	_tprintf_s(_T("     -> DF   = %hhu\n"), pCTX->m_unDF);
+	_tprintf_s(_T("     -> OF   = %hhu\n"), pCTX->m_unOF);
+	_tprintf_s(_T("     -> IOPL = %hhu\n"), pCTX->m_unIOPL);
+	_tprintf_s(_T("     -> NT   = %hhu\n"), pCTX->m_unNT);
+	_tprintf_s(_T("     -> MD   = %hhu\n"), pCTX->m_unMD);
+	_tprintf_s(_T("     -> RF   = %hhu\n"), pCTX->m_unRF);
+	_tprintf_s(_T("     -> VM   = %hhu\n"), pCTX->m_unVM);
+	_tprintf_s(_T("     -> AC   = %hhu\n"), pCTX->m_unAC);
+	_tprintf_s(_T("     -> VIF  = %hhu\n"), pCTX->m_unVIF);
+	_tprintf_s(_T("     -> VIP  = %hhu\n"), pCTX->m_unVIP);
+	_tprintf_s(_T("     -> ID   = %hhu\n"), pCTX->m_unID);
+	_tprintf_s(_T("     -> AI   = %hhu\n"), pCTX->m_unAI);
 
 	_tprintf_s(_T("  -> CS = 0x%04X\n"), pCTX->m_unCS);
 	_tprintf_s(_T("  -> DS = 0x%04X\n"), pCTX->m_unDS);
@@ -526,12 +526,6 @@ bool __cdecl Sleep_RawHook(Detours::Hook::PRAW_HOOK_CONTEXT pCTX) {
 		_tprintf_s(_T("  -> YMM2  = 0x"));
 		for (int i = 31; i >= 0; --i) {
 			_tprintf_s(_T("%02X"), pCTX->m_YMM2.m_un8[i]);
-		}
-		_tprintf_s(_T("\n"));
-
-		_tprintf_s(_T("  -> YMM3  = 0x"));
-		for (int i = 31; i >= 0; --i) {
-			_tprintf_s(_T("%02X"), pCTX->m_YMM3.m_un8[i]);
 		}
 		_tprintf_s(_T("\n"));
 

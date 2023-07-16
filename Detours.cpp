@@ -558,7 +558,7 @@ namespace Detours {
 						unBlockSize += (4 - (unBlockSize & 3));
 					}
 
-					if (strncmp(szSectionName, pBlock->m_pName, 0x1000) == 0) {  // FIXME: Unsafe.
+					if (strncmp(szSectionName, pBlock->m_pName, 0x1000) == 0) { // FIXME: Unsafe.
 						if (pAddress) {
 							*pAddress = reinterpret_cast<void*>(reinterpret_cast<char*>(hModule) + pBlock->m_unRVA);
 						}
