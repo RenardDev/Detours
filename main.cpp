@@ -223,7 +223,7 @@ bool __cdecl Sleep_RawHook(Detours::Hook::PRAW_HOOK_CONTEXT pCTX) {
 	const bool bHaveAVX512 = (cpuinfo[1] & (1 << 16)) != 0;
 
 #ifdef _M_X64
-	_tprintf_s(_T("  -> RFLAGS = 0x%08X\n"), pCTX->m_unEFLAGS);
+	_tprintf_s(_T("  -> RFLAGS = 0x%016llX\n"), pCTX->m_unRFLAGS);
 #elif _M_IX86
 	_tprintf_s(_T("  -> EFLAGS = 0x%08X\n"), pCTX->m_unEFLAGS);
 #endif
