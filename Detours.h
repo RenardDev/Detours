@@ -5014,8 +5014,12 @@ namespace Detours {
 
 		private:
 			bool m_bInitialized;
-			void* m_pAddress;
+			void* m_pAddress;	
+#ifdef _M_X64
 			std::unique_ptr<Detours::Memory::NearPage> m_Trampoline;
+#elif _M_IX86
+			std::unique_ptr<Detours::Memory::Page> m_Trampoline;
+#endif
 			void* m_pTrampoline;
 			void* m_pAddressAfterJump;
 			size_t m_unOriginalBytes;
@@ -5769,10 +5773,18 @@ namespace Detours {
 		private:
 			bool m_bInitialized;
 			void* m_pAddress;
+#ifdef _M_X64
 			std::unique_ptr<Detours::Memory::NearPage> m_Wrapper;
+#elif _M_IX86
+			std::unique_ptr<Detours::Memory::Page> m_Wrapper;
+#endif
 			void* m_pWrapper;
 			void* m_pAddressAfterJump;
+#ifdef _M_X64
 			std::unique_ptr<Detours::Memory::NearPage> m_Trampoline;
+#elif _M_IX86
+			std::unique_ptr<Detours::Memory::Page> m_Trampoline;
+#endif
 			void* m_pTrampoline;
 			size_t m_unOriginalBytes;
 			std::unique_ptr<unsigned char[]> m_pOriginalBytes;

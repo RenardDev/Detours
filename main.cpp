@@ -819,6 +819,62 @@ bool __cdecl Sleep_RawHook(Detours::Hook::PRAW_HOOK_CONTEXT pCTX) {
 	return true;
 }
 
+/*
+Detours::Hook::RawHook RawCPUIDHook;
+bool __cdecl CPUID_RawHook(Detours::Hook::PRAW_HOOK_CONTEXT pCTX) {
+#ifdef _M_X64
+	pCTX->m_unRSP -= 8;
+	*reinterpret_cast<unsigned long long*>(pCTX->m_unRSP) = reinterpret_cast<unsigned long long>(RawCPUIDHook.GetTrampoline());
+#elif _M_IX86
+	pCTX->m_unEAX = 0x11;
+	pCTX->m_unESI = 0x22;
+	pCTX->m_unECX = 0x33;
+	pCTX->m_unEDX = 0x44;
+	*reinterpret_cast<unsigned int*>(pCTX->m_unESP) = reinterpret_cast<unsigned int>(RawCPUIDHook.GetAddressAfterJump());
+#endif
+
+	return true;
+}
+
+void DemoRawHook() { SELF_EXPORT("DemoHook");
+	_tprintf_s(_T("rddisasm + RawHook Example\n"));
+
+	Detours::rddisasm::INSTRUCTION ins;
+	size_t unOffset = 0;
+	void* pFoundCPUID = nullptr;
+	while (unOffset < 0x1000) {
+		if (!RD_SUCCESS(Detours::rddisasm::RdDecode(&ins, reinterpret_cast<unsigned char*>(DemoRawHook) + unOffset, RD_DATA_32, RD_DATA_32))) {
+			return;
+		}
+
+		if (ins.Instruction == Detours::rddisasm::RD_INS_CLASS::RD_INS_CPUID) {
+			_tprintf_s(_T("Found cpuid instruction!\n"));
+			pFoundCPUID = reinterpret_cast<void*>(reinterpret_cast<char*>(DemoRawHook) + unOffset);
+			break;
+		}
+
+		unOffset += ins.Length;
+	}
+
+	if (!pFoundCPUID) {
+		return;
+	}
+
+	_tprintf_s(_T("RawCPUIDHook.Set = %d\n"), RawCPUIDHook.Set(pFoundCPUID));
+	_tprintf_s(_T("RawCPUIDHook.Hook = %d\n"), RawCPUIDHook.Hook(CPUID_RawHook));
+
+	int cpuinfo[4];
+	__cpuidex(cpuinfo, 7, 0); // Hooking `cpuid` in this function.
+	const bool bHaveAVX512 = (cpuinfo[1] & (1 << 16)) != 0;
+	_tprintf_s(_T("cpuinfo[1] = 0x%08X\n"), cpuinfo[1]);
+	_tprintf_s(_T("bHaveAVX512 = %d\n"), bHaveAVX512);
+
+	_tprintf_s(_T("RawCPUIDHook.UnHook = %d\n"), RawCPUIDHook.UnHook());
+
+	_tprintf_s(_T("\n"));
+}
+*/
+
 int _tmain(int nArguments, PTCHAR* pArguments) {
 	g_pBaseTestingRTTI = new BaseTestingRTTI();
 	g_pTestingRTTI = new TestingRTTI();
@@ -1320,9 +1376,14 @@ int _tmain(int nArguments, PTCHAR* pArguments) {
 		Sleep(1000);
 		_tprintf_s(_T("RawSleepHook.UnHook = %d\n"), RawSleepHook.UnHook());
 	}
-
+	
 	_tprintf_s(_T("\n"));
 
+	// RawHook + rddisasm
+
+	//DemoRawHook();
+
 	_tprintf_s(_T("[ FINISHED ]\n"));
+	_CRT_UNUSED(getchar());
 	return 0;
 }

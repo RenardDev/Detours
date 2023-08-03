@@ -444,6 +444,15 @@ namespace Detours {
 		};
 
 		// ----------------------------------------------------------------
+		// __align_down
+		// ----------------------------------------------------------------
+
+		template <typename T>
+		static const T inline __align_down(const T unValue, const T unAlignment) {
+			return unValue & ~(unAlignment - 1);
+		};
+
+		// ----------------------------------------------------------------
 		// __bit_scan_forward
 		// ----------------------------------------------------------------
 
@@ -3885,7 +3894,7 @@ namespace Detours {
 				// [unAddress; unEnd] - From unAddress to unEnd (Forward)
 				for (size_t unAddress = reinterpret_cast<size_t>(pDesiredAddress); unAddress < unEnd; unAddress += mbi.RegionSize) {
 					if (!VirtualQuery(reinterpret_cast<void*>(unAddress), &mbi, sizeof(mbi))) {
-						continue;
+						break;
 					}
 
 					if (mbi.State != MEM_FREE) {
@@ -3900,9 +3909,9 @@ namespace Detours {
 
 				if (!m_pPageAddress) {
 					// [unAddress; unBegin]  - From unAddress to unBegin (Backward)
-					for (size_t unAddress = reinterpret_cast<size_t>(pDesiredAddress); unAddress > unBegin; unAddress -= mbi.RegionSize) {
+					for (size_t unAddress = reinterpret_cast<size_t>(pDesiredAddress); unAddress > unBegin; unAddress = __align_down(reinterpret_cast<size_t>(mbi.AllocationBase) - 1, static_cast<size_t>(sysinf.dwAllocationGranularity))) {
 						if (!VirtualQuery(reinterpret_cast<void*>(unAddress), &mbi, sizeof(mbi))) {
-							continue;
+							break;
 						}
 
 						if (mbi.State != MEM_FREE) {
@@ -117539,7 +117548,11 @@ namespace Detours {
 				unCopyingSize += ins.Length;
 			}
 
+#ifdef _M_X64
 			m_Trampoline = std::make_unique<NearPage>(0x1000, m_pAddress);
+#elif _M_IX86
+			m_Trampoline = std::make_unique<Page>(0x1000);
+#endif
 			if (!m_Trampoline) {
 				m_pAddressAfterJump = nullptr;
 				g_ThreadControl.ResumeThreads();
@@ -117923,11 +117936,19 @@ namespace Detours {
 				return false;
 			}
 
+			printf("BEIN0!\n");
+
+#ifdef _M_X64
 			m_Wrapper = std::make_unique<NearPage>(0x1000, m_pAddress);
+#elif _M_IX86
+			m_Wrapper = std::make_unique<Page>(0x1000);
+#endif
 			if (!m_Wrapper) {
 				g_ThreadControl.ResumeThreads();
 				return false;
 			}
+			
+			printf("BEIN3!\n");
 
 			m_pWrapper = m_Wrapper->Alloc(0x1000);
 			if (!m_pWrapper) {
@@ -118162,7 +118183,13 @@ namespace Detours {
 				unCopyingSize += ins.Length;
 			}
 
+			printf("BEIN!\n");
+
+#ifdef _M_X64
 			m_Trampoline = std::make_unique<NearPage>(0x1000, m_pAddress);
+#elif _M_IX86
+			m_Trampoline = std::make_unique<Page>(0x1000);
+#endif
 			if (!m_Trampoline) {
 				m_pAddressAfterJump = nullptr;
 				m_Wrapper->DeAlloc(m_pWrapper);
@@ -118171,6 +118198,8 @@ namespace Detours {
 				g_ThreadControl.ResumeThreads();
 				return false;
 			}
+
+			printf("BEIN2!\n");
 
 			m_pTrampoline = m_Trampoline->Alloc(0x1000);
 			if (!m_pTrampoline) {
