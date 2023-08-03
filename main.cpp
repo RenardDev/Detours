@@ -819,12 +819,12 @@ bool __cdecl Sleep_RawHook(Detours::Hook::PRAW_HOOK_CONTEXT pCTX) {
 	return true;
 }
 
-/*
 Detours::Hook::RawHook RawCPUIDHook;
 bool __cdecl CPUID_RawHook(Detours::Hook::PRAW_HOOK_CONTEXT pCTX) {
 #ifdef _M_X64
+	pCTX->m_unEBX = 0x11;
 	pCTX->m_unRSP -= 8;
-	*reinterpret_cast<unsigned long long*>(pCTX->m_unRSP) = reinterpret_cast<unsigned long long>(RawCPUIDHook.GetTrampoline());
+	*reinterpret_cast<unsigned long long*>(pCTX->m_unRSP) = reinterpret_cast<unsigned long long>(RawCPUIDHook.GetTrampoline()) + 2;
 #elif _M_IX86
 	pCTX->m_unEAX = 0x11;
 	pCTX->m_unESI = 0x22;
@@ -873,7 +873,6 @@ void DemoRawHook() { SELF_EXPORT("DemoHook");
 
 	_tprintf_s(_T("\n"));
 }
-*/
 
 int _tmain(int nArguments, PTCHAR* pArguments) {
 	g_pBaseTestingRTTI = new BaseTestingRTTI();
@@ -1381,7 +1380,7 @@ int _tmain(int nArguments, PTCHAR* pArguments) {
 
 	// RawHook + rddisasm
 
-	//DemoRawHook();
+	DemoRawHook();
 
 	_tprintf_s(_T("[ FINISHED ]\n"));
 	_CRT_UNUSED(getchar());

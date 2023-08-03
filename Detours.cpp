@@ -117936,8 +117936,6 @@ namespace Detours {
 				return false;
 			}
 
-			printf("BEIN0!\n");
-
 #ifdef _M_X64
 			m_Wrapper = std::make_unique<NearPage>(0x1000, m_pAddress);
 #elif _M_IX86
@@ -117947,8 +117945,6 @@ namespace Detours {
 				g_ThreadControl.ResumeThreads();
 				return false;
 			}
-			
-			printf("BEIN3!\n");
 
 			m_pWrapper = m_Wrapper->Alloc(0x1000);
 			if (!m_pWrapper) {
@@ -118183,8 +118179,6 @@ namespace Detours {
 				unCopyingSize += ins.Length;
 			}
 
-			printf("BEIN!\n");
-
 #ifdef _M_X64
 			m_Trampoline = std::make_unique<NearPage>(0x1000, m_pAddress);
 #elif _M_IX86
@@ -118198,8 +118192,6 @@ namespace Detours {
 				g_ThreadControl.ResumeThreads();
 				return false;
 			}
-
-			printf("BEIN2!\n");
 
 			m_pTrampoline = m_Trampoline->Alloc(0x1000);
 			if (!m_pTrampoline) {
@@ -118764,7 +118756,7 @@ namespace Detours {
 			}
 
 			unsigned char* pJumpToOriginal = reinterpret_cast<unsigned char*>(m_pTrampoline) + unCopyingSize;
-			const size_t unTrampolineJumpOffset = (reinterpret_cast<size_t>(m_pAddress) + unJumpToOriginalSize) - (reinterpret_cast<size_t>(m_pTrampoline) + unCopyingSize);
+			const size_t unTrampolineJumpOffset = (reinterpret_cast<size_t>(m_pAddress) + unJumpToWrapperSize) - (reinterpret_cast<size_t>(m_pTrampoline) + unCopyingSize);
 			if ((unTrampolineJumpOffset - 2) <= 0xFF) { // EB 00 - jmp rel8
 				pJumpToOriginal[0] = 0xEB;
 				const unsigned char unOffset = static_cast<unsigned char>(unTrampolineJumpOffset & 0xFF) - 2;
