@@ -1548,20 +1548,127 @@ namespace Detours {
 		const void* FindData(const char* const szModuleName, const std::array<const unsigned char, 8>& SectionName, const unsigned char* const pData, const size_t unDataSize);
 		const void* FindData(const char* const szModuleName, const char* const szSectionName, const unsigned char* const pData, const size_t unDataSize);
 #endif
+	}
+
+	// ----------------------------------------------------------------
+	// Run-Time Type Information (RTTI)
+	// ----------------------------------------------------------------
+
+	namespace RTTI {
 
 		// ----------------------------------------------------------------
-		// RTTI
+		// Definitions
 		// ----------------------------------------------------------------
 
-		const void* FindRTTI(const void* const pBaseAddress, const void* const pAddress, const size_t unSize, const char* const szRTTI);
-		const void* FindRTTI(const void* const pBaseAddress, const size_t unSize, const char* const szRTTI);
-		const void* FindRTTI(const HMODULE hModule, const char* const szRTTI);
-		const void* FindRTTIA(const char* const szModuleName, const char* const szRTTI);
-		const void* FindRTTIW(const wchar_t* const szModuleName, const char* const szRTTI);
-#ifdef UNICODE
-		const void* FindRTTI(const wchar_t* const szModuleName, const char* const szRTTI);
+#pragma pack(push, 1)
+
+		typedef struct _RTTI_PMD {
+			int m_nMDisp;
+			int m_nPDisp;
+			int m_nVDisp;
+		} RTTI_PMD, *PRTTI_PMD;
+
+		typedef struct _RTTI_TYPE_DESCRIPTOR {
+			void* m_pVFTable;
+			void* m_pSpare;
+			char m_szName[1];
+		} RTTI_TYPE_DESCRIPTOR, *PRTTI_TYPE_DESCRIPTOR;
+
+		typedef struct _RTTI_BASE_CLASS_DESCRIPTOR {
+#ifdef _M_X64
+			unsigned int m_unTypeDescriptor;
+#elif _M_IX86
+			_RTTI_TYPE_DESCRIPTOR* m_pTypeDescriptor;
+#endif
+			unsigned int m_unNumberOfContainedBases;
+			_RTTI_PMD m_Where;
+			unsigned int m_unAttributes;
+#if _M_X64
+			unsigned int m_unClassHierarchyDescriptor;
+#elif _M_IX86
+			struct _RTTI_CLASS_HIERARCHY_DESCRIPTOR* m_pClassHierarchyDescriptor;
+#endif
+		} RTTI_BASE_CLASS_DESCRIPTOR, *PRTTI_BASE_CLASS_DESCRIPTOR;
+
+		typedef struct _RTTI_BASE_CLASS_ARRAY {
+#ifdef _M_X64
+			unsigned int m_unBaseClassDescriptors[1];
+#elif _M_IX86
+			_RTTI_BASE_CLASS_DESCRIPTOR* m_pBaseClassDescriptors[1];
+#endif
+		} RTTI_BASE_CLASS_ARRAY, *PRTTI_BASE_CLASS_ARRAY;
+
+		typedef struct _RTTI_CLASS_HIERARCHY_DESCRIPTOR {
+			unsigned int m_unSignature;
+			unsigned int m_unAttributes;
+			unsigned int m_unNumberOfBaseClasses;
+#ifdef _M_X64
+			unsigned int m_unBaseClassArray;
+#elif _M_IX86
+			_RTTI_BASE_CLASS_ARRAY* m_pBaseClassArray;
+#endif
+		} RTTI_CLASS_HIERARCHY_DESCRIPTOR, *PRTTI_CLASS_HIERARCHY_DESCRIPTOR;
+
+		typedef struct _RTTI_COMPLETE_OBJECT_LOCATOR {
+			unsigned int m_unSignature;
+			unsigned int m_unOffset;
+			unsigned int m_unConstructorOffset;
+#ifdef _M_X64
+			unsigned int m_unTypeDescriptor;
+			unsigned int m_unClassHierarchyDescriptor;
+			unsigned int m_unSelf;
+#elif _M_IX86
+			_RTTI_TYPE_DESCRIPTOR* m_pTypeDescriptor;
+			_RTTI_CLASS_HIERARCHY_DESCRIPTOR* m_pClassHierarchyDescriptor;
+#endif
+		} RTTI_COMPLETE_OBJECT_LOCATOR, *PRTTI_COMPLETE_OBJECT_LOCATOR;
+
+#pragma pack(pop)
+
+		// ----------------------------------------------------------------
+		// Object
+		// ----------------------------------------------------------------
+
+		class Object {
+		public:
+			Object(void* pBaseAddress, void* pAddress, size_t unSize, PRTTI_TYPE_DESCRIPTOR pTypeDescriptor, PRTTI_CLASS_HIERARCHY_DESCRIPTOR pClassHierarchyDescriptor, PRTTI_BASE_CLASS_ARRAY pBaseClassArray, PRTTI_COMPLETE_OBJECT_LOCATOR pCompleteObject, void** pVTable);
+			~Object() = default;
+
+		public:
+			void* DynamicCast(void* pAddress, Object* pObject);
+
+		public:
+			PRTTI_TYPE_DESCRIPTOR GetTypeDescriptor();
+			PRTTI_CLASS_HIERARCHY_DESCRIPTOR GetClassHierarchyDescriptor();
+			PRTTI_COMPLETE_OBJECT_LOCATOR GetCompleteObject();
+			void** GetVTable();
+			std::vector<std::unique_ptr<Object>>& GetBaseObjects();
+
+		private:
+			void* m_pBaseAddress;
+			void* m_pAddress;
+			size_t m_unSize;
+			PRTTI_TYPE_DESCRIPTOR m_pTypeDescriptor;
+			PRTTI_CLASS_HIERARCHY_DESCRIPTOR m_pClassHierarchyDescriptor;
+			PRTTI_BASE_CLASS_ARRAY m_pBaseClassArray;
+			PRTTI_COMPLETE_OBJECT_LOCATOR m_pCompleteObject;
+			void** m_pVTable;
+			std::vector<std::unique_ptr<Object>> m_vecBaseClasses;
+		};
+
+		// ----------------------------------------------------------------
+		// FindObject
+		// ----------------------------------------------------------------
+
+		std::unique_ptr<Object> FindObject(void* pBaseAddress, void* pAddress, size_t unSize, const char* const szName, bool bCompleteObject = true);
+		std::unique_ptr<Object> FindObject(void* pAddress, size_t unSize, const char* const szName, bool bCompleteObject = true);
+		std::unique_ptr<Object> FindObject(HMODULE hModule, const char* const szName, bool bCompleteObject = true);
+		std::unique_ptr<Object> FindObjectA(const char* const szModuleName, const char* const szName, bool bCompleteObject = true);
+		std::unique_ptr<Object> FindObjectW(const wchar_t* const szModuleName, const char* const szName, bool bCompleteObject = true);
+#ifdef _UNICODE
+		std::unique_ptr<Object> FindObject(const wchar_t* const szModuleName, const char* const szName, bool bCompleteObject = true);
 #else
-		const void* FindRTTI(const char* const szModuleName, const char* const szRTTI);
+		std::unique_ptr<Object> FindObject(const char* const szModuleName, const char* const szName, bool bCompleteObject = true);
 #endif
 	}
 

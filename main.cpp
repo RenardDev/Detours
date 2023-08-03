@@ -31,15 +31,62 @@ typedef struct _SHARED_MEMORY {
 	DWORD m_unTick;
 } SHARED_MEMORY, *PSHARED_MEMORY;
 
-class TestingRTTI {
+class BaseMessage {
+public:
+	virtual void Message() const {
+		_tprintf_s(_T("Hello, World!\n"));
+	}
+};
+
+class MessageOne : public BaseMessage {
+public:
+	void Message() const override {
+		_tprintf_s(_T("> Hello, World!\n"));
+	}
+
+	void PrintName() const {
+#ifdef _UNICODE
+		_tprintf_s(_T("> '%hs'\n"), typeid(MessageOne).raw_name());
+#else
+		_tprintf_s(_T("> '%s'\n"), typeid(MessageOne).raw_name());
+#endif
+	}
+};
+
+class MessageTwo : public BaseMessage {
+public:
+	void Message() const override {
+		_tprintf_s(_T("> Hello, World!\n"));
+	}
+
+	void PrintName() const {
+#ifdef _UNICODE
+		_tprintf_s(_T("> '%hs'\n"), typeid(MessageTwo).raw_name());
+#else
+		_tprintf_s(_T("> '%s'\n"), typeid(MessageTwo).raw_name());
+#endif
+	}
+};
+
+class BaseTestingRTTI {
+public:
+	virtual bool foo() { return false; }
+	virtual bool boo() { return true; }
+
+private:
+	bool m_bFoo;
+	bool m_bBoo;
+};
+
+class TestingRTTI : public BaseTestingRTTI {
 public:
 	TestingRTTI() {
 		m_bFoo = true;
 		m_bBoo = false;
 	}
 
-	virtual bool foo() { return m_bFoo; }
-	virtual bool boo() { return m_bBoo; }
+	bool foo() override { return m_bFoo; }
+	bool boo() override { return m_bBoo; }
 
 private:
 	bool m_bFoo;
@@ -47,6 +94,7 @@ private:
 };
 
 DATA_SECTION_BEGIN(r1, ".dat"); // Will be in a new `.dat` segment
+__declspec(dllexport) BaseTestingRTTI* g_pBaseTestingRTTI = nullptr;
 __declspec(dllexport) TestingRTTI* g_pTestingRTTI = nullptr;
 DATA_SECTION_END(r1);
 
@@ -69,6 +117,55 @@ DWORD GetUBR() {
 
 	RegCloseKey(hKey);
 	return unUBR;
+}
+
+void DumpObject(void* pAddress, Detours::RTTI::Object* pObject, unsigned int unLevel = 0) {
+	if (!pAddress || !pObject) {
+		return;
+	}
+
+	if (!unLevel) {
+		_tprintf_s(_T("Dumping object:\n"));
+	}
+
+	for (unsigned int i = 0; i < unLevel; ++i) {
+		_tprintf_s(_T(" "));
+	}
+
+#ifdef _M_X64
+#ifdef _UNICODE
+	_tprintf_s(_T("> '%hs' = 0x%016llX\n"), pObject->GetTypeDescriptor()->m_szName, reinterpret_cast<size_t>(pObject->GetVTable()));
+#else
+	_tprintf_s(_T("> '%s' = 0x%016llX\n"), pObject->GetTypeDescriptor()->m_szName, reinterpret_cast<size_t>(pObject->GetVTable()));
+#endif
+#elif _M_IX86
+#ifdef _UNICODE
+	_tprintf_s(_T("> '%hs' = 0x%08X\n"), pObject->GetTypeDescriptor()->m_szName, reinterpret_cast<size_t>(pObject->GetVTable()));
+#else
+	_tprintf_s(_T("> '%s' = 0x%08X\n"), pObject->GetTypeDescriptor()->m_szName, reinterpret_cast<size_t>(pObject->GetVTable()));
+#endif
+#endif
+
+	for (auto& BaseObject : pObject->GetBaseObjects()) {
+		DumpObject(pAddress, BaseObject.get(), unLevel + 1);
+	}
+
+	if (!unLevel) {
+		_tprintf_s(_T("\n"));
+	}
+}
+
+void ProcessMessage(BaseMessage* pMessage) {
+	MessageOne* Msg1 = dynamic_cast<MessageOne*>(pMessage);
+	MessageTwo* Msg2 = dynamic_cast<MessageTwo*>(pMessage);
+
+	if (Msg1) {
+		Msg1->Message();
+		Msg1->PrintName();
+	} else if (Msg2) {
+		Msg2->Message();
+		Msg2->PrintName();
+	}
 }
 
 bool OnException(const EXCEPTION_RECORD& Exception, const PCONTEXT pCTX) {
@@ -723,6 +820,7 @@ bool __cdecl Sleep_RawHook(Detours::Hook::PRAW_HOOK_CONTEXT pCTX) {
 }
 
 int _tmain(int nArguments, PTCHAR* pArguments) {
+	g_pBaseTestingRTTI = new BaseTestingRTTI();
 	g_pTestingRTTI = new TestingRTTI();
 
 	// ----------------------------------------------------------------
@@ -984,31 +1082,100 @@ int _tmain(int nArguments, PTCHAR* pArguments) {
 	_tprintf_s(_T("FindData(...) = 0x%08X\n"), reinterpret_cast<size_t>(Detours::Scan::FindData(_T("ntdll.dll"), reinterpret_cast<const unsigned char* const>("\x8B\xD1\x8B\x42\x08"), 5)));
 #endif
 
-	void** pVTable = reinterpret_cast<void**>(const_cast<void*>(Detours::Scan::FindRTTI(_T("Detours.exe"), ".?AVTestingRTTI@@")));
+	_tprintf_s(_T("\n"));
+
+	// ----------------------------------------------------------------
+	// RTTI
+	// ----------------------------------------------------------------
+
+	_tprintf_s(_T("RTTI Example\n\n"));
+
+	auto pObject = Detours::RTTI::FindObject(_T("Detours.exe"), ".?AVTestingRTTI@@");
+	if (pObject) {
+
+		DumpObject(g_pTestingRTTI, pObject.get());
+
+		void** pVTable = pObject->GetVTable();
 
 #ifdef _M_X64
-#ifdef UNICODE
-	_tprintf_s(_T("> FindRTTI(...) '%hs' = 0x%016llX\n"), typeid(TestingRTTI).raw_name(), reinterpret_cast<size_t>(pVTable));
+#ifdef _UNICODE
+		_tprintf_s(_T("> FindObject(...)->GetVTable(...) '%hs' = 0x%016llX\n"), typeid(TestingRTTI).raw_name(), reinterpret_cast<size_t>(pVTable));
 #else
-	_tprintf_s(_T("> FindRTTI(...) '%s' = 0x%016llX\n"), typeid(TestingRTTI).raw_name(), reinterpret_cast<size_t>(pVTable));
+		_tprintf_s(_T("> FindObject(...)->GetVTable(...) '%s' = 0x%016llX\n"), typeid(TestingRTTI).raw_name(), reinterpret_cast<size_t>(pVTable));
 #endif
 #elif _M_IX86
-#ifdef UNICODE
-	_tprintf_s(_T("> FindRTTI(...) '%hs' = 0x%08X\n"), typeid(TestingRTTI).raw_name(), reinterpret_cast<size_t>(pVTable));
+#ifdef _UNICODE
+		_tprintf_s(_T("> FindObject(...)->GetVTable(...) '%hs' = 0x%08X\n"), typeid(TestingRTTI).raw_name(), reinterpret_cast<size_t>(pVTable));
 #else
-	_tprintf_s(_T("> FindRTTI(...) '%s' = 0x%08X\n"), typeid(TestingRTTI).raw_name(), reinterpret_cast<size_t>(pVTable));
+		_tprintf_s(_T("> FindObject(...)->GetVTable(...) '%s' = 0x%08X\n"), typeid(TestingRTTI).raw_name(), reinterpret_cast<size_t>(pVTable));
 #endif
 #endif
 
-	if (pVTable) {
-		// __thiscall - 1st arg (this) = ecx
-		// __fastcall - 1st arg = ecx, 2nd arg = edx
-		using fnFoo = bool(__fastcall*)(void* pThis, void* /* unused */);
-		using fnBoo = bool(__fastcall*)(void* pThis, void* /* unused */);
+		if (pVTable) {
+			// __thiscall - 1st arg (this) = ecx
+			// __fastcall - 1st arg = ecx, 2nd arg = edx
+			using fnFoo = bool(__fastcall*)(void* pThis, void* /* unused */);
+			using fnBoo = bool(__fastcall*)(void* pThis, void* /* unused */);
 
-		_tprintf_s(_T("  > foo() = %d\n"), reinterpret_cast<fnFoo>(pVTable[0])(g_pTestingRTTI, nullptr));
-		_tprintf_s(_T("  > boo() = %d\n"), reinterpret_cast<fnBoo>(pVTable[1])(g_pTestingRTTI, nullptr));
+			_tprintf_s(_T("  > foo() = %d\n"), reinterpret_cast<fnFoo>(pVTable[0])(g_pTestingRTTI, nullptr));
+			_tprintf_s(_T("  > boo() = %d\n"), reinterpret_cast<fnBoo>(pVTable[1])(g_pTestingRTTI, nullptr));
+		}
 	}
+
+	BaseMessage* pMsg1 = new MessageOne();
+	BaseMessage* pMsg2 = new MessageTwo();
+
+	ProcessMessage(pMsg1);
+	ProcessMessage(pMsg2);
+
+	auto pBaseMessageObject = Detours::RTTI::FindObject(_T("Detours.exe"), ".?AVBaseMessage@@", false);
+	auto pMessageOneObject = Detours::RTTI::FindObject(_T("Detours.exe"), ".?AVMessageOne@@");
+	auto pMessageTwoObject = Detours::RTTI::FindObject(_T("Detours.exe"), ".?AVMessageTwo@@");
+
+#ifdef _M_X64
+#ifdef _UNICODE
+	_tprintf_s(_T("> FindObject(...) '%hs' = 0x%016llX\n"), typeid(BaseMessage).raw_name(), reinterpret_cast<size_t>(pBaseMessageObject.get()));
+	_tprintf_s(_T("> FindObject(...) '%hs' = 0x%016llX\n"), typeid(MessageOne).raw_name(), reinterpret_cast<size_t>(pMessageOneObject.get()));
+	_tprintf_s(_T("> FindObject(...) '%hs' = 0x%016llX\n"), typeid(MessageTwo).raw_name(), reinterpret_cast<size_t>(pMessageTwoObject.get()));
+#else
+	_tprintf_s(_T("> FindObject(...) '%s' = 0x%016llX\n"), typeid(BaseMessage).raw_name(), reinterpret_cast<size_t>(pBaseMessageObject.get()));
+	_tprintf_s(_T("> FindObject(...) '%s' = 0x%016llX\n"), typeid(MessageOne).raw_name(), reinterpret_cast<size_t>(pMessageOneObject.get()));
+	_tprintf_s(_T("> FindObject(...) '%s' = 0x%016llX\n"), typeid(MessageTwo).raw_name(), reinterpret_cast<size_t>(pMessageTwoObject.get()));
+#endif
+#elif _M_IX86
+#ifdef _UNICODE
+	_tprintf_s(_T("> FindObject(...)->GetVTable(...) '%hs' = 0x%08X\n"), typeid(BaseMessage).raw_name(), reinterpret_cast<size_t>(pBaseMessageObject.get()));
+	_tprintf_s(_T("> FindObject(...)->GetVTable(...) '%hs' = 0x%08X\n"), typeid(MessageOne).raw_name(), reinterpret_cast<size_t>(pMessageOneObject.get()));
+	_tprintf_s(_T("> FindObject(...)->GetVTable(...) '%hs' = 0x%08X\n"), typeid(MessageTwo).raw_name(), reinterpret_cast<size_t>(pMessageTwoObject.get()));
+#else
+	_tprintf_s(_T("> FindObject(...)->GetVTable(...) '%s' = 0x%08X\n"), typeid(BaseMessage).raw_name(), reinterpret_cast<size_t>(pBaseMessageObject.get()));
+	_tprintf_s(_T("> FindObject(...)->GetVTable(...) '%s' = 0x%08X\n"), typeid(MessageOne).raw_name(), reinterpret_cast<size_t>(pMessageOneObject.get()));
+	_tprintf_s(_T("> FindObject(...)->GetVTable(...) '%s' = 0x%08X\n"), typeid(MessageTwo).raw_name(), reinterpret_cast<size_t>(pMessageTwoObject.get()));
+#endif
+#endif
+
+	if (pBaseMessageObject && pMessageOneObject && pMessageTwoObject) {
+#ifdef _M_X64
+#ifdef _UNICODE
+		_tprintf_s(_T("> BaseMessage->DynamicCast(...) '%hs' -> `%hs` = [0x%016llX -> 0x%016llX]\n"), typeid(BaseMessage).raw_name(), typeid(MessageOne).raw_name(), reinterpret_cast<size_t>(pMsg1), reinterpret_cast<size_t>(pBaseMessageObject->DynamicCast(pMsg1, pMessageOneObject.get())));
+		_tprintf_s(_T("> BaseMessage->DynamicCast(...) '%hs' -> `%hs` = [0x%016llX -> 0x%016llX]\n"), typeid(BaseMessage).raw_name(), typeid(MessageTwo).raw_name(), reinterpret_cast<size_t>(pMsg1), reinterpret_cast<size_t>(pBaseMessageObject->DynamicCast(pMsg1, pMessageTwoObject.get())));
+#else
+		_tprintf_s(_T("> BaseMessage->DynamicCast(...) '%s' -> `%s` = [0x%016llX -> 0x%016llX]\n"), typeid(BaseMessage).raw_name(), typeid(MessageOne).raw_name() reinterpret_cast<size_t>(pMsg1), reinterpret_cast<size_t>(pBaseMessageObject->DynamicCast(pMsg1, pMessageOneObject.get())));
+		_tprintf_s(_T("> BaseMessage->DynamicCast(...) '%s' -> `%s` = [0x%016llX -> 0x%016llX]\n"), typeid(BaseMessage).raw_name(),, typeid(MessageTwo).raw_name(), reinterpret_cast<size_t>(pMsg1), reinterpret_cast<size_t>(pBaseMessageObject->DynamicCast(pMsg1, pMessageTwoObject.get())));
+#endif
+#elif _M_IX86
+#ifdef _UNICODE
+		_tprintf_s(_T("> BaseMessage->DynamicCast(...) '%hs' -> `%hs` = [0x%08X -> 0x%08X]\n"), typeid(BaseMessage).raw_name(), typeid(MessageOne).raw_name(), reinterpret_cast<size_t>(pMsg1), reinterpret_cast<size_t>(pBaseMessageObject->DynamicCast(pMsg1, pMessageOneObject.get())));
+		_tprintf_s(_T("> BaseMessage->DynamicCast(...) '%hs' -> `%hs` = [0x%08X -> 0x%08X]\n"), typeid(BaseMessage).raw_name(), typeid(MessageTwo).raw_name(), reinterpret_cast<size_t>(pMsg1), reinterpret_cast<size_t>(pBaseMessageObject->DynamicCast(pMsg1, pMessageTwoObject.get())));
+#else
+		_tprintf_s(_T("> BaseMessage->DynamicCast(...) '%s' -> `%s` = [0x%08X -> 0x%08X]\n"), typeid(BaseMessage).raw_name(), typeid(MessageOne).raw_name(), reinterpret_cast<size_t>(pMsg1), reinterpret_cast<size_t>(pBaseMessageObject->DynamicCast(pMsg1, pMessageOneObject.get())));
+		_tprintf_s(_T("> BaseMessage->DynamicCast(...) '%s' -> `%s` = [0x%08X -> 0x%08X]\n"), typeid(BaseMessage).raw_name(), typeid(MessageTwo).raw_name(), reinterpret_cast<size_t>(pMsg1), reinterpret_cast<size_t>(pBaseMessageObject->DynamicCast(pMsg1, pMessageTwoObject.get())));
+#endif
+#endif
+	}
+
+	delete pMsg1;
+	delete pMsg2;
 
 	_tprintf_s(_T("\n"));
 
@@ -1081,54 +1248,57 @@ int _tmain(int nArguments, PTCHAR* pArguments) {
 
 	// VTableFunctionHook & VTableHook
 
-	void** pHookingVTable = reinterpret_cast<void**>(const_cast<void*>(Detours::Scan::FindRTTI(_T("Detours.exe"), ".?AVTestingRTTI@@")));
+	auto pHookingObject = Detours::RTTI::FindObject(_T("Detours.exe"), ".?AVTestingRTTI@@");
+	if (pHookingObject) {
+		void** pHookingVTable = pHookingObject->GetVTable();
 
 #ifdef _M_X64
-#ifdef UNICODE
-	_tprintf_s(_T("> '%hs' = 0x%016llX\n"), typeid(TestingRTTI).raw_name(), reinterpret_cast<size_t>(pHookingVTable));
+#ifdef _UNICODE
+		_tprintf_s(_T("> FindObject(...)->GetVTable(...) '%hs' = 0x%016llX\n"), typeid(TestingRTTI).raw_name(), reinterpret_cast<size_t>(pHookingVTable));
 #else
-	_tprintf_s(_T("> '%s' = 0x%016llX\n"), typeid(TestingRTTI).raw_name(), reinterpret_cast<size_t>(pHookingVTable));
+		_tprintf_s(_T("> FindObject(...)->GetVTable(...) '%s' = 0x%016llX\n"), typeid(TestingRTTI).raw_name(), reinterpret_cast<size_t>(pHookingVTable));
 #endif
 #elif _M_IX86
-#ifdef UNICODE
-	_tprintf_s(_T("> '%hs' = 0x%08X\n"), typeid(TestingRTTI).raw_name(), reinterpret_cast<size_t>(pHookingVTable));
+#ifdef _UNICODE
+		_tprintf_s(_T("> FindObject(...)->GetVTable(...) '%hs' = 0x%08X\n"), typeid(TestingRTTI).raw_name(), reinterpret_cast<size_t>(pHookingVTable));
 #else
-	_tprintf_s(_T("> '%s' = 0x%08X\n"), typeid(TestingRTTI).raw_name(), reinterpret_cast<size_t>(pHookingVTable));
+		_tprintf_s(_T("> FindObject(...)->GetVTable(...) '%s' = 0x%08X\n"), typeid(TestingRTTI).raw_name(), reinterpret_cast<size_t>(pHookingVTable));
 #endif
 #endif
 
-	if (pHookingVTable) {
-		// __thiscall - 1st arg (this) = ecx
-		// __fastcall - 1st arg = ecx, 2nd arg = edx
-		using fnFoo = bool(__fastcall*)(void* pThis, void* /* unused */);
-		using fnBoo = bool(__fastcall*)(void* pThis, void* /* unused */);
+		if (pHookingVTable) {
+			// __thiscall - 1st arg (this) = ecx
+			// __fastcall - 1st arg = ecx, 2nd arg = edx
+			using fnFoo = bool(__fastcall*)(void* pThis, void* /* unused */);
+			using fnBoo = bool(__fastcall*)(void* pThis, void* /* unused */);
 
-		_tprintf_s(_T("  > foo() = %d\n"), reinterpret_cast<fnFoo>(pHookingVTable[0])(g_pTestingRTTI, nullptr));
-		_tprintf_s(_T("  > boo() = %d\n"), reinterpret_cast<fnBoo>(pHookingVTable[1])(g_pTestingRTTI, nullptr));
+			_tprintf_s(_T("  > foo() = %d\n"), reinterpret_cast<fnFoo>(pHookingVTable[0])(g_pTestingRTTI, nullptr));
+			_tprintf_s(_T("  > boo() = %d\n"), reinterpret_cast<fnBoo>(pHookingVTable[1])(g_pTestingRTTI, nullptr));
 
-		_tprintf_s(_T("fooHook.Set(...) = %d\n"), fooHook.Set(pHookingVTable, 0));
-		_tprintf_s(_T("fooHook.Hook(...) = %d\n"), fooHook.Hook(reinterpret_cast<void*>(foo_Hook)));
-		_tprintf_s(_T("  > foo() = %d\n"), reinterpret_cast<fnFoo>(pHookingVTable[0])(g_pTestingRTTI, nullptr));
-		_tprintf_s(_T("fooHook.UnHook() = %d\n"), fooHook.UnHook());
+			_tprintf_s(_T("fooHook.Set(...) = %d\n"), fooHook.Set(pHookingVTable, 0));
+			_tprintf_s(_T("fooHook.Hook(...) = %d\n"), fooHook.Hook(reinterpret_cast<void*>(foo_Hook)));
+			_tprintf_s(_T("  > foo() = %d\n"), reinterpret_cast<fnFoo>(pHookingVTable[0])(g_pTestingRTTI, nullptr));
+			_tprintf_s(_T("fooHook.UnHook() = %d\n"), fooHook.UnHook());
 
-		_tprintf_s(_T("booHook.Set(...) = %d\n"), booHook.Set(pHookingVTable, 1));
-		_tprintf_s(_T("booHook.Hook(...) = %d\n"), booHook.Hook(reinterpret_cast<void*>(boo_Hook)));
-		_tprintf_s(_T("  > boo() = %d\n"), reinterpret_cast<fnBoo>(pHookingVTable[1])(g_pTestingRTTI, nullptr));
-		_tprintf_s(_T("booHook.UnHook() = %d\n"), booHook.UnHook());
+			_tprintf_s(_T("booHook.Set(...) = %d\n"), booHook.Set(pHookingVTable, 1));
+			_tprintf_s(_T("booHook.Hook(...) = %d\n"), booHook.Hook(reinterpret_cast<void*>(boo_Hook)));
+			_tprintf_s(_T("  > boo() = %d\n"), reinterpret_cast<fnBoo>(pHookingVTable[1])(g_pTestingRTTI, nullptr));
+			_tprintf_s(_T("booHook.UnHook() = %d\n"), booHook.UnHook());
 
-		void* pNewVTable[2] = {
-			nullptr, // Will be skipped
-			reinterpret_cast<void*>(boo_Hook2)
-		};
+			void* pNewVTable[2] = {
+				nullptr, // Will be skipped
+				reinterpret_cast<void*>(boo_Hook2)
+			};
 
-		_tprintf_s(_T("NewTestingRTTIVTable.Set(...) = %d\n"), NewTestingRTTIVTable.Set(pHookingVTable, 2));
-		_tprintf_s(_T("NewTestingRTTIVTable.Hook(...) = %d\n"), NewTestingRTTIVTable.Hook(pNewVTable));
-		_tprintf_s(_T("  > foo() = %d\n"), reinterpret_cast<fnFoo>(pHookingVTable[0])(g_pTestingRTTI, nullptr));
-		_tprintf_s(_T("  > boo() = %d\n"), reinterpret_cast<fnBoo>(pHookingVTable[1])(g_pTestingRTTI, nullptr));
-		_tprintf_s(_T("NewTestingRTTIVTable.UnHook() = %d\n"), NewTestingRTTIVTable.UnHook());
+			_tprintf_s(_T("NewTestingRTTIVTable.Set(...) = %d\n"), NewTestingRTTIVTable.Set(pHookingVTable, 2));
+			_tprintf_s(_T("NewTestingRTTIVTable.Hook(...) = %d\n"), NewTestingRTTIVTable.Hook(pNewVTable));
+			_tprintf_s(_T("  > foo() = %d\n"), reinterpret_cast<fnFoo>(pHookingVTable[0])(g_pTestingRTTI, nullptr));
+			_tprintf_s(_T("  > boo() = %d\n"), reinterpret_cast<fnBoo>(pHookingVTable[1])(g_pTestingRTTI, nullptr));
+			_tprintf_s(_T("NewTestingRTTIVTable.UnHook() = %d\n"), NewTestingRTTIVTable.UnHook());
+		}
+
+		_tprintf_s(_T("\n"));
 	}
-
-	_tprintf_s(_T("\n"));
 
 	// InlineHook
 
