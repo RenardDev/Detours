@@ -1,2 +1,2 @@
 # Detours
-Set of features like pattern search, RTTI VTable search, hooks.
+Set of features like pattern search, RTTI search/cast, hooks.
