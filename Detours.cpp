@@ -116767,10 +116767,10 @@ namespace Detours {
 	namespace Hook {
 
 		// ----------------------------------------------------------------
-		// Thread Control
+		// Thread Suspender
 		// ----------------------------------------------------------------
 
-		ThreadControl::ThreadControl() {
+		ThreadSuspender::ThreadSuspender() {
 			m_pNtGetNextThread = nullptr;
 
 			HMODULE hNTDLL = GetModuleHandle(_T("ntdll.dll"));
@@ -116779,16 +116779,16 @@ namespace Detours {
 			}
 		}
 
-		ThreadControl::~ThreadControl() {
+		ThreadSuspender::~ThreadSuspender() {
 			ResumeThreads();
 		}
 
-		void ThreadControl::SuspendThreads() {
+		void ThreadSuspender::SuspendThreads() {
 			if (m_pNtGetNextThread == nullptr) {
 				return;
 			}
 
-			std::lock_guard<std::mutex> ThreadsLock(m_ThreadControlMutex);
+			std::lock_guard<std::mutex> ThreadsLock(m_ThreadSuspenderMutex);
 
 			size_t unThreadsSuspended = 0;
 			do {
@@ -116803,7 +116803,7 @@ namespace Detours {
 
 					if (hThread && (hThread != INVALID_HANDLE_VALUE)) {
 						DWORD unThreadID = GetThreadId(hThread);
-						if ((unThreadID == 0) || (unThreadID == GetCurrentThreadId()) || (std::find_if(m_Threads.begin(), m_Threads.end(), [&](const THREAD_CONTROL_DATA& thread) { return thread.m_unThreadID == unThreadID; }) != m_Threads.end())) {
+						if ((unThreadID == 0) || (unThreadID == GetCurrentThreadId()) || (std::find_if(m_Threads.begin(), m_Threads.end(), [&](const THREAD_SUSPENDER_DATA& thread) { return thread.m_unThreadID == unThreadID; }) != m_Threads.end())) {
 							CloseHandle(hThread);
 							continue;
 						}
@@ -116818,14 +116818,14 @@ namespace Detours {
 							continue;
 						}
 
-						m_Threads.emplace_back(THREAD_CONTROL_DATA{ unThreadID, hThread, ctx });
+						m_Threads.emplace_back(unThreadID, hThread, ctx);
 					}
 				}
 			} while (unThreadsSuspended != m_Threads.size());
 		}
 
-		void ThreadControl::ResumeThreads() {
-			std::lock_guard<std::mutex> ThreadsLock(m_ThreadControlMutex);
+		void ThreadSuspender::ResumeThreads() {
+			std::lock_guard<std::mutex> ThreadsLock(m_ThreadSuspenderMutex);
 
 			for (auto& thread : m_Threads) {
 				SetThreadContext(thread.m_hHandle, &thread.m_CTX);  // BUG: VS says m_hHandle variable is uninitialized, which is false.
@@ -116836,8 +116836,8 @@ namespace Detours {
 			m_Threads.clear();
 		}
 
-		void ThreadControl::FixExecutionAddress(void* pAddress, void* pNewAddress) {
-			std::lock_guard<std::mutex> ThreadsLock(m_ThreadControlMutex);
+		void ThreadSuspender::FixExecutionAddress(void* pAddress, void* pNewAddress) {
+			std::lock_guard<std::mutex> ThreadsLock(m_ThreadSuspenderMutex);
 
 			for (auto& thread : m_Threads) {
 #ifdef _M_X64
@@ -116862,7 +116862,7 @@ namespace Detours {
 			}
 		}
 
-		ThreadControl g_ThreadControl;
+		ThreadSuspender g_ThreadSuspender;
 
 		// ----------------------------------------------------------------
 		// Memory Hook
@@ -116880,28 +116880,28 @@ namespace Detours {
 		}
 
 		bool MemoryHook::Hook(const fnMemoryHookCallBack pCallBack) {
-			g_ThreadControl.SuspendThreads();
+			g_ThreadSuspender.SuspendThreads();
 
 			if (!m_pAddress || !m_unSize || m_pCallBack || !pCallBack) {
-				g_ThreadControl.ResumeThreads();
+				g_ThreadSuspender.ResumeThreads();
 				return false;
 			}
 
 			const auto& it = g_Protections.find(m_pAddress);
 			if (it != g_Protections.end()) {
-				g_ThreadControl.ResumeThreads();
+				g_ThreadSuspender.ResumeThreads();
 				return false;
 			}
 
 			auto pProtection = std::make_unique<Protection>(m_pAddress, m_unSize);
 			if (!pProtection) {
-				g_ThreadControl.ResumeThreads();
+				g_ThreadSuspender.ResumeThreads();
 				return false;
 			}
 
 			DWORD unProtection = 0;
 			if (!pProtection->GetProtection(&unProtection)) {
-				g_ThreadControl.ResumeThreads();
+				g_ThreadSuspender.ResumeThreads();
 				return false;
 			}
 
@@ -116912,7 +116912,7 @@ namespace Detours {
 			}
 
 			if (!pProtection->ChangeProtection(unProtection)) {
-				g_ThreadControl.ResumeThreads();
+				g_ThreadSuspender.ResumeThreads();
 				return false;
 			}
 
@@ -116920,32 +116920,32 @@ namespace Detours {
 
 			m_pCallBack = pCallBack;
 
-			g_ThreadControl.ResumeThreads();
+			g_ThreadSuspender.ResumeThreads();
 			return true;
 		}
 
 		bool MemoryHook::UnHook() {
-			g_ThreadControl.SuspendThreads();
+			g_ThreadSuspender.SuspendThreads();
 
 			if (!m_pAddress || !m_unSize || !m_pCallBack) {
-				g_ThreadControl.ResumeThreads();
+				g_ThreadSuspender.ResumeThreads();
 				return false;
 			}
 
 			const auto& it = g_Protections.find(m_pAddress);
 			if (it == g_Protections.end()) {
-				g_ThreadControl.ResumeThreads();
+				g_ThreadSuspender.ResumeThreads();
 				return false;
 			}
 
 			const auto& pProtection = it->second;
 			if (!pProtection) {
-				g_ThreadControl.ResumeThreads();
+				g_ThreadSuspender.ResumeThreads();
 				return false;
 			}
 
 			if (!pProtection->RestoreProtection()) {
-				g_ThreadControl.ResumeThreads();
+				g_ThreadSuspender.ResumeThreads();
 				return false;
 			}
 
@@ -116953,33 +116953,33 @@ namespace Detours {
 
 			m_pCallBack = nullptr;
 
-			g_ThreadControl.ResumeThreads();
+			g_ThreadSuspender.ResumeThreads();
 			return true;
 		}
 
 		bool MemoryHook::Enable() {
-			g_ThreadControl.SuspendThreads();
+			g_ThreadSuspender.SuspendThreads();
 
 			if (!m_pAddress || !m_unSize || !m_pCallBack) {
-				g_ThreadControl.ResumeThreads();
+				g_ThreadSuspender.ResumeThreads();
 				return false;
 			}
 
 			const auto& it = g_Protections.find(m_pAddress);
 			if (it == g_Protections.end()) {
-				g_ThreadControl.ResumeThreads();
+				g_ThreadSuspender.ResumeThreads();
 				return false;
 			}
 
 			const auto& pProtection = it->second;
 			if (!pProtection) {
-				g_ThreadControl.ResumeThreads();
+				g_ThreadSuspender.ResumeThreads();
 				return false;
 			}
 
 			DWORD unProtection = 0;
 			if (!pProtection->GetProtection(&unProtection)) {
-				g_ThreadControl.ResumeThreads();
+				g_ThreadSuspender.ResumeThreads();
 				return false;
 			}
 
@@ -116991,33 +116991,33 @@ namespace Detours {
 
 			const bool bSuccess = pProtection->ChangeProtection(unProtection);
 
-			g_ThreadControl.ResumeThreads();
+			g_ThreadSuspender.ResumeThreads();
 			return bSuccess;
 		}
 
 		bool MemoryHook::Disable() {
-			g_ThreadControl.SuspendThreads();
+			g_ThreadSuspender.SuspendThreads();
 
 			if (!m_pAddress || !m_unSize || !m_pCallBack) {
-				g_ThreadControl.ResumeThreads();
+				g_ThreadSuspender.ResumeThreads();
 				return false;
 			}
 
 			const auto& it = g_Protections.find(m_pAddress);
 			if (it == g_Protections.end()) {
-				g_ThreadControl.ResumeThreads();
+				g_ThreadSuspender.ResumeThreads();
 				return false;
 			}
 
 			const auto& pProtection = it->second;
 			if (!pProtection) {
-				g_ThreadControl.ResumeThreads();
+				g_ThreadSuspender.ResumeThreads();
 				return false;
 			}
 
 			const bool bSuccess = pProtection->RestoreProtection();
 
-			g_ThreadControl.ResumeThreads();
+			g_ThreadSuspender.ResumeThreads();
 			return bSuccess;
 		}
 
@@ -117038,7 +117038,7 @@ namespace Detours {
 		}
 
 		// ----------------------------------------------------------------
-		// Simple Memory Hook
+		// Memory Hook
 		// ----------------------------------------------------------------
 
 		bool HookMemory(void* pAddress, const fnMemoryHookCallBack pCallBack, bool bAutoDisable) {
@@ -117137,30 +117137,30 @@ namespace Detours {
 		}
 
 		bool InterruptHook::Hook(const fnInterruptHookCallBack pCallBack) {
-			g_ThreadControl.SuspendThreads();
+			g_ThreadSuspender.SuspendThreads();
 
 			if (m_pCallBack || !pCallBack) {
-				g_ThreadControl.ResumeThreads();
+				g_ThreadSuspender.ResumeThreads();
 				return false;
 			}
 
 			m_pCallBack = pCallBack;
 
-			g_ThreadControl.ResumeThreads();
+			g_ThreadSuspender.ResumeThreads();
 			return true;
 		}
 
 		bool InterruptHook::UnHook() {
-			g_ThreadControl.SuspendThreads();
+			g_ThreadSuspender.SuspendThreads();
 
 			if (!m_pCallBack) {
-				g_ThreadControl.ResumeThreads();
+				g_ThreadSuspender.ResumeThreads();
 				return false;
 			}
 
 			m_pCallBack = nullptr;
 
-			g_ThreadControl.ResumeThreads();
+			g_ThreadSuspender.ResumeThreads();
 			return true;
 		}
 
@@ -117173,7 +117173,7 @@ namespace Detours {
 		}
 
 		// ----------------------------------------------------------------
-		// Simple Interrupt Hook
+		// Interrupt Hook
 		// ----------------------------------------------------------------
 
 		bool HookInterrupt(const fnInterruptHookCallBack pCallBack, unsigned char unInterrupt) {
@@ -117279,10 +117279,10 @@ namespace Detours {
 		}
 
 		bool VTableFunctionHook::Hook(void* pHookAddress) {
-			g_ThreadControl.SuspendThreads();
+			g_ThreadSuspender.SuspendThreads();
 
 			if (!m_bInitialized || !m_pVTable || !m_pOriginal || !pHookAddress) {
-				g_ThreadControl.ResumeThreads();
+				g_ThreadSuspender.ResumeThreads();
 				return false;
 			}
 
@@ -117290,18 +117290,18 @@ namespace Detours {
 
 			const auto& it = g_Protections.find(reinterpret_cast<void*>(pAddress));
 			if (it != g_Protections.end()) {
-				g_ThreadControl.ResumeThreads();
+				g_ThreadSuspender.ResumeThreads();
 				return false;
 			}
 
 			auto pProtection = std::make_unique<Protection>(pAddress, sizeof(void*));
 			if (!pProtection) {
-				g_ThreadControl.ResumeThreads();
+				g_ThreadSuspender.ResumeThreads();
 				return false;
 			}
 
 			if (!pProtection->ChangeProtection(PAGE_EXECUTE_READWRITE)) {
-				g_ThreadControl.ResumeThreads();
+				g_ThreadSuspender.ResumeThreads();
 				return false;
 			}
 
@@ -117312,15 +117312,15 @@ namespace Detours {
 
 			g_Protections.emplace_hint(it, reinterpret_cast<void*>(pAddress), std::move(pProtection));
 
-			g_ThreadControl.ResumeThreads();
+			g_ThreadSuspender.ResumeThreads();
 			return true;
 		}
 
 		bool VTableFunctionHook::UnHook() {
-			g_ThreadControl.SuspendThreads();
+			g_ThreadSuspender.SuspendThreads();
 
 			if (!m_bInitialized || !m_pVTable || !m_pOriginal) {
-				g_ThreadControl.ResumeThreads();
+				g_ThreadSuspender.ResumeThreads();
 				return false;
 			}
 
@@ -117328,18 +117328,18 @@ namespace Detours {
 
 			const auto& it = g_Protections.find(reinterpret_cast<void*>(pAddress));
 			if (it == g_Protections.end()) {
-				g_ThreadControl.ResumeThreads();
+				g_ThreadSuspender.ResumeThreads();
 				return false;
 			}
 
 			const auto& pProtection = it->second;
 			if (!pProtection) {
-				g_ThreadControl.ResumeThreads();
+				g_ThreadSuspender.ResumeThreads();
 				return false;
 			}
 
 			if (!pProtection->ChangeProtection(PAGE_EXECUTE_READWRITE)) {
-				g_ThreadControl.ResumeThreads();
+				g_ThreadSuspender.ResumeThreads();
 				return false;
 			}
 
@@ -117350,7 +117350,7 @@ namespace Detours {
 
 			g_Protections.erase(it);
 
-			g_ThreadControl.ResumeThreads();
+			g_ThreadSuspender.ResumeThreads();
 			return true;
 		}
 
@@ -117503,10 +117503,10 @@ namespace Detours {
 		}
 
 		bool InlineHook::Hook(void* pHookAddress) {
-			g_ThreadControl.SuspendThreads();
+			g_ThreadSuspender.SuspendThreads();
 
 			if (!m_bInitialized || !m_pAddress || m_Trampoline || m_pTrampoline || !pHookAddress) {
-				g_ThreadControl.ResumeThreads();
+				g_ThreadSuspender.ResumeThreads();
 				return false;
 			}
 
@@ -117525,7 +117525,7 @@ namespace Detours {
 				// FF 64 24 F8 - jmp [rsp-8]
 				unJumpToHookSize = 20;
 #elif _M_IX86
-				g_ThreadControl.ResumeThreads();
+				g_ThreadSuspender.ResumeThreads();
 				return false;
 #endif
 			}
@@ -117541,7 +117541,7 @@ namespace Detours {
 				if (!RD_SUCCESS(RdDecode(&ins, reinterpret_cast<unsigned char*>(m_pAddress) + unCopyingSize, RD_CODE_32, RD_DATA_32))) {
 #endif
 					m_pAddressAfterJump = nullptr;
-					g_ThreadControl.ResumeThreads();
+					g_ThreadSuspender.ResumeThreads();
 					return false;
 				}
 
@@ -117555,7 +117555,7 @@ namespace Detours {
 #endif
 			if (!m_Trampoline) {
 				m_pAddressAfterJump = nullptr;
-				g_ThreadControl.ResumeThreads();
+				g_ThreadSuspender.ResumeThreads();
 				return false;
 			}
 
@@ -117563,7 +117563,7 @@ namespace Detours {
 			if (!m_pTrampoline) {
 				m_Trampoline = nullptr;
 				m_pAddressAfterJump = nullptr;
-				g_ThreadControl.ResumeThreads();
+				g_ThreadSuspender.ResumeThreads();
 				return false;
 			}
 
@@ -117586,7 +117586,7 @@ namespace Detours {
 				m_pTrampoline = nullptr;
 				m_Trampoline = nullptr;
 				m_pAddressAfterJump = nullptr;
-				g_ThreadControl.ResumeThreads();
+				g_ThreadSuspender.ResumeThreads();
 				return false;
 #endif
 			}
@@ -117605,7 +117605,7 @@ namespace Detours {
 					m_pTrampoline = nullptr;
 					m_Trampoline = nullptr;
 					m_pAddressAfterJump = nullptr;
-					g_ThreadControl.ResumeThreads();
+					g_ThreadSuspender.ResumeThreads();
 					return false;
 				}
 
@@ -117631,7 +117631,7 @@ namespace Detours {
 							m_pTrampoline = nullptr;
 							m_Trampoline = nullptr;
 							m_pAddressAfterJump = nullptr;
-							g_ThreadControl.ResumeThreads();
+							g_ThreadSuspender.ResumeThreads();
 							return false;
 					}
 				} else if (ins.HasRelOffs) {
@@ -117653,7 +117653,7 @@ namespace Detours {
 							m_pTrampoline = nullptr;
 							m_Trampoline = nullptr;
 							m_pAddressAfterJump = nullptr;
-							g_ThreadControl.ResumeThreads();
+							g_ThreadSuspender.ResumeThreads();
 							return false;
 					}
 				}
@@ -117710,7 +117710,7 @@ namespace Detours {
 				m_pTrampoline = nullptr;
 				m_Trampoline = nullptr;
 				m_pAddressAfterJump = nullptr;
-				g_ThreadControl.ResumeThreads();
+				g_ThreadSuspender.ResumeThreads();
 				return false;
 #endif
 			}
@@ -117720,7 +117720,7 @@ namespace Detours {
 				m_pTrampoline = nullptr;
 				m_Trampoline = nullptr;
 				m_pAddressAfterJump = nullptr;
-				g_ThreadControl.ResumeThreads();
+				g_ThreadSuspender.ResumeThreads();
 				return false;
 			}
 
@@ -117733,7 +117733,7 @@ namespace Detours {
 				m_pTrampoline = nullptr;
 				m_Trampoline = nullptr;
 				m_pAddressAfterJump = nullptr;
-				g_ThreadControl.ResumeThreads();
+				g_ThreadSuspender.ResumeThreads();
 				return false;
 			}
 
@@ -117747,7 +117747,7 @@ namespace Detours {
 				m_pTrampoline = nullptr;
 				m_Trampoline = nullptr;
 				m_pAddressAfterJump = nullptr;
-				g_ThreadControl.ResumeThreads();
+				g_ThreadSuspender.ResumeThreads();
 				return false;
 			}
 
@@ -117805,32 +117805,32 @@ namespace Detours {
 				m_pTrampoline = nullptr;
 				m_Trampoline = nullptr;
 				m_pAddressAfterJump = nullptr;
-				g_ThreadControl.ResumeThreads();
+				g_ThreadSuspender.ResumeThreads();
 				return false;
 #endif
 			}
 
 			JumpToHookProtection.RestoreProtection();
 
-			g_ThreadControl.ResumeThreads();
+			g_ThreadSuspender.ResumeThreads();
 			return true;
 		}
 
 		bool InlineHook::UnHook() {
-			g_ThreadControl.SuspendThreads();
+			g_ThreadSuspender.SuspendThreads();
 
 			if (!m_bInitialized || !m_pAddress || !m_pTrampoline) {
-				g_ThreadControl.ResumeThreads();
+				g_ThreadSuspender.ResumeThreads();
 				return false;
 			}
 
 			for (size_t unIndex = 0; unIndex < 0x1000; ++unIndex) {
-				g_ThreadControl.FixExecutionAddress(reinterpret_cast<unsigned char*>(m_pTrampoline) + unIndex, reinterpret_cast<unsigned char*>(m_pAddress) + unIndex);
+				g_ThreadSuspender.FixExecutionAddress(reinterpret_cast<unsigned char*>(m_pTrampoline) + unIndex, reinterpret_cast<unsigned char*>(m_pAddress) + unIndex);
 			}
 
 			Protection HookProtection(m_pAddress, m_unOriginalBytes, false);
 			if (!HookProtection.ChangeProtection(PAGE_READWRITE)) {
-				g_ThreadControl.ResumeThreads();
+				g_ThreadSuspender.ResumeThreads();
 				return false;
 			}
 
@@ -117844,7 +117844,7 @@ namespace Detours {
 			m_pTrampoline = nullptr;
 			m_Trampoline = nullptr;
 
-			g_ThreadControl.ResumeThreads();
+			g_ThreadSuspender.ResumeThreads();
 			return true;
 		}
 
@@ -117929,10 +117929,10 @@ namespace Detours {
 		}
 
 		bool RawHook::Hook(const fnRawHookCallBack pCallBack) {
-			g_ThreadControl.SuspendThreads();
+			g_ThreadSuspender.SuspendThreads();
 
 			if (!m_bInitialized || !m_pAddress || m_Wrapper || m_pWrapper || m_Trampoline || m_pTrampoline || !pCallBack) {
-				g_ThreadControl.ResumeThreads();
+				g_ThreadSuspender.ResumeThreads();
 				return false;
 			}
 
@@ -117942,14 +117942,14 @@ namespace Detours {
 			m_Wrapper = std::make_unique<Page>(0x1000);
 #endif
 			if (!m_Wrapper) {
-				g_ThreadControl.ResumeThreads();
+				g_ThreadSuspender.ResumeThreads();
 				return false;
 			}
 
 			m_pWrapper = m_Wrapper->Alloc(0x1000);
 			if (!m_pWrapper) {
 				m_Wrapper = nullptr;
-				g_ThreadControl.ResumeThreads();
+				g_ThreadSuspender.ResumeThreads();
 				return false;
 			}
 
@@ -118049,7 +118049,7 @@ namespace Detours {
 					m_Wrapper->DeAlloc(m_pWrapper);
 					m_pWrapper = nullptr;
 					m_Wrapper = nullptr;
-					g_ThreadControl.ResumeThreads();
+					g_ThreadSuspender.ResumeThreads();
 					return false;
 				}
 			} else if (bHaveAVX) {
@@ -118065,7 +118065,7 @@ namespace Detours {
 					m_Wrapper->DeAlloc(m_pWrapper);
 					m_pWrapper = nullptr;
 					m_Wrapper = nullptr;
-					g_ThreadControl.ResumeThreads();
+					g_ThreadSuspender.ResumeThreads();
 					return false;
 				}
 			} else if (bHaveSSE) {
@@ -118081,7 +118081,7 @@ namespace Detours {
 					m_Wrapper->DeAlloc(m_pWrapper);
 					m_pWrapper = nullptr;
 					m_Wrapper = nullptr;
-					g_ThreadControl.ResumeThreads();
+					g_ThreadSuspender.ResumeThreads();
 					return false;
 				}
 			} else if (bHaveMMX) {
@@ -118097,7 +118097,7 @@ namespace Detours {
 					m_Wrapper->DeAlloc(m_pWrapper);
 					m_pWrapper = nullptr;
 					m_Wrapper = nullptr;
-					g_ThreadControl.ResumeThreads();
+					g_ThreadSuspender.ResumeThreads();
 					return false;
 				}
 			} else if (bHaveFPU) {
@@ -118113,7 +118113,7 @@ namespace Detours {
 					m_Wrapper->DeAlloc(m_pWrapper);
 					m_pWrapper = nullptr;
 					m_Wrapper = nullptr;
-					g_ThreadControl.ResumeThreads();
+					g_ThreadSuspender.ResumeThreads();
 					return false;
 				}
 			} else {
@@ -118129,7 +118129,7 @@ namespace Detours {
 					m_Wrapper->DeAlloc(m_pWrapper);
 					m_pWrapper = nullptr;
 					m_Wrapper = nullptr;
-					g_ThreadControl.ResumeThreads();
+					g_ThreadSuspender.ResumeThreads();
 					return false;
 				}
 			}
@@ -118153,7 +118153,7 @@ namespace Detours {
 				m_Wrapper->DeAlloc(m_pWrapper);
 				m_pWrapper = nullptr;
 				m_Wrapper = nullptr;
-				g_ThreadControl.ResumeThreads();
+				g_ThreadSuspender.ResumeThreads();
 				return false;
 #endif
 			}
@@ -118172,7 +118172,7 @@ namespace Detours {
 					m_Wrapper->DeAlloc(m_pWrapper);
 					m_pWrapper = nullptr;
 					m_Wrapper = nullptr;
-					g_ThreadControl.ResumeThreads();
+					g_ThreadSuspender.ResumeThreads();
 					return false;
 				}
 
@@ -118189,7 +118189,7 @@ namespace Detours {
 				m_Wrapper->DeAlloc(m_pWrapper);
 				m_pWrapper = nullptr;
 				m_Wrapper = nullptr;
-				g_ThreadControl.ResumeThreads();
+				g_ThreadSuspender.ResumeThreads();
 				return false;
 			}
 
@@ -118200,7 +118200,7 @@ namespace Detours {
 				m_Wrapper->DeAlloc(m_pWrapper);
 				m_pWrapper = nullptr;
 				m_Wrapper = nullptr;
-				g_ThreadControl.ResumeThreads();
+				g_ThreadSuspender.ResumeThreads();
 				return false;
 			}
 
@@ -118500,7 +118500,7 @@ namespace Detours {
 					m_Trampoline->DeAlloc(m_pTrampoline);
 					m_pTrampoline = nullptr;
 					m_Trampoline = nullptr;
-					g_ThreadControl.ResumeThreads();
+					g_ThreadSuspender.ResumeThreads();
 					return false;
 				}
 			} else if (bHaveAVX) {
@@ -118526,7 +118526,7 @@ namespace Detours {
 					m_Trampoline->DeAlloc(m_pTrampoline);
 					m_pTrampoline = nullptr;
 					m_Trampoline = nullptr;
-					g_ThreadControl.ResumeThreads();
+					g_ThreadSuspender.ResumeThreads();
 					return false;
 				}
 			} else if (bHaveSSE) {
@@ -118552,7 +118552,7 @@ namespace Detours {
 					m_Trampoline->DeAlloc(m_pTrampoline);
 					m_pTrampoline = nullptr;
 					m_Trampoline = nullptr;
-					g_ThreadControl.ResumeThreads();
+					g_ThreadSuspender.ResumeThreads();
 					return false;
 				}
 			} else if (bHaveMMX) {
@@ -118578,7 +118578,7 @@ namespace Detours {
 					m_Trampoline->DeAlloc(m_pTrampoline);
 					m_pTrampoline = nullptr;
 					m_Trampoline = nullptr;
-					g_ThreadControl.ResumeThreads();
+					g_ThreadSuspender.ResumeThreads();
 					return false;
 				}
 			} else if (bHaveFPU) {
@@ -118604,7 +118604,7 @@ namespace Detours {
 					m_Trampoline->DeAlloc(m_pTrampoline);
 					m_pTrampoline = nullptr;
 					m_Trampoline = nullptr;
-					g_ThreadControl.ResumeThreads();
+					g_ThreadSuspender.ResumeThreads();
 					return false;
 				}
 			} else {
@@ -118630,7 +118630,7 @@ namespace Detours {
 					m_Trampoline->DeAlloc(m_pTrampoline);
 					m_pTrampoline = nullptr;
 					m_Trampoline = nullptr;
-					g_ThreadControl.ResumeThreads();
+					g_ThreadSuspender.ResumeThreads();
 					return false;
 				}
 			}
@@ -118644,7 +118644,7 @@ namespace Detours {
 				m_Wrapper->DeAlloc(m_pWrapper);
 				m_pWrapper = nullptr;
 				m_Wrapper = nullptr;
-				g_ThreadControl.ResumeThreads();
+				g_ThreadSuspender.ResumeThreads();
 				return false;
 			}
 
@@ -118670,7 +118670,7 @@ namespace Detours {
 				m_Wrapper->DeAlloc(m_pWrapper);
 				m_pWrapper = nullptr;
 				m_Wrapper = nullptr;
-				g_ThreadControl.ResumeThreads();
+				g_ThreadSuspender.ResumeThreads();
 				return false;
 #endif
 			}
@@ -118693,7 +118693,7 @@ namespace Detours {
 					m_Wrapper->DeAlloc(m_pWrapper);
 					m_pWrapper = nullptr;
 					m_Wrapper = nullptr;
-					g_ThreadControl.ResumeThreads();
+					g_ThreadSuspender.ResumeThreads();
 					return false;
 				}
 
@@ -118722,7 +118722,7 @@ namespace Detours {
 							m_Wrapper->DeAlloc(m_pWrapper);
 							m_pWrapper = nullptr;
 							m_Wrapper = nullptr;
-							g_ThreadControl.ResumeThreads();
+							g_ThreadSuspender.ResumeThreads();
 							return false;
 					}
 				} else if (ins.HasRelOffs) {
@@ -118747,7 +118747,7 @@ namespace Detours {
 							m_Wrapper->DeAlloc(m_pWrapper);
 							m_pWrapper = nullptr;
 							m_Wrapper = nullptr;
-							g_ThreadControl.ResumeThreads();
+							g_ThreadSuspender.ResumeThreads();
 							return false;
 					}
 				}
@@ -118807,7 +118807,7 @@ namespace Detours {
 				m_Wrapper->DeAlloc(m_pWrapper);
 				m_pWrapper = nullptr;
 				m_Wrapper = nullptr;
-				g_ThreadControl.ResumeThreads();
+				g_ThreadSuspender.ResumeThreads();
 				return false;
 #endif
 			}
@@ -118820,7 +118820,7 @@ namespace Detours {
 				m_Wrapper->DeAlloc(m_pWrapper);
 				m_pWrapper = nullptr;
 				m_Wrapper = nullptr;
-				g_ThreadControl.ResumeThreads();
+				g_ThreadSuspender.ResumeThreads();
 				return false;
 			}
 
@@ -118836,7 +118836,7 @@ namespace Detours {
 				m_Wrapper->DeAlloc(m_pWrapper);
 				m_pWrapper = nullptr;
 				m_Wrapper = nullptr;
-				g_ThreadControl.ResumeThreads();
+				g_ThreadSuspender.ResumeThreads();
 				return false;
 			}
 
@@ -118853,7 +118853,7 @@ namespace Detours {
 				m_Wrapper->DeAlloc(m_pWrapper);
 				m_pWrapper = nullptr;
 				m_Wrapper = nullptr;
-				g_ThreadControl.ResumeThreads();
+				g_ThreadSuspender.ResumeThreads();
 				return false;
 			}
 
@@ -118914,33 +118914,33 @@ namespace Detours {
 				m_Wrapper->DeAlloc(m_pWrapper);
 				m_pWrapper = nullptr;
 				m_Wrapper = nullptr;
-				g_ThreadControl.ResumeThreads();
+				g_ThreadSuspender.ResumeThreads();
 				return false;
 #endif
 			}
 
 			JumpToHookProtection.RestoreProtection();
 
-			g_ThreadControl.ResumeThreads();
+			g_ThreadSuspender.ResumeThreads();
 			return true;
 		}
 
 		bool RawHook::UnHook() {
-			g_ThreadControl.SuspendThreads();
+			g_ThreadSuspender.SuspendThreads();
 
 			if (!m_bInitialized || !m_pAddress || !m_pWrapper || !m_pTrampoline) {
-				g_ThreadControl.ResumeThreads();
+				g_ThreadSuspender.ResumeThreads();
 				return false;
 			}
 
 			for (size_t unIndex = 0; unIndex < 0x1000; ++unIndex) {
-				g_ThreadControl.FixExecutionAddress(reinterpret_cast<unsigned char*>(m_pWrapper) + unIndex, reinterpret_cast<unsigned char*>(m_pAddress));
-				g_ThreadControl.FixExecutionAddress(reinterpret_cast<unsigned char*>(m_pTrampoline) + unIndex, reinterpret_cast<unsigned char*>(m_pAddress) + unIndex);
+				g_ThreadSuspender.FixExecutionAddress(reinterpret_cast<unsigned char*>(m_pWrapper) + unIndex, reinterpret_cast<unsigned char*>(m_pAddress));
+				g_ThreadSuspender.FixExecutionAddress(reinterpret_cast<unsigned char*>(m_pTrampoline) + unIndex, reinterpret_cast<unsigned char*>(m_pAddress) + unIndex);
 			}
 
 			Protection HookProtection(m_pAddress, m_unOriginalBytes, false);
 			if (!HookProtection.ChangeProtection(PAGE_READWRITE)) {
-				g_ThreadControl.ResumeThreads();
+				g_ThreadSuspender.ResumeThreads();
 				return false;
 			}
 
@@ -118956,7 +118956,7 @@ namespace Detours {
 			m_pWrapper = nullptr;
 			m_Wrapper = nullptr;
 
-			g_ThreadControl.ResumeThreads();
+			g_ThreadSuspender.ResumeThreads();
 			return true;
 		}
 

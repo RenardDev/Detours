@@ -61,6 +61,21 @@
 #error Only x86 and x86_64 platforms are supported.
 #endif
 
+// MSVC - Linker
+#define LINKER_OPTION(OPTION) __pragma(comment(linker, OPTION))
+
+// MSVC - Symbols
+#define INCLUDE(SYMBOL_NAME) LINKER_OPTION("/INCLUDE:" SYMBOL_NAME)
+#define SELF_INCLUDE INCLUDE(__FUNCDNAME__)
+#define EXPORT(SYMBOL_NAME, ALIAS_NAME) LINKER_OPTION("/EXPORT:" ALIAS_NAME "=" SYMBOL_NAME)
+#define SELF_EXPORT(ALIAS_NAME) EXPORT(__FUNCDNAME__, ALIAS_NAME)
+
+// MSVC - Sections
+#define CODE_SECTION_BEGIN(IDENTIFIER, SECTION_NAME) __pragma(code_seg(push, IDENTIFIER, SECTION_NAME))
+#define CODE_SECTION_END(IDENTIFIER) __pragma(code_seg(pop, IDENTIFIER))
+#define DATA_SECTION_BEGIN(IDENTIFIER, SECTION_NAME) __pragma(data_seg(push, IDENTIFIER, SECTION_NAME))
+#define DATA_SECTION_END(IDENTIFIER) __pragma(data_seg(pop, IDENTIFIER))
+
 // rddisasm
 
 #define RD_PREF_REP 0x0001
@@ -575,21 +590,6 @@
 #define RD_FPU_FLAG_SET_1 1
 #define RD_FPU_FLAG_MODIFIED 2
 #define RD_FPU_FLAG_UNDEFINED 3
-
-// MSVC - Linker
-#define LINKER_OPTION(OPTION) __pragma(comment(linker, OPTION))
-
-// MSVC - Symbols
-#define INCLUDE(SYMBOL_NAME) LINKER_OPTION("/INCLUDE:" SYMBOL_NAME)
-#define SELF_INCLUDE INCLUDE(__FUNCDNAME__)
-#define EXPORT(SYMBOL_NAME, ALIAS_NAME) LINKER_OPTION("/EXPORT:" ALIAS_NAME "=" SYMBOL_NAME)
-#define SELF_EXPORT(ALIAS_NAME) EXPORT(__FUNCDNAME__, ALIAS_NAME)
-
-// MSVC - Sections
-#define CODE_SECTION_BEGIN(IDENTIFIER, SECTION_NAME) __pragma(code_seg(push, IDENTIFIER, SECTION_NAME))
-#define CODE_SECTION_END(IDENTIFIER) __pragma(code_seg(pop, IDENTIFIER))
-#define DATA_SECTION_BEGIN(IDENTIFIER, SECTION_NAME) __pragma(data_seg(push, IDENTIFIER, SECTION_NAME))
-#define DATA_SECTION_END(IDENTIFIER) __pragma(data_seg(pop, IDENTIFIER))
 
 // ----------------------------------------------------------------
 // Detours
@@ -4817,14 +4817,20 @@ namespace Detours {
 	namespace Hook {
 
 		// ----------------------------------------------------------------
-		// Thread Control Context
+		// Thread Suspender Context
 		// ----------------------------------------------------------------
 
-		typedef struct _THREAD_CONTROL_DATA {
+		typedef struct _THREAD_SUSPENDER_DATA {
+			_THREAD_SUSPENDER_DATA(DWORD unThreadID, HANDLE hHandle, CONTEXT CTX) {
+				m_unThreadID = unThreadID;
+				m_hHandle = hHandle;
+				m_CTX = CTX;
+			}
+
 			DWORD m_unThreadID;
 			HANDLE m_hHandle;
 			CONTEXT m_CTX;
-		} THREAD_CONTROL_DATA, *PTHREAD_CONTROL_DATA;
+		} THREAD_SUSPENDER_DATA, *PTHREAD_SUSPENDER_DATA;
 
 		// ----------------------------------------------------------------
 		// fnNtGetNextThread
@@ -4833,13 +4839,13 @@ namespace Detours {
 		typedef LONG(NTAPI* fnNtGetNextThread)(HANDLE ProcessHandle, HANDLE ThreadHandle, ACCESS_MASK DesiredAccess, ULONG HandleAttributes, ULONG Flags, PHANDLE NewThreadHandle);
 
 		// ----------------------------------------------------------------
-		// Thread Control
+		// Thread Suspender
 		// ----------------------------------------------------------------
 
-		class ThreadControl {
+		class ThreadSuspender {
 		public:
-			ThreadControl();
-			~ThreadControl();
+			ThreadSuspender();
+			~ThreadSuspender();
 
 		public:
 			void SuspendThreads();
@@ -4847,12 +4853,12 @@ namespace Detours {
 			void FixExecutionAddress(void* pAddress, void* pNewAddress);
 
 		private:
-			std::deque<THREAD_CONTROL_DATA> m_Threads;
+			std::deque<THREAD_SUSPENDER_DATA> m_Threads;
 			fnNtGetNextThread m_pNtGetNextThread;
-			std::mutex m_ThreadControlMutex;
+			std::mutex m_ThreadSuspenderMutex;
 		};
 
-		extern ThreadControl g_ThreadControl;
+		extern ThreadSuspender g_ThreadSuspender;
 
 		// ----------------------------------------------------------------
 		// Memory Hook CallBack
