@@ -828,7 +828,7 @@ bool __cdecl CPUID_RawHook(Detours::Hook::PRAW_HOOK_CONTEXT pCTX) {
 #ifdef _M_X64
 	pCTX->m_unEBX = 0x11223344;
 	pCTX->m_unRSP -= 8;
-	*reinterpret_cast<unsigned long long*>(pCTX->m_unRSP) = reinterpret_cast<unsigned long long>(RawCPUIDHook.GetTrampoline()) + 2;
+	*reinterpret_cast<unsigned long long*>(pCTX->m_unRSP) = reinterpret_cast<unsigned long long>(RawCPUIDHook.GetTrampoline()) + 2; // Trampoline + Skip `cpuid`
 #elif _M_IX86
 	pCTX->m_unESI = 0x11223344;
 	*reinterpret_cast<unsigned int*>(pCTX->m_unESP) = reinterpret_cast<unsigned int>(RawCPUIDHook.GetAddressAfterJump());
