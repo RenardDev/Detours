@@ -806,14 +806,11 @@ bool __cdecl Sleep_RawHook(Detours::Hook::PRAW_HOOK_CONTEXT pCTX) {
 	}
 
 #ifdef _M_X64
-	pCTX->m_unRDX = 0;
-	*reinterpret_cast<unsigned int*>(pCTX->m_unRSP + 0x8) = pCTX->m_unEBX;
-	*reinterpret_cast<unsigned int*>(pCTX->m_unRSP + 0x10) = 0;
-	pCTX->m_unRBX = *reinterpret_cast<unsigned long long*>(pCTX->m_unRSP + 0x10);
+	// Not needed for x86_64
 #elif _M_IX86
-	unsigned int unIP = *reinterpret_cast<unsigned int*>(pCTX->m_unESP);
-	pCTX->m_unESP += 4;
-	*reinterpret_cast<unsigned int*>(pCTX->m_unESP) = unIP;
+	unsigned int unIP = *reinterpret_cast<unsigned int*>(pCTX->m_unESP); // Getting return address
+	pCTX->m_unESP += 4; // Clearing argument
+	*reinterpret_cast<unsigned int*>(pCTX->m_unESP) = unIP; // Restoring return address
 #endif
 
 	return true;
