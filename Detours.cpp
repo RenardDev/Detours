@@ -3130,6 +3130,9 @@ namespace Detours {
 			const auto pBCA = pCompleteObjectLocator->m_pClassHierarchyDescriptor->m_pBaseClassArray;
 			const unsigned int unNumberOfBaseClasses = pCompleteObjectLocator->m_pClassHierarchyDescriptor->m_unNumberOfBaseClasses;
 #endif
+			if (!pBCA) {
+				return nullptr;
+			}
 
 			unsigned int unTarget = static_cast<unsigned int>(-1);
 			unsigned int nTargetBases = 0;
@@ -3143,6 +3146,9 @@ namespace Detours {
 #elif _M_IX86
 				const auto pBCD = pBCA->m_pBaseClassDescriptors[i];
 #endif
+				if (!pBCD) {
+					continue;
+				}
 
 #ifdef _M_X64
 				if (((i - unTarget) > nTargetBases) && IsTypeDescriptorEqual(__GetTypeDescriptor(pBaseAddress, pBCD), pTargetTypeDescriptor)) {
@@ -116793,10 +116799,13 @@ namespace Detours {
 			size_t unThreadsSuspended = 0;
 			do {
 				unThreadsSuspended = m_Threads.size();
-				HANDLE hThread = nullptr; // BUG: VS says this variable is uninitialized, which is false.
+				HANDLE hThread = nullptr;
 
 				while (true) {
+#pragma warning(push)
+#pragma warning(disable : 6001)
 					NTSTATUS unStatus = m_pNtGetNextThread(GetCurrentProcess(), hThread, THREAD_QUERY_LIMITED_INFORMATION | THREAD_SUSPEND_RESUME | THREAD_GET_CONTEXT | THREAD_SET_CONTEXT, 0, 0, &hThread);
+#pragma warning(pop)
 					if (!(unStatus >= 0)) {
 						break;
 					}
@@ -116828,7 +116837,10 @@ namespace Detours {
 			std::lock_guard<std::mutex> ThreadsLock(m_ThreadSuspenderMutex);
 
 			for (auto& thread : m_Threads) {
+#pragma warning(push)
+#pragma warning(disable : 6001)
 				SetThreadContext(thread.m_hHandle, &thread.m_CTX);  // BUG: VS says m_hHandle variable is uninitialized, which is false.
+#pragma warning(pop)
 				ResumeThread(thread.m_hHandle);
 				CloseHandle(thread.m_hHandle);
 			}

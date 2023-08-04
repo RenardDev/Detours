@@ -33,6 +33,7 @@ typedef struct _SHARED_MEMORY {
 
 class BaseMessage {
 public:
+	virtual ~BaseMessage() {}
 	virtual void Message() const {
 		_tprintf_s(_T("Hello, World!\n"));
 	}
@@ -72,10 +73,6 @@ class BaseTestingRTTI {
 public:
 	virtual bool foo() { return false; }
 	virtual bool boo() { return true; }
-
-private:
-	bool m_bFoo;
-	bool m_bBoo;
 };
 
 class TestingRTTI : public BaseTestingRTTI {
@@ -816,6 +813,15 @@ bool __cdecl Sleep_RawHook(Detours::Hook::PRAW_HOOK_CONTEXT pCTX) {
 	return true;
 }
 
+Detours::Hook::RAW_HOOK_M128 g_LastXMM7;
+
+bool __cdecl Sleep_RawHookMod(Detours::Hook::PRAW_HOOK_CONTEXT pCTX) {
+	g_LastXMM7 = pCTX->m_XMM7;
+	pCTX->m_XMM7.m_un64[0] = 0x1122334455667788;
+	pCTX->m_XMM7.m_un64[1] = 0x1122334455667788;
+	return true;
+}
+
 Detours::Hook::RawHook RawCPUIDHook;
 bool __cdecl CPUID_RawHook(Detours::Hook::PRAW_HOOK_CONTEXT pCTX) {
 
@@ -838,7 +844,11 @@ void DemoRawHook() { SELF_EXPORT("DemoHook");
 	size_t unOffset = 0;
 	void* pFoundCPUID = nullptr;
 	while (unOffset < 0x1000) {
+#ifdef _M_X64
+		if (!RD_SUCCESS(Detours::rddisasm::RdDecode(&ins, reinterpret_cast<unsigned char*>(DemoRawHook) + unOffset, RD_DATA_64, RD_DATA_64))) {
+#elif _M_IX86
 		if (!RD_SUCCESS(Detours::rddisasm::RdDecode(&ins, reinterpret_cast<unsigned char*>(DemoRawHook) + unOffset, RD_DATA_32, RD_DATA_32))) {
+#endif
 			return;
 		}
 
@@ -860,9 +870,7 @@ void DemoRawHook() { SELF_EXPORT("DemoHook");
 
 	int cpuinfo[4];
 	__cpuidex(cpuinfo, 7, 0); // Hooking `cpuid` in this function.
-	const bool bHaveAVX512 = (cpuinfo[1] & (1 << 16)) != 0;
 	_tprintf_s(_T("cpuinfo[1] = 0x%08X\n"), cpuinfo[1]);
-	_tprintf_s(_T("bHaveAVX512 = %d\n"), bHaveAVX512);
 
 	_tprintf_s(_T("RawCPUIDHook.UnHook = %d\n"), RawCPUIDHook.UnHook());
 
@@ -1362,12 +1370,42 @@ int _tmain(int nArguments, PTCHAR* pArguments) {
 
 	_tprintf_s(_T("\n"));
 
-	// RawHook
+	// RawHook #1
 
 	if (hKernel32 && (hKernel32 != INVALID_HANDLE_VALUE)) {
 		_tprintf_s(_T("RawSleepHook.Set = %d\n"), RawSleepHook.Set(reinterpret_cast<void*>(GetProcAddress(hKernel32, "Sleep"))));
 		_tprintf_s(_T("RawSleepHook.Hook = %d\n"), RawSleepHook.Hook(Sleep_RawHook));
 		Sleep(1000);
+		_tprintf_s(_T("RawSleepHook.UnHook = %d\n"), RawSleepHook.UnHook());
+	}
+
+	// RawHook #2
+
+	int cpuinfo[4];
+	__cpuid(cpuinfo, 1);
+
+	const bool bHaveSSE = (cpuinfo[3] & (1 << 25)) != 0;
+
+	if (bHaveSSE && hKernel32 && (hKernel32 != INVALID_HANDLE_VALUE)) {
+		_tprintf_s(_T("RawSleepHook.Set = %d\n"), RawSleepHook.Set(reinterpret_cast<void*>(GetProcAddress(hKernel32, "Sleep"))));
+		_tprintf_s(_T("RawSleepHook.Hook = %d\n"), RawSleepHook.Hook(Sleep_RawHookMod));
+
+		Sleep(1000); // Will record last XMM7 value and change it
+
+		_tprintf_s(_T("LastXMM7 = 0x"));
+		for (int i = 15; i >= 0; --i) {
+			_tprintf_s(_T("%02X"), g_LastXMM7.m_un8[i]);
+		}
+		_tprintf_s(_T("\n"));
+
+		Sleep(1000); // Will record last XMM7 value and change it
+
+		_tprintf_s(_T("LastXMM7 = 0x"));
+		for (int i = 15; i >= 0; --i) {
+			_tprintf_s(_T("%02X"), g_LastXMM7.m_un8[i]);
+		}
+		_tprintf_s(_T("\n"));
+
 		_tprintf_s(_T("RawSleepHook.UnHook = %d\n"), RawSleepHook.UnHook());
 	}
 	
