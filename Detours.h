@@ -1210,7 +1210,7 @@ namespace Detours {
 
 		bool EncodeA(const void* const pData, const size_t unSize, char* szHex, const unsigned char unIgnoredByte = 0x2A);
 		bool EncodeW(const void* const pData, const size_t unSize, wchar_t* szHex, const unsigned char unIgnoredByte = 0x2A);
-#ifdef UNICODE
+#ifdef _UNICODE
 		bool Encode(const void* const pData, const size_t unSize, wchar_t* szHex, const unsigned char unIgnoredByte = 0x2A);
 #else
 		bool Encode(const void* const pData, const size_t unSize, char* szHex, const unsigned char unIgnoredByte = 0x2A);
@@ -1222,7 +1222,7 @@ namespace Detours {
 
 		bool DecodeA(const char* const szHex, void* pData, const unsigned char unIgnoredByte = 0x2A);
 		bool DecodeW(const wchar_t* const szHex, void* pData, const unsigned char unIgnoredByte = 0x2A);
-#ifdef UNICODE
+#ifdef _UNICODE
 		bool Decode(const wchar_t* const szHex, void* pData, const unsigned char unIgnoredByte = 0x2A);
 #else
 		bool Decode(const char* const szHex, void* pData, const unsigned char unIgnoredByte = 0x2A);
@@ -1242,7 +1242,7 @@ namespace Detours {
 		bool FindSection(const HMODULE hModule, const std::array<const unsigned char, 8>& SectionName, void** pAddress, size_t* pSize);
 		bool FindSectionA(const char* const szModuleName, const std::array<const unsigned char, 8>& SectionName, void** pAddress, size_t* pSize);
 		bool FindSectionW(const wchar_t* const szModuleName, const std::array<const unsigned char, 8>& SectionName, void** pAddress, size_t* pSize);
-#ifdef UNICODE
+#ifdef _UNICODE
 		bool FindSection(const wchar_t* const szModuleName, const std::array<const unsigned char, 8>& SectionName, void** pAddress, size_t* pSize);
 #else
 		bool FindSection(const char* const szModuleName, const std::array<const unsigned char, 8>& SectionName, void** pAddress, size_t* pSize);
@@ -1255,7 +1255,7 @@ namespace Detours {
 		bool FindSectionPOGO(const HMODULE hModule, const char* const szSectionName, void** pAddress, size_t* pSize);
 		bool FindSectionPOGOA(const char* const szModuleName, const char* const szSectionName, void** pAddress, size_t* pSize);
 		bool FindSectionPOGOW(const wchar_t* const szModuleName, const char* const szSectionName, void** pAddress, size_t* pSize);
-#ifdef UNICODE
+#ifdef _UNICODE
 		bool FindSectionPOGO(const wchar_t* const szModuleName, const char* const szSectionName, void** pAddress, size_t* pSize);
 #else
 		bool FindSectionPOGO(const char* const szModuleName, const char* const szSectionName, void** pAddress, size_t* pSize);
@@ -1275,7 +1275,7 @@ namespace Detours {
 		const void* FindSignatureNativeW(const wchar_t* const szModuleName, const char* const szSignature, const size_t unOffset = 0, const unsigned char unIgnoredByte = 0x2A);
 		const void* FindSignatureNativeW(const wchar_t* const szModuleName, const std::array<const unsigned char, 8>& SectionName, const char* const szSignature, const size_t unOffset = 0, const unsigned char unIgnoredByte = 0x2A);
 		const void* FindSignatureNativeW(const wchar_t* const szModuleName, const char* const szSectionName, const char* const szSignature, const size_t unOffset = 0, const unsigned char unIgnoredByte = 0x2A);
-#ifdef UNICODE
+#ifdef _UNICODE
 		const void* FindSignatureNative(const wchar_t* const szModuleName, const char* const szSignature, const size_t unOffset = 0, const unsigned char unIgnoredByte = 0x2A);
 		const void* FindSignatureNative(const wchar_t* const szModuleName, const std::array<const unsigned char, 8>& SectionName, const char* const szSignature, const size_t unOffset = 0, const unsigned char unIgnoredByte = 0x2A);
 		const void* FindSignatureNative(const wchar_t* const szModuleName, const char* const szSectionName, const char* const szSignature, const size_t unOffset = 0, const unsigned char unIgnoredByte = 0x2A);
@@ -1299,7 +1299,7 @@ namespace Detours {
 		const void* FindSignatureSSE2W(const wchar_t* const szModuleName, const char* const szSignature, const size_t unOffset = 0, const unsigned char unIgnoredByte = 0x2A);
 		const void* FindSignatureSSE2W(const wchar_t* const szModuleName, const std::array<const unsigned char, 8>& SectionName, const char* const szSignature, const size_t unOffset = 0, const unsigned char unIgnoredByte = 0x2A);
 		const void* FindSignatureSSE2W(const wchar_t* const szModuleName, const char* const szSectionName, const char* const szSignature, const size_t unOffset = 0, const unsigned char unIgnoredByte = 0x2A);
-#ifdef UNICODE
+#ifdef _UNICODE
 		const void* FindSignatureSSE2(const wchar_t* const szModuleName, const char* const szSignature, const size_t unOffset = 0, const unsigned char unIgnoredByte = 0x2A);
 		const void* FindSignatureSSE2(const wchar_t* const szModuleName, const std::array<const unsigned char, 8>& SectionName, const char* const szSignature, const size_t unOffset = 0, const unsigned char unIgnoredByte = 0x2A);
 		const void* FindSignatureSSE2(const wchar_t* const szModuleName, const char* const szSectionName, const char* const szSignature, const size_t unOffset = 0, const unsigned char unIgnoredByte = 0x2A);
@@ -1323,7 +1323,7 @@ namespace Detours {
 		const void* FindSignatureAVXW(const wchar_t* const szModuleName, const char* const szSignature, const size_t unOffset = 0, const unsigned char unIgnoredByte = 0x2A);
 		const void* FindSignatureAVXW(const wchar_t* const szModuleName, const std::array<const unsigned char, 8>& SectionName, const char* const szSignature, const size_t unOffset = 0, const unsigned char unIgnoredByte = 0x2A);
 		const void* FindSignatureAVXW(const wchar_t* const szModuleName, const char* const szSectionName, const char* const szSignature, const size_t unOffset = 0, const unsigned char unIgnoredByte = 0x2A);
-#ifdef UNICODE
+#ifdef _UNICODE
 		const void* FindSignatureAVX(const wchar_t* const szModuleName, const char* const szSignature, const size_t unOffset = 0, const unsigned char unIgnoredByte = 0x2A);
 		const void* FindSignatureAVX(const wchar_t* const szModuleName, const std::array<const unsigned char, 8>& SectionName, const char* const szSignature, const size_t unOffset = 0, const unsigned char unIgnoredByte = 0x2A);
 		const void* FindSignatureAVX(const wchar_t* const szModuleName, const char* const szSectionName, const char* const szSignature, const size_t unOffset = 0, const unsigned char unIgnoredByte = 0x2A);
@@ -1347,7 +1347,7 @@ namespace Detours {
 		const void* FindSignatureAVX2W(const wchar_t* const szModuleName, const char* const szSignature, const size_t unOffset = 0, const unsigned char unIgnoredByte = 0x2A);
 		const void* FindSignatureAVX2W(const wchar_t* const szModuleName, const std::array<const unsigned char, 8>& SectionName, const char* const szSignature, const size_t unOffset = 0, const unsigned char unIgnoredByte = 0x2A);
 		const void* FindSignatureAVX2W(const wchar_t* const szModuleName, const char* const szSectionName, const char* const szSignature, const size_t unOffset = 0, const unsigned char unIgnoredByte = 0x2A);
-#ifdef UNICODE
+#ifdef _UNICODE
 		const void* FindSignatureAVX2(const wchar_t* const szModuleName, const char* const szSignature, const size_t unOffset = 0, const unsigned char unIgnoredByte = 0x2A);
 		const void* FindSignatureAVX2(const wchar_t* const szModuleName, const std::array<const unsigned char, 8>& SectionName, const char* const szSignature, const size_t unOffset = 0, const unsigned char unIgnoredByte = 0x2A);
 		const void* FindSignatureAVX2(const wchar_t* const szModuleName, const char* const szSectionName, const char* const szSignature, const size_t unOffset = 0, const unsigned char unIgnoredByte = 0x2A);
@@ -1371,7 +1371,7 @@ namespace Detours {
 		const void* FindSignatureAVX512W(const wchar_t* const szModuleName, const char* const szSignature, const size_t unOffset = 0, const unsigned char unIgnoredByte = 0x2A);
 		const void* FindSignatureAVX512W(const wchar_t* const szModuleName, const std::array<const unsigned char, 8>& SectionName, const char* const szSignature, const size_t unOffset = 0, const unsigned char unIgnoredByte = 0x2A);
 		const void* FindSignatureAVX512W(const wchar_t* const szModuleName, const char* const szSectionName, const char* const szSignature, const size_t unOffset = 0, const unsigned char unIgnoredByte = 0x2A);
-#ifdef UNICODE
+#ifdef _UNICODE
 		const void* FindSignatureAVX512(const wchar_t* const szModuleName, const char* const szSignature, const size_t unOffset = 0, const unsigned char unIgnoredByte = 0x2A);
 		const void* FindSignatureAVX512(const wchar_t* const szModuleName, const std::array<const unsigned char, 8>& SectionName, const char* const szSignature, const size_t unOffset = 0, const unsigned char unIgnoredByte = 0x2A);
 		const void* FindSignatureAVX512(const wchar_t* const szModuleName, const char* const szSectionName, const char* const szSignature, const size_t unOffset = 0, const unsigned char unIgnoredByte = 0x2A);
@@ -1395,7 +1395,7 @@ namespace Detours {
 		const void* FindSignatureW(const wchar_t* const szModuleName, const char* const szSignature, const size_t unOffset = 0, const unsigned char unIgnoredByte = 0x2A);
 		const void* FindSignatureW(const wchar_t* const szModuleName, const std::array<const unsigned char, 8>& SectionName, const char* const szSignature, const size_t unOffset = 0, const unsigned char unIgnoredByte = 0x2A);
 		const void* FindSignatureW(const wchar_t* const szModuleName, const char* const szSectionName, const char* const szSignature, const size_t unOffset = 0, const unsigned char unIgnoredByte = 0x2A);
-#ifdef UNICODE
+#ifdef _UNICODE
 		const void* FindSignature(const wchar_t* const szModuleName, const char* const szSignature, const size_t unOffset = 0, const unsigned char unIgnoredByte = 0x2A);
 		const void* FindSignature(const wchar_t* const szModuleName, const std::array<const unsigned char, 8>& SectionName, const char* const szSignature, const size_t unOffset = 0, const unsigned char unIgnoredByte = 0x2A);
 		const void* FindSignature(const wchar_t* const szModuleName, const char* const szSectionName, const char* const szSignature, const size_t unOffset = 0, const unsigned char unIgnoredByte = 0x2A);
@@ -1419,7 +1419,7 @@ namespace Detours {
 		const void* FindDataNativeW(const wchar_t* const szModuleName, const unsigned char* const pData, const size_t unDataSize);
 		const void* FindDataNativeW(const wchar_t* const szModuleName, const std::array<const unsigned char, 8>& SectionName, const unsigned char* const pData, const size_t unDataSize);
 		const void* FindDataNativeW(const wchar_t* const szModuleName, const char* const szSectionName, const unsigned char* const pData, const size_t unDataSize);
-#ifdef UNICODE
+#ifdef _UNICODE
 		const void* FindDataNative(const wchar_t* const szModuleName, const unsigned char* const pData, const size_t unDataSize);
 		const void* FindDataNative(const wchar_t* const szModuleName, const std::array<const unsigned char, 8>& SectionName, const unsigned char* const pData, const size_t unDataSize);
 		const void* FindDataNative(const wchar_t* const szModuleName, const char* const szSectionName, const unsigned char* const pData, const size_t unDataSize);
@@ -1443,7 +1443,7 @@ namespace Detours {
 		const void* FindDataSSE2W(const wchar_t* const szModuleName, const unsigned char* const pData, const size_t unDataSize);
 		const void* FindDataSSE2W(const wchar_t* const szModuleName, const std::array<const unsigned char, 8>& SectionName, const unsigned char* const pData, const size_t unDataSize);
 		const void* FindDataSSE2W(const wchar_t* const szModuleName, const char* const szSectionName, const unsigned char* const pData, const size_t unDataSize);
-#ifdef UNICODE
+#ifdef _UNICODE
 		const void* FindDataSSE2(const wchar_t* const szModuleName, const unsigned char* const pData, const size_t unDataSize);
 		const void* FindDataSSE2(const wchar_t* const szModuleName, const std::array<const unsigned char, 8>& SectionName, const unsigned char* const pData, const size_t unDataSize);
 		const void* FindDataSSE2(const wchar_t* const szModuleName, const char* const szSectionName, const unsigned char* const pData, const size_t unDataSize);
@@ -1467,7 +1467,7 @@ namespace Detours {
 		const void* FindDataAVXW(const wchar_t* const szModuleName, const unsigned char* const pData, const size_t unDataSize);
 		const void* FindDataAVXW(const wchar_t* const szModuleName, const std::array<const unsigned char, 8>& SectionName, const unsigned char* const pData, const size_t unDataSize);
 		const void* FindDataAVXW(const wchar_t* const szModuleName, const char* const szSectionName, const unsigned char* const pData, const size_t unDataSize);
-#ifdef UNICODE
+#ifdef _UNICODE
 		const void* FindDataAVX(const wchar_t* const szModuleName, const unsigned char* const pData, const size_t unDataSize);
 		const void* FindDataAVX(const wchar_t* const szModuleName, const std::array<const unsigned char, 8>& SectionName, const unsigned char* const pData, const size_t unDataSize);
 		const void* FindDataAVX(const wchar_t* const szModuleName, const char* const szSectionName, const unsigned char* const pData, const size_t unDataSize);
@@ -1491,7 +1491,7 @@ namespace Detours {
 		const void* FindDataAVX2W(const wchar_t* const szModuleName, const unsigned char* const pData, const size_t unDataSize);
 		const void* FindDataAVX2W(const wchar_t* const szModuleName, const std::array<const unsigned char, 8>& SectionName, const unsigned char* const pData, const size_t unDataSize);
 		const void* FindDataAVX2W(const wchar_t* const szModuleName, const char* const szSectionName, const unsigned char* const pData, const size_t unDataSize);
-#ifdef UNICODE
+#ifdef _UNICODE
 		const void* FindDataAVX2(const wchar_t* const szModuleName, const unsigned char* const pData, const size_t unDataSize);
 		const void* FindDataAVX2(const wchar_t* const szModuleName, const std::array<const unsigned char, 8>& SectionName, const unsigned char* const pData, const size_t unDataSize);
 		const void* FindDataAVX2(const wchar_t* const szModuleName, const char* const szSectionName, const unsigned char* const pData, const size_t unDataSize);
@@ -1515,7 +1515,7 @@ namespace Detours {
 		const void* FindDataAVX512W(const wchar_t* const szModuleName, const unsigned char* const pData, const size_t unDataSize);
 		const void* FindDataAVX512W(const wchar_t* const szModuleName, const std::array<const unsigned char, 8>& SectionName, const unsigned char* const pData, const size_t unDataSize);
 		const void* FindDataAVX512W(const wchar_t* const szModuleName, const char* const szSectionName, const unsigned char* const pData, const size_t unDataSize);
-#ifdef UNICODE
+#ifdef _UNICODE
 		const void* FindDataAVX512(const wchar_t* const szModuleName, const unsigned char* const pData, const size_t unDataSize);
 		const void* FindDataAVX512(const wchar_t* const szModuleName, const std::array<const unsigned char, 8>& SectionName, const unsigned char* const pData, const size_t unDataSize);
 		const void* FindDataAVX512(const wchar_t* const szModuleName, const char* const szSectionName, const unsigned char* const pData, const size_t unDataSize);
@@ -1539,7 +1539,7 @@ namespace Detours {
 		const void* FindDataW(const wchar_t* const szModuleName, const unsigned char* const pData, const size_t unDataSize);
 		const void* FindDataW(const wchar_t* const szModuleName, const std::array<const unsigned char, 8>& SectionName, const unsigned char* const pData, const size_t unDataSize);
 		const void* FindDataW(const wchar_t* const szModuleName, const char* const szSectionName, const unsigned char* const pData, const size_t unDataSize);
-#ifdef UNICODE
+#ifdef _UNICODE
 		const void* FindData(const wchar_t* const szModuleName, const unsigned char* const pData, const size_t unDataSize);
 		const void* FindData(const wchar_t* const szModuleName, const std::array<const unsigned char, 8>& SectionName, const unsigned char* const pData, const size_t unDataSize);
 		const void* FindData(const wchar_t* const szModuleName, const char* const szSectionName, const unsigned char* const pData, const size_t unDataSize);

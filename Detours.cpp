@@ -281,7 +281,7 @@ namespace Detours {
 			return true;
 		}
 
-#ifdef UNICODE
+#ifdef _UNICODE
 		bool Encode(const void* const pData, const size_t unSize, wchar_t* szHex, const unsigned char unIgnoredByte) {
 			return EncodeW(pData, unSize, szHex, unIgnoredByte);
 		}
@@ -417,7 +417,7 @@ namespace Detours {
 			return true;
 		}
 
-#ifdef UNICODE
+#ifdef _UNICODE
 		bool Decode(const wchar_t* const szHex, void* pData, const unsigned char unIgnoredByte) {
 			return DecodeW(szHex, pData, unIgnoredByte);
 		}
@@ -526,7 +526,7 @@ namespace Detours {
 			return FindSection(hMod, SectionName, pAddress, pSize);
 		}
 
-#ifdef UNICODE
+#ifdef _UNICODE
 		bool FindSection(const wchar_t* const szModuleName, const std::array<const unsigned char, 8>& SectionName, void** pAddress, size_t* pSize) {
 			return FindSectionW(szModuleName, SectionName, pAddress, pSize);
 		}
@@ -629,7 +629,7 @@ namespace Detours {
 			return FindSectionPOGO(hMod, szSectionName, pAddress, pSize);
 		}
 
-#ifdef UNICODE
+#ifdef _UNICODE
 		bool FindSectionPOGO(const wchar_t* const szModuleName, const char* const szSectionName, void** pAddress, size_t* pSize) {
 			return FindSectionPOGOW(szModuleName, szSectionName, pAddress, pSize);
 		}
@@ -792,7 +792,7 @@ namespace Detours {
 			return FindSignatureNative(hMod, szSectionName, szSignature, unOffset, unIgnoredByte);
 		}
 
-#ifdef UNICODE
+#ifdef _UNICODE
 		const void* FindSignatureNative(const wchar_t* const szModuleName, const char* const szSignature, const size_t unOffset, const unsigned char unIgnoredByte) {
 			return FindSignatureNativeW(szModuleName, szSignature, unOffset, unIgnoredByte);
 		}
@@ -985,7 +985,7 @@ namespace Detours {
 			return FindSignatureSSE2(hMod, szSectionName, szSignature, unOffset, unIgnoredByte);
 		}
 
-#ifdef UNICODE
+#ifdef _UNICODE
 		const void* FindSignatureSSE2(const wchar_t* const szModuleName, const char* const szSignature, const size_t unOffset, const unsigned char unIgnoredByte) {
 			return FindSignatureSSE2W(szModuleName, szSignature, unOffset, unIgnoredByte);
 		}
@@ -1181,7 +1181,7 @@ namespace Detours {
 			return FindSignatureAVX(hMod, szSectionName, szSignature, unOffset, unIgnoredByte);
 		}
 
-#ifdef UNICODE
+#ifdef _UNICODE
 		const void* FindSignatureAVX(const wchar_t* const szModuleName, const char* const szSignature, const size_t unOffset, const unsigned char unIgnoredByte) {
 			return FindSignatureAVXW(szModuleName, szSignature, unOffset, unIgnoredByte);
 		}
@@ -1374,7 +1374,7 @@ namespace Detours {
 			return FindSignatureAVX2(hMod, szSectionName, szSignature, unOffset, unIgnoredByte);
 		}
 
-#ifdef UNICODE
+#ifdef _UNICODE
 		const void* FindSignatureAVX2(const wchar_t* const szModuleName, const char* const szSignature, const size_t unOffset, const unsigned char unIgnoredByte) {
 			return FindSignatureAVX2W(szModuleName, szSignature, unOffset, unIgnoredByte);
 		}
@@ -1565,7 +1565,7 @@ namespace Detours {
 			return FindSignatureAVX512(hMod, szSectionName, szSignature, unOffset, unIgnoredByte);
 		}
 
-#ifdef UNICODE
+#ifdef _UNICODE
 		const void* FindSignatureAVX512(const wchar_t* const szModuleName, const char* const szSignature, const size_t unOffset, const unsigned char unIgnoredByte) {
 			return FindSignatureAVX512W(szModuleName, szSignature, unOffset, unIgnoredByte);
 		}
@@ -1751,7 +1751,7 @@ namespace Detours {
 			return FindSignature(hMod, szSectionName, szSignature, unOffset, unIgnoredByte);
 		}
 
-#ifdef UNICODE
+#ifdef _UNICODE
 		const void* FindSignature(const wchar_t* const szModuleName, const char* const szSignature, const size_t unOffset, const unsigned char unIgnoredByte) {
 			return FindSignatureW(szModuleName, szSignature, unOffset, unIgnoredByte);
 		}
@@ -1921,7 +1921,7 @@ namespace Detours {
 			return FindDataNative(hMod, szSectionName, pData, unDataSize);
 		}
 
-#ifdef UNICODE
+#ifdef _UNICODE
 		const void* FindDataNative(const wchar_t* const szModuleName, const unsigned char* const pData, const size_t unDataSize) {
 			return FindDataNativeW(szModuleName, pData, unDataSize);
 		}
@@ -2103,7 +2103,7 @@ namespace Detours {
 			return FindDataSSE2(hMod, szSectionName, pData, unDataSize);
 		}
 
-#ifdef UNICODE
+#ifdef _UNICODE
 		const void* FindDataSSE2(const wchar_t* const szModuleName, const unsigned char* const pData, const size_t unDataSize) {
 			return FindDataSSE2W(szModuleName, pData, unDataSize);
 		}
@@ -2288,7 +2288,7 @@ namespace Detours {
 			return FindDataAVX(hMod, szSectionName, pData, unDataSize);
 		}
 
-#ifdef UNICODE
+#ifdef _UNICODE
 		const void* FindDataAVX(const wchar_t* const szModuleName, const unsigned char* const pData, const size_t unDataSize) {
 			return FindDataAVXW(szModuleName, pData, unDataSize);
 		}
@@ -2470,7 +2470,7 @@ namespace Detours {
 			return FindDataAVX2(hMod, szSectionName, pData, unDataSize);
 		}
 
-#ifdef UNICODE
+#ifdef _UNICODE
 		const void* FindDataAVX2(const wchar_t* const szModuleName, const unsigned char* const pData, const size_t unDataSize) {
 			return FindDataAVX2W(szModuleName, pData, unDataSize);
 		}
@@ -2650,7 +2650,7 @@ namespace Detours {
 			return FindDataAVX512(hMod, szSectionName, pData, unDataSize);
 		}
 
-#ifdef UNICODE
+#ifdef _UNICODE
 		const void* FindDataAVX512(const wchar_t* const szModuleName, const unsigned char* const pData, const size_t unDataSize) {
 			return FindDataAVX512W(szModuleName, pData, unDataSize);
 		}
@@ -2830,7 +2830,7 @@ namespace Detours {
 			return FindData(hMod, szSectionName, pData, unDataSize);
 		}
 
-#ifdef UNICODE
+#ifdef _UNICODE
 		const void* FindData(const wchar_t* const szModuleName, const unsigned char* const pData, const size_t unDataSize) {
 			return FindDataW(szModuleName, pData, unDataSize);
 		}

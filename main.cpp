@@ -993,7 +993,7 @@ int _tmain(int nArguments, PTCHAR* pArguments) {
 	auto pProcessParameters = pPEB->ProcessParameters;
 	if (pProcessParameters) {
 		if (pProcessParameters->CommandLine.Length) {
-#ifdef UNICODE
+#ifdef _UNICODE
 			_tprintf_s(_T("CommandLine = `%s`\n"), pPEB->ProcessParameters->CommandLine.Buffer);
 #else
 			_tprintf_s(_T("CommandLine = `%ws`\n"), pPEB->ProcessParameters->CommandLine.Buffer);
@@ -1044,7 +1044,7 @@ int _tmain(int nArguments, PTCHAR* pArguments) {
 			return -1;
 		}
 
-#ifdef UNICODE
+#ifdef _UNICODE
 		_tprintf_s(_T("Encode: `%s`\n"), pBuffer);
 #else
 		_tprintf_s(_T("Encode: `%ws`\n"), pBuffer);
@@ -1093,7 +1093,7 @@ int _tmain(int nArguments, PTCHAR* pArguments) {
 	char szData[16];
 	memset(szData, 0, sizeof(szData));
 	if (Detours::Hexadecimal::Decode(szHex, reinterpret_cast<void*>(szData), 0x00)) {
-#ifdef UNICODE
+#ifdef _UNICODE
 		_tprintf_s(_T("Decode: `%hs`\n"), szData);
 #else
 		_tprintf_s(_T("Decode: `%s`\n"), szData);
