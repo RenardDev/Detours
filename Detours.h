@@ -1265,288 +1265,288 @@ namespace Detours {
 		// FindSignature (Native)
 		// ----------------------------------------------------------------
 
-		const void* FindSignatureNative(const void* const pAddress, const size_t unSize, const char* const szSignature, const size_t unOffset = 0, const unsigned char unIgnoredByte = 0x2A);
-		const void* FindSignatureNative(const HMODULE hModule, const char* const szSignature, const size_t unOffset = 0, const unsigned char unIgnoredByte = 0x2A);
-		const void* FindSignatureNative(const HMODULE hModule, const std::array<const unsigned char, 8>& SectionName, const char* const szSignature, const size_t unOffset = 0, const unsigned char unIgnoredByte = 0x2A);
-		const void* FindSignatureNative(const HMODULE hModule, const char* const szSectionName, const char* const szSignature, const size_t unOffset = 0, const unsigned char unIgnoredByte = 0x2A);
-		const void* FindSignatureNativeA(const char* const szModuleName, const char* const szSignature, const size_t unOffset = 0, const unsigned char unIgnoredByte = 0x2A);
-		const void* FindSignatureNativeA(const char* const szModuleName, const std::array<const unsigned char, 8>& SectionName, const char* const szSignature, const size_t unOffset = 0, const unsigned char unIgnoredByte = 0x2A);
-		const void* FindSignatureNativeA(const char* const szModuleName, const char* const szSectionName, const char* const szSignature, const size_t unOffset = 0, const unsigned char unIgnoredByte = 0x2A);
-		const void* FindSignatureNativeW(const wchar_t* const szModuleName, const char* const szSignature, const size_t unOffset = 0, const unsigned char unIgnoredByte = 0x2A);
-		const void* FindSignatureNativeW(const wchar_t* const szModuleName, const std::array<const unsigned char, 8>& SectionName, const char* const szSignature, const size_t unOffset = 0, const unsigned char unIgnoredByte = 0x2A);
-		const void* FindSignatureNativeW(const wchar_t* const szModuleName, const char* const szSectionName, const char* const szSignature, const size_t unOffset = 0, const unsigned char unIgnoredByte = 0x2A);
+		const void* FindSignatureNative(const void* const pAddress, const size_t unSize, const char* const szSignature, const size_t unOffset = 0, const unsigned char unIgnoredByte = 0x2A) noexcept;
+		const void* FindSignatureNative(const HMODULE hModule, const char* const szSignature, const size_t unOffset = 0, const unsigned char unIgnoredByte = 0x2A) noexcept;
+		const void* FindSignatureNative(const HMODULE hModule, const std::array<const unsigned char, 8>& SectionName, const char* const szSignature, const size_t unOffset = 0, const unsigned char unIgnoredByte = 0x2A) noexcept;
+		const void* FindSignatureNative(const HMODULE hModule, const char* const szSectionName, const char* const szSignature, const size_t unOffset = 0, const unsigned char unIgnoredByte = 0x2A) noexcept;
+		const void* FindSignatureNativeA(const char* const szModuleName, const char* const szSignature, const size_t unOffset = 0, const unsigned char unIgnoredByte = 0x2A) noexcept;
+		const void* FindSignatureNativeA(const char* const szModuleName, const std::array<const unsigned char, 8>& SectionName, const char* const szSignature, const size_t unOffset = 0, const unsigned char unIgnoredByte = 0x2A) noexcept;
+		const void* FindSignatureNativeA(const char* const szModuleName, const char* const szSectionName, const char* const szSignature, const size_t unOffset = 0, const unsigned char unIgnoredByte = 0x2A) noexcept;
+		const void* FindSignatureNativeW(const wchar_t* const szModuleName, const char* const szSignature, const size_t unOffset = 0, const unsigned char unIgnoredByte = 0x2A) noexcept;
+		const void* FindSignatureNativeW(const wchar_t* const szModuleName, const std::array<const unsigned char, 8>& SectionName, const char* const szSignature, const size_t unOffset = 0, const unsigned char unIgnoredByte = 0x2A) noexcept;
+		const void* FindSignatureNativeW(const wchar_t* const szModuleName, const char* const szSectionName, const char* const szSignature, const size_t unOffset = 0, const unsigned char unIgnoredByte = 0x2A) noexcept;
 #ifdef _UNICODE
-		const void* FindSignatureNative(const wchar_t* const szModuleName, const char* const szSignature, const size_t unOffset = 0, const unsigned char unIgnoredByte = 0x2A);
-		const void* FindSignatureNative(const wchar_t* const szModuleName, const std::array<const unsigned char, 8>& SectionName, const char* const szSignature, const size_t unOffset = 0, const unsigned char unIgnoredByte = 0x2A);
-		const void* FindSignatureNative(const wchar_t* const szModuleName, const char* const szSectionName, const char* const szSignature, const size_t unOffset = 0, const unsigned char unIgnoredByte = 0x2A);
+		const void* FindSignatureNative(const wchar_t* const szModuleName, const char* const szSignature, const size_t unOffset = 0, const unsigned char unIgnoredByte = 0x2A) noexcept;
+		const void* FindSignatureNative(const wchar_t* const szModuleName, const std::array<const unsigned char, 8>& SectionName, const char* const szSignature, const size_t unOffset = 0, const unsigned char unIgnoredByte = 0x2A) noexcept;
+		const void* FindSignatureNative(const wchar_t* const szModuleName, const char* const szSectionName, const char* const szSignature, const size_t unOffset = 0, const unsigned char unIgnoredByte = 0x2A) noexcept;
 #else
-		const void* FindSignatureNative(const char* const szModuleName, const char* const szSignature, const size_t unOffset = 0, const unsigned char unIgnoredByte = 0x2A);
-		const void* FindSignatureNative(const char* const szModuleName, const std::array<const unsigned char, 8>& SectionName, const char* const szSignature, const size_t unOffset = 0, const unsigned char unIgnoredByte = 0x2A);
-		const void* FindSignatureNative(const char* const szModuleName, const char* const szSectionName, const char* const szSignature, const size_t unOffset = 0, const unsigned char unIgnoredByte = 0x2A);
+		const void* FindSignatureNative(const char* const szModuleName, const char* const szSignature, const size_t unOffset = 0, const unsigned char unIgnoredByte = 0x2A) noexcept;
+		const void* FindSignatureNative(const char* const szModuleName, const std::array<const unsigned char, 8>& SectionName, const char* const szSignature, const size_t unOffset = 0, const unsigned char unIgnoredByte = 0x2A) noexcept;
+		const void* FindSignatureNative(const char* const szModuleName, const char* const szSectionName, const char* const szSignature, const size_t unOffset = 0, const unsigned char unIgnoredByte = 0x2A) noexcept;
 #endif
 
 		// ----------------------------------------------------------------
 		// FindSignature (SSE2)
 		// ----------------------------------------------------------------
 
-		const void* FindSignatureSSE2(const void* const pAddress, const size_t unSize, const char* const szSignature, const size_t unOffset = 0, const unsigned char unIgnoredByte = 0x2A);
-		const void* FindSignatureSSE2(const HMODULE hModule, const char* const szSignature, const size_t unOffset = 0, const unsigned char unIgnoredByte = 0x2A);
-		const void* FindSignatureSSE2(const HMODULE hModule, const std::array<const unsigned char, 8>& SectionName, const char* const szSignature, const size_t unOffset = 0, const unsigned char unIgnoredByte = 0x2A);
-		const void* FindSignatureSSE2(const HMODULE hModule, const char* const szSectionName, const char* const szSignature, const size_t unOffset = 0, const unsigned char unIgnoredByte = 0x2A);
-		const void* FindSignatureSSE2A(const char* const szModuleName, const char* const szSignature, const size_t unOffset = 0, const unsigned char unIgnoredByte = 0x2A);
-		const void* FindSignatureSSE2A(const char* const szModuleName, const std::array<const unsigned char, 8>& SectionName, const char* const szSignature, const size_t unOffset = 0, const unsigned char unIgnoredByte = 0x2A);
-		const void* FindSignatureSSE2A(const char* const szModuleName, const char* const szSectionName, const char* const szSignature, const size_t unOffset = 0, const unsigned char unIgnoredByte = 0x2A);
-		const void* FindSignatureSSE2W(const wchar_t* const szModuleName, const char* const szSignature, const size_t unOffset = 0, const unsigned char unIgnoredByte = 0x2A);
-		const void* FindSignatureSSE2W(const wchar_t* const szModuleName, const std::array<const unsigned char, 8>& SectionName, const char* const szSignature, const size_t unOffset = 0, const unsigned char unIgnoredByte = 0x2A);
-		const void* FindSignatureSSE2W(const wchar_t* const szModuleName, const char* const szSectionName, const char* const szSignature, const size_t unOffset = 0, const unsigned char unIgnoredByte = 0x2A);
+		const void* FindSignatureSSE2(const void* const pAddress, const size_t unSize, const char* const szSignature, const size_t unOffset = 0, const unsigned char unIgnoredByte = 0x2A) noexcept;
+		const void* FindSignatureSSE2(const HMODULE hModule, const char* const szSignature, const size_t unOffset = 0, const unsigned char unIgnoredByte = 0x2A) noexcept;
+		const void* FindSignatureSSE2(const HMODULE hModule, const std::array<const unsigned char, 8>& SectionName, const char* const szSignature, const size_t unOffset = 0, const unsigned char unIgnoredByte = 0x2A) noexcept;
+		const void* FindSignatureSSE2(const HMODULE hModule, const char* const szSectionName, const char* const szSignature, const size_t unOffset = 0, const unsigned char unIgnoredByte = 0x2A) noexcept;
+		const void* FindSignatureSSE2A(const char* const szModuleName, const char* const szSignature, const size_t unOffset = 0, const unsigned char unIgnoredByte = 0x2A) noexcept;
+		const void* FindSignatureSSE2A(const char* const szModuleName, const std::array<const unsigned char, 8>& SectionName, const char* const szSignature, const size_t unOffset = 0, const unsigned char unIgnoredByte = 0x2A) noexcept;
+		const void* FindSignatureSSE2A(const char* const szModuleName, const char* const szSectionName, const char* const szSignature, const size_t unOffset = 0, const unsigned char unIgnoredByte = 0x2A) noexcept;
+		const void* FindSignatureSSE2W(const wchar_t* const szModuleName, const char* const szSignature, const size_t unOffset = 0, const unsigned char unIgnoredByte = 0x2A) noexcept;
+		const void* FindSignatureSSE2W(const wchar_t* const szModuleName, const std::array<const unsigned char, 8>& SectionName, const char* const szSignature, const size_t unOffset = 0, const unsigned char unIgnoredByte = 0x2A) noexcept;
+		const void* FindSignatureSSE2W(const wchar_t* const szModuleName, const char* const szSectionName, const char* const szSignature, const size_t unOffset = 0, const unsigned char unIgnoredByte = 0x2A) noexcept;
 #ifdef _UNICODE
-		const void* FindSignatureSSE2(const wchar_t* const szModuleName, const char* const szSignature, const size_t unOffset = 0, const unsigned char unIgnoredByte = 0x2A);
-		const void* FindSignatureSSE2(const wchar_t* const szModuleName, const std::array<const unsigned char, 8>& SectionName, const char* const szSignature, const size_t unOffset = 0, const unsigned char unIgnoredByte = 0x2A);
-		const void* FindSignatureSSE2(const wchar_t* const szModuleName, const char* const szSectionName, const char* const szSignature, const size_t unOffset = 0, const unsigned char unIgnoredByte = 0x2A);
+		const void* FindSignatureSSE2(const wchar_t* const szModuleName, const char* const szSignature, const size_t unOffset = 0, const unsigned char unIgnoredByte = 0x2A) noexcept;
+		const void* FindSignatureSSE2(const wchar_t* const szModuleName, const std::array<const unsigned char, 8>& SectionName, const char* const szSignature, const size_t unOffset = 0, const unsigned char unIgnoredByte = 0x2A) noexcept;
+		const void* FindSignatureSSE2(const wchar_t* const szModuleName, const char* const szSectionName, const char* const szSignature, const size_t unOffset = 0, const unsigned char unIgnoredByte = 0x2A) noexcept;
 #else
-		const void* FindSignatureSSE2(const char* const szModuleName, const char* const szSignature, const size_t unOffset = 0, const unsigned char unIgnoredByte = 0x2A);
-		const void* FindSignatureSSE2(const char* const szModuleName, const std::array<const unsigned char, 8>& SectionName, const char* const szSignature, const size_t unOffset = 0, const unsigned char unIgnoredByte = 0x2A);
-		const void* FindSignatureSSE2(const char* const szModuleName, const char* const szSectionName, const char* const szSignature, const size_t unOffset = 0, const unsigned char unIgnoredByte = 0x2A);
+		const void* FindSignatureSSE2(const char* const szModuleName, const char* const szSignature, const size_t unOffset = 0, const unsigned char unIgnoredByte = 0x2A) noexcept;
+		const void* FindSignatureSSE2(const char* const szModuleName, const std::array<const unsigned char, 8>& SectionName, const char* const szSignature, const size_t unOffset = 0, const unsigned char unIgnoredByte = 0x2A) noexcept;
+		const void* FindSignatureSSE2(const char* const szModuleName, const char* const szSectionName, const char* const szSignature, const size_t unOffset = 0, const unsigned char unIgnoredByte = 0x2A) noexcept;
 #endif
 
 		// ----------------------------------------------------------------
 		// FindSignature (AVX)
 		// ----------------------------------------------------------------
 
-		const void* FindSignatureAVX(const void* const pAddress, const size_t unSize, const char* const szSignature, const size_t unOffset = 0, const unsigned char unIgnoredByte = 0x2A);
-		const void* FindSignatureAVX(const HMODULE hModule, const char* const szSignature, const size_t unOffset = 0, const unsigned char unIgnoredByte = 0x2A);
-		const void* FindSignatureAVX(const HMODULE hModule, const std::array<const unsigned char, 8>& SectionName, const char* const szSignature, const size_t unOffset = 0, const unsigned char unIgnoredByte = 0x2A);
-		const void* FindSignatureAVX(const HMODULE hModule, const char* const szSectionName, const char* const szSignature, const size_t unOffset = 0, const unsigned char unIgnoredByte = 0x2A);
-		const void* FindSignatureAVXA(const char* const szModuleName, const char* const szSignature, const size_t unOffset = 0, const unsigned char unIgnoredByte = 0x2A);
-		const void* FindSignatureAVXA(const char* const szModuleName, const std::array<const unsigned char, 8>& SectionName, const char* const szSignature, const size_t unOffset = 0, const unsigned char unIgnoredByte = 0x2A);
-		const void* FindSignatureAVXA(const char* const szModuleName, const char* const szSectionName, const char* const szSignature, const size_t unOffset = 0, const unsigned char unIgnoredByte = 0x2A);
-		const void* FindSignatureAVXW(const wchar_t* const szModuleName, const char* const szSignature, const size_t unOffset = 0, const unsigned char unIgnoredByte = 0x2A);
-		const void* FindSignatureAVXW(const wchar_t* const szModuleName, const std::array<const unsigned char, 8>& SectionName, const char* const szSignature, const size_t unOffset = 0, const unsigned char unIgnoredByte = 0x2A);
-		const void* FindSignatureAVXW(const wchar_t* const szModuleName, const char* const szSectionName, const char* const szSignature, const size_t unOffset = 0, const unsigned char unIgnoredByte = 0x2A);
+		const void* FindSignatureAVX(const void* const pAddress, const size_t unSize, const char* const szSignature, const size_t unOffset = 0, const unsigned char unIgnoredByte = 0x2A) noexcept;
+		const void* FindSignatureAVX(const HMODULE hModule, const char* const szSignature, const size_t unOffset = 0, const unsigned char unIgnoredByte = 0x2A) noexcept;
+		const void* FindSignatureAVX(const HMODULE hModule, const std::array<const unsigned char, 8>& SectionName, const char* const szSignature, const size_t unOffset = 0, const unsigned char unIgnoredByte = 0x2A) noexcept;
+		const void* FindSignatureAVX(const HMODULE hModule, const char* const szSectionName, const char* const szSignature, const size_t unOffset = 0, const unsigned char unIgnoredByte = 0x2A) noexcept;
+		const void* FindSignatureAVXA(const char* const szModuleName, const char* const szSignature, const size_t unOffset = 0, const unsigned char unIgnoredByte = 0x2A) noexcept;
+		const void* FindSignatureAVXA(const char* const szModuleName, const std::array<const unsigned char, 8>& SectionName, const char* const szSignature, const size_t unOffset = 0, const unsigned char unIgnoredByte = 0x2A) noexcept;
+		const void* FindSignatureAVXA(const char* const szModuleName, const char* const szSectionName, const char* const szSignature, const size_t unOffset = 0, const unsigned char unIgnoredByte = 0x2A) noexcept;
+		const void* FindSignatureAVXW(const wchar_t* const szModuleName, const char* const szSignature, const size_t unOffset = 0, const unsigned char unIgnoredByte = 0x2A) noexcept;
+		const void* FindSignatureAVXW(const wchar_t* const szModuleName, const std::array<const unsigned char, 8>& SectionName, const char* const szSignature, const size_t unOffset = 0, const unsigned char unIgnoredByte = 0x2A) noexcept;
+		const void* FindSignatureAVXW(const wchar_t* const szModuleName, const char* const szSectionName, const char* const szSignature, const size_t unOffset = 0, const unsigned char unIgnoredByte = 0x2A) noexcept;
 #ifdef _UNICODE
-		const void* FindSignatureAVX(const wchar_t* const szModuleName, const char* const szSignature, const size_t unOffset = 0, const unsigned char unIgnoredByte = 0x2A);
-		const void* FindSignatureAVX(const wchar_t* const szModuleName, const std::array<const unsigned char, 8>& SectionName, const char* const szSignature, const size_t unOffset = 0, const unsigned char unIgnoredByte = 0x2A);
-		const void* FindSignatureAVX(const wchar_t* const szModuleName, const char* const szSectionName, const char* const szSignature, const size_t unOffset = 0, const unsigned char unIgnoredByte = 0x2A);
+		const void* FindSignatureAVX(const wchar_t* const szModuleName, const char* const szSignature, const size_t unOffset = 0, const unsigned char unIgnoredByte = 0x2A) noexcept;
+		const void* FindSignatureAVX(const wchar_t* const szModuleName, const std::array<const unsigned char, 8>& SectionName, const char* const szSignature, const size_t unOffset = 0, const unsigned char unIgnoredByte = 0x2A) noexcept;
+		const void* FindSignatureAVX(const wchar_t* const szModuleName, const char* const szSectionName, const char* const szSignature, const size_t unOffset = 0, const unsigned char unIgnoredByte = 0x2A) noexcept;
 #else
-		const void* FindSignatureAVX(const char* const szModuleName, const char* const szSignature, const size_t unOffset = 0, const unsigned char unIgnoredByte = 0x2A);
-		const void* FindSignatureAVX(const char* const szModuleName, const std::array<const unsigned char, 8>& SectionName, const char* const szSignature, const size_t unOffset = 0, const unsigned char unIgnoredByte = 0x2A);
-		const void* FindSignatureAVX(const char* const szModuleName, const char* const szSectionName, const char* const szSignature, const size_t unOffset = 0, const unsigned char unIgnoredByte = 0x2A);
+		const void* FindSignatureAVX(const char* const szModuleName, const char* const szSignature, const size_t unOffset = 0, const unsigned char unIgnoredByte = 0x2A) noexcept;
+		const void* FindSignatureAVX(const char* const szModuleName, const std::array<const unsigned char, 8>& SectionName, const char* const szSignature, const size_t unOffset = 0, const unsigned char unIgnoredByte = 0x2A) noexcept;
+		const void* FindSignatureAVX(const char* const szModuleName, const char* const szSectionName, const char* const szSignature, const size_t unOffset = 0, const unsigned char unIgnoredByte = 0x2A) noexcept;
 #endif
 
 		// ----------------------------------------------------------------
 		// FindSignature (AVX2)
 		// ----------------------------------------------------------------
 
-		const void* FindSignatureAVX2(const void* const pAddress, const size_t unSize, const char* const szSignature, const size_t unOffset = 0, const unsigned char unIgnoredByte = 0x2A);
-		const void* FindSignatureAVX2(const HMODULE hModule, const char* const szSignature, const size_t unOffset = 0, const unsigned char unIgnoredByte = 0x2A);
-		const void* FindSignatureAVX2(const HMODULE hModule, const std::array<const unsigned char, 8>& SectionName, const char* const szSignature, const size_t unOffset = 0, const unsigned char unIgnoredByte = 0x2A);
-		const void* FindSignatureAVX2(const HMODULE hModule, const char* const szSectionName, const char* const szSignature, const size_t unOffset = 0, const unsigned char unIgnoredByte = 0x2A);
-		const void* FindSignatureAVX2A(const char* const szModuleName, const char* const szSignature, const size_t unOffset = 0, const unsigned char unIgnoredByte = 0x2A);
-		const void* FindSignatureAVX2A(const char* const szModuleName, const std::array<const unsigned char, 8>& SectionName, const char* const szSignature, const size_t unOffset = 0, const unsigned char unIgnoredByte = 0x2A);
-		const void* FindSignatureAVX2A(const char* const szModuleName, const char* const szSectionName, const char* const szSignature, const size_t unOffset = 0, const unsigned char unIgnoredByte = 0x2A);
-		const void* FindSignatureAVX2W(const wchar_t* const szModuleName, const char* const szSignature, const size_t unOffset = 0, const unsigned char unIgnoredByte = 0x2A);
-		const void* FindSignatureAVX2W(const wchar_t* const szModuleName, const std::array<const unsigned char, 8>& SectionName, const char* const szSignature, const size_t unOffset = 0, const unsigned char unIgnoredByte = 0x2A);
-		const void* FindSignatureAVX2W(const wchar_t* const szModuleName, const char* const szSectionName, const char* const szSignature, const size_t unOffset = 0, const unsigned char unIgnoredByte = 0x2A);
+		const void* FindSignatureAVX2(const void* const pAddress, const size_t unSize, const char* const szSignature, const size_t unOffset = 0, const unsigned char unIgnoredByte = 0x2A) noexcept;
+		const void* FindSignatureAVX2(const HMODULE hModule, const char* const szSignature, const size_t unOffset = 0, const unsigned char unIgnoredByte = 0x2A) noexcept;
+		const void* FindSignatureAVX2(const HMODULE hModule, const std::array<const unsigned char, 8>& SectionName, const char* const szSignature, const size_t unOffset = 0, const unsigned char unIgnoredByte = 0x2A) noexcept;
+		const void* FindSignatureAVX2(const HMODULE hModule, const char* const szSectionName, const char* const szSignature, const size_t unOffset = 0, const unsigned char unIgnoredByte = 0x2A) noexcept;
+		const void* FindSignatureAVX2A(const char* const szModuleName, const char* const szSignature, const size_t unOffset = 0, const unsigned char unIgnoredByte = 0x2A) noexcept;
+		const void* FindSignatureAVX2A(const char* const szModuleName, const std::array<const unsigned char, 8>& SectionName, const char* const szSignature, const size_t unOffset = 0, const unsigned char unIgnoredByte = 0x2A) noexcept;
+		const void* FindSignatureAVX2A(const char* const szModuleName, const char* const szSectionName, const char* const szSignature, const size_t unOffset = 0, const unsigned char unIgnoredByte = 0x2A) noexcept;
+		const void* FindSignatureAVX2W(const wchar_t* const szModuleName, const char* const szSignature, const size_t unOffset = 0, const unsigned char unIgnoredByte = 0x2A) noexcept;
+		const void* FindSignatureAVX2W(const wchar_t* const szModuleName, const std::array<const unsigned char, 8>& SectionName, const char* const szSignature, const size_t unOffset = 0, const unsigned char unIgnoredByte = 0x2A) noexcept;
+		const void* FindSignatureAVX2W(const wchar_t* const szModuleName, const char* const szSectionName, const char* const szSignature, const size_t unOffset = 0, const unsigned char unIgnoredByte = 0x2A) noexcept;
 #ifdef _UNICODE
-		const void* FindSignatureAVX2(const wchar_t* const szModuleName, const char* const szSignature, const size_t unOffset = 0, const unsigned char unIgnoredByte = 0x2A);
-		const void* FindSignatureAVX2(const wchar_t* const szModuleName, const std::array<const unsigned char, 8>& SectionName, const char* const szSignature, const size_t unOffset = 0, const unsigned char unIgnoredByte = 0x2A);
-		const void* FindSignatureAVX2(const wchar_t* const szModuleName, const char* const szSectionName, const char* const szSignature, const size_t unOffset = 0, const unsigned char unIgnoredByte = 0x2A);
+		const void* FindSignatureAVX2(const wchar_t* const szModuleName, const char* const szSignature, const size_t unOffset = 0, const unsigned char unIgnoredByte = 0x2A) noexcept;
+		const void* FindSignatureAVX2(const wchar_t* const szModuleName, const std::array<const unsigned char, 8>& SectionName, const char* const szSignature, const size_t unOffset = 0, const unsigned char unIgnoredByte = 0x2A) noexcept;
+		const void* FindSignatureAVX2(const wchar_t* const szModuleName, const char* const szSectionName, const char* const szSignature, const size_t unOffset = 0, const unsigned char unIgnoredByte = 0x2A) noexcept;
 #else
-		const void* FindSignatureAVX2(const char* const szModuleName, const char* const szSignature, const size_t unOffset = 0, const unsigned char unIgnoredByte = 0x2A);
-		const void* FindSignatureAVX2(const char* const szModuleName, const std::array<const unsigned char, 8>& SectionName, const char* const szSignature, const size_t unOffset = 0, const unsigned char unIgnoredByte = 0x2A);
-		const void* FindSignatureAVX2(const char* const szModuleName, const char* const szSectionName, const char* const szSignature, const size_t unOffset = 0, const unsigned char unIgnoredByte = 0x2A);
+		const void* FindSignatureAVX2(const char* const szModuleName, const char* const szSignature, const size_t unOffset = 0, const unsigned char unIgnoredByte = 0x2A) noexcept;
+		const void* FindSignatureAVX2(const char* const szModuleName, const std::array<const unsigned char, 8>& SectionName, const char* const szSignature, const size_t unOffset = 0, const unsigned char unIgnoredByte = 0x2A) noexcept;
+		const void* FindSignatureAVX2(const char* const szModuleName, const char* const szSectionName, const char* const szSignature, const size_t unOffset = 0, const unsigned char unIgnoredByte = 0x2A) noexcept;
 #endif
 
 		// ----------------------------------------------------------------
 		// FindSignature (AVX512) [AVX512BW]
 		// ----------------------------------------------------------------
 
-		const void* FindSignatureAVX512(const void* const pAddress, const size_t unSize, const char* const szSignature, const size_t unOffset = 0, const unsigned char unIgnoredByte = 0x2A);
-		const void* FindSignatureAVX512(const HMODULE hModule, const char* const szSignature, const size_t unOffset = 0, const unsigned char unIgnoredByte = 0x2A);
-		const void* FindSignatureAVX512(const HMODULE hModule, const std::array<const unsigned char, 8>& SectionName, const char* const szSignature, const size_t unOffset = 0, const unsigned char unIgnoredByte = 0x2A);
-		const void* FindSignatureAVX512(const HMODULE hModule, const char* const szSectionName, const char* const szSignature, const size_t unOffset = 0, const unsigned char unIgnoredByte = 0x2A);
-		const void* FindSignatureAVX512A(const char* const szModuleName, const char* const szSignature, const size_t unOffset = 0, const unsigned char unIgnoredByte = 0x2A);
-		const void* FindSignatureAVX512A(const char* const szModuleName, const std::array<const unsigned char, 8>& SectionName, const char* const szSignature, const size_t unOffset = 0, const unsigned char unIgnoredByte = 0x2A);
-		const void* FindSignatureAVX512A(const char* const szModuleName, const char* const szSectionName, const char* const szSignature, const size_t unOffset = 0, const unsigned char unIgnoredByte = 0x2A);
-		const void* FindSignatureAVX512W(const wchar_t* const szModuleName, const char* const szSignature, const size_t unOffset = 0, const unsigned char unIgnoredByte = 0x2A);
-		const void* FindSignatureAVX512W(const wchar_t* const szModuleName, const std::array<const unsigned char, 8>& SectionName, const char* const szSignature, const size_t unOffset = 0, const unsigned char unIgnoredByte = 0x2A);
-		const void* FindSignatureAVX512W(const wchar_t* const szModuleName, const char* const szSectionName, const char* const szSignature, const size_t unOffset = 0, const unsigned char unIgnoredByte = 0x2A);
+		const void* FindSignatureAVX512(const void* const pAddress, const size_t unSize, const char* const szSignature, const size_t unOffset = 0, const unsigned char unIgnoredByte = 0x2A) noexcept;
+		const void* FindSignatureAVX512(const HMODULE hModule, const char* const szSignature, const size_t unOffset = 0, const unsigned char unIgnoredByte = 0x2A) noexcept;
+		const void* FindSignatureAVX512(const HMODULE hModule, const std::array<const unsigned char, 8>& SectionName, const char* const szSignature, const size_t unOffset = 0, const unsigned char unIgnoredByte = 0x2A) noexcept;
+		const void* FindSignatureAVX512(const HMODULE hModule, const char* const szSectionName, const char* const szSignature, const size_t unOffset = 0, const unsigned char unIgnoredByte = 0x2A) noexcept;
+		const void* FindSignatureAVX512A(const char* const szModuleName, const char* const szSignature, const size_t unOffset = 0, const unsigned char unIgnoredByte = 0x2A) noexcept;
+		const void* FindSignatureAVX512A(const char* const szModuleName, const std::array<const unsigned char, 8>& SectionName, const char* const szSignature, const size_t unOffset = 0, const unsigned char unIgnoredByte = 0x2A) noexcept;
+		const void* FindSignatureAVX512A(const char* const szModuleName, const char* const szSectionName, const char* const szSignature, const size_t unOffset = 0, const unsigned char unIgnoredByte = 0x2A) noexcept;
+		const void* FindSignatureAVX512W(const wchar_t* const szModuleName, const char* const szSignature, const size_t unOffset = 0, const unsigned char unIgnoredByte = 0x2A) noexcept;
+		const void* FindSignatureAVX512W(const wchar_t* const szModuleName, const std::array<const unsigned char, 8>& SectionName, const char* const szSignature, const size_t unOffset = 0, const unsigned char unIgnoredByte = 0x2A) noexcept;
+		const void* FindSignatureAVX512W(const wchar_t* const szModuleName, const char* const szSectionName, const char* const szSignature, const size_t unOffset = 0, const unsigned char unIgnoredByte = 0x2A) noexcept;
 #ifdef _UNICODE
-		const void* FindSignatureAVX512(const wchar_t* const szModuleName, const char* const szSignature, const size_t unOffset = 0, const unsigned char unIgnoredByte = 0x2A);
-		const void* FindSignatureAVX512(const wchar_t* const szModuleName, const std::array<const unsigned char, 8>& SectionName, const char* const szSignature, const size_t unOffset = 0, const unsigned char unIgnoredByte = 0x2A);
-		const void* FindSignatureAVX512(const wchar_t* const szModuleName, const char* const szSectionName, const char* const szSignature, const size_t unOffset = 0, const unsigned char unIgnoredByte = 0x2A);
+		const void* FindSignatureAVX512(const wchar_t* const szModuleName, const char* const szSignature, const size_t unOffset = 0, const unsigned char unIgnoredByte = 0x2A) noexcept;
+		const void* FindSignatureAVX512(const wchar_t* const szModuleName, const std::array<const unsigned char, 8>& SectionName, const char* const szSignature, const size_t unOffset = 0, const unsigned char unIgnoredByte = 0x2A) noexcept;
+		const void* FindSignatureAVX512(const wchar_t* const szModuleName, const char* const szSectionName, const char* const szSignature, const size_t unOffset = 0, const unsigned char unIgnoredByte = 0x2A) noexcept;
 #else
-		const void* FindSignatureAVX512(const char* const szModuleName, const char* const szSignature, const size_t unOffset = 0, const unsigned char unIgnoredByte = 0x2A);
-		const void* FindSignatureAVX512(const char* const szModuleName, const std::array<const unsigned char, 8>& SectionName, const char* const szSignature, const size_t unOffset = 0, const unsigned char unIgnoredByte = 0x2A);
-		const void* FindSignatureAVX512(const char* const szModuleName, const char* const szSectionName, const char* const szSignature, const size_t unOffset = 0, const unsigned char unIgnoredByte = 0x2A);
+		const void* FindSignatureAVX512(const char* const szModuleName, const char* const szSignature, const size_t unOffset = 0, const unsigned char unIgnoredByte = 0x2A) noexcept;
+		const void* FindSignatureAVX512(const char* const szModuleName, const std::array<const unsigned char, 8>& SectionName, const char* const szSignature, const size_t unOffset = 0, const unsigned char unIgnoredByte = 0x2A) noexcept;
+		const void* FindSignatureAVX512(const char* const szModuleName, const char* const szSectionName, const char* const szSignature, const size_t unOffset = 0, const unsigned char unIgnoredByte = 0x2A) noexcept;
 #endif
 
 		// ----------------------------------------------------------------
 		// FindSignature (Auto)
 		// ----------------------------------------------------------------
 
-		const void* FindSignature(const void* const pAddress, const size_t unSize, const char* const szSignature, const size_t unOffset = 0, const unsigned char unIgnoredByte = 0x2A);
-		const void* FindSignature(const HMODULE hModule, const char* const szSignature, const size_t unOffset = 0, const unsigned char unIgnoredByte = 0x2A);
-		const void* FindSignature(const HMODULE hModule, const std::array<const unsigned char, 8>& SectionName, const char* const szSignature, const size_t unOffset = 0, const unsigned char unIgnoredByte = 0x2A);
-		const void* FindSignature(const HMODULE hModule, const char* const szSectionName, const char* const szSignature, const size_t unOffset = 0, const unsigned char unIgnoredByte = 0x2A);
-		const void* FindSignatureA(const char* const szModuleName, const char* const szSignature, const size_t unOffset = 0, const unsigned char unIgnoredByte = 0x2A);
-		const void* FindSignatureA(const char* const szModuleName, const std::array<const unsigned char, 8>& SectionName, const char* const szSignature, const size_t unOffset = 0, const unsigned char unIgnoredByte = 0x2A);
-		const void* FindSignatureA(const char* const szModuleName, const char* const szSectionName, const char* const szSignature, const size_t unOffset = 0, const unsigned char unIgnoredByte = 0x2A);
-		const void* FindSignatureW(const wchar_t* const szModuleName, const char* const szSignature, const size_t unOffset = 0, const unsigned char unIgnoredByte = 0x2A);
-		const void* FindSignatureW(const wchar_t* const szModuleName, const std::array<const unsigned char, 8>& SectionName, const char* const szSignature, const size_t unOffset = 0, const unsigned char unIgnoredByte = 0x2A);
-		const void* FindSignatureW(const wchar_t* const szModuleName, const char* const szSectionName, const char* const szSignature, const size_t unOffset = 0, const unsigned char unIgnoredByte = 0x2A);
+		const void* FindSignature(const void* const pAddress, const size_t unSize, const char* const szSignature, const size_t unOffset = 0, const unsigned char unIgnoredByte = 0x2A) noexcept;
+		const void* FindSignature(const HMODULE hModule, const char* const szSignature, const size_t unOffset = 0, const unsigned char unIgnoredByte = 0x2A) noexcept;
+		const void* FindSignature(const HMODULE hModule, const std::array<const unsigned char, 8>& SectionName, const char* const szSignature, const size_t unOffset = 0, const unsigned char unIgnoredByte = 0x2A) noexcept;
+		const void* FindSignature(const HMODULE hModule, const char* const szSectionName, const char* const szSignature, const size_t unOffset = 0, const unsigned char unIgnoredByte = 0x2A) noexcept;
+		const void* FindSignatureA(const char* const szModuleName, const char* const szSignature, const size_t unOffset = 0, const unsigned char unIgnoredByte = 0x2A) noexcept;
+		const void* FindSignatureA(const char* const szModuleName, const std::array<const unsigned char, 8>& SectionName, const char* const szSignature, const size_t unOffset = 0, const unsigned char unIgnoredByte = 0x2A) noexcept;
+		const void* FindSignatureA(const char* const szModuleName, const char* const szSectionName, const char* const szSignature, const size_t unOffset = 0, const unsigned char unIgnoredByte = 0x2A) noexcept;
+		const void* FindSignatureW(const wchar_t* const szModuleName, const char* const szSignature, const size_t unOffset = 0, const unsigned char unIgnoredByte = 0x2A) noexcept;
+		const void* FindSignatureW(const wchar_t* const szModuleName, const std::array<const unsigned char, 8>& SectionName, const char* const szSignature, const size_t unOffset = 0, const unsigned char unIgnoredByte = 0x2A) noexcept;
+		const void* FindSignatureW(const wchar_t* const szModuleName, const char* const szSectionName, const char* const szSignature, const size_t unOffset = 0, const unsigned char unIgnoredByte = 0x2A) noexcept;
 #ifdef _UNICODE
-		const void* FindSignature(const wchar_t* const szModuleName, const char* const szSignature, const size_t unOffset = 0, const unsigned char unIgnoredByte = 0x2A);
-		const void* FindSignature(const wchar_t* const szModuleName, const std::array<const unsigned char, 8>& SectionName, const char* const szSignature, const size_t unOffset = 0, const unsigned char unIgnoredByte = 0x2A);
-		const void* FindSignature(const wchar_t* const szModuleName, const char* const szSectionName, const char* const szSignature, const size_t unOffset = 0, const unsigned char unIgnoredByte = 0x2A);
+		const void* FindSignature(const wchar_t* const szModuleName, const char* const szSignature, const size_t unOffset = 0, const unsigned char unIgnoredByte = 0x2A) noexcept;
+		const void* FindSignature(const wchar_t* const szModuleName, const std::array<const unsigned char, 8>& SectionName, const char* const szSignature, const size_t unOffset = 0, const unsigned char unIgnoredByte = 0x2A) noexcept;
+		const void* FindSignature(const wchar_t* const szModuleName, const char* const szSectionName, const char* const szSignature, const size_t unOffset = 0, const unsigned char unIgnoredByte = 0x2A) noexcept;
 #else
-		const void* FindSignature(const char* const szModuleName, const char* const szSignature, const size_t unOffset = 0, const unsigned char unIgnoredByte = 0x2A);
-		const void* FindSignature(const char* const szModuleName, const std::array<const unsigned char, 8>& SectionName, const char* const szSignature, const size_t unOffset = 0, const unsigned char unIgnoredByte = 0x2A);
-		const void* FindSignature(const char* const szModuleName, const char* const szSectionName, const char* const szSignature, const size_t unOffset = 0, const unsigned char unIgnoredByte = 0x2A);
+		const void* FindSignature(const char* const szModuleName, const char* const szSignature, const size_t unOffset = 0, const unsigned char unIgnoredByte = 0x2A) noexcept;
+		const void* FindSignature(const char* const szModuleName, const std::array<const unsigned char, 8>& SectionName, const char* const szSignature, const size_t unOffset = 0, const unsigned char unIgnoredByte = 0x2A) noexcept;
+		const void* FindSignature(const char* const szModuleName, const char* const szSectionName, const char* const szSignature, const size_t unOffset = 0, const unsigned char unIgnoredByte = 0x2A) noexcept;
 #endif
 
 		// ----------------------------------------------------------------
 		// FindData (Native)
 		// ----------------------------------------------------------------
 
-		const void* FindDataNative(const void* const pAddress, const size_t unSize, const unsigned char* const pData, const size_t unDataSize);
-		const void* FindDataNative(const HMODULE hModule, const unsigned char* const pData, const size_t unDataSize);
-		const void* FindDataNative(const HMODULE hModule, const std::array<const unsigned char, 8>& SectionName, const unsigned char* const pData, const size_t unDataSize);
-		const void* FindDataNative(const HMODULE hModule, const char* const szSectionName, const unsigned char* const pData, const size_t unDataSize);
-		const void* FindDataNativeA(const char* const szModuleName, const unsigned char* const pData, const size_t unDataSize);
-		const void* FindDataNativeA(const char* const szModuleName, const std::array<const unsigned char, 8>& SectionName, const unsigned char* const pData, const size_t unDataSize);
-		const void* FindDataNativeA(const char* const szModuleName, const char* const szSectionName, const unsigned char* const pData, const size_t unDataSize);
-		const void* FindDataNativeW(const wchar_t* const szModuleName, const unsigned char* const pData, const size_t unDataSize);
-		const void* FindDataNativeW(const wchar_t* const szModuleName, const std::array<const unsigned char, 8>& SectionName, const unsigned char* const pData, const size_t unDataSize);
-		const void* FindDataNativeW(const wchar_t* const szModuleName, const char* const szSectionName, const unsigned char* const pData, const size_t unDataSize);
+		const void* FindDataNative(const void* const pAddress, const size_t unSize, const unsigned char* const pData, const size_t unDataSize) noexcept;
+		const void* FindDataNative(const HMODULE hModule, const unsigned char* const pData, const size_t unDataSize) noexcept;
+		const void* FindDataNative(const HMODULE hModule, const std::array<const unsigned char, 8>& SectionName, const unsigned char* const pData, const size_t unDataSize) noexcept;
+		const void* FindDataNative(const HMODULE hModule, const char* const szSectionName, const unsigned char* const pData, const size_t unDataSize) noexcept;
+		const void* FindDataNativeA(const char* const szModuleName, const unsigned char* const pData, const size_t unDataSize) noexcept;
+		const void* FindDataNativeA(const char* const szModuleName, const std::array<const unsigned char, 8>& SectionName, const unsigned char* const pData, const size_t unDataSize) noexcept;
+		const void* FindDataNativeA(const char* const szModuleName, const char* const szSectionName, const unsigned char* const pData, const size_t unDataSize) noexcept;
+		const void* FindDataNativeW(const wchar_t* const szModuleName, const unsigned char* const pData, const size_t unDataSize) noexcept;
+		const void* FindDataNativeW(const wchar_t* const szModuleName, const std::array<const unsigned char, 8>& SectionName, const unsigned char* const pData, const size_t unDataSize) noexcept;
+		const void* FindDataNativeW(const wchar_t* const szModuleName, const char* const szSectionName, const unsigned char* const pData, const size_t unDataSize) noexcept;
 #ifdef _UNICODE
-		const void* FindDataNative(const wchar_t* const szModuleName, const unsigned char* const pData, const size_t unDataSize);
-		const void* FindDataNative(const wchar_t* const szModuleName, const std::array<const unsigned char, 8>& SectionName, const unsigned char* const pData, const size_t unDataSize);
-		const void* FindDataNative(const wchar_t* const szModuleName, const char* const szSectionName, const unsigned char* const pData, const size_t unDataSize);
+		const void* FindDataNative(const wchar_t* const szModuleName, const unsigned char* const pData, const size_t unDataSize) noexcept;
+		const void* FindDataNative(const wchar_t* const szModuleName, const std::array<const unsigned char, 8>& SectionName, const unsigned char* const pData, const size_t unDataSize) noexcept;
+		const void* FindDataNative(const wchar_t* const szModuleName, const char* const szSectionName, const unsigned char* const pData, const size_t unDataSize) noexcept;
 #else
-		const void* FindDataNative(const char* const szModuleName, const unsigned char* const pData, const size_t unDataSize);
-		const void* FindDataNative(const char* const szModuleName, const std::array<const unsigned char, 8>& SectionName, const unsigned char* const pData, const size_t unDataSize);
-		const void* FindDataNative(const char* const szModuleName, const char* const szSectionName, const unsigned char* const pData, const size_t unDataSize);
+		const void* FindDataNative(const char* const szModuleName, const unsigned char* const pData, const size_t unDataSize) noexcept;
+		const void* FindDataNative(const char* const szModuleName, const std::array<const unsigned char, 8>& SectionName, const unsigned char* const pData, const size_t unDataSize) noexcept;
+		const void* FindDataNative(const char* const szModuleName, const char* const szSectionName, const unsigned char* const pData, const size_t unDataSize) noexcept;
 #endif
 
 		// ----------------------------------------------------------------
 		// FindData (SSE2)
 		// ----------------------------------------------------------------
 
-		const void* FindDataSSE2(const void* const pAddress, const size_t unSize, const unsigned char* const pData, const size_t unDataSize);
-		const void* FindDataSSE2(const HMODULE hModule, const unsigned char* const pData, const size_t unDataSize);
-		const void* FindDataSSE2(const HMODULE hModule, const std::array<const unsigned char, 8>& SectionName, const unsigned char* const pData, const size_t unDataSize);
-		const void* FindDataSSE2(const HMODULE hModule, const char* const szSectionName, const unsigned char* const pData, const size_t unDataSize);
-		const void* FindDataSSE2A(const char* const szModuleName, const unsigned char* const pData, const size_t unDataSize);
-		const void* FindDataSSE2A(const char* const szModuleName, const std::array<const unsigned char, 8>& SectionName, const unsigned char* const pData, const size_t unDataSize);
-		const void* FindDataSSE2A(const char* const szModuleName, const char* const szSectionName, const unsigned char* const pData, const size_t unDataSize);
-		const void* FindDataSSE2W(const wchar_t* const szModuleName, const unsigned char* const pData, const size_t unDataSize);
-		const void* FindDataSSE2W(const wchar_t* const szModuleName, const std::array<const unsigned char, 8>& SectionName, const unsigned char* const pData, const size_t unDataSize);
-		const void* FindDataSSE2W(const wchar_t* const szModuleName, const char* const szSectionName, const unsigned char* const pData, const size_t unDataSize);
+		const void* FindDataSSE2(const void* const pAddress, const size_t unSize, const unsigned char* const pData, const size_t unDataSize) noexcept;
+		const void* FindDataSSE2(const HMODULE hModule, const unsigned char* const pData, const size_t unDataSize) noexcept;
+		const void* FindDataSSE2(const HMODULE hModule, const std::array<const unsigned char, 8>& SectionName, const unsigned char* const pData, const size_t unDataSize) noexcept;
+		const void* FindDataSSE2(const HMODULE hModule, const char* const szSectionName, const unsigned char* const pData, const size_t unDataSize) noexcept;
+		const void* FindDataSSE2A(const char* const szModuleName, const unsigned char* const pData, const size_t unDataSize) noexcept;
+		const void* FindDataSSE2A(const char* const szModuleName, const std::array<const unsigned char, 8>& SectionName, const unsigned char* const pData, const size_t unDataSize) noexcept;
+		const void* FindDataSSE2A(const char* const szModuleName, const char* const szSectionName, const unsigned char* const pData, const size_t unDataSize) noexcept;
+		const void* FindDataSSE2W(const wchar_t* const szModuleName, const unsigned char* const pData, const size_t unDataSize) noexcept;
+		const void* FindDataSSE2W(const wchar_t* const szModuleName, const std::array<const unsigned char, 8>& SectionName, const unsigned char* const pData, const size_t unDataSize) noexcept;
+		const void* FindDataSSE2W(const wchar_t* const szModuleName, const char* const szSectionName, const unsigned char* const pData, const size_t unDataSize) noexcept;
 #ifdef _UNICODE
-		const void* FindDataSSE2(const wchar_t* const szModuleName, const unsigned char* const pData, const size_t unDataSize);
-		const void* FindDataSSE2(const wchar_t* const szModuleName, const std::array<const unsigned char, 8>& SectionName, const unsigned char* const pData, const size_t unDataSize);
-		const void* FindDataSSE2(const wchar_t* const szModuleName, const char* const szSectionName, const unsigned char* const pData, const size_t unDataSize);
+		const void* FindDataSSE2(const wchar_t* const szModuleName, const unsigned char* const pData, const size_t unDataSize) noexcept;
+		const void* FindDataSSE2(const wchar_t* const szModuleName, const std::array<const unsigned char, 8>& SectionName, const unsigned char* const pData, const size_t unDataSize) noexcept;
+		const void* FindDataSSE2(const wchar_t* const szModuleName, const char* const szSectionName, const unsigned char* const pData, const size_t unDataSize) noexcept;
 #else
-		const void* FindDataSSE2(const char* const szModuleName, const unsigned char* const pData, const size_t unDataSize);
-		const void* FindDataSSE2(const char* const szModuleName, const std::array<const unsigned char, 8>& SectionName, const unsigned char* const pData, const size_t unDataSize);
-		const void* FindDataSSE2(const char* const szModuleName, const char* const szSectionName, const unsigned char* const pData, const size_t unDataSize);
+		const void* FindDataSSE2(const char* const szModuleName, const unsigned char* const pData, const size_t unDataSize) noexcept;
+		const void* FindDataSSE2(const char* const szModuleName, const std::array<const unsigned char, 8>& SectionName, const unsigned char* const pData, const size_t unDataSize) noexcept;
+		const void* FindDataSSE2(const char* const szModuleName, const char* const szSectionName, const unsigned char* const pData, const size_t unDataSize) noexcept;
 #endif
 
 		// ----------------------------------------------------------------
 		// FindData (AVX)
 		// ----------------------------------------------------------------
 
-		const void* FindDataAVX(const void* const pAddress, const size_t unSize, const unsigned char* const pData, const size_t unDataSize);
-		const void* FindDataAVX(const HMODULE hModule, const unsigned char* const pData, const size_t unDataSize);
-		const void* FindDataAVX(const HMODULE hModule, const std::array<const unsigned char, 8>& SectionName, const unsigned char* const pData, const size_t unDataSize);
-		const void* FindDataAVX(const HMODULE hModule, const char* const szSectionName, const unsigned char* const pData, const size_t unDataSize);
-		const void* FindDataAVXA(const char* const szModuleName, const unsigned char* const pData, const size_t unDataSize);
-		const void* FindDataAVXA(const char* const szModuleName, const std::array<const unsigned char, 8>& SectionName, const unsigned char* const pData, const size_t unDataSize);
-		const void* FindDataAVXA(const char* const szModuleName, const char* const szSectionName, const unsigned char* const pData, const size_t unDataSize);
-		const void* FindDataAVXW(const wchar_t* const szModuleName, const unsigned char* const pData, const size_t unDataSize);
-		const void* FindDataAVXW(const wchar_t* const szModuleName, const std::array<const unsigned char, 8>& SectionName, const unsigned char* const pData, const size_t unDataSize);
-		const void* FindDataAVXW(const wchar_t* const szModuleName, const char* const szSectionName, const unsigned char* const pData, const size_t unDataSize);
+		const void* FindDataAVX(const void* const pAddress, const size_t unSize, const unsigned char* const pData, const size_t unDataSize) noexcept;
+		const void* FindDataAVX(const HMODULE hModule, const unsigned char* const pData, const size_t unDataSize) noexcept;
+		const void* FindDataAVX(const HMODULE hModule, const std::array<const unsigned char, 8>& SectionName, const unsigned char* const pData, const size_t unDataSize) noexcept;
+		const void* FindDataAVX(const HMODULE hModule, const char* const szSectionName, const unsigned char* const pData, const size_t unDataSize) noexcept;
+		const void* FindDataAVXA(const char* const szModuleName, const unsigned char* const pData, const size_t unDataSize) noexcept;
+		const void* FindDataAVXA(const char* const szModuleName, const std::array<const unsigned char, 8>& SectionName, const unsigned char* const pData, const size_t unDataSize) noexcept;
+		const void* FindDataAVXA(const char* const szModuleName, const char* const szSectionName, const unsigned char* const pData, const size_t unDataSize) noexcept;
+		const void* FindDataAVXW(const wchar_t* const szModuleName, const unsigned char* const pData, const size_t unDataSize) noexcept;
+		const void* FindDataAVXW(const wchar_t* const szModuleName, const std::array<const unsigned char, 8>& SectionName, const unsigned char* const pData, const size_t unDataSize) noexcept;
+		const void* FindDataAVXW(const wchar_t* const szModuleName, const char* const szSectionName, const unsigned char* const pData, const size_t unDataSize) noexcept;
 #ifdef _UNICODE
-		const void* FindDataAVX(const wchar_t* const szModuleName, const unsigned char* const pData, const size_t unDataSize);
-		const void* FindDataAVX(const wchar_t* const szModuleName, const std::array<const unsigned char, 8>& SectionName, const unsigned char* const pData, const size_t unDataSize);
-		const void* FindDataAVX(const wchar_t* const szModuleName, const char* const szSectionName, const unsigned char* const pData, const size_t unDataSize);
+		const void* FindDataAVX(const wchar_t* const szModuleName, const unsigned char* const pData, const size_t unDataSize) noexcept;
+		const void* FindDataAVX(const wchar_t* const szModuleName, const std::array<const unsigned char, 8>& SectionName, const unsigned char* const pData, const size_t unDataSize) noexcept;
+		const void* FindDataAVX(const wchar_t* const szModuleName, const char* const szSectionName, const unsigned char* const pData, const size_t unDataSize) noexcept;
 #else
-		const void* FindDataAVX(const char* const szModuleName, const unsigned char* const pData, const size_t unDataSize);
-		const void* FindDataAVX(const char* const szModuleName, const std::array<const unsigned char, 8>& SectionName, const unsigned char* const pData, const size_t unDataSize);
-		const void* FindDataAVX(const char* const szModuleName, const char* const szSectionName, const unsigned char* const pData, const size_t unDataSize);
+		const void* FindDataAVX(const char* const szModuleName, const unsigned char* const pData, const size_t unDataSize) noexcept;
+		const void* FindDataAVX(const char* const szModuleName, const std::array<const unsigned char, 8>& SectionName, const unsigned char* const pData, const size_t unDataSize) noexcept;
+		const void* FindDataAVX(const char* const szModuleName, const char* const szSectionName, const unsigned char* const pData, const size_t unDataSize) noexcept;
 #endif
 
 		// ----------------------------------------------------------------
 		// FindData (AVX2)
 		// ----------------------------------------------------------------
 
-		const void* FindDataAVX2(const void* const pAddress, const size_t unSize, const unsigned char* const pData, const size_t unDataSize);
-		const void* FindDataAVX2(const HMODULE hModule, const unsigned char* const pData, const size_t unDataSize);
-		const void* FindDataAVX2(const HMODULE hModule, const std::array<const unsigned char, 8>& SectionName, const unsigned char* const pData, const size_t unDataSize);
-		const void* FindDataAVX2(const HMODULE hModule, const char* const szSectionName, const unsigned char* const pData, const size_t unDataSize);
-		const void* FindDataAVX2A(const char* const szModuleName, const unsigned char* const pData, const size_t unDataSize);
-		const void* FindDataAVX2A(const char* const szModuleName, const std::array<const unsigned char, 8>& SectionName, const unsigned char* const pData, const size_t unDataSize);
-		const void* FindDataAVX2A(const char* const szModuleName, const char* const szSectionName, const unsigned char* const pData, const size_t unDataSize);
-		const void* FindDataAVX2W(const wchar_t* const szModuleName, const unsigned char* const pData, const size_t unDataSize);
-		const void* FindDataAVX2W(const wchar_t* const szModuleName, const std::array<const unsigned char, 8>& SectionName, const unsigned char* const pData, const size_t unDataSize);
-		const void* FindDataAVX2W(const wchar_t* const szModuleName, const char* const szSectionName, const unsigned char* const pData, const size_t unDataSize);
+		const void* FindDataAVX2(const void* const pAddress, const size_t unSize, const unsigned char* const pData, const size_t unDataSize) noexcept;
+		const void* FindDataAVX2(const HMODULE hModule, const unsigned char* const pData, const size_t unDataSize) noexcept;
+		const void* FindDataAVX2(const HMODULE hModule, const std::array<const unsigned char, 8>& SectionName, const unsigned char* const pData, const size_t unDataSize) noexcept;
+		const void* FindDataAVX2(const HMODULE hModule, const char* const szSectionName, const unsigned char* const pData, const size_t unDataSize) noexcept;
+		const void* FindDataAVX2A(const char* const szModuleName, const unsigned char* const pData, const size_t unDataSize) noexcept;
+		const void* FindDataAVX2A(const char* const szModuleName, const std::array<const unsigned char, 8>& SectionName, const unsigned char* const pData, const size_t unDataSize) noexcept;
+		const void* FindDataAVX2A(const char* const szModuleName, const char* const szSectionName, const unsigned char* const pData, const size_t unDataSize) noexcept;
+		const void* FindDataAVX2W(const wchar_t* const szModuleName, const unsigned char* const pData, const size_t unDataSize) noexcept;
+		const void* FindDataAVX2W(const wchar_t* const szModuleName, const std::array<const unsigned char, 8>& SectionName, const unsigned char* const pData, const size_t unDataSize) noexcept;
+		const void* FindDataAVX2W(const wchar_t* const szModuleName, const char* const szSectionName, const unsigned char* const pData, const size_t unDataSize) noexcept;
 #ifdef _UNICODE
-		const void* FindDataAVX2(const wchar_t* const szModuleName, const unsigned char* const pData, const size_t unDataSize);
-		const void* FindDataAVX2(const wchar_t* const szModuleName, const std::array<const unsigned char, 8>& SectionName, const unsigned char* const pData, const size_t unDataSize);
-		const void* FindDataAVX2(const wchar_t* const szModuleName, const char* const szSectionName, const unsigned char* const pData, const size_t unDataSize);
+		const void* FindDataAVX2(const wchar_t* const szModuleName, const unsigned char* const pData, const size_t unDataSize) noexcept;
+		const void* FindDataAVX2(const wchar_t* const szModuleName, const std::array<const unsigned char, 8>& SectionName, const unsigned char* const pData, const size_t unDataSize) noexcept;
+		const void* FindDataAVX2(const wchar_t* const szModuleName, const char* const szSectionName, const unsigned char* const pData, const size_t unDataSize) noexcept;
 #else
-		const void* FindDataAVX2(const char* const szModuleName, const unsigned char* const pData, const size_t unDataSize);
-		const void* FindDataAVX2(const char* const szModuleName, const std::array<const unsigned char, 8>& SectionName, const unsigned char* const pData, const size_t unDataSize);
-		const void* FindDataAVX2(const char* const szModuleName, const char* const szSectionName, const unsigned char* const pData, const size_t unDataSize);
+		const void* FindDataAVX2(const char* const szModuleName, const unsigned char* const pData, const size_t unDataSize) noexcept;
+		const void* FindDataAVX2(const char* const szModuleName, const std::array<const unsigned char, 8>& SectionName, const unsigned char* const pData, const size_t unDataSize) noexcept;
+		const void* FindDataAVX2(const char* const szModuleName, const char* const szSectionName, const unsigned char* const pData, const size_t unDataSize) noexcept;
 #endif
 
 		// ----------------------------------------------------------------
 		// FindData (AVX512) [AVX512BW]
 		// ----------------------------------------------------------------
 
-		const void* FindDataAVX512(const void* const pAddress, const size_t unSize, const unsigned char* const pData, const size_t unDataSize);
-		const void* FindDataAVX512(const HMODULE hModule, const unsigned char* const pData, const size_t unDataSize);
-		const void* FindDataAVX512(const HMODULE hModule, const std::array<const unsigned char, 8>& SectionName, const unsigned char* const pData, const size_t unDataSize);
-		const void* FindDataAVX512(const HMODULE hModule, const char* const szSectionName, const unsigned char* const pData, const size_t unDataSize);
-		const void* FindDataAVX512A(const char* const szModuleName, const unsigned char* const pData, const size_t unDataSize);
-		const void* FindDataAVX512A(const char* const szModuleName, const std::array<const unsigned char, 8>& SectionName, const unsigned char* const pData, const size_t unDataSize);
-		const void* FindDataAVX512A(const char* const szModuleName, const char* const szSectionName, const unsigned char* const pData, const size_t unDataSize);
-		const void* FindDataAVX512W(const wchar_t* const szModuleName, const unsigned char* const pData, const size_t unDataSize);
-		const void* FindDataAVX512W(const wchar_t* const szModuleName, const std::array<const unsigned char, 8>& SectionName, const unsigned char* const pData, const size_t unDataSize);
-		const void* FindDataAVX512W(const wchar_t* const szModuleName, const char* const szSectionName, const unsigned char* const pData, const size_t unDataSize);
+		const void* FindDataAVX512(const void* const pAddress, const size_t unSize, const unsigned char* const pData, const size_t unDataSize) noexcept;
+		const void* FindDataAVX512(const HMODULE hModule, const unsigned char* const pData, const size_t unDataSize) noexcept;
+		const void* FindDataAVX512(const HMODULE hModule, const std::array<const unsigned char, 8>& SectionName, const unsigned char* const pData, const size_t unDataSize) noexcept;
+		const void* FindDataAVX512(const HMODULE hModule, const char* const szSectionName, const unsigned char* const pData, const size_t unDataSize) noexcept;
+		const void* FindDataAVX512A(const char* const szModuleName, const unsigned char* const pData, const size_t unDataSize) noexcept;
+		const void* FindDataAVX512A(const char* const szModuleName, const std::array<const unsigned char, 8>& SectionName, const unsigned char* const pData, const size_t unDataSize) noexcept;
+		const void* FindDataAVX512A(const char* const szModuleName, const char* const szSectionName, const unsigned char* const pData, const size_t unDataSize) noexcept;
+		const void* FindDataAVX512W(const wchar_t* const szModuleName, const unsigned char* const pData, const size_t unDataSize) noexcept;
+		const void* FindDataAVX512W(const wchar_t* const szModuleName, const std::array<const unsigned char, 8>& SectionName, const unsigned char* const pData, const size_t unDataSize) noexcept;
+		const void* FindDataAVX512W(const wchar_t* const szModuleName, const char* const szSectionName, const unsigned char* const pData, const size_t unDataSize) noexcept;
 #ifdef _UNICODE
-		const void* FindDataAVX512(const wchar_t* const szModuleName, const unsigned char* const pData, const size_t unDataSize);
-		const void* FindDataAVX512(const wchar_t* const szModuleName, const std::array<const unsigned char, 8>& SectionName, const unsigned char* const pData, const size_t unDataSize);
-		const void* FindDataAVX512(const wchar_t* const szModuleName, const char* const szSectionName, const unsigned char* const pData, const size_t unDataSize);
+		const void* FindDataAVX512(const wchar_t* const szModuleName, const unsigned char* const pData, const size_t unDataSize) noexcept;
+		const void* FindDataAVX512(const wchar_t* const szModuleName, const std::array<const unsigned char, 8>& SectionName, const unsigned char* const pData, const size_t unDataSize) noexcept;
+		const void* FindDataAVX512(const wchar_t* const szModuleName, const char* const szSectionName, const unsigned char* const pData, const size_t unDataSize) noexcept;
 #else
-		const void* FindDataAVX512(const char* const szModuleName, const unsigned char* const pData, const size_t unDataSize);
-		const void* FindDataAVX512(const char* const szModuleName, const std::array<const unsigned char, 8>& SectionName, const unsigned char* const pData, const size_t unDataSize);
-		const void* FindDataAVX512(const char* const szModuleName, const char* const szSectionName, const unsigned char* const pData, const size_t unDataSize);
+		const void* FindDataAVX512(const char* const szModuleName, const unsigned char* const pData, const size_t unDataSize) noexcept;
+		const void* FindDataAVX512(const char* const szModuleName, const std::array<const unsigned char, 8>& SectionName, const unsigned char* const pData, const size_t unDataSize) noexcept;
+		const void* FindDataAVX512(const char* const szModuleName, const char* const szSectionName, const unsigned char* const pData, const size_t unDataSize) noexcept;
 #endif
 
 		// ----------------------------------------------------------------
 		// FindData (Auto)
 		// ----------------------------------------------------------------
 
-		const void* FindData(const void* const pAddress, const size_t unSize, const unsigned char* const pData, const size_t unDataSize);
-		const void* FindData(const HMODULE hModule, const unsigned char* const pData, const size_t unDataSize);
-		const void* FindData(const HMODULE hModule, const std::array<const unsigned char, 8>& SectionName, const unsigned char* const pData, const size_t unDataSize);
-		const void* FindData(const HMODULE hModule, const char* const szSectionName, const unsigned char* const pData, const size_t unDataSize);
-		const void* FindDataA(const char* const szModuleName, const unsigned char* const pData, const size_t unDataSize);
-		const void* FindDataA(const char* const szModuleName, const std::array<const unsigned char, 8>& SectionName, const unsigned char* const pData, const size_t unDataSize);
-		const void* FindDataA(const char* const szModuleName, const char* const szSectionName, const unsigned char* const pData, const size_t unDataSize);
-		const void* FindDataW(const wchar_t* const szModuleName, const unsigned char* const pData, const size_t unDataSize);
-		const void* FindDataW(const wchar_t* const szModuleName, const std::array<const unsigned char, 8>& SectionName, const unsigned char* const pData, const size_t unDataSize);
-		const void* FindDataW(const wchar_t* const szModuleName, const char* const szSectionName, const unsigned char* const pData, const size_t unDataSize);
+		const void* FindData(const void* const pAddress, const size_t unSize, const unsigned char* const pData, const size_t unDataSize) noexcept;
+		const void* FindData(const HMODULE hModule, const unsigned char* const pData, const size_t unDataSize) noexcept;
+		const void* FindData(const HMODULE hModule, const std::array<const unsigned char, 8>& SectionName, const unsigned char* const pData, const size_t unDataSize) noexcept;
+		const void* FindData(const HMODULE hModule, const char* const szSectionName, const unsigned char* const pData, const size_t unDataSize) noexcept;
+		const void* FindDataA(const char* const szModuleName, const unsigned char* const pData, const size_t unDataSize) noexcept;
+		const void* FindDataA(const char* const szModuleName, const std::array<const unsigned char, 8>& SectionName, const unsigned char* const pData, const size_t unDataSize) noexcept;
+		const void* FindDataA(const char* const szModuleName, const char* const szSectionName, const unsigned char* const pData, const size_t unDataSize) noexcept;
+		const void* FindDataW(const wchar_t* const szModuleName, const unsigned char* const pData, const size_t unDataSize) noexcept;
+		const void* FindDataW(const wchar_t* const szModuleName, const std::array<const unsigned char, 8>& SectionName, const unsigned char* const pData, const size_t unDataSize) noexcept;
+		const void* FindDataW(const wchar_t* const szModuleName, const char* const szSectionName, const unsigned char* const pData, const size_t unDataSize) noexcept;
 #ifdef _UNICODE
-		const void* FindData(const wchar_t* const szModuleName, const unsigned char* const pData, const size_t unDataSize);
-		const void* FindData(const wchar_t* const szModuleName, const std::array<const unsigned char, 8>& SectionName, const unsigned char* const pData, const size_t unDataSize);
-		const void* FindData(const wchar_t* const szModuleName, const char* const szSectionName, const unsigned char* const pData, const size_t unDataSize);
+		const void* FindData(const wchar_t* const szModuleName, const unsigned char* const pData, const size_t unDataSize) noexcept;
+		const void* FindData(const wchar_t* const szModuleName, const std::array<const unsigned char, 8>& SectionName, const unsigned char* const pData, const size_t unDataSize) noexcept;
+		const void* FindData(const wchar_t* const szModuleName, const char* const szSectionName, const unsigned char* const pData, const size_t unDataSize) noexcept;
 #else
-		const void* FindData(const char* const szModuleName, const unsigned char* const pData, const size_t unDataSize);
-		const void* FindData(const char* const szModuleName, const std::array<const unsigned char, 8>& SectionName, const unsigned char* const pData, const size_t unDataSize);
-		const void* FindData(const char* const szModuleName, const char* const szSectionName, const unsigned char* const pData, const size_t unDataSize);
+		const void* FindData(const char* const szModuleName, const unsigned char* const pData, const size_t unDataSize) noexcept;
+		const void* FindData(const char* const szModuleName, const std::array<const unsigned char, 8>& SectionName, const unsigned char* const pData, const size_t unDataSize) noexcept;
+		const void* FindData(const char* const szModuleName, const char* const szSectionName, const unsigned char* const pData, const size_t unDataSize) noexcept;
 #endif
 	}
 
@@ -1695,7 +1695,7 @@ namespace Detours {
 
 		public:
 			bool GetSessionName(TCHAR szSessionName[64]);
-			void* GetAddress();
+			void* GetAddress() const;
 
 		private:
 			TCHAR m_szSessionName[64];
@@ -1713,7 +1713,7 @@ namespace Detours {
 			~Client();
 
 		public:
-			void* GetAddress();
+			void* GetAddress() const;
 
 		private:
 			HANDLE m_hMap;
@@ -1815,7 +1815,7 @@ namespace Detours {
 		public:
 			size_t GetCapacity() const;
 			size_t GetSize() const;
-			bool IsEmpty();
+			bool IsEmpty() const;
 
 		private:
 			size_t m_unTotalCapacity;
@@ -1841,7 +1841,7 @@ namespace Detours {
 		public:
 			size_t GetCapacity() const;
 			size_t GetSize() const;
-			bool IsEmpty();
+			bool IsEmpty() const;
 
 		private:
 			size_t m_unTotalCapacity;
@@ -1866,9 +1866,9 @@ namespace Detours {
 			bool RestoreProtection();
 
 		public:
-			const void* GetAddress();
-			size_t GetSize();
-			DWORD GetOriginalProtection();
+			const void* GetAddress() const;
+			size_t GetSize() const;
+			DWORD GetOriginalProtection() const;
 
 		private:
 			const void* const m_pAddress;
@@ -4884,9 +4884,9 @@ namespace Detours {
 			bool Disable();
 
 		public:
-			void* GetAddress();
-			size_t GetSize();
-			bool IsAutoDisable();
+			void* GetAddress() const;
+			size_t GetSize() const;
+			bool IsAutoDisable() const;
 			fnMemoryHookCallBack GetCallBack();
 
 		private:
@@ -4925,7 +4925,7 @@ namespace Detours {
 			bool UnHook();
 
 		public:
-			unsigned char GetInterrupt();
+			unsigned char GetInterrupt() const;
 			fnInterruptHookCallBack GetCallBack();
 
 		private:
@@ -4959,7 +4959,7 @@ namespace Detours {
 			bool UnHook();
 
 		public:
-			void* GetOriginal();
+			void* GetOriginal() const;
 
 		private:
 			bool m_bInitialized;
@@ -5015,8 +5015,8 @@ namespace Detours {
 			bool UnHook();
 
 		public:
-			void* GetTrampoline();
-			void* GetAddressAfterJump();
+			void* GetTrampoline() const;
+			void* GetAddressAfterJump() const;
 
 		private:
 			bool m_bInitialized;
@@ -5773,8 +5773,8 @@ namespace Detours {
 			bool UnHook();
 
 		public:
-			void* GetTrampoline();
-			void* GetAddressAfterJump();
+			void* GetTrampoline() const;
+			void* GetAddressAfterJump() const;
 
 		private:
 			bool m_bInitialized;
