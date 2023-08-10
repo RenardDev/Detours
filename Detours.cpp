@@ -14,14 +14,14 @@
 #define BCD_PRIVORPROTINCOMPOBJ	0x00000008
 #define BCD_VBOFCONTOBJ			0x00000010
 #define BCD_NONPOLYMORPHIC		0x00000020
-#define BCD_HASPCHD				0x00000040 // pClassDescriptor field is present
+#define BCD_HASPCHD				0x00000040 // pClassHierarchyDescriptor field is present
 
 #define COL_SIG_REV0 0
 #define COL_SIG_REV1 1
 
-#define CHD_MULTINH					0x00000001
-#define CHD_VIRTINH					0x00000002
-#define CHD_AMBIGUOUS				0x00000004
+#define CHD_MULTINH		0x00000001
+#define CHD_VIRTINH		0x00000002
+#define CHD_AMBIGUOUS	0x00000004
 
 // rddisasm
 
@@ -249,7 +249,7 @@ namespace Detours {
 			'C', 'D', 'E', 'F'
 		};
 
-		bool EncodeA(const void* const pData, const size_t unSize, char* szHex, const unsigned char unIgnoredByte) {
+		bool EncodeA(void const* const pData, const size_t unSize, char* szHex, const unsigned char unIgnoredByte) {
 			if (!pData || !unSize || !szHex) {
 				return false;
 			}
@@ -265,7 +265,7 @@ namespace Detours {
 			return true;
 		}
 
-		bool EncodeW(const void* const pData, const size_t unSize, wchar_t* szHex, const unsigned char unIgnoredByte) {
+		bool EncodeW(void const* const pData, const size_t unSize, wchar_t* szHex, const unsigned char unIgnoredByte) {
 			if (!pData || !unSize || !szHex) {
 				return false;
 			}
@@ -282,11 +282,11 @@ namespace Detours {
 		}
 
 #ifdef _UNICODE
-		bool Encode(const void* const pData, const size_t unSize, wchar_t* szHex, const unsigned char unIgnoredByte) {
+		bool Encode(void const* const pData, const size_t unSize, wchar_t* szHex, const unsigned char unIgnoredByte) {
 			return EncodeW(pData, unSize, szHex, unIgnoredByte);
 		}
 #else
-		bool Encode(const void* const pData, const size_t unSize, char* szHex, const unsigned char unIgnoredByte) {
+		bool Encode(void const* const pData, const size_t unSize, char* szHex, const unsigned char unIgnoredByte) {
 			return EncodeA(pData, unSize, szHex, unIgnoredByte);
 		}
 #endif
@@ -470,17 +470,17 @@ namespace Detours {
 		// FindSection
 		// ----------------------------------------------------------------
 
-		bool FindSection(const HMODULE hModule, const std::array<const unsigned char, 8>& SectionName, void** pAddress, size_t* pSize) {
+		bool FindSection(const HMODULE hModule, const std::array<const unsigned char, 8>& SectionName, void** pAddress, size_t* pSize) noexcept {
 			if (!hModule) {
 				return false;
 			}
 
-			const PIMAGE_DOS_HEADER pDH = reinterpret_cast<PIMAGE_DOS_HEADER>(hModule);
-			const PIMAGE_NT_HEADERS pNTHs = reinterpret_cast<PIMAGE_NT_HEADERS>(reinterpret_cast<char*>(hModule) + pDH->e_lfanew);
-			const PIMAGE_FILE_HEADER pFH = &(pNTHs->FileHeader);
-			const PIMAGE_OPTIONAL_HEADER pOH = &(pNTHs->OptionalHeader);
+			const auto& pDH = reinterpret_cast<PIMAGE_DOS_HEADER>(hModule);
+			const auto& pNTHs = reinterpret_cast<PIMAGE_NT_HEADERS>(reinterpret_cast<char*>(hModule) + pDH->e_lfanew);
+			const auto& pFH = &(pNTHs->FileHeader);
+			const auto& pOH = &(pNTHs->OptionalHeader);
 
-			const PIMAGE_SECTION_HEADER pFirstSection = reinterpret_cast<PIMAGE_SECTION_HEADER>(reinterpret_cast<char*>(pOH) + pFH->SizeOfOptionalHeader);
+			const auto& pFirstSection = reinterpret_cast<PIMAGE_SECTION_HEADER>(reinterpret_cast<char*>(pOH) + pFH->SizeOfOptionalHeader);
 			const WORD unNumberOfSections = pFH->NumberOfSections;
 			const size_t unFileAlignment = static_cast<size_t>(pOH->FileAlignment);
 			for (WORD i = 0; i < unNumberOfSections; ++i) {
@@ -500,12 +500,12 @@ namespace Detours {
 			return false;
 		}
 
-		bool FindSectionA(const char* const szModuleName, const std::array<const unsigned char, 8>& SectionName, void** pAddress, size_t* pSize) {
+		bool FindSectionA(const char* const szModuleName, const std::array<const unsigned char, 8>& SectionName, void** pAddress, size_t* pSize) noexcept {
 			if (!szModuleName) {
 				return false;
 			}
 
-			const HMODULE hMod = GetModuleHandleA(szModuleName);
+			const auto& hMod = GetModuleHandleA(szModuleName);
 			if (!hMod) {
 				return false;
 			}
@@ -513,12 +513,12 @@ namespace Detours {
 			return FindSection(hMod, SectionName, pAddress, pSize);
 		}
 
-		bool FindSectionW(const wchar_t* const szModuleName, const std::array<const unsigned char, 8>& SectionName, void** pAddress, size_t* pSize) {
+		bool FindSectionW(const wchar_t* const szModuleName, const std::array<const unsigned char, 8>& SectionName, void** pAddress, size_t* pSize) noexcept {
 			if (!szModuleName) {
 				return false;
 			}
 
-			const HMODULE hMod = GetModuleHandleW(szModuleName);
+			const auto& hMod = GetModuleHandleW(szModuleName);
 			if (!hMod) {
 				return false;
 			}
@@ -527,11 +527,11 @@ namespace Detours {
 		}
 
 #ifdef _UNICODE
-		bool FindSection(const wchar_t* const szModuleName, const std::array<const unsigned char, 8>& SectionName, void** pAddress, size_t* pSize) {
+		bool FindSection(const wchar_t* const szModuleName, const std::array<const unsigned char, 8>& SectionName, void** pAddress, size_t* pSize) noexcept {
 			return FindSectionW(szModuleName, SectionName, pAddress, pSize);
 		}
 #else
-		bool FindSection(const char* const szModuleName, const std::array<const unsigned char, 8>& SectionName, void** pAddress, size_t* pSize) {
+		bool FindSection(const char* const szModuleName, const std::array<const unsigned char, 8>& SectionName, void** pAddress, size_t* pSize) noexcept {
 			return FindSectionA(szModuleName, SectionName, pAddress, pSize);
 		}
 #endif
@@ -551,14 +551,14 @@ namespace Detours {
 			IMAGE_POGO_BLOCK m_pBlocks[1];
 		} IMAGE_POGO_INFO, *PIMAGE_POGO_INFO;
 
-		bool FindSectionPOGO(const HMODULE hModule, const char* const szSectionName, void** pAddress, size_t* pSize) {
+		bool FindSectionPOGO(const HMODULE hModule, const char* const szSectionName, void** pAddress, size_t* pSize) noexcept {
 			if (!hModule || !szSectionName) {
 				return false;
 			}
 
-			const PIMAGE_DOS_HEADER pDH = reinterpret_cast<PIMAGE_DOS_HEADER>(hModule);
-			const PIMAGE_NT_HEADERS pNTHs = reinterpret_cast<PIMAGE_NT_HEADERS>(reinterpret_cast<char*>(hModule) + pDH->e_lfanew);
-			const PIMAGE_OPTIONAL_HEADER pOH = &(pNTHs->OptionalHeader);
+			const auto& pDH = reinterpret_cast<PIMAGE_DOS_HEADER>(hModule);
+			const auto& pNTHs = reinterpret_cast<PIMAGE_NT_HEADERS>(reinterpret_cast<char*>(hModule) + pDH->e_lfanew);
+			const auto& pOH = &(pNTHs->OptionalHeader);
 
 			const IMAGE_DATA_DIRECTORY DebugDD = pOH->DataDirectory[IMAGE_DIRECTORY_ENTRY_DEBUG];
 			if (!DebugDD.Size) {
@@ -603,12 +603,12 @@ namespace Detours {
 			return false;
 		}
 
-		bool FindSectionPOGOA(const char* const szModuleName, const char* const szSectionName, void** pAddress, size_t* pSize) {
+		bool FindSectionPOGOA(const char* const szModuleName, const char* const szSectionName, void** pAddress, size_t* pSize) noexcept {
 			if (!szModuleName) {
 				return false;
 			}
 
-			const HMODULE hMod = GetModuleHandleA(szModuleName);
+			const auto& hMod = GetModuleHandleA(szModuleName);
 			if (!hMod) {
 				return false;
 			}
@@ -616,12 +616,12 @@ namespace Detours {
 			return FindSectionPOGO(hMod, szSectionName, pAddress, pSize);
 		}
 
-		bool FindSectionPOGOW(const wchar_t* const szModuleName, const char* const szSectionName, void** pAddress, size_t* pSize) {
+		bool FindSectionPOGOW(const wchar_t* const szModuleName, const char* const szSectionName, void** pAddress, size_t* pSize) noexcept {
 			if (!szModuleName) {
 				return false;
 			}
 
-			const HMODULE hMod = GetModuleHandleW(szModuleName);
+			const auto& hMod = GetModuleHandleW(szModuleName);
 			if (!hMod) {
 				return false;
 			}
@@ -630,11 +630,11 @@ namespace Detours {
 		}
 
 #ifdef _UNICODE
-		bool FindSectionPOGO(const wchar_t* const szModuleName, const char* const szSectionName, void** pAddress, size_t* pSize) {
+		bool FindSectionPOGO(const wchar_t* const szModuleName, const char* const szSectionName, void** pAddress, size_t* pSize) noexcept {
 			return FindSectionPOGOW(szModuleName, szSectionName, pAddress, pSize);
 		}
 #else
-		bool FindSectionPOGO(const char* const szModuleName, const char* const szSectionName, void** pAddress, size_t* pSize) {
+		bool FindSectionPOGO(const char* const szModuleName, const char* const szSectionName, void** pAddress, size_t* pSize) noexcept {
 			return FindSectionPOGOA(szModuleName, szSectionName, pAddress, pSize);
 		}
 #endif
@@ -643,7 +643,7 @@ namespace Detours {
 		// FindSignature (Native)
 		// ----------------------------------------------------------------
 
-		const void* FindSignatureNative(const void* const pAddress, const size_t unSize, const char* const szSignature, const size_t unOffset, const unsigned char unIgnoredByte) noexcept {
+		const void* FindSignatureNative(void const* const pAddress, const size_t unSize, const char* const szSignature, const size_t unOffset, const unsigned char unIgnoredByte) noexcept {
 			if (!pAddress || !unSize || !szSignature) {
 				return nullptr;
 			}
@@ -679,9 +679,9 @@ namespace Detours {
 				return nullptr;
 			}
 
-			const PIMAGE_DOS_HEADER pDH = reinterpret_cast<PIMAGE_DOS_HEADER>(hModule);
-			const PIMAGE_NT_HEADERS pNTHs = reinterpret_cast<PIMAGE_NT_HEADERS>(reinterpret_cast<char*>(hModule) + pDH->e_lfanew);
-			const PIMAGE_OPTIONAL_HEADER pOH = &(pNTHs->OptionalHeader);
+			const auto& pDH = reinterpret_cast<PIMAGE_DOS_HEADER>(hModule);
+			const auto& pNTHs = reinterpret_cast<PIMAGE_NT_HEADERS>(reinterpret_cast<char*>(hModule) + pDH->e_lfanew);
+			const auto& pOH = &(pNTHs->OptionalHeader);
 
 			return FindSignatureNative(reinterpret_cast<void*>(hModule), static_cast<size_t>(pOH->SizeOfImage) - 1, szSignature, unOffset, unIgnoredByte);
 		}
@@ -719,7 +719,7 @@ namespace Detours {
 				return nullptr;
 			}
 
-			const HMODULE hMod = GetModuleHandleA(szModuleName);
+			const auto& hMod = GetModuleHandleA(szModuleName);
 			if (!hMod) {
 				return nullptr;
 			}
@@ -732,7 +732,7 @@ namespace Detours {
 				return nullptr;
 			}
 
-			const HMODULE hMod = GetModuleHandleA(szModuleName);
+			const auto& hMod = GetModuleHandleA(szModuleName);
 			if (!hMod) {
 				return nullptr;
 			}
@@ -745,7 +745,7 @@ namespace Detours {
 				return nullptr;
 			}
 
-			const HMODULE hMod = GetModuleHandleA(szModuleName);
+			const auto& hMod = GetModuleHandleA(szModuleName);
 			if (!hMod) {
 				return nullptr;
 			}
@@ -758,7 +758,7 @@ namespace Detours {
 				return nullptr;
 			}
 
-			const HMODULE hMod = GetModuleHandleW(szModuleName);
+			const auto& hMod = GetModuleHandleW(szModuleName);
 			if (!hMod) {
 				return nullptr;
 			}
@@ -771,7 +771,7 @@ namespace Detours {
 				return nullptr;
 			}
 
-			const HMODULE hMod = GetModuleHandleW(szModuleName);
+			const auto& hMod = GetModuleHandleW(szModuleName);
 			if (!hMod) {
 				return nullptr;
 			}
@@ -784,7 +784,7 @@ namespace Detours {
 				return nullptr;
 			}
 
-			const HMODULE hMod = GetModuleHandleW(szModuleName);
+			const auto& hMod = GetModuleHandleW(szModuleName);
 			if (!hMod) {
 				return nullptr;
 			}
@@ -822,7 +822,7 @@ namespace Detours {
 		// FindSignature (SSE2)
 		// ----------------------------------------------------------------
 
-		const void* FindSignatureSSE2(const void* const pAddress, const size_t unSize, const char* const szSignature, const size_t unOffset, const unsigned char unIgnoredByte) noexcept {
+		const void* FindSignatureSSE2(void const* const pAddress, const size_t unSize, const char* const szSignature, const size_t unOffset, const unsigned char unIgnoredByte) noexcept {
 			if (!pAddress || !unSize || !szSignature) {
 				return nullptr;
 			}
@@ -872,9 +872,9 @@ namespace Detours {
 				return nullptr;
 			}
 
-			const PIMAGE_DOS_HEADER pDH = reinterpret_cast<PIMAGE_DOS_HEADER>(hModule);
-			const PIMAGE_NT_HEADERS pNTHs = reinterpret_cast<PIMAGE_NT_HEADERS>(reinterpret_cast<char*>(hModule) + pDH->e_lfanew);
-			const PIMAGE_OPTIONAL_HEADER pOH = &(pNTHs->OptionalHeader);
+			const auto& pDH = reinterpret_cast<PIMAGE_DOS_HEADER>(hModule);
+			const auto& pNTHs = reinterpret_cast<PIMAGE_NT_HEADERS>(reinterpret_cast<char*>(hModule) + pDH->e_lfanew);
+			const auto& pOH = &(pNTHs->OptionalHeader);
 
 			return FindSignatureSSE2(reinterpret_cast<void*>(hModule), static_cast<size_t>(pOH->SizeOfImage) - 1, szSignature, unOffset, unIgnoredByte);
 		}
@@ -912,7 +912,7 @@ namespace Detours {
 				return nullptr;
 			}
 
-			const HMODULE hMod = GetModuleHandleA(szModuleName);
+			const auto& hMod = GetModuleHandleA(szModuleName);
 			if (!hMod) {
 				return nullptr;
 			}
@@ -925,7 +925,7 @@ namespace Detours {
 				return nullptr;
 			}
 
-			const HMODULE hMod = GetModuleHandleA(szModuleName);
+			const auto& hMod = GetModuleHandleA(szModuleName);
 			if (!hMod) {
 				return nullptr;
 			}
@@ -938,7 +938,7 @@ namespace Detours {
 				return nullptr;
 			}
 
-			const HMODULE hMod = GetModuleHandleA(szModuleName);
+			const auto& hMod = GetModuleHandleA(szModuleName);
 			if (!hMod) {
 				return nullptr;
 			}
@@ -951,7 +951,7 @@ namespace Detours {
 				return nullptr;
 			}
 
-			const HMODULE hMod = GetModuleHandleW(szModuleName);
+			const auto& hMod = GetModuleHandleW(szModuleName);
 			if (!hMod) {
 				return nullptr;
 			}
@@ -964,7 +964,7 @@ namespace Detours {
 				return nullptr;
 			}
 
-			const HMODULE hMod = GetModuleHandleW(szModuleName);
+			const auto& hMod = GetModuleHandleW(szModuleName);
 			if (!hMod) {
 				return nullptr;
 			}
@@ -977,7 +977,7 @@ namespace Detours {
 				return nullptr;
 			}
 
-			const HMODULE hMod = GetModuleHandleW(szModuleName);
+			const auto& hMod = GetModuleHandleW(szModuleName);
 			if (!hMod) {
 				return nullptr;
 			}
@@ -1015,7 +1015,7 @@ namespace Detours {
 		// FindSignature (AVX)
 		// ----------------------------------------------------------------
 
-		const void* FindSignatureAVX(const void* const pAddress, const size_t unSize, const char* const szSignature, const size_t unOffset, const unsigned char unIgnoredByte) noexcept {
+		const void* FindSignatureAVX(void const* const pAddress, const size_t unSize, const char* const szSignature, const size_t unOffset, const unsigned char unIgnoredByte) noexcept {
 			if (!pAddress || !unSize || !szSignature) {
 				return nullptr;
 			}
@@ -1068,9 +1068,9 @@ namespace Detours {
 				return nullptr;
 			}
 
-			const PIMAGE_DOS_HEADER pDH = reinterpret_cast<PIMAGE_DOS_HEADER>(hModule);
-			const PIMAGE_NT_HEADERS pNTHs = reinterpret_cast<PIMAGE_NT_HEADERS>(reinterpret_cast<char*>(hModule) + pDH->e_lfanew);
-			const PIMAGE_OPTIONAL_HEADER pOH = &(pNTHs->OptionalHeader);
+			const auto& pDH = reinterpret_cast<PIMAGE_DOS_HEADER>(hModule);
+			const auto& pNTHs = reinterpret_cast<PIMAGE_NT_HEADERS>(reinterpret_cast<char*>(hModule) + pDH->e_lfanew);
+			const auto& pOH = &(pNTHs->OptionalHeader);
 
 			return FindSignatureAVX(reinterpret_cast<void*>(hModule), static_cast<size_t>(pOH->SizeOfImage) - 1, szSignature, unOffset, unIgnoredByte);
 		}
@@ -1108,7 +1108,7 @@ namespace Detours {
 				return nullptr;
 			}
 
-			const HMODULE hMod = GetModuleHandleA(szModuleName);
+			const auto& hMod = GetModuleHandleA(szModuleName);
 			if (!hMod) {
 				return nullptr;
 			}
@@ -1121,7 +1121,7 @@ namespace Detours {
 				return nullptr;
 			}
 
-			const HMODULE hMod = GetModuleHandleA(szModuleName);
+			const auto& hMod = GetModuleHandleA(szModuleName);
 			if (!hMod) {
 				return nullptr;
 			}
@@ -1134,7 +1134,7 @@ namespace Detours {
 				return nullptr;
 			}
 
-			const HMODULE hMod = GetModuleHandleA(szModuleName);
+			const auto& hMod = GetModuleHandleA(szModuleName);
 			if (!hMod) {
 				return nullptr;
 			}
@@ -1147,7 +1147,7 @@ namespace Detours {
 				return nullptr;
 			}
 
-			const HMODULE hMod = GetModuleHandleW(szModuleName);
+			const auto& hMod = GetModuleHandleW(szModuleName);
 			if (!hMod) {
 				return nullptr;
 			}
@@ -1160,7 +1160,7 @@ namespace Detours {
 				return nullptr;
 			}
 
-			const HMODULE hMod = GetModuleHandleW(szModuleName);
+			const auto& hMod = GetModuleHandleW(szModuleName);
 			if (!hMod) {
 				return nullptr;
 			}
@@ -1173,7 +1173,7 @@ namespace Detours {
 				return nullptr;
 			}
 
-			const HMODULE hMod = GetModuleHandleW(szModuleName);
+			const auto& hMod = GetModuleHandleW(szModuleName);
 			if (!hMod) {
 				return nullptr;
 			}
@@ -1211,7 +1211,7 @@ namespace Detours {
 		// FindSignature (AVX2)
 		// ----------------------------------------------------------------
 
-		const void* FindSignatureAVX2(const void* const pAddress, const size_t unSize, const char* const szSignature, const size_t unOffset, const unsigned char unIgnoredByte) noexcept {
+		const void* FindSignatureAVX2(void const* const pAddress, const size_t unSize, const char* const szSignature, const size_t unOffset, const unsigned char unIgnoredByte) noexcept {
 			if (!pAddress || !unSize || !szSignature) {
 				return nullptr;
 			}
@@ -1261,9 +1261,9 @@ namespace Detours {
 				return nullptr;
 			}
 
-			const PIMAGE_DOS_HEADER pDH = reinterpret_cast<PIMAGE_DOS_HEADER>(hModule);
-			const PIMAGE_NT_HEADERS pNTHs = reinterpret_cast<PIMAGE_NT_HEADERS>(reinterpret_cast<char*>(hModule) + pDH->e_lfanew);
-			const PIMAGE_OPTIONAL_HEADER pOH = &(pNTHs->OptionalHeader);
+			const auto& pDH = reinterpret_cast<PIMAGE_DOS_HEADER>(hModule);
+			const auto& pNTHs = reinterpret_cast<PIMAGE_NT_HEADERS>(reinterpret_cast<char*>(hModule) + pDH->e_lfanew);
+			const auto& pOH = &(pNTHs->OptionalHeader);
 
 			return FindSignatureAVX2(reinterpret_cast<void*>(hModule), static_cast<size_t>(pOH->SizeOfImage) - 1, szSignature, unOffset, unIgnoredByte);
 		}
@@ -1301,7 +1301,7 @@ namespace Detours {
 				return nullptr;
 			}
 
-			const HMODULE hMod = GetModuleHandleA(szModuleName);
+			const auto& hMod = GetModuleHandleA(szModuleName);
 			if (!hMod) {
 				return nullptr;
 			}
@@ -1314,7 +1314,7 @@ namespace Detours {
 				return nullptr;
 			}
 
-			const HMODULE hMod = GetModuleHandleA(szModuleName);
+			const auto& hMod = GetModuleHandleA(szModuleName);
 			if (!hMod) {
 				return nullptr;
 			}
@@ -1327,7 +1327,7 @@ namespace Detours {
 				return nullptr;
 			}
 
-			const HMODULE hMod = GetModuleHandleA(szModuleName);
+			const auto& hMod = GetModuleHandleA(szModuleName);
 			if (!hMod) {
 				return nullptr;
 			}
@@ -1340,7 +1340,7 @@ namespace Detours {
 				return nullptr;
 			}
 
-			const HMODULE hMod = GetModuleHandleW(szModuleName);
+			const auto& hMod = GetModuleHandleW(szModuleName);
 			if (!hMod) {
 				return nullptr;
 			}
@@ -1353,7 +1353,7 @@ namespace Detours {
 				return nullptr;
 			}
 
-			const HMODULE hMod = GetModuleHandleW(szModuleName);
+			const auto& hMod = GetModuleHandleW(szModuleName);
 			if (!hMod) {
 				return nullptr;
 			}
@@ -1366,7 +1366,7 @@ namespace Detours {
 				return nullptr;
 			}
 
-			const HMODULE hMod = GetModuleHandleW(szModuleName);
+			const auto& hMod = GetModuleHandleW(szModuleName);
 			if (!hMod) {
 				return nullptr;
 			}
@@ -1404,7 +1404,7 @@ namespace Detours {
 		// FindSignature (AVX-512) [AVX512BW]
 		// ----------------------------------------------------------------
 
-		const void* FindSignatureAVX512(const void* const pAddress, const size_t unSize, const char* const szSignature, const size_t unOffset, const unsigned char unIgnoredByte) noexcept {
+		const void* FindSignatureAVX512(void const* const pAddress, const size_t unSize, const char* const szSignature, const size_t unOffset, const unsigned char unIgnoredByte) noexcept {
 			if (!pAddress || !unSize || !szSignature) {
 				return nullptr;
 			}
@@ -1452,9 +1452,9 @@ namespace Detours {
 				return nullptr;
 			}
 
-			const PIMAGE_DOS_HEADER pDH = reinterpret_cast<PIMAGE_DOS_HEADER>(hModule);
-			const PIMAGE_NT_HEADERS pNTHs = reinterpret_cast<PIMAGE_NT_HEADERS>(reinterpret_cast<char*>(hModule) + pDH->e_lfanew);
-			const PIMAGE_OPTIONAL_HEADER pOH = &(pNTHs->OptionalHeader);
+			const auto& pDH = reinterpret_cast<PIMAGE_DOS_HEADER>(hModule);
+			const auto& pNTHs = reinterpret_cast<PIMAGE_NT_HEADERS>(reinterpret_cast<char*>(hModule) + pDH->e_lfanew);
+			const auto& pOH = &(pNTHs->OptionalHeader);
 
 			return FindSignatureAVX512(reinterpret_cast<void*>(hModule), static_cast<size_t>(pOH->SizeOfImage) - 1, szSignature, unOffset, unIgnoredByte);
 		}
@@ -1492,7 +1492,7 @@ namespace Detours {
 				return nullptr;
 			}
 
-			const HMODULE hMod = GetModuleHandleA(szModuleName);
+			const auto& hMod = GetModuleHandleA(szModuleName);
 			if (!hMod) {
 				return nullptr;
 			}
@@ -1505,7 +1505,7 @@ namespace Detours {
 				return nullptr;
 			}
 
-			const HMODULE hMod = GetModuleHandleA(szModuleName);
+			const auto& hMod = GetModuleHandleA(szModuleName);
 			if (!hMod) {
 				return nullptr;
 			}
@@ -1518,7 +1518,7 @@ namespace Detours {
 				return nullptr;
 			}
 
-			const HMODULE hMod = GetModuleHandleA(szModuleName);
+			const auto& hMod = GetModuleHandleA(szModuleName);
 			if (!hMod) {
 				return nullptr;
 			}
@@ -1531,7 +1531,7 @@ namespace Detours {
 				return nullptr;
 			}
 
-			const HMODULE hMod = GetModuleHandleW(szModuleName);
+			const auto& hMod = GetModuleHandleW(szModuleName);
 			if (!hMod) {
 				return nullptr;
 			}
@@ -1544,7 +1544,7 @@ namespace Detours {
 				return nullptr;
 			}
 
-			const HMODULE hMod = GetModuleHandleW(szModuleName);
+			const auto& hMod = GetModuleHandleW(szModuleName);
 			if (!hMod) {
 				return nullptr;
 			}
@@ -1557,7 +1557,7 @@ namespace Detours {
 				return nullptr;
 			}
 
-			const HMODULE hMod = GetModuleHandleW(szModuleName);
+			const auto& hMod = GetModuleHandleW(szModuleName);
 			if (!hMod) {
 				return nullptr;
 			}
@@ -1601,7 +1601,7 @@ namespace Detours {
 		static bool bProcessorFeatureAVX2 = false;
 		static bool bProcessorFeatureAVX512BW = false;
 
-		const void* FindSignature(const void* const pAddress, const size_t unSize, const char* const szSignature, const size_t unOffset, const unsigned char unIgnoredByte) noexcept {
+		const void* FindSignature(void const* const pAddress, const size_t unSize, const char* const szSignature, const size_t unOffset, const unsigned char unIgnoredByte) noexcept {
 
 			if (!bOnceInitialization) {
 				bOnceInitialization = true;
@@ -1638,9 +1638,9 @@ namespace Detours {
 				return nullptr;
 			}
 
-			const PIMAGE_DOS_HEADER pDH = reinterpret_cast<PIMAGE_DOS_HEADER>(hModule);
-			const PIMAGE_NT_HEADERS pNTHs = reinterpret_cast<PIMAGE_NT_HEADERS>(reinterpret_cast<char*>(hModule) + pDH->e_lfanew);
-			const PIMAGE_OPTIONAL_HEADER pOH = &(pNTHs->OptionalHeader);
+			const auto& pDH = reinterpret_cast<PIMAGE_DOS_HEADER>(hModule);
+			const auto& pNTHs = reinterpret_cast<PIMAGE_NT_HEADERS>(reinterpret_cast<char*>(hModule) + pDH->e_lfanew);
+			const auto& pOH = &(pNTHs->OptionalHeader);
 
 			return FindSignature(reinterpret_cast<void*>(hModule), static_cast<size_t>(pOH->SizeOfImage) - 1, szSignature, unOffset, unIgnoredByte);
 		}
@@ -1678,7 +1678,7 @@ namespace Detours {
 				return nullptr;
 			}
 
-			const HMODULE hMod = GetModuleHandleA(szModuleName);
+			const auto& hMod = GetModuleHandleA(szModuleName);
 			if (!hMod) {
 				return nullptr;
 			}
@@ -1691,7 +1691,7 @@ namespace Detours {
 				return nullptr;
 			}
 
-			const HMODULE hMod = GetModuleHandleA(szModuleName);
+			const auto& hMod = GetModuleHandleA(szModuleName);
 			if (!hMod) {
 				return nullptr;
 			}
@@ -1704,7 +1704,7 @@ namespace Detours {
 				return nullptr;
 			}
 
-			const HMODULE hMod = GetModuleHandleA(szModuleName);
+			const auto& hMod = GetModuleHandleA(szModuleName);
 			if (!hMod) {
 				return nullptr;
 			}
@@ -1717,7 +1717,7 @@ namespace Detours {
 				return nullptr;
 			}
 
-			const HMODULE hMod = GetModuleHandleW(szModuleName);
+			const auto& hMod = GetModuleHandleW(szModuleName);
 			if (!hMod) {
 				return nullptr;
 			}
@@ -1730,7 +1730,7 @@ namespace Detours {
 				return nullptr;
 			}
 
-			const HMODULE hMod = GetModuleHandleW(szModuleName);
+			const auto& hMod = GetModuleHandleW(szModuleName);
 			if (!hMod) {
 				return nullptr;
 			}
@@ -1743,7 +1743,7 @@ namespace Detours {
 				return nullptr;
 			}
 
-			const HMODULE hMod = GetModuleHandleW(szModuleName);
+			const auto& hMod = GetModuleHandleW(szModuleName);
 			if (!hMod) {
 				return nullptr;
 			}
@@ -1781,7 +1781,7 @@ namespace Detours {
 		// FindData (Native)
 		// ----------------------------------------------------------------
 
-		const void* FindDataNative(const void* const pAddress, const size_t unSize, const unsigned char* const pData, const size_t unDataSize) noexcept {
+		const void* FindDataNative(void const* const pAddress, const size_t unSize, const unsigned char* const pData, const size_t unDataSize) noexcept {
 			if (!pAddress || !unSize || !pData || !unDataSize || (unSize < unDataSize)) {
 				return nullptr;
 			}
@@ -1808,9 +1808,9 @@ namespace Detours {
 				return nullptr;
 			}
 
-			const PIMAGE_DOS_HEADER pDH = reinterpret_cast<PIMAGE_DOS_HEADER>(hModule);
-			const PIMAGE_NT_HEADERS pNTHs = reinterpret_cast<PIMAGE_NT_HEADERS>(reinterpret_cast<char*>(hModule) + pDH->e_lfanew);
-			const PIMAGE_OPTIONAL_HEADER pOH = &(pNTHs->OptionalHeader);
+			const auto& pDH = reinterpret_cast<PIMAGE_DOS_HEADER>(hModule);
+			const auto& pNTHs = reinterpret_cast<PIMAGE_NT_HEADERS>(reinterpret_cast<char*>(hModule) + pDH->e_lfanew);
+			const auto& pOH = &(pNTHs->OptionalHeader);
 
 			return FindDataNative(reinterpret_cast<void*>(hModule), static_cast<size_t>(pOH->SizeOfImage) - 1, pData, unDataSize);
 		}
@@ -1848,7 +1848,7 @@ namespace Detours {
 				return nullptr;
 			}
 
-			const HMODULE hMod = GetModuleHandleA(szModuleName);
+			const auto& hMod = GetModuleHandleA(szModuleName);
 			if (!hMod) {
 				return nullptr;
 			}
@@ -1861,7 +1861,7 @@ namespace Detours {
 				return nullptr;
 			}
 
-			const HMODULE hMod = GetModuleHandleA(szModuleName);
+			const auto& hMod = GetModuleHandleA(szModuleName);
 			if (!hMod) {
 				return nullptr;
 			}
@@ -1874,7 +1874,7 @@ namespace Detours {
 				return nullptr;
 			}
 
-			const HMODULE hMod = GetModuleHandleA(szModuleName);
+			const auto& hMod = GetModuleHandleA(szModuleName);
 			if (!hMod) {
 				return nullptr;
 			}
@@ -1887,7 +1887,7 @@ namespace Detours {
 				return nullptr;
 			}
 
-			const HMODULE hMod = GetModuleHandleW(szModuleName);
+			const auto& hMod = GetModuleHandleW(szModuleName);
 			if (!hMod) {
 				return nullptr;
 			}
@@ -1900,7 +1900,7 @@ namespace Detours {
 				return nullptr;
 			}
 
-			const HMODULE hMod = GetModuleHandleW(szModuleName);
+			const auto& hMod = GetModuleHandleW(szModuleName);
 			if (!hMod) {
 				return nullptr;
 			}
@@ -1913,7 +1913,7 @@ namespace Detours {
 				return nullptr;
 			}
 
-			const HMODULE hMod = GetModuleHandleW(szModuleName);
+			const auto& hMod = GetModuleHandleW(szModuleName);
 			if (!hMod) {
 				return nullptr;
 			}
@@ -1951,7 +1951,7 @@ namespace Detours {
 		// FindData (SSE2)
 		// ----------------------------------------------------------------
 
-		const void* FindDataSSE2(const void* const pAddress, const size_t unSize, const unsigned char* const pData, const size_t unDataSize) noexcept {
+		const void* FindDataSSE2(void const* const pAddress, const size_t unSize, const unsigned char* const pData, const size_t unDataSize) noexcept {
 			if (!pAddress || !unSize || !pData || !unDataSize || (unSize < unDataSize)) {
 				return nullptr;
 			}
@@ -1990,9 +1990,9 @@ namespace Detours {
 				return nullptr;
 			}
 
-			const PIMAGE_DOS_HEADER pDH = reinterpret_cast<PIMAGE_DOS_HEADER>(hModule);
-			const PIMAGE_NT_HEADERS pNTHs = reinterpret_cast<PIMAGE_NT_HEADERS>(reinterpret_cast<char*>(hModule) + pDH->e_lfanew);
-			const PIMAGE_OPTIONAL_HEADER pOH = &(pNTHs->OptionalHeader);
+			const auto& pDH = reinterpret_cast<PIMAGE_DOS_HEADER>(hModule);
+			const auto& pNTHs = reinterpret_cast<PIMAGE_NT_HEADERS>(reinterpret_cast<char*>(hModule) + pDH->e_lfanew);
+			const auto& pOH = &(pNTHs->OptionalHeader);
 
 			return FindDataSSE2(reinterpret_cast<void*>(hModule), static_cast<size_t>(pOH->SizeOfImage) - 1, pData, unDataSize);
 		}
@@ -2030,7 +2030,7 @@ namespace Detours {
 				return nullptr;
 			}
 
-			const HMODULE hMod = GetModuleHandleA(szModuleName);
+			const auto& hMod = GetModuleHandleA(szModuleName);
 			if (!hMod) {
 				return nullptr;
 			}
@@ -2043,7 +2043,7 @@ namespace Detours {
 				return nullptr;
 			}
 
-			const HMODULE hMod = GetModuleHandleA(szModuleName);
+			const auto& hMod = GetModuleHandleA(szModuleName);
 			if (!hMod) {
 				return nullptr;
 			}
@@ -2056,7 +2056,7 @@ namespace Detours {
 				return nullptr;
 			}
 
-			const HMODULE hMod = GetModuleHandleA(szModuleName);
+			const auto& hMod = GetModuleHandleA(szModuleName);
 			if (!hMod) {
 				return nullptr;
 			}
@@ -2069,7 +2069,7 @@ namespace Detours {
 				return nullptr;
 			}
 
-			const HMODULE hMod = GetModuleHandleW(szModuleName);
+			const auto& hMod = GetModuleHandleW(szModuleName);
 			if (!hMod) {
 				return nullptr;
 			}
@@ -2082,7 +2082,7 @@ namespace Detours {
 				return nullptr;
 			}
 
-			const HMODULE hMod = GetModuleHandleW(szModuleName);
+			const auto& hMod = GetModuleHandleW(szModuleName);
 			if (!hMod) {
 				return nullptr;
 			}
@@ -2095,7 +2095,7 @@ namespace Detours {
 				return nullptr;
 			}
 
-			const HMODULE hMod = GetModuleHandleW(szModuleName);
+			const auto& hMod = GetModuleHandleW(szModuleName);
 			if (!hMod) {
 				return nullptr;
 			}
@@ -2133,7 +2133,7 @@ namespace Detours {
 		// FindData (AVX)
 		// ----------------------------------------------------------------
 
-		const void* FindDataAVX(const void* const pAddress, const size_t unSize, const unsigned char* const pData, const size_t unDataSize) noexcept {
+		const void* FindDataAVX(void const* const pAddress, const size_t unSize, const unsigned char* const pData, const size_t unDataSize) noexcept {
 			if (!pAddress || !unSize || !pData || !unDataSize || (unSize < unDataSize)) {
 				return nullptr;
 			}
@@ -2175,9 +2175,9 @@ namespace Detours {
 				return nullptr;
 			}
 
-			const PIMAGE_DOS_HEADER pDH = reinterpret_cast<PIMAGE_DOS_HEADER>(hModule);
-			const PIMAGE_NT_HEADERS pNTHs = reinterpret_cast<PIMAGE_NT_HEADERS>(reinterpret_cast<char*>(hModule) + pDH->e_lfanew);
-			const PIMAGE_OPTIONAL_HEADER pOH = &(pNTHs->OptionalHeader);
+			const auto& pDH = reinterpret_cast<PIMAGE_DOS_HEADER>(hModule);
+			const auto& pNTHs = reinterpret_cast<PIMAGE_NT_HEADERS>(reinterpret_cast<char*>(hModule) + pDH->e_lfanew);
+			const auto& pOH = &(pNTHs->OptionalHeader);
 
 			return FindDataAVX(reinterpret_cast<void*>(hModule), static_cast<size_t>(pOH->SizeOfImage) - 1, pData, unDataSize);
 		}
@@ -2215,7 +2215,7 @@ namespace Detours {
 				return nullptr;
 			}
 
-			const HMODULE hMod = GetModuleHandleA(szModuleName);
+			const auto& hMod = GetModuleHandleA(szModuleName);
 			if (!hMod) {
 				return nullptr;
 			}
@@ -2228,7 +2228,7 @@ namespace Detours {
 				return nullptr;
 			}
 
-			const HMODULE hMod = GetModuleHandleA(szModuleName);
+			const auto& hMod = GetModuleHandleA(szModuleName);
 			if (!hMod) {
 				return nullptr;
 			}
@@ -2241,7 +2241,7 @@ namespace Detours {
 				return nullptr;
 			}
 
-			const HMODULE hMod = GetModuleHandleA(szModuleName);
+			const auto& hMod = GetModuleHandleA(szModuleName);
 			if (!hMod) {
 				return nullptr;
 			}
@@ -2254,7 +2254,7 @@ namespace Detours {
 				return nullptr;
 			}
 
-			const HMODULE hMod = GetModuleHandleW(szModuleName);
+			const auto& hMod = GetModuleHandleW(szModuleName);
 			if (!hMod) {
 				return nullptr;
 			}
@@ -2267,7 +2267,7 @@ namespace Detours {
 				return nullptr;
 			}
 
-			const HMODULE hMod = GetModuleHandleW(szModuleName);
+			const auto& hMod = GetModuleHandleW(szModuleName);
 			if (!hMod) {
 				return nullptr;
 			}
@@ -2280,7 +2280,7 @@ namespace Detours {
 				return nullptr;
 			}
 
-			const HMODULE hMod = GetModuleHandleW(szModuleName);
+			const auto& hMod = GetModuleHandleW(szModuleName);
 			if (!hMod) {
 				return nullptr;
 			}
@@ -2318,7 +2318,7 @@ namespace Detours {
 		// FindData (AVX2)
 		// ----------------------------------------------------------------
 
-		const void* FindDataAVX2(const void* const pAddress, const size_t unSize, const unsigned char* const pData, const size_t unDataSize) noexcept {
+		const void* FindDataAVX2(void const* const pAddress, const size_t unSize, const unsigned char* const pData, const size_t unDataSize) noexcept {
 			if (!pAddress || !unSize || !pData || !unDataSize || (unSize < unDataSize)) {
 				return nullptr;
 			}
@@ -2357,9 +2357,9 @@ namespace Detours {
 				return nullptr;
 			}
 
-			const PIMAGE_DOS_HEADER pDH = reinterpret_cast<PIMAGE_DOS_HEADER>(hModule);
-			const PIMAGE_NT_HEADERS pNTHs = reinterpret_cast<PIMAGE_NT_HEADERS>(reinterpret_cast<char*>(hModule) + pDH->e_lfanew);
-			const PIMAGE_OPTIONAL_HEADER pOH = &(pNTHs->OptionalHeader);
+			const auto& pDH = reinterpret_cast<PIMAGE_DOS_HEADER>(hModule);
+			const auto& pNTHs = reinterpret_cast<PIMAGE_NT_HEADERS>(reinterpret_cast<char*>(hModule) + pDH->e_lfanew);
+			const auto& pOH = &(pNTHs->OptionalHeader);
 
 			return FindDataAVX2(reinterpret_cast<void*>(hModule), static_cast<size_t>(pOH->SizeOfImage) - 1, pData, unDataSize);
 		}
@@ -2397,7 +2397,7 @@ namespace Detours {
 				return nullptr;
 			}
 
-			const HMODULE hMod = GetModuleHandleA(szModuleName);
+			const auto& hMod = GetModuleHandleA(szModuleName);
 			if (!hMod) {
 				return nullptr;
 			}
@@ -2410,7 +2410,7 @@ namespace Detours {
 				return nullptr;
 			}
 
-			const HMODULE hMod = GetModuleHandleA(szModuleName);
+			const auto& hMod = GetModuleHandleA(szModuleName);
 			if (!hMod) {
 				return nullptr;
 			}
@@ -2423,7 +2423,7 @@ namespace Detours {
 				return nullptr;
 			}
 
-			const HMODULE hMod = GetModuleHandleA(szModuleName);
+			const auto& hMod = GetModuleHandleA(szModuleName);
 			if (!hMod) {
 				return nullptr;
 			}
@@ -2436,7 +2436,7 @@ namespace Detours {
 				return nullptr;
 			}
 
-			const HMODULE hMod = GetModuleHandleW(szModuleName);
+			const auto& hMod = GetModuleHandleW(szModuleName);
 			if (!hMod) {
 				return nullptr;
 			}
@@ -2449,7 +2449,7 @@ namespace Detours {
 				return nullptr;
 			}
 
-			const HMODULE hMod = GetModuleHandleW(szModuleName);
+			const auto& hMod = GetModuleHandleW(szModuleName);
 			if (!hMod) {
 				return nullptr;
 			}
@@ -2462,7 +2462,7 @@ namespace Detours {
 				return nullptr;
 			}
 
-			const HMODULE hMod = GetModuleHandleW(szModuleName);
+			const auto& hMod = GetModuleHandleW(szModuleName);
 			if (!hMod) {
 				return nullptr;
 			}
@@ -2500,7 +2500,7 @@ namespace Detours {
 		// FindData (AVX-512) [AVX512BW]
 		// ----------------------------------------------------------------
 
-		const void* FindDataAVX512(const void* const pAddress, const size_t unSize, const unsigned char* const pData, const size_t unDataSize) noexcept {
+		const void* FindDataAVX512(void const* const pAddress, const size_t unSize, const unsigned char* const pData, const size_t unDataSize) noexcept {
 			if (!pAddress || !unSize || !pData || !unDataSize || (unSize < unDataSize)) {
 				return nullptr;
 			}
@@ -2537,9 +2537,9 @@ namespace Detours {
 				return nullptr;
 			}
 
-			const PIMAGE_DOS_HEADER pDH = reinterpret_cast<PIMAGE_DOS_HEADER>(hModule);
-			const PIMAGE_NT_HEADERS pNTHs = reinterpret_cast<PIMAGE_NT_HEADERS>(reinterpret_cast<char*>(hModule) + pDH->e_lfanew);
-			const PIMAGE_OPTIONAL_HEADER pOH = &(pNTHs->OptionalHeader);
+			const auto& pDH = reinterpret_cast<PIMAGE_DOS_HEADER>(hModule);
+			const auto& pNTHs = reinterpret_cast<PIMAGE_NT_HEADERS>(reinterpret_cast<char*>(hModule) + pDH->e_lfanew);
+			const auto& pOH = &(pNTHs->OptionalHeader);
 
 			return FindDataAVX512(reinterpret_cast<void*>(hModule), static_cast<size_t>(pOH->SizeOfImage) - 1, pData, unDataSize);
 		}
@@ -2577,7 +2577,7 @@ namespace Detours {
 				return nullptr;
 			}
 
-			const HMODULE hMod = GetModuleHandleA(szModuleName);
+			const auto& hMod = GetModuleHandleA(szModuleName);
 			if (!hMod) {
 				return nullptr;
 			}
@@ -2590,7 +2590,7 @@ namespace Detours {
 				return nullptr;
 			}
 
-			const HMODULE hMod = GetModuleHandleA(szModuleName);
+			const auto& hMod = GetModuleHandleA(szModuleName);
 			if (!hMod) {
 				return nullptr;
 			}
@@ -2603,7 +2603,7 @@ namespace Detours {
 				return nullptr;
 			}
 
-			const HMODULE hMod = GetModuleHandleA(szModuleName);
+			const auto& hMod = GetModuleHandleA(szModuleName);
 			if (!hMod) {
 				return nullptr;
 			}
@@ -2616,7 +2616,7 @@ namespace Detours {
 				return nullptr;
 			}
 
-			const HMODULE hMod = GetModuleHandleW(szModuleName);
+			const auto& hMod = GetModuleHandleW(szModuleName);
 			if (!hMod) {
 				return nullptr;
 			}
@@ -2629,7 +2629,7 @@ namespace Detours {
 				return nullptr;
 			}
 
-			const HMODULE hMod = GetModuleHandleW(szModuleName);
+			const auto& hMod = GetModuleHandleW(szModuleName);
 			if (!hMod) {
 				return nullptr;
 			}
@@ -2642,7 +2642,7 @@ namespace Detours {
 				return nullptr;
 			}
 
-			const HMODULE hMod = GetModuleHandleW(szModuleName);
+			const auto& hMod = GetModuleHandleW(szModuleName);
 			if (!hMod) {
 				return nullptr;
 			}
@@ -2680,7 +2680,7 @@ namespace Detours {
 		// FindData (Auto)
 		// ----------------------------------------------------------------
 
-		const void* FindData(const void* const pAddress, const size_t unSize, const unsigned char* const pData, const size_t unDataSize) noexcept {
+		const void* FindData(void const* const pAddress, const size_t unSize, const unsigned char* const pData, const size_t unDataSize) noexcept {
 
 			if (!bOnceInitialization) {
 				bOnceInitialization = true;
@@ -2717,9 +2717,9 @@ namespace Detours {
 				return nullptr;
 			}
 
-			const PIMAGE_DOS_HEADER pDH = reinterpret_cast<PIMAGE_DOS_HEADER>(hModule);
-			const PIMAGE_NT_HEADERS pNTHs = reinterpret_cast<PIMAGE_NT_HEADERS>(reinterpret_cast<char*>(hModule) + pDH->e_lfanew);
-			const PIMAGE_OPTIONAL_HEADER pOH = &(pNTHs->OptionalHeader);
+			const auto& pDH = reinterpret_cast<PIMAGE_DOS_HEADER>(hModule);
+			const auto& pNTHs = reinterpret_cast<PIMAGE_NT_HEADERS>(reinterpret_cast<char*>(hModule) + pDH->e_lfanew);
+			const auto& pOH = &(pNTHs->OptionalHeader);
 
 			return FindData(reinterpret_cast<void*>(hModule), static_cast<size_t>(pOH->SizeOfImage) - 1, pData, unDataSize);
 		}
@@ -2757,7 +2757,7 @@ namespace Detours {
 				return nullptr;
 			}
 
-			const HMODULE hMod = GetModuleHandleA(szModuleName);
+			const auto& hMod = GetModuleHandleA(szModuleName);
 			if (!hMod) {
 				return nullptr;
 			}
@@ -2770,7 +2770,7 @@ namespace Detours {
 				return nullptr;
 			}
 
-			const HMODULE hMod = GetModuleHandleA(szModuleName);
+			const auto& hMod = GetModuleHandleA(szModuleName);
 			if (!hMod) {
 				return nullptr;
 			}
@@ -2783,7 +2783,7 @@ namespace Detours {
 				return nullptr;
 			}
 
-			const HMODULE hMod = GetModuleHandleA(szModuleName);
+			const auto& hMod = GetModuleHandleA(szModuleName);
 			if (!hMod) {
 				return nullptr;
 			}
@@ -2796,7 +2796,7 @@ namespace Detours {
 				return nullptr;
 			}
 
-			const HMODULE hMod = GetModuleHandleW(szModuleName);
+			const auto& hMod = GetModuleHandleW(szModuleName);
 			if (!hMod) {
 				return nullptr;
 			}
@@ -2809,7 +2809,7 @@ namespace Detours {
 				return nullptr;
 			}
 
-			const HMODULE hMod = GetModuleHandleW(szModuleName);
+			const auto& hMod = GetModuleHandleW(szModuleName);
 			if (!hMod) {
 				return nullptr;
 			}
@@ -2822,7 +2822,7 @@ namespace Detours {
 				return nullptr;
 			}
 
-			const HMODULE hMod = GetModuleHandleW(szModuleName);
+			const auto& hMod = GetModuleHandleW(szModuleName);
 			if (!hMod) {
 				return nullptr;
 			}
@@ -2868,27 +2868,27 @@ namespace Detours {
 		// ----------------------------------------------------------------
 
 #ifdef _M_X64
-		static inline PRTTI_BASE_CLASS_DESCRIPTOR __GetBaseClassDescriptor(void* pBaseAddress, PRTTI_BASE_CLASS_ARRAY pBaseClassArray, size_t unIndex) {
-			return reinterpret_cast<PRTTI_BASE_CLASS_DESCRIPTOR>(reinterpret_cast<size_t>(pBaseAddress) + pBaseClassArray->m_unBaseClassDescriptors[unIndex]);
+		static inline const PRTTI_BASE_CLASS_DESCRIPTOR __GetBaseClassDescriptor(void const* const pBaseAddress, const PRTTI_BASE_CLASS_ARRAY pBaseClassArray, const size_t unIndex) {
+			return reinterpret_cast<const PRTTI_BASE_CLASS_DESCRIPTOR>(reinterpret_cast<size_t>(pBaseAddress) + pBaseClassArray->m_unBaseClassDescriptors[unIndex]);
 		}
 
-		static inline PRTTI_BASE_CLASS_ARRAY __GetBaseClassArray(void* pBaseAddress, PRTTI_CLASS_HIERARCHY_DESCRIPTOR pClassHierarchyDescriptor) {
-			return reinterpret_cast<PRTTI_BASE_CLASS_ARRAY>(reinterpret_cast<size_t>(pBaseAddress) + pClassHierarchyDescriptor->m_unBaseClassArray);
+		static inline const PRTTI_BASE_CLASS_ARRAY __GetBaseClassArray(void const* const pBaseAddress, const PRTTI_CLASS_HIERARCHY_DESCRIPTOR pClassHierarchyDescriptor) {
+			return reinterpret_cast<const PRTTI_BASE_CLASS_ARRAY>(reinterpret_cast<size_t>(pBaseAddress) + pClassHierarchyDescriptor->m_unBaseClassArray);
 		}
 
-		static inline PRTTI_TYPE_DESCRIPTOR __GetTypeDescriptor(void* pBaseAddress, PRTTI_BASE_CLASS_DESCRIPTOR pBaseClassDescriptor) {
-			return reinterpret_cast<PRTTI_TYPE_DESCRIPTOR>(reinterpret_cast<size_t>(pBaseAddress) + pBaseClassDescriptor->m_unTypeDescriptor);
+		static inline const PRTTI_TYPE_DESCRIPTOR __GetTypeDescriptor(void const* const pBaseAddress, const PRTTI_BASE_CLASS_DESCRIPTOR pBaseClassDescriptor) {
+			return reinterpret_cast<const PRTTI_TYPE_DESCRIPTOR>(reinterpret_cast<size_t>(pBaseAddress) + pBaseClassDescriptor->m_unTypeDescriptor);
 		}
 
-		static inline PRTTI_TYPE_DESCRIPTOR __GetTypeDescriptor(void* pBaseAddress, PRTTI_COMPLETE_OBJECT_LOCATOR pCompleteObjectLocator) {
-			return reinterpret_cast<PRTTI_TYPE_DESCRIPTOR>(reinterpret_cast<size_t>(pBaseAddress) + pCompleteObjectLocator->m_unTypeDescriptor);
+		static inline const PRTTI_TYPE_DESCRIPTOR __GetTypeDescriptor(void const* const pBaseAddress, const PRTTI_COMPLETE_OBJECT_LOCATOR pCompleteObjectLocator) {
+			return reinterpret_cast<const PRTTI_TYPE_DESCRIPTOR>(reinterpret_cast<size_t>(pBaseAddress) + pCompleteObjectLocator->m_unTypeDescriptor);
 		}
 
-		static inline PRTTI_CLASS_HIERARCHY_DESCRIPTOR __GetClassHierarchyDescriptor(void* pBaseAddress, PRTTI_BASE_CLASS_DESCRIPTOR pBaseClassDescriptor) {
-			return reinterpret_cast<PRTTI_CLASS_HIERARCHY_DESCRIPTOR>(reinterpret_cast<size_t>(pBaseAddress) + pBaseClassDescriptor->m_unClassHierarchyDescriptor);
+		static inline const PRTTI_CLASS_HIERARCHY_DESCRIPTOR __GetClassHierarchyDescriptor(void const* const pBaseAddress, const PRTTI_BASE_CLASS_DESCRIPTOR pBaseClassDescriptor) {
+			return reinterpret_cast<const PRTTI_CLASS_HIERARCHY_DESCRIPTOR>(reinterpret_cast<size_t>(pBaseAddress) + pBaseClassDescriptor->m_unClassHierarchyDescriptor);
 		}
 
-		static inline PRTTI_CLASS_HIERARCHY_DESCRIPTOR __GetClassHierarchyDescriptor(void* pBaseAddress, PRTTI_COMPLETE_OBJECT_LOCATOR pCompleteObjectLocator) {
+		static inline PRTTI_CLASS_HIERARCHY_DESCRIPTOR __GetClassHierarchyDescriptor(void const* const pBaseAddress, PRTTI_COMPLETE_OBJECT_LOCATOR pCompleteObjectLocator) {
 			return reinterpret_cast<PRTTI_CLASS_HIERARCHY_DESCRIPTOR>(reinterpret_cast<size_t>(pBaseAddress) + pCompleteObjectLocator->m_unClassHierarchyDescriptor);
 		}
 #endif
@@ -2897,35 +2897,28 @@ namespace Detours {
 		// Object
 		// ----------------------------------------------------------------
 
-		Object::Object(void* pBaseAddress, void* pAddress, size_t unSize, PRTTI_TYPE_DESCRIPTOR pTypeDescriptor, PRTTI_CLASS_HIERARCHY_DESCRIPTOR pClassHierarchyDescriptor, PRTTI_BASE_CLASS_ARRAY pBaseClassArray, PRTTI_COMPLETE_OBJECT_LOCATOR pCompleteObject, void** pVTable) {
-			m_pBaseAddress = pBaseAddress;
-			m_pAddress = pAddress;
-			m_unSize = unSize;
-			m_pTypeDescriptor = pTypeDescriptor;
-			m_pClassHierarchyDescriptor = pClassHierarchyDescriptor;
-			m_pBaseClassArray = pBaseClassArray;
-			m_pCompleteObject = pCompleteObject;
+		Object::Object(void const* const pBaseAddress, void const* const pAddress, const size_t unSize, const PRTTI_TYPE_DESCRIPTOR pTypeDescriptor, const PRTTI_CLASS_HIERARCHY_DESCRIPTOR pClassHierarchyDescriptor, const PRTTI_BASE_CLASS_ARRAY pBaseClassArray, const PRTTI_COMPLETE_OBJECT_LOCATOR pCompleteObject, void** pVTable) : m_pBaseAddress(pBaseAddress), m_pAddress(pAddress), m_unSize(unSize), m_pTypeDescriptor(pTypeDescriptor), m_pClassHierarchyDescriptor(pClassHierarchyDescriptor), m_pBaseClassArray(pBaseClassArray), m_pCompleteObject(pCompleteObject) {
 			m_pVTable = pVTable;
-
 			if (pBaseClassArray) {
-				for (unsigned int i = 0; i < pClassHierarchyDescriptor->m_unNumberOfBaseClasses; ++i) {
+				const unsigned int unNumberOfBaseClasses = pClassHierarchyDescriptor->m_unNumberOfBaseClasses;
+				for (unsigned int i = 0; i < unNumberOfBaseClasses; ++i) {
 #ifdef _M_X64
-					const auto pBCD = __GetBaseClassDescriptor(pBaseAddress, pBaseClassArray, i);
+					const auto& pBCD = __GetBaseClassDescriptor(pBaseAddress, pBaseClassArray, i);
 #elif _M_IX86
-					const auto pBCD = pBaseClassArray->m_pBaseClassDescriptors[i];
+					const auto& pBCD = pBaseClassArray->m_pBaseClassDescriptors[i];
 #endif
 					if (!pBCD) {
 						break;
 					}
 
 #ifdef _M_X64
-					const auto pCurrentTD = __GetTypeDescriptor(pBaseAddress, pBCD);
-					const auto pCurrentCHD = __GetClassHierarchyDescriptor(pBaseAddress, pBCD);
-					const auto pCurrentBCA = __GetBaseClassArray(pBaseAddress, pCurrentCHD);
+					const auto& pCurrentTD = __GetTypeDescriptor(pBaseAddress, pBCD);
+					const auto& pCurrentCHD = __GetClassHierarchyDescriptor(pBaseAddress, pBCD);
+					const auto& pCurrentBCA = __GetBaseClassArray(pBaseAddress, pCurrentCHD);
 #elif _M_IX86
-					const auto pCurrentTD = pBCD->m_pTypeDescriptor;
-					const auto pCurrentCHD = pBCD->m_pClassHierarchyDescriptor;
-					const auto pCurrentBCA = pCurrentCHD->m_pBaseClassArray;
+					const auto& pCurrentTD = pBCD->m_pTypeDescriptor;
+					const auto& pCurrentCHD = pBCD->m_pClassHierarchyDescriptor;
+					const auto& pCurrentBCA = pCurrentCHD->m_pBaseClassArray;
 #endif
 
 					if (pCurrentTD == pTypeDescriptor) {
@@ -2946,20 +2939,20 @@ namespace Detours {
 			}
 		}
 
-		static PRTTI_COMPLETE_OBJECT_LOCATOR GetCompleteObjectLocatorFromObject(void* pAddress) {
+		static const PRTTI_COMPLETE_OBJECT_LOCATOR GetCompleteObjectLocatorFromObject(void const* const pAddress) {
 			if (!pAddress) {
 				return nullptr;
 			}
 
-			return static_cast<PRTTI_COMPLETE_OBJECT_LOCATOR**>(pAddress)[0][-1];
+			return static_cast<PRTTI_COMPLETE_OBJECT_LOCATOR const* const*>(pAddress)[0][-1];
 		}
 
-		static void* FindCompleteObject(void* pAddress) {
+		static void const* const FindCompleteObject(void const* const pAddress) {
 			if (!pAddress) {
 				return nullptr;
 			}
 
-			const auto pCompleteLocator = GetCompleteObjectLocatorFromObject(pAddress);
+			const auto& pCompleteLocator = GetCompleteObjectLocatorFromObject(pAddress);
 			if (!pCompleteLocator) {
 				return nullptr;
 			}
@@ -2974,9 +2967,9 @@ namespace Detours {
 		}
 
 #ifdef _M_X64
-		static PRTTI_BASE_CLASS_DESCRIPTOR FindSITargetTypeInstance(void* pBaseAddress, PRTTI_COMPLETE_OBJECT_LOCATOR pCompleteObjectLocator, PRTTI_TYPE_DESCRIPTOR pSourceTypeDescriptor, PRTTI_TYPE_DESCRIPTOR pTargetTypeDescriptor) {
+		static const PRTTI_BASE_CLASS_DESCRIPTOR FindSITargetTypeInstance(void const* const pBaseAddress, const PRTTI_COMPLETE_OBJECT_LOCATOR pCompleteObjectLocator, const PRTTI_TYPE_DESCRIPTOR pSourceTypeDescriptor, const PRTTI_TYPE_DESCRIPTOR pTargetTypeDescriptor) {
 #elif _M_IX86
-		static PRTTI_BASE_CLASS_DESCRIPTOR FindSITargetTypeInstance(PRTTI_COMPLETE_OBJECT_LOCATOR pCompleteObjectLocator, PRTTI_TYPE_DESCRIPTOR pSourceTypeDescriptor, PRTTI_TYPE_DESCRIPTOR pTargetTypeDescriptor) {
+		static const PRTTI_BASE_CLASS_DESCRIPTOR FindSITargetTypeInstance(const PRTTI_COMPLETE_OBJECT_LOCATOR pCompleteObjectLocator, const PRTTI_TYPE_DESCRIPTOR pSourceTypeDescriptor, const PRTTI_TYPE_DESCRIPTOR pTargetTypeDescriptor) {
 #endif
 #ifdef _M_X64
 			if (!pBaseAddress || !pCompleteObjectLocator || !pSourceTypeDescriptor || !pTargetTypeDescriptor) {
@@ -2987,18 +2980,18 @@ namespace Detours {
 			}
 
 #ifdef _M_X64
-			const auto pCHD = __GetClassHierarchyDescriptor(pBaseAddress, pCompleteObjectLocator);
+			const auto& pCHD = __GetClassHierarchyDescriptor(pBaseAddress, pCompleteObjectLocator);
 #elif _M_IX86
-			const auto pCHD = pCompleteObjectLocator->m_pClassHierarchyDescriptor;
+			const auto& pCHD = pCompleteObjectLocator->m_pClassHierarchyDescriptor;
 #endif
 			if (!pCHD) {
 				return nullptr;
 			}
 
 #ifdef _M_X64
-			const auto pBCA = __GetBaseClassArray(pBaseAddress, pCHD);
+			const auto& pBCA = __GetBaseClassArray(pBaseAddress, pCHD);
 #elif _M_IX86
-			const auto pBCA = pCHD->m_pBaseClassArray;
+			const auto& pBCA = pCHD->m_pBaseClassArray;
 #endif
 			if (!pBCA) {
 				return nullptr;
@@ -3007,9 +3000,9 @@ namespace Detours {
 			const unsigned int unNumberOfBaseClasses = pCHD->m_unNumberOfBaseClasses;
 			for (unsigned int i = 0; i < unNumberOfBaseClasses; ++i) {
 #ifdef _M_X64
-				const auto pBCD = __GetBaseClassDescriptor(pBaseAddress, pBCA, i);
+				const auto& pBCD = __GetBaseClassDescriptor(pBaseAddress, pBCA, i);
 #elif _M_IX86
-				const auto pBCD = pBCA->m_pBaseClassDescriptors[i];
+				const auto& pBCD = pBCA->m_pBaseClassDescriptors[i];
 #endif
 				if (!pBCD) {
 					continue;
@@ -3022,9 +3015,9 @@ namespace Detours {
 #endif
 					for (unsigned int j = i + 1; j < unNumberOfBaseClasses; ++j) {
 #ifdef _M_X64
-						const auto pSourceBCD = __GetBaseClassDescriptor(pBaseAddress, pBCA, j);
+						const auto& pSourceBCD = __GetBaseClassDescriptor(pBaseAddress, pBCA, j);
 #elif _M_IX86
-						const auto pSourceBCD = pBCA->m_pBaseClassDescriptors[j];
+						const auto& pSourceBCD = pBCA->m_pBaseClassDescriptors[j];
 #endif
 						if (!pSourceBCD) {
 							continue;
@@ -3050,9 +3043,9 @@ namespace Detours {
 
 			for (unsigned int i = 0; i < unNumberOfBaseClasses; ++i) {
 #ifdef _M_X64
-				const auto pBCD = __GetBaseClassDescriptor(pBaseAddress, pBCA, i);
+				const auto& pBCD = __GetBaseClassDescriptor(pBaseAddress, pBCA, i);
 #elif _M_IX86
-				const auto pBCD = pBCA->m_pBaseClassDescriptors[i];
+				const auto& pBCD = pBCA->m_pBaseClassDescriptors[i];
 #endif
 				if (!pBCD) {
 					continue;
@@ -3065,9 +3058,9 @@ namespace Detours {
 #endif
 					for (unsigned int j = i + 1; j < unNumberOfBaseClasses; ++j) {
 #ifdef _M_X64
-						const auto pSourceBCD = __GetBaseClassDescriptor(pBaseAddress, pBCA, j);
+						const auto& pSourceBCD = __GetBaseClassDescriptor(pBaseAddress, pBCA, j);
 #elif _M_IX86
-						const auto pSourceBCD = pBCA->m_pBaseClassDescriptors[j];
+						const auto& pSourceBCD = pBCA->m_pBaseClassDescriptors[j];
 #endif
 						if (!pSourceBCD) {
 							continue;
@@ -3078,9 +3071,9 @@ namespace Detours {
 						}
 
 #ifdef _M_X64
-						if (!strcmp(__GetTypeDescriptor(pBaseAddress, pBCD)->m_szName, pSourceTypeDescriptor->m_szName)) {
+						if (!strncmp(__GetTypeDescriptor(pBaseAddress, pBCD)->m_szName, pSourceTypeDescriptor->m_szName, 0x1000)) {
 #elif _M_IX86
-						if (!strcmp(pBCD->m_pTypeDescriptor->m_szName, pSourceTypeDescriptor->m_szName)) {
+						if (!strncmp(pBCD->m_pTypeDescriptor->m_szName, pSourceTypeDescriptor->m_szName, 0x1000)) {
 #endif
 							return pBCD;
 						}
@@ -3093,16 +3086,16 @@ namespace Detours {
 			return nullptr;
 		}
 
-		static bool IsTypeDescriptorEqual(PRTTI_TYPE_DESCRIPTOR pLeft, PRTTI_TYPE_DESCRIPTOR pRight) {
+		static bool IsTypeDescriptorEqual(const PRTTI_TYPE_DESCRIPTOR pLeft, const PRTTI_TYPE_DESCRIPTOR pRight) {
 			return (pLeft == pRight) || !strncmp(pLeft->m_szName, pRight->m_szName, 0x1000);
 		}
 
-		static ptrdiff_t PMDtoOffset(void* pAddress, const RTTI_PMD& pmd) {
+		static ptrdiff_t PMDtoOffset(void const* const pAddress, const RTTI_PMD& pmd) {
 			ptrdiff_t unRetOff = 0;
 
 			if (pmd.m_nPDisp >= 0) {
 				unRetOff = pmd.m_nPDisp;
-				unRetOff += *reinterpret_cast<int*>(reinterpret_cast<char*>(*reinterpret_cast<size_t*>(reinterpret_cast<char*>(pAddress) + unRetOff)) + pmd.m_nVDisp);
+				unRetOff += *reinterpret_cast<int*>(reinterpret_cast<char*>(*reinterpret_cast<size_t const* const>(reinterpret_cast<char const* const>(pAddress) + unRetOff)) + pmd.m_nVDisp);
 			}
 
 			unRetOff += pmd.m_nMDisp;
@@ -3111,9 +3104,9 @@ namespace Detours {
 		}
 
 #ifdef _M_X64
-		static PRTTI_BASE_CLASS_DESCRIPTOR FindMITargetTypeInstance(void* pBaseAddress, void* pCompleteObject, PRTTI_COMPLETE_OBJECT_LOCATOR pCompleteObjectLocator, PRTTI_TYPE_DESCRIPTOR pSourceTypeDescriptor, ptrdiff_t nSourceOffset, PRTTI_TYPE_DESCRIPTOR pTargetTypeDescriptor) {
+		static const PRTTI_BASE_CLASS_DESCRIPTOR FindMITargetTypeInstance(void const* const pBaseAddress, void const* const pCompleteObject, const PRTTI_COMPLETE_OBJECT_LOCATOR pCompleteObjectLocator, const PRTTI_TYPE_DESCRIPTOR pSourceTypeDescriptor, const ptrdiff_t nSourceOffset, const PRTTI_TYPE_DESCRIPTOR pTargetTypeDescriptor) {
 #elif _M_IX86
-		static PRTTI_BASE_CLASS_DESCRIPTOR FindMITargetTypeInstance(void* pCompleteObject, PRTTI_COMPLETE_OBJECT_LOCATOR pCompleteObjectLocator, PRTTI_TYPE_DESCRIPTOR pSourceTypeDescriptor, ptrdiff_t nSourceOffset, PRTTI_TYPE_DESCRIPTOR pTargetTypeDescriptor) {
+		static const PRTTI_BASE_CLASS_DESCRIPTOR FindMITargetTypeInstance(void const* const pCompleteObject, const PRTTI_COMPLETE_OBJECT_LOCATOR pCompleteObjectLocator, const PRTTI_TYPE_DESCRIPTOR pSourceTypeDescriptor, const ptrdiff_t nSourceOffset, const PRTTI_TYPE_DESCRIPTOR pTargetTypeDescriptor) {
 #endif
 #ifdef _M_X64
 			if (!pBaseAddress || !pCompleteObject || !pCompleteObjectLocator || !pSourceTypeDescriptor || !pTargetTypeDescriptor) {
@@ -3124,10 +3117,10 @@ namespace Detours {
 			}
 
 #ifdef _M_X64
-			const auto pBCA = __GetBaseClassArray(pBaseAddress, __GetClassHierarchyDescriptor(pBaseAddress, pCompleteObjectLocator));
+			const auto& pBCA = __GetBaseClassArray(pBaseAddress, __GetClassHierarchyDescriptor(pBaseAddress, pCompleteObjectLocator));
 			const unsigned int unNumberOfBaseClasses = __GetClassHierarchyDescriptor(pBaseAddress, pCompleteObjectLocator)->m_unNumberOfBaseClasses;
 #elif _M_IX86
-			const auto pBCA = pCompleteObjectLocator->m_pClassHierarchyDescriptor->m_pBaseClassArray;
+			const auto& pBCA = pCompleteObjectLocator->m_pClassHierarchyDescriptor->m_pBaseClassArray;
 			const unsigned int unNumberOfBaseClasses = pCompleteObjectLocator->m_pClassHierarchyDescriptor->m_unNumberOfBaseClasses;
 #endif
 			if (!pBCA) {
@@ -3142,9 +3135,9 @@ namespace Detours {
 
 			for (unsigned int i = 0; i < unNumberOfBaseClasses; ++i) {
 #ifdef _M_X64
-				const auto pBCD = __GetBaseClassDescriptor(pBaseAddress, pBCA, i);
+				const auto& pBCD = __GetBaseClassDescriptor(pBaseAddress, pBCA, i);
 #elif _M_IX86
-				const auto pBCD = pBCA->m_pBaseClassDescriptors[i];
+				const auto& pBCD = pBCA->m_pBaseClassDescriptors[i];
 #endif
 				if (!pBCD) {
 					continue;
@@ -3184,11 +3177,11 @@ namespace Detours {
 							}
 
 #ifdef _M_X64
-							const auto pTargetBCA = __GetBaseClassArray(pBaseAddress, __GetClassHierarchyDescriptor(pBaseAddress, pTargetBCD));
-							const auto pSourceInTargetBCD = __GetBaseClassDescriptor(pBaseAddress, pTargetBCA, i - unTarget);
+							const auto& pTargetBCA = __GetBaseClassArray(pBaseAddress, __GetClassHierarchyDescriptor(pBaseAddress, pTargetBCD));
+							const auto& pSourceInTargetBCD = __GetBaseClassDescriptor(pBaseAddress, pTargetBCA, i - unTarget);
 #elif _M_IX86
-							const auto pTargetBCA = pTargetBCD->m_pClassHierarchyDescriptor->m_pBaseClassArray;
-							const auto pSourceInTargetBCD = pTargetBCA->m_pBaseClassDescriptors[i - unTarget];
+							const auto& pTargetBCA = pTargetBCD->m_pClassHierarchyDescriptor->m_pBaseClassArray;
+							const auto& pSourceInTargetBCD = pTargetBCA->m_pBaseClassDescriptors[i - unTarget];
 #endif
 
 							if (pSourceInTargetBCD->m_unAttributes & BCD_NOTVISIBLE) {
@@ -3213,9 +3206,9 @@ namespace Detours {
 		}
 
 #ifdef _M_X64
-		static PRTTI_BASE_CLASS_DESCRIPTOR FindVITargetTypeInstance(void* pBaseAddress, void* pCompleteObject, PRTTI_COMPLETE_OBJECT_LOCATOR pCompleteObjectLocator, PRTTI_TYPE_DESCRIPTOR pSourceTypeDescriptor, ptrdiff_t nSourceOffset, PRTTI_TYPE_DESCRIPTOR pTargetTypeDescriptor) {
+		static const PRTTI_BASE_CLASS_DESCRIPTOR FindVITargetTypeInstance(void const* const pBaseAddress, void const* const pCompleteObject, const PRTTI_COMPLETE_OBJECT_LOCATOR pCompleteObjectLocator, const PRTTI_TYPE_DESCRIPTOR pSourceTypeDescriptor, const ptrdiff_t nSourceOffset, const PRTTI_TYPE_DESCRIPTOR pTargetTypeDescriptor) {
 #elif _M_IX86
-		static PRTTI_BASE_CLASS_DESCRIPTOR FindVITargetTypeInstance(void* pCompleteObject, PRTTI_COMPLETE_OBJECT_LOCATOR pCompleteObjectLocator, PRTTI_TYPE_DESCRIPTOR pSourceTypeDescriptor, ptrdiff_t nSourceOffset, PRTTI_TYPE_DESCRIPTOR pTargetTypeDescriptor) {
+		static const PRTTI_BASE_CLASS_DESCRIPTOR FindVITargetTypeInstance(void const* const pCompleteObject, const PRTTI_COMPLETE_OBJECT_LOCATOR pCompleteObjectLocator, const PRTTI_TYPE_DESCRIPTOR pSourceTypeDescriptor, const ptrdiff_t nSourceOffset, const PRTTI_TYPE_DESCRIPTOR pTargetTypeDescriptor) {
 #endif
 #ifdef _M_X64
 			if (!pBaseAddress || !pCompleteObject || !pCompleteObjectLocator || !pSourceTypeDescriptor || !pTargetTypeDescriptor) {
@@ -3226,10 +3219,10 @@ namespace Detours {
 			}
 
 #ifdef _M_X64
-			auto const pBCA = __GetBaseClassArray(pBaseAddress, __GetClassHierarchyDescriptor(pBaseAddress, pCompleteObjectLocator));
+			auto const& pBCA = __GetBaseClassArray(pBaseAddress, __GetClassHierarchyDescriptor(pBaseAddress, pCompleteObjectLocator));
 			const unsigned int unNumberOfBaseClasses = __GetClassHierarchyDescriptor(pBaseAddress, pCompleteObjectLocator)->m_unNumberOfBaseClasses;
 #elif _M_IX86
-			const auto pBCA = pCompleteObjectLocator->m_pClassHierarchyDescriptor->m_pBaseClassArray;
+			const auto& pBCA = pCompleteObjectLocator->m_pClassHierarchyDescriptor->m_pBaseClassArray;
 			const unsigned int unNumberOfBaseClasses = pCompleteObjectLocator->m_pClassHierarchyDescriptor->m_unNumberOfBaseClasses;
 #endif
 
@@ -3250,9 +3243,9 @@ namespace Detours {
 
 			for (unsigned int i = 0; i < unNumberOfBaseClasses; ++i) {
 #ifdef _M_X64
-				const auto pBCD = __GetBaseClassDescriptor(pBaseAddress, pBCA, i);
+				const auto& pBCD = __GetBaseClassDescriptor(pBaseAddress, pBCA, i);
 #elif _M_IX86
-				const auto pBCD = pBCA->m_pBaseClassDescriptors[i];
+				const auto& pBCD = pBCA->m_pBaseClassDescriptors[i];
 #endif
 				if (!pBCD) {
 					continue;
@@ -3332,9 +3325,9 @@ namespace Detours {
 		}
 
 #ifdef _M_X64
-		void* __RTDynamicCast(void* pBaseAddress, void* pAddress, LONG nOffset, PRTTI_TYPE_DESCRIPTOR pSourceTypeDescriptor, PRTTI_TYPE_DESCRIPTOR pDestinationTypeDescriptor) {
+		void const* const __RTDynamicCast(void const* const pBaseAddress, void const* const pAddress, const LONG nOffset, const PRTTI_TYPE_DESCRIPTOR pSourceTypeDescriptor, const PRTTI_TYPE_DESCRIPTOR pDestinationTypeDescriptor) {
 #elif _M_IX86
-		void* __RTDynamicCast(void* pAddress, LONG nOffset, PRTTI_TYPE_DESCRIPTOR pSourceTypeDescriptor, PRTTI_TYPE_DESCRIPTOR pDestinationTypeDescriptor) {
+		void const* const __RTDynamicCast(void const* const pAddress, const LONG nOffset, const PRTTI_TYPE_DESCRIPTOR pSourceTypeDescriptor, const PRTTI_TYPE_DESCRIPTOR pDestinationTypeDescriptor) {
 #endif
 #ifdef _M_X64
 			if (!pBaseAddress || !pAddress || !pSourceTypeDescriptor || !pDestinationTypeDescriptor) {
@@ -3344,20 +3337,20 @@ namespace Detours {
 				return nullptr;
 			}
 
-			auto pCO = FindCompleteObject(pAddress);
+			const auto& pCO = FindCompleteObject(pAddress);
 			if (!pCO) {
 				return nullptr;
 			}
 
-			const auto pCOL = GetCompleteObjectLocatorFromObject(pAddress);
+			const auto& pCOL = GetCompleteObjectLocatorFromObject(pAddress);
 			if (!pCOL) {
 				return nullptr;
 			}
 
 #ifdef _M_X64
-			const auto pCHD = reinterpret_cast<PRTTI_CLASS_HIERARCHY_DESCRIPTOR>(reinterpret_cast<size_t>(pBaseAddress) + pCOL->m_unClassHierarchyDescriptor);
+			const auto& pCHD = reinterpret_cast<PRTTI_CLASS_HIERARCHY_DESCRIPTOR>(reinterpret_cast<size_t>(pBaseAddress) + pCOL->m_unClassHierarchyDescriptor);
 #elif _M_IX86
-			const auto pCHD = pCOL->m_pClassHierarchyDescriptor;
+			const auto& pCHD = pCOL->m_pClassHierarchyDescriptor;
 #endif
 			if (!pCHD) {
 				return nullptr;
@@ -3373,9 +3366,7 @@ namespace Detours {
 				pBCD = FindSITargetTypeInstance(pCOL, pSourceTypeDescriptor, pDestinationTypeDescriptor);
 #endif
 			} else {
-				pAddress = reinterpret_cast<void*>(reinterpret_cast<char*>(pAddress) - nOffset);
-
-				const size_t unOffset = reinterpret_cast<size_t>(pAddress) - reinterpret_cast<size_t>(pCO);
+				const size_t unOffset = reinterpret_cast<size_t>(pAddress) - nOffset - reinterpret_cast<size_t>(pCO);
 
 				if (!(unAttributes & CHD_VIRTINH)) {
 #ifdef _M_X64
@@ -3400,7 +3391,7 @@ namespace Detours {
 		}
 
 
-		void* Object::DynamicCast(void* pAddress, Object* pObject) {
+		void const* const Object::DynamicCast(void const* const pAddress, const Object* pObject) {
 			if (!pAddress || !pObject) {
 				return nullptr;
 			}
@@ -3412,19 +3403,19 @@ namespace Detours {
 #endif
 		}
 
-		PRTTI_TYPE_DESCRIPTOR Object::GetTypeDescriptor() {
+		const PRTTI_TYPE_DESCRIPTOR Object::GetTypeDescriptor() const {
 			return m_pTypeDescriptor;
 		}
 
-		PRTTI_CLASS_HIERARCHY_DESCRIPTOR Object::GetClassHierarchyDescriptor() {
+		const PRTTI_CLASS_HIERARCHY_DESCRIPTOR Object::GetClassHierarchyDescriptor() const {
 			return m_pClassHierarchyDescriptor;
 		}
 
-		PRTTI_COMPLETE_OBJECT_LOCATOR Object::GetCompleteObject() {
+		const PRTTI_COMPLETE_OBJECT_LOCATOR Object::GetCompleteObject() const {
 			return m_pCompleteObject;
 		}
 
-		void** Object::GetVTable() {
+		void** Object::GetVTable() const {
 			return m_pVTable;
 		}
 
@@ -3436,7 +3427,7 @@ namespace Detours {
 		// FindObject
 		// ----------------------------------------------------------------
 
-		std::unique_ptr<Object> FindObject(void* pBaseAddress, void* pAddress, size_t unSize, const char* const szName, bool bCompleteObject) {
+		std::unique_ptr<Object> FindObject(void const* const pBaseAddress, void const* const pAddress, const size_t unSize, const char* const szName, bool bCompleteObject) {
 			if (!pBaseAddress || !pAddress || !unSize || !szName) {
 				return nullptr;
 			}
@@ -3454,7 +3445,7 @@ namespace Detours {
 					break;
 				}
 
-				const PRTTI_TYPE_DESCRIPTOR pTypeDescriptor = reinterpret_cast<PRTTI_TYPE_DESCRIPTOR>(reinterpret_cast<char*>(pReference) - sizeof(void*) * 2);
+				const auto& pTypeDescriptor = reinterpret_cast<PRTTI_TYPE_DESCRIPTOR>(reinterpret_cast<char*>(pReference) - sizeof(void*) * 2);
 				if ((pTypeDescriptor->m_pVFTable < pBaseAddress) || (pTypeDescriptor->m_pVFTable >= pEndAddress)) {
 					pReference = reinterpret_cast<void*>(reinterpret_cast<char*>(pReference) + 1);
 					continue;
@@ -3474,7 +3465,7 @@ namespace Detours {
 					}
 
 					if (bCompleteObject) {
-						const PRTTI_COMPLETE_OBJECT_LOCATOR pCompleteObjectLocator = reinterpret_cast<PRTTI_COMPLETE_OBJECT_LOCATOR>(reinterpret_cast<char*>(pTypeDescriptorReference) - sizeof(int) * 3);
+						const auto& pCompleteObjectLocator = reinterpret_cast<PRTTI_COMPLETE_OBJECT_LOCATOR>(reinterpret_cast<char*>(pTypeDescriptorReference) - sizeof(int) * 3);
 						if ((pCompleteObjectLocator->m_unSignature != COL_SIG_REV0) && (pCompleteObjectLocator->m_unSignature != COL_SIG_REV1)) {
 							pTypeDescriptorReference = reinterpret_cast<void*>(reinterpret_cast<char*>(pTypeDescriptorReference) + 1);
 							continue;
@@ -3490,9 +3481,9 @@ namespace Detours {
 #endif
 
 #ifdef _M_X64
-						const PRTTI_CLASS_HIERARCHY_DESCRIPTOR pClassHierarchyDescriptor = reinterpret_cast<PRTTI_CLASS_HIERARCHY_DESCRIPTOR>(reinterpret_cast<size_t>(pBaseAddress) + pCompleteObjectLocator->m_unClassHierarchyDescriptor);
+						const auto& pClassHierarchyDescriptor = reinterpret_cast<PRTTI_CLASS_HIERARCHY_DESCRIPTOR>(reinterpret_cast<size_t>(pBaseAddress) + pCompleteObjectLocator->m_unClassHierarchyDescriptor);
 #elif _M_IX86
-						const PRTTI_CLASS_HIERARCHY_DESCRIPTOR pClassHierarchyDescriptor = pCompleteObjectLocator->m_pClassHierarchyDescriptor;
+						const auto& pClassHierarchyDescriptor = pCompleteObjectLocator->m_pClassHierarchyDescriptor;
 #endif
 						if ((pClassHierarchyDescriptor < pBaseAddress) || (pClassHierarchyDescriptor >= pEndAddress)) {
 							pTypeDescriptorReference = reinterpret_cast<void*>(reinterpret_cast<char*>(pTypeDescriptorReference) + 1);
@@ -3505,9 +3496,9 @@ namespace Detours {
 						}
 
 #ifdef _M_X64
-						const PRTTI_BASE_CLASS_ARRAY pBaseClassArray = reinterpret_cast<PRTTI_BASE_CLASS_ARRAY>(reinterpret_cast<size_t>(pBaseAddress) + pClassHierarchyDescriptor->m_unBaseClassArray);
+						const auto& pBaseClassArray = reinterpret_cast<PRTTI_BASE_CLASS_ARRAY>(reinterpret_cast<size_t>(pBaseAddress) + pClassHierarchyDescriptor->m_unBaseClassArray);
 #elif _M_IX86
-						const PRTTI_BASE_CLASS_ARRAY pBaseClassArray = pClassHierarchyDescriptor->m_pBaseClassArray;
+						const auto& pBaseClassArray = pClassHierarchyDescriptor->m_pBaseClassArray;
 #endif
 						if ((pBaseClassArray < pBaseAddress) || (pBaseClassArray >= pEndAddress)) {
 							pTypeDescriptorReference = reinterpret_cast<void*>(reinterpret_cast<char*>(pTypeDescriptorReference) + 1);
@@ -3516,9 +3507,9 @@ namespace Detours {
 
 						for (unsigned int i = 0; i < pClassHierarchyDescriptor->m_unNumberOfBaseClasses; ++i) {
 #ifdef _M_X64
-							const PRTTI_BASE_CLASS_DESCRIPTOR pBaseClassDescriptor = reinterpret_cast<PRTTI_BASE_CLASS_DESCRIPTOR>(reinterpret_cast<size_t>(pBaseAddress) + pBaseClassArray->m_unBaseClassDescriptors[i]);
+							const auto& pBaseClassDescriptor = reinterpret_cast<PRTTI_BASE_CLASS_DESCRIPTOR>(reinterpret_cast<size_t>(pBaseAddress) + pBaseClassArray->m_unBaseClassDescriptors[i]);
 #elif _M_IX86
-							const PRTTI_BASE_CLASS_DESCRIPTOR pBaseClassDescriptor = pBaseClassArray->m_pBaseClassDescriptors[i];
+							const auto& pBaseClassDescriptor = pBaseClassArray->m_pBaseClassDescriptors[i];
 #endif
 							if (!pBaseClassDescriptor) {
 								break;
@@ -3538,11 +3529,11 @@ namespace Detours {
 							}
 						}
 					} else {
-						const PRTTI_BASE_CLASS_DESCRIPTOR pBaseClassDescriptor = reinterpret_cast<PRTTI_BASE_CLASS_DESCRIPTOR>(pTypeDescriptorReference);
+						const auto& pBaseClassDescriptor = reinterpret_cast<PRTTI_BASE_CLASS_DESCRIPTOR>(pTypeDescriptorReference);
 #ifdef _M_X64
-						const PRTTI_CLASS_HIERARCHY_DESCRIPTOR pClassHierarchyDescriptor = reinterpret_cast<PRTTI_CLASS_HIERARCHY_DESCRIPTOR>(reinterpret_cast<size_t>(pBaseAddress) + pBaseClassDescriptor->m_unClassHierarchyDescriptor);
+						const auto& pClassHierarchyDescriptor = reinterpret_cast<PRTTI_CLASS_HIERARCHY_DESCRIPTOR>(reinterpret_cast<size_t>(pBaseAddress) + pBaseClassDescriptor->m_unClassHierarchyDescriptor);
 #elif _M_IX86
-						const PRTTI_CLASS_HIERARCHY_DESCRIPTOR pClassHierarchyDescriptor = pBaseClassDescriptor->m_pClassHierarchyDescriptor;
+						const auto& pClassHierarchyDescriptor = pBaseClassDescriptor->m_pClassHierarchyDescriptor;
 #endif
 						if ((pClassHierarchyDescriptor < pBaseAddress) || (pClassHierarchyDescriptor >= pEndAddress)) {
 							pTypeDescriptorReference = reinterpret_cast<void*>(reinterpret_cast<char*>(pTypeDescriptorReference) + 1);
@@ -3555,9 +3546,9 @@ namespace Detours {
 						}
 
 #ifdef _M_X64
-						const PRTTI_BASE_CLASS_ARRAY pBaseClassArray = reinterpret_cast<PRTTI_BASE_CLASS_ARRAY>(reinterpret_cast<size_t>(pBaseAddress) + pClassHierarchyDescriptor->m_unBaseClassArray);
+						const auto& pBaseClassArray = reinterpret_cast<PRTTI_BASE_CLASS_ARRAY>(reinterpret_cast<size_t>(pBaseAddress) + pClassHierarchyDescriptor->m_unBaseClassArray);
 #elif _M_IX86
-						const PRTTI_BASE_CLASS_ARRAY pBaseClassArray = pClassHierarchyDescriptor->m_pBaseClassArray;
+						const auto& pBaseClassArray = pClassHierarchyDescriptor->m_pBaseClassArray;
 #endif
 						if ((pBaseClassArray < pBaseAddress) || (pBaseClassArray >= pEndAddress)) {
 							pTypeDescriptorReference = reinterpret_cast<void*>(reinterpret_cast<char*>(pTypeDescriptorReference) + 1);
@@ -3584,18 +3575,18 @@ namespace Detours {
 			return nullptr;
 		}
 
-		std::unique_ptr<Object> FindObject(void* pAddress, size_t unSize, const char* const szName, bool bCompleteObject) {
+		std::unique_ptr<Object> FindObject(void const* const pAddress, const size_t unSize, const char* const szName, bool bCompleteObject) {
 			return FindObject(pAddress, pAddress, unSize, szName, bCompleteObject);
 		}
 
-		std::unique_ptr<Object> FindObject(HMODULE hModule, const char* const szName, bool bCompleteObject) {
+		std::unique_ptr<Object> FindObject(const HMODULE hModule, const char* const szName, bool bCompleteObject) {
 			if (!hModule || !szName) {
 				return nullptr;
 			}
 
-			const PIMAGE_DOS_HEADER pDH = reinterpret_cast<PIMAGE_DOS_HEADER>(hModule);
-			const PIMAGE_NT_HEADERS pNTHs = reinterpret_cast<PIMAGE_NT_HEADERS>(reinterpret_cast<char*>(hModule) + pDH->e_lfanew);
-			const PIMAGE_OPTIONAL_HEADER pOH = &(pNTHs->OptionalHeader);
+			const auto& pDH = reinterpret_cast<PIMAGE_DOS_HEADER>(hModule);
+			const auto& pNTHs = reinterpret_cast<PIMAGE_NT_HEADERS>(reinterpret_cast<char*>(hModule) + pDH->e_lfanew);
+			const auto& pOH = &(pNTHs->OptionalHeader);
 
 			return FindObject(reinterpret_cast<void*>(hModule), static_cast<size_t>(pOH->SizeOfImage) - 1, szName, bCompleteObject);
 		}
@@ -3605,7 +3596,7 @@ namespace Detours {
 				return nullptr;
 			}
 
-			const HMODULE hMod = GetModuleHandleA(szModuleName);
+			const auto& hMod = GetModuleHandleA(szModuleName);
 			if (!hMod) {
 				return nullptr;
 			}
@@ -3619,7 +3610,7 @@ namespace Detours {
 				return nullptr;
 			}
 
-			const HMODULE hMod = GetModuleHandleW(szModuleName);
+			const auto& hMod = GetModuleHandleW(szModuleName);
 			if (!hMod) {
 				return nullptr;
 			}
@@ -4247,7 +4238,7 @@ namespace Detours {
 		// Protection
 		// ----------------------------------------------------------------
 
-		Protection::Protection(const void* const pAddress, const size_t unSize, const bool bAutoRestore) : m_pAddress(pAddress), m_unSize(unSize), m_bAutoRestore(bAutoRestore) {
+		Protection::Protection(void const* const pAddress, const size_t unSize, const bool bAutoRestore) : m_pAddress(pAddress), m_unSize(unSize), m_bAutoRestore(bAutoRestore) {
 			m_pVirtualProtect = nullptr;
 			m_unOriginalProtection = 0;
 
@@ -117300,7 +117291,7 @@ namespace Detours {
 
 			void** pAddress = &m_pVTable[m_unIndex];
 
-			const auto& it = g_Protections.find(reinterpret_cast<void*>(pAddress));
+			const auto& it = g_Protections.find(reinterpret_cast<void*>(const_cast<void**>(pAddress)));
 			if (it != g_Protections.end()) {
 				g_ThreadSuspender.ResumeThreads();
 				return false;
@@ -117694,10 +117685,10 @@ namespace Detours {
 				// C7 44 24 FC 44332211 - mov [rsp-0x4], 0x11223344
 				// FF 64 24 F8 - jmp [rsp-8]
 
-				size_t unAddress = reinterpret_cast<size_t>(m_pAddress) + unJumpToOriginalSize;
+				const size_t unAddress = reinterpret_cast<size_t>(m_pAddress) + unJumpToOriginalSize;
 
-				size_t unAddressLow = unAddress & 0xFFFFFFFF;
-				size_t unAddressHigh = (unAddress >> 32) & 0xFFFFFFFF;
+				const size_t unAddressLow = unAddress & 0xFFFFFFFF;
+				const size_t unAddressHigh = (unAddress >> 32) & 0xFFFFFFFF;
 
 				pJumpToOriginal[ 0] = 0xC7;
 				pJumpToOriginal[ 1] = 0x44;
@@ -117785,10 +117776,10 @@ namespace Detours {
 				// C7 44 24 FC 44332211 - mov [rsp-0x4], 0x11223344 ; High
 				// FF 64 24 F8 - jmp [rsp-8]
 
-				size_t unAddress = reinterpret_cast<size_t>(pHookAddress);
+				const size_t unAddress = reinterpret_cast<size_t>(pHookAddress);
 
-				size_t unAddressLow = unAddress & 0xFFFFFFFF;
-				size_t unAddressHigh = (unAddress >> 32) & 0xFFFFFFFF;
+				const size_t unAddressLow = unAddress & 0xFFFFFFFF;
+				const size_t unAddressHigh = (unAddress >> 32) & 0xFFFFFFFF;
 
 				pJumpToHook[ 0] = 0xC7;
 				pJumpToHook[ 1] = 0x44;

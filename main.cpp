@@ -1086,7 +1086,7 @@ int _tmain(int nArguments, PTCHAR* pArguments) {
 
 	TCHAR szHex[32];
 	memset(szHex, 0, sizeof(szHex));
-	if (Detours::Hexadecimal::Encode(reinterpret_cast<const void* const>("Hello, World!"), 14, szHex, 0x00)) {
+	if (Detours::Hexadecimal::Encode(reinterpret_cast<void const* const>("Hello, World!"), 14, szHex, 0x00)) {
 		_tprintf_s(_T("Encode: `%s`\n"), szHex);
 	}
 
@@ -1148,12 +1148,12 @@ int _tmain(int nArguments, PTCHAR* pArguments) {
 
 	_tprintf_s(_T("RTTI Example\n\n"));
 
-	auto pObject = Detours::RTTI::FindObject(_T("Detours.exe"), ".?AVTestingRTTI@@");
+	const auto& pObject = Detours::RTTI::FindObject(_T("Detours.exe"), ".?AVTestingRTTI@@");
 	if (pObject) {
 
 		DumpObject(g_pTestingRTTI, pObject.get());
 
-		void** pVTable = pObject->GetVTable();
+		const auto& pVTable = pObject->GetVTable();
 
 #ifdef _M_X64
 #ifdef _UNICODE
@@ -1180,15 +1180,15 @@ int _tmain(int nArguments, PTCHAR* pArguments) {
 		}
 	}
 
-	BaseMessage* pMsg1 = new MessageOne();
-	BaseMessage* pMsg2 = new MessageTwo();
+	const auto& pMsg1 = new MessageOne();
+	const auto& pMsg2 = new MessageTwo();
 
 	ProcessMessage(pMsg1);
 	ProcessMessage(pMsg2);
 
-	auto pBaseMessageObject = Detours::RTTI::FindObject(_T("Detours.exe"), ".?AVBaseMessage@@", false);
-	auto pMessageOneObject = Detours::RTTI::FindObject(_T("Detours.exe"), ".?AVMessageOne@@");
-	auto pMessageTwoObject = Detours::RTTI::FindObject(_T("Detours.exe"), ".?AVMessageTwo@@");
+	const auto& pBaseMessageObject = Detours::RTTI::FindObject(_T("Detours.exe"), ".?AVBaseMessage@@", false);
+	const auto& pMessageOneObject = Detours::RTTI::FindObject(_T("Detours.exe"), ".?AVMessageOne@@");
+	const auto& pMessageTwoObject = Detours::RTTI::FindObject(_T("Detours.exe"), ".?AVMessageTwo@@");
 
 #ifdef _M_X64
 #ifdef _UNICODE
@@ -1306,7 +1306,7 @@ int _tmain(int nArguments, PTCHAR* pArguments) {
 
 	// VTableFunctionHook & VTableHook
 
-	auto pHookingObject = Detours::RTTI::FindObject(_T("Detours.exe"), ".?AVTestingRTTI@@");
+	const auto& pHookingObject = Detours::RTTI::FindObject(_T("Detours.exe"), ".?AVTestingRTTI@@");
 	if (pHookingObject) {
 		void** pHookingVTable = pHookingObject->GetVTable();
 
@@ -1334,12 +1334,12 @@ int _tmain(int nArguments, PTCHAR* pArguments) {
 			_tprintf_s(_T("  > boo() = %d\n"), reinterpret_cast<fnBoo>(pHookingVTable[1])(g_pTestingRTTI, nullptr));
 
 			_tprintf_s(_T("fooHook.Set(...) = %d\n"), fooHook.Set(pHookingVTable, 0));
-			_tprintf_s(_T("fooHook.Hook(...) = %d\n"), fooHook.Hook(reinterpret_cast<void*>(foo_Hook)));
+			_tprintf_s(_T("fooHook.Hook(...) = %d\n"), fooHook.Hook(foo_Hook));
 			_tprintf_s(_T("  > foo() = %d\n"), reinterpret_cast<fnFoo>(pHookingVTable[0])(g_pTestingRTTI, nullptr));
 			_tprintf_s(_T("fooHook.UnHook() = %d\n"), fooHook.UnHook());
 
 			_tprintf_s(_T("booHook.Set(...) = %d\n"), booHook.Set(pHookingVTable, 1));
-			_tprintf_s(_T("booHook.Hook(...) = %d\n"), booHook.Hook(reinterpret_cast<void*>(boo_Hook)));
+			_tprintf_s(_T("booHook.Hook(...) = %d\n"), booHook.Hook(boo_Hook));
 			_tprintf_s(_T("  > boo() = %d\n"), reinterpret_cast<fnBoo>(pHookingVTable[1])(g_pTestingRTTI, nullptr));
 			_tprintf_s(_T("booHook.UnHook() = %d\n"), booHook.UnHook());
 
