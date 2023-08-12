@@ -816,9 +816,19 @@ bool __cdecl Sleep_RawHook(Detours::Hook::PRAW_HOOK_CONTEXT pCTX) {
 Detours::Hook::RAW_HOOK_M128 g_LastXMM7;
 
 bool __cdecl Sleep_RawHookMod(Detours::Hook::PRAW_HOOK_CONTEXT pCTX) {
+
 	g_LastXMM7 = pCTX->m_XMM7;
 	pCTX->m_XMM7.m_un64[0] = 0x1122334455667788;
 	pCTX->m_XMM7.m_un64[1] = 0x1122334455667788;
+
+#ifdef _M_X64
+	// Not needed for x86_64
+#elif _M_IX86
+	unsigned int unIP = *reinterpret_cast<unsigned int*>(pCTX->m_unESP); // Getting return address
+	pCTX->m_unESP += 4; // Clearing argument
+	*reinterpret_cast<unsigned int*>(pCTX->m_unESP) = unIP; // Restoring return address
+#endif
+
 	return true;
 }
 
@@ -1129,9 +1139,9 @@ int _tmain(int nArguments, PTCHAR* pArguments) {
 	}
 
 #ifdef _M_X64
-	_tprintf_s(_T("FindSignature(...) = 0x%016llX\n"), reinterpret_cast<size_t>(Detours::Scan::FindSignature(_T("ntdll.dll"), { '.', 't', 'e', 'x', 't', 0, 0, 0 }, "\x48\x8B\x41\x10\x33\xD2\x4C\x8B\xC1\x48\x85\xC0\x75")));
+	_tprintf_s(_T("FindSignature(...) = 0x%016llX\n"), reinterpret_cast<size_t>(Detours::Scan::FindSignature(_T("ntdll.dll"), { '.', 't', 'e', 'x', 't', 0, 0, 0 }, "\x48\x8B\x41\x2A\x33\xD2\x4C\x8B\xC1\x48\x85\xC0\x75", 0, 0x20C2003D)));
 #elif _M_IX86
-	_tprintf_s(_T("FindSignature(...) = 0x%08X\n"), reinterpret_cast<size_t>(Detours::Scan::FindSignature(_T("ntdll.dll"), { '.', 't', 'e', 'x', 't', 0, 0, 0 }, "\x8B\xD1\x8B\x42\x08")));
+	_tprintf_s(_T("FindSignature(...) = 0x%08X\n"), reinterpret_cast<size_t>(Detours::Scan::FindSignature(_T("ntdll.dll"), { '.', 't', 'e', 'x', 't', 0, 0, 0 }, "\x8B\xD1\x8B\x42", 0, 0xF3780028)));
 #endif
 
 #ifdef _M_X64
