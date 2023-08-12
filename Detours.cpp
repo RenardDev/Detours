@@ -683,13 +683,13 @@ namespace Detours {
 		// CheckSignatureHash
 		// ----------------------------------------------------------------
 
-		static void const* CheckSignatureHash(void const* const pAddress, const unsigned int unHash) noexcept {
+		static bool CheckSignatureHash(void const* const pAddress, const unsigned int unHash) noexcept {
 			const unsigned short unFunctionSize = unHash & 0xFFFF;
 			const unsigned short unFunctionHash = unHash >> 16;
 
 			auto pSignatureBytes = std::make_unique<unsigned char[]>(unFunctionSize);
 			if (!pSignatureBytes) {
-				return nullptr;
+				return false;
 			}
 
 			INSTRUCTION ins;
@@ -701,7 +701,7 @@ namespace Detours {
 #elif _M_IX86
 				if (!RD_SUCCESS(RdDecode(&ins, reinterpret_cast<unsigned char*>(const_cast<void*>(pAddress)) + unFunctionIndex, RD_CODE_32, RD_DATA_32))) {
 #endif
-					return nullptr;
+					return false;
 				}
 
 				const unsigned char unInstructionLength = ins.Length;
@@ -716,10 +716,10 @@ namespace Detours {
 
 			const unsigned int unCalculatedHash = Adler32(pSignatureBytes.get(), unSignatureIndex);
 			if ((unCalculatedHash >> 16) != unFunctionHash) {
-				return nullptr;
+				return false;
 			}
 
-			return pAddress;
+			return true;
 		}
 
 		// ----------------------------------------------------------------
@@ -749,12 +749,17 @@ namespace Detours {
 						break;
 					}
 				}
+
 				if (unSignatureIndex == unSignatureLength) {
+					const unsigned char* pFoundAddress = pData + unIndex;
+
 					if (unHash) {
-						return CheckSignatureHash(pData + unIndex + unOffset, unHash);
+						if (!CheckSignatureHash(pFoundAddress, unHash)) {
+							return nullptr;
+						}
 					}
 
-					return pData + unIndex + unOffset;
+					return pFoundAddress + unOffset;
 				}
 			}
 
@@ -938,12 +943,17 @@ namespace Detours {
 						unFound &= _mm_movemask_epi8(xmm3);
 					}
 				}
+
 				if (unFound != 0) {
+					const unsigned char* pFoundAddress = pData + unCycle * 16 + __bit_scan_forward(unFound);
+
 					if (unHash) {
-						return CheckSignatureHash(pData + unCycle * 16 + __bit_scan_forward(unFound), unHash);
+						if (!CheckSignatureHash(pFoundAddress, unHash)) {
+							return nullptr;
+						}
 					}
 
-					return pData + unCycle * 16 + __bit_scan_forward(unFound) + unOffset;
+					return pFoundAddress + unOffset;
 				}
 			}
 
@@ -952,6 +962,7 @@ namespace Detours {
 				if (unDataBytesLeft < unSignatureLength) {
 					return FindSignatureNative(pData + unSize - unDataBytesLeft - unSignatureLength, unDataBytesLeft + unSignatureLength, szSignature, unOffset, unHash, unIgnoredByte);
 				}
+
 				return FindSignatureNative(pData + unSize - unDataBytesLeft, unDataBytesLeft, szSignature, unOffset, unHash, unIgnoredByte);
 			}
 
@@ -1138,12 +1149,17 @@ namespace Detours {
 						reinterpret_cast<__int16*>(&unFound)[1] &= _mm_movemask_epi8(reinterpret_cast<const __m128i*>(&ymm2)[1]);
 					}
 				}
+
 				if (unFound != 0) {
+					const unsigned char* pFoundAddress = pData + unCycle * 32 + __bit_scan_forward(unFound);
+
 					if (unHash) {
-						return CheckSignatureHash(pData + unCycle * 32 + __bit_scan_forward(unFound), unHash);
+						if (!CheckSignatureHash(pFoundAddress, unHash)) {
+							return nullptr;
+						}
 					}
 
-					return pData + unCycle * 32 + __bit_scan_forward(unFound) + unOffset;
+					return pFoundAddress + unOffset;
 				}
 			}
 
@@ -1152,6 +1168,7 @@ namespace Detours {
 				if (unDataBytesLeft < unSignatureLength) {
 					return FindSignatureSSE2(pData + unSize - unDataBytesLeft - unSignatureLength, unDataBytesLeft + unSignatureLength, szSignature, unOffset, unHash, unIgnoredByte);
 				}
+
 				return FindSignatureSSE2(pData + unSize - unDataBytesLeft, unDataBytesLeft, szSignature, unOffset, unHash, unIgnoredByte);
 			}
 
@@ -1335,12 +1352,17 @@ namespace Detours {
 						unFound &= _mm256_movemask_epi8(ymm3);
 					}
 				}
+
 				if (unFound != 0) {
+					const unsigned char* pFoundAddress = pData + unCycle * 32 + __bit_scan_forward(unFound);
+
 					if (unHash) {
-						return CheckSignatureHash(pData + unCycle * 32 + __bit_scan_forward(unFound), unHash);
+						if (!CheckSignatureHash(pFoundAddress, unHash)) {
+							return nullptr;
+						}
 					}
 
-					return pData + unCycle * 32 + __bit_scan_forward(unFound) + unOffset;
+					return pFoundAddress + unOffset;
 				}
 			}
 
@@ -1349,6 +1371,7 @@ namespace Detours {
 				if (unDataBytesLeft < unSignatureLength) {
 					return FindSignatureAVX(pData + unSize - unDataBytesLeft - unSignatureLength, unDataBytesLeft + unSignatureLength, szSignature, unOffset, unHash, unIgnoredByte);
 				}
+
 				return FindSignatureAVX(pData + unSize - unDataBytesLeft, unDataBytesLeft, szSignature, unOffset, unHash, unIgnoredByte);
 			}
 
@@ -1530,12 +1553,17 @@ namespace Detours {
 						unFound &= _mm512_cmpeq_epi8_mask(zmm0, zmm1);
 					}
 				}
+
 				if (unFound != 0) {
+					const unsigned char* pFoundAddress = pData + unCycle * 64 + __bit_scan_forward(unFound);
+
 					if (unHash) {
-						return CheckSignatureHash(pData + unCycle * 64 + __bit_scan_forward(unFound), unHash);
+						if (!CheckSignatureHash(pFoundAddress, unHash)) {
+							return nullptr;
+						}
 					}
 
-					return pData + unCycle * 64 + __bit_scan_forward(unFound) + unOffset;
+					return pFoundAddress + unOffset;
 				}
 			}
 
@@ -1544,6 +1572,7 @@ namespace Detours {
 				if (unDataBytesLeft < unSignatureLength) {
 					return FindSignatureAVX2(pData + unSize - unDataBytesLeft - unSignatureLength, unDataBytesLeft + unSignatureLength, szSignature, unOffset, unHash, unIgnoredByte);
 				}
+
 				return FindSignatureAVX2(pData + unSize - unDataBytesLeft, unDataBytesLeft, szSignature, unOffset, unHash, unIgnoredByte);
 			}
 
