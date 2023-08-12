@@ -922,7 +922,7 @@ namespace Detours {
 			const unsigned char* const pData = reinterpret_cast<const unsigned char* const>(pAddress);
 			const unsigned char* const pSignature = reinterpret_cast<const unsigned char* const>(szSignature);
 
-			const size_t unDataBytesCycles = unSize / 16;
+			const size_t unDataBytesCycles = unSize * __div_to_mul(16);
 			for (size_t unCycle = 0; unCycle < unDataBytesCycles; ++unCycle) {
 				unsigned __int16 unFound = 0xFFFFui16;
 				for (size_t unSignatureIndex = 0; (unSignatureIndex < unSignatureLength) && (unFound != 0); ++unSignatureIndex) {
@@ -1119,7 +1119,7 @@ namespace Detours {
 			const unsigned char* const pData = reinterpret_cast<const unsigned char* const>(pAddress);
 			const unsigned char* const pSignature = reinterpret_cast<const unsigned char* const>(szSignature);
 
-			const size_t unDataBytesCycles = unSize / 32;
+			const size_t unDataBytesCycles = unSize * __div_to_mul(32);
 			for (size_t unCycle = 0; unCycle < unDataBytesCycles; ++unCycle) {
 				unsigned __int32 unFound = 0xFFFFFFFFui32;
 				for (size_t unSignatureIndex = 0; (unSignatureIndex < unSignatureLength) && (unFound != 0); ++unSignatureIndex) {
@@ -1319,7 +1319,7 @@ namespace Detours {
 			const unsigned char* const pData = reinterpret_cast<const unsigned char* const>(pAddress);
 			const unsigned char* const pSignature = reinterpret_cast<const unsigned char* const>(szSignature);
 
-			const size_t unDataBytesCycles = unSize / 32;
+			const size_t unDataBytesCycles = unSize * __div_to_mul(32);
 			for (size_t unCycle = 0; unCycle < unDataBytesCycles; ++unCycle) {
 				unsigned __int32 unFound = 0xFFFFFFFFui32;
 				for (size_t unSignatureIndex = 0; (unSignatureIndex < unSignatureLength) && (unFound != 0); ++unSignatureIndex) {
@@ -1516,7 +1516,7 @@ namespace Detours {
 			const unsigned char* const pData = reinterpret_cast<const unsigned char* const>(pAddress);
 			const unsigned char* const pSignature = reinterpret_cast<const unsigned char* const>(szSignature);
 
-			const size_t unDataBytesCycles = unSize / 64;
+			const size_t unDataBytesCycles = unSize * __div_to_mul(64);
 			for (size_t unCycle = 0; unCycle < unDataBytesCycles; ++unCycle) {
 				unsigned __int64 unFound = 0xFFFFFFFFFFFFFFFFui64;
 				for (size_t unSignatureIndex = 0; (unSignatureIndex < unSignatureLength) && (unFound != 0); ++unSignatureIndex) {
@@ -2061,7 +2061,7 @@ namespace Detours {
 
 			const unsigned char* const pSourceData = reinterpret_cast<const unsigned char* const>(pAddress);
 
-			const size_t unDataBytesCycles = unSize / 16;
+			const size_t unDataBytesCycles = unSize * __div_to_mul(16);
 			for (size_t unCycle = 0; unCycle < unDataBytesCycles; ++unCycle) {
 				unsigned __int16 unFound = 0xFFFFui16;
 				for (size_t unDataIndex = 0; (unDataIndex < unDataSize) && (unFound != 0); ++unDataIndex) {
@@ -2243,7 +2243,7 @@ namespace Detours {
 
 			const unsigned char* const pSourceData = reinterpret_cast<const unsigned char* const>(pAddress);
 
-			const size_t unDataBytesCycles = unSize / 32;
+			const size_t unDataBytesCycles = unSize * __div_to_mul(32);
 			for (size_t unCycle = 0; unCycle < unDataBytesCycles; ++unCycle) {
 				unsigned __int32 unFound = 0xFFFFFFFFui32;
 				for (size_t unDataIndex = 0; (unDataIndex < unDataSize) && (unFound != 0); ++unDataIndex) {
@@ -2428,7 +2428,7 @@ namespace Detours {
 
 			const unsigned char* const pSourceData = reinterpret_cast<const unsigned char* const>(pAddress);
 
-			const size_t unDataBytesCycles = unSize / 32;
+			const size_t unDataBytesCycles = unSize * __div_to_mul(32);
 			for (size_t unCycle = 0; unCycle < unDataBytesCycles; ++unCycle) {
 				unsigned __int32 unFound = 0xFFFFFFFFui32;
 				for (size_t unDataIndex = 0; (unDataIndex < unDataSize) && (unFound != 0); ++unDataIndex) {
@@ -2610,7 +2610,7 @@ namespace Detours {
 
 			const unsigned char* const pSourceData = reinterpret_cast<const unsigned char* const>(pAddress);
 
-			const size_t unDataBytesCycles = unSize / 64;
+			const size_t unDataBytesCycles = unSize * __div_to_mul(64);
 			for (size_t unCycle = 0; unCycle < unDataBytesCycles; ++unCycle) {
 				unsigned __int64 unFound = 0xFFFFFFFFFFFFFFFFui64;
 				for (size_t unDataIndex = 0; (unDataIndex < unDataSize) && (unFound != 0); ++unDataIndex) {

@@ -1122,7 +1122,7 @@ int _tmain(int nArguments, PTCHAR* pArguments) {
 	size_t unSectionNTDLLSize = 0;
 	if (Detours::Scan::FindSection(_T("ntdll.dll"), { '.', 't', 'e', 'x', 't', 0, 0, 0 }, &pSectionNTDLL, &unSectionNTDLLSize)) {
 #ifdef _M_X64
-		_tprintf_s(_T("FindSection(...) = 0x%08llX\n"), reinterpret_cast<size_t>(pSectionNTDLL));
+		_tprintf_s(_T("FindSection(...) = 0x%016llX\n"), reinterpret_cast<size_t>(pSectionNTDLL));
 #elif _M_IX86
 		_tprintf_s(_T("FindSection(...) = 0x%08X\n"), reinterpret_cast<size_t>(pSectionNTDLL));
 #endif
@@ -1132,7 +1132,7 @@ int _tmain(int nArguments, PTCHAR* pArguments) {
 	unSectionNTDLLSize = 0;
 	if (Detours::Scan::FindSectionPOGO(_T("ntdll.dll"), ".rdata", &pSectionNTDLL, &unSectionNTDLLSize)) {
 #ifdef _M_X64
-		_tprintf_s(_T("FindSection(...) = 0x%08llX\n"), reinterpret_cast<size_t>(pSectionNTDLL));
+		_tprintf_s(_T("FindSection(...) = 0x%016llX\n"), reinterpret_cast<size_t>(pSectionNTDLL));
 #elif _M_IX86
 		_tprintf_s(_T("FindSection(...) = 0x%08X\n"), reinterpret_cast<size_t>(pSectionNTDLL));
 #endif
