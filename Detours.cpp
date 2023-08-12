@@ -705,7 +705,7 @@ namespace Detours {
 				}
 
 				const unsigned char unInstructionLength = ins.Length;
-				const unsigned char unInstructionSize = unInstructionLength - ins.AddrLength - ins.DispLength - ins.RelOffsLength;
+				const unsigned char unInstructionSize = unInstructionLength - ins.AddrLength - ins.DispLength - ins.Imm1Length - ins.Imm2Length - ins.Imm3Length - ins.MoffsetLength - ins.RelOffsLength;
 				for (unsigned char i = 0; i < unInstructionSize; ++i) {
 					pSignatureBytes[unSignatureIndex] = ins.InstructionBytes[i];
 					++unSignatureIndex;
