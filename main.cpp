@@ -422,12 +422,6 @@ bool __cdecl Sleep_RawHook(Detours::Hook::PRAW_HOOK_CONTEXT pCTX) {
 		}
 		_tprintf_s(_T("\n"));
 
-		_tprintf_s(_T("  -> ZMM3  = 0x"));
-		for (int i = 63; i >= 0; --i) {
-			_tprintf_s(_T("%02X"), pCTX->m_ZMM3.m_un8[i]);
-		}
-		_tprintf_s(_T("\n"));
-
 		_tprintf_s(_T("  -> ZMM4  = 0x"));
 		for (int i = 63; i >= 0; --i) {
 			_tprintf_s(_T("%02X"), pCTX->m_ZMM4.m_un8[i]);
@@ -712,12 +706,6 @@ bool __cdecl Sleep_RawHook(Detours::Hook::PRAW_HOOK_CONTEXT pCTX) {
 		_tprintf_s(_T("  -> XMM2  = 0x"));
 		for (int i = 15; i >= 0; --i) {
 			_tprintf_s(_T("%02X"), pCTX->m_XMM2.m_un8[i]);
-		}
-		_tprintf_s(_T("\n"));
-
-		_tprintf_s(_T("  -> XMM3  = 0x"));
-		for (int i = 15; i >= 0; --i) {
-			_tprintf_s(_T("%02X"), pCTX->m_XMM3.m_un8[i]);
 		}
 		_tprintf_s(_T("\n"));
 

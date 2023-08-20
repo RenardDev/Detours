@@ -3222,7 +3222,7 @@ namespace Detours {
 			return (pLeft == pRight) || !strncmp(pLeft->m_szName, pRight->m_szName, 0x1000);
 		}
 
-		static ptrdiff_t PMDtoOffset(void const* const pAddress, const RTTI_PMD& pmd) {
+		static ptrdiff_t PMDtoOffset(void const* const pAddress, const RTTI_PMD pmd) {
 			ptrdiff_t unRetOff = 0;
 
 			if (pmd.m_nPDisp >= 0) {
@@ -3404,6 +3404,10 @@ namespace Detours {
 #endif
 					if ((i - unTarget) <= unTargetBases) {
 						if (bDownCastAllowed) {
+							if (!pTargetBCD) {
+								continue;
+							}
+
 							if (!(pTargetBCD->m_unAttributes & BCD_HASPCHD)) {
 								if (!unTarget && (pTargetBCD->m_unAttributes & BCD_NOTVISIBLE)) {
 									bDownCastAllowed = false;
@@ -3444,7 +3448,6 @@ namespace Detours {
 				}
 			}
 
-			
 			if (bDownCastAllowed && pDownCastResultBCD) {
 				return pDownCastResultBCD;
 			}
@@ -3521,7 +3524,6 @@ namespace Detours {
 
 			return reinterpret_cast<void*>(reinterpret_cast<size_t>(pCO) + PMDtoOffset(pCO, pBCD->m_Where));
 		}
-
 
 		void const* const Object::DynamicCast(void const* const pAddress, const Object* pObject) {
 			if (!pAddress || !pObject) {
@@ -78903,9 +78905,9 @@ namespace Detours {
 				pInstruction->Exs.rp = 0;
 				pInstruction->Exs.v &= 0x7;
 
-				if (pInstruction->Exs.vp == 1) {
-					return RD_STATUS_BAD_EVEX_V_PRIME;
-				}
+				//if (pInstruction->Exs.vp == 1) {
+				//	return RD_STATUS_BAD_EVEX_V_PRIME;
+				//}
 			}
 
 			pInstruction->Length += 4;
@@ -81536,7 +81538,7 @@ namespace Detours {
 					}
 				}
 
-				if ((pInstruction->Operands[i].Type == RD_OP_REG) && pInstruction->Operands->Flags.IsDefault) {
+				if ((pInstruction->Operands[i].Type == RD_OP_REG) && pInstruction->Operands[0].Flags.IsDefault) {
 					switch (pInstruction->Operands[i].Info.Register.Type) {
 						case RD_REG_FLG:
 							pRlut->Flags = &pInstruction->Operands[i];
@@ -81602,10 +81604,7 @@ namespace Detours {
 				HANDLE hThread = nullptr;
 
 				while (true) {
-#pragma warning(push)
-#pragma warning(disable : 6001)
-					NTSTATUS unStatus = m_pNtGetNextThread(GetCurrentProcess(), hThread, THREAD_QUERY_LIMITED_INFORMATION | THREAD_SUSPEND_RESUME | THREAD_GET_CONTEXT | THREAD_SET_CONTEXT, 0, 0, &hThread);
-#pragma warning(pop)
+					const NTSTATUS unStatus = m_pNtGetNextThread(GetCurrentProcess(), hThread, THREAD_QUERY_LIMITED_INFORMATION | THREAD_SUSPEND_RESUME | THREAD_GET_CONTEXT | THREAD_SET_CONTEXT, 0, 0, &hThread);
 					if (!(unStatus >= 0)) {
 						break;
 					}
@@ -81637,10 +81636,7 @@ namespace Detours {
 			std::lock_guard<std::mutex> ThreadsLock(m_ThreadSuspenderMutex);
 
 			for (auto& thread : m_Threads) {
-#pragma warning(push)
-#pragma warning(disable : 6001)
-				SetThreadContext(thread.m_hHandle, &thread.m_CTX);  // BUG: VS says m_hHandle variable is uninitialized, which is false.
-#pragma warning(pop)
+				SetThreadContext(thread.m_hHandle, &thread.m_CTX);
 				ResumeThread(thread.m_hHandle);
 				CloseHandle(thread.m_hHandle);
 			}
@@ -82263,6 +82259,7 @@ namespace Detours {
 			m_pAddress = nullptr;
 			m_Trampoline = nullptr;
 			m_pTrampoline = nullptr;
+			m_pAddressAfterJump = nullptr;
 			m_pOriginalBytes = nullptr;
 			m_unOriginalBytes = 0;
 		}
@@ -82272,6 +82269,7 @@ namespace Detours {
 			m_pAddress = pAddress;
 			m_Trampoline = nullptr;
 			m_pTrampoline = nullptr;
+			m_pAddressAfterJump = nullptr;
 			m_pOriginalBytes = nullptr;
 			m_unOriginalBytes = 0;
 		}
@@ -82288,6 +82286,7 @@ namespace Detours {
 			m_pAddress = pAddress;
 			m_Trampoline = nullptr;
 			m_pTrampoline = nullptr;
+			m_pAddressAfterJump = nullptr;
 			m_pOriginalBytes = nullptr;
 			m_unOriginalBytes = 0;
 
@@ -82324,11 +82323,11 @@ namespace Detours {
 
 			const size_t unJumpToHookOffset = reinterpret_cast<size_t>(pHookAddress) - reinterpret_cast<size_t>(m_pAddress);
 			size_t unJumpToHookSize = 0;
-			if ((unJumpToHookOffset - 2) <= 0xFF) {
+			if ((unJumpToHookOffset - 2) <= 0xFE) {
 				unJumpToHookSize = 2; // EB 00 - jmp rel8
-			} else if ((unJumpToHookOffset - 4) <= 0xFFFF) {
+			} else if ((unJumpToHookOffset - 4) <= 0xFFFE) {
 				unJumpToHookSize = 4; // 66 E9 00 00 - jmp rel16
-			} else if ((unJumpToHookOffset - 5) <= 0xFFFFFFFF) {
+			} else if ((unJumpToHookOffset - 5) <= 0xFFFFFFFE) {
 				unJumpToHookSize = 5; // E9 00 00 00 00 - jmp rel32
 			} else {
 #ifdef _M_X64
@@ -82381,11 +82380,11 @@ namespace Detours {
 
 			const size_t unJumpToOriginalOffset = (reinterpret_cast<size_t>(m_pAddress) + unJumpToHookSize) - (reinterpret_cast<size_t>(m_pTrampoline) + unCopyingSize);
 			size_t unJumpToOriginalSize = 0;
-			if ((unJumpToOriginalOffset - 2) <= 0xFF) { // EB 00 - jmp rel8
+			if ((unJumpToOriginalOffset - 2) <= 0xFE) { // EB 00 - jmp rel8
 				unJumpToOriginalSize = 2;
-			} else if ((unJumpToOriginalOffset - 4) <= 0xFFFF) { // 66 E9 00 00 - jmp rel16
+			} else if ((unJumpToOriginalOffset - 4) <= 0xFFFE) { // 66 E9 00 00 - jmp rel16
 				unJumpToOriginalSize = 4;
-			} else if ((unJumpToOriginalOffset - 5) <= 0xFFFFFFFF) { // E9 00 00 00 00 - jmp rel32
+			} else if ((unJumpToOriginalOffset - 5) <= 0xFFFFFFFE) { // E9 00 00 00 00 - jmp rel32
 				unJumpToOriginalSize = 5;
 			} else {
 #ifdef _M_X64
@@ -82474,16 +82473,16 @@ namespace Detours {
 
 			unsigned char* pJumpToOriginal = reinterpret_cast<unsigned char*>(m_pTrampoline) + unCopyingSize;
 			const size_t unTrampolineJumpOffset = (reinterpret_cast<size_t>(m_pAddress) + unJumpToOriginalSize) - (reinterpret_cast<size_t>(m_pTrampoline) + unCopyingSize);
-			if ((unTrampolineJumpOffset - 2) <= 0xFF) { // EB 00 - jmp rel8
+			if ((unTrampolineJumpOffset - 2) <= 0xFE) { // EB 00 - jmp rel8
 				pJumpToOriginal[0] = 0xEB;
 				unsigned char unOffset = static_cast<unsigned char>(unTrampolineJumpOffset & 0xFF) - 2;
 				memcpy(pJumpToOriginal + 1, &unOffset, 1);
-			} else if ((unTrampolineJumpOffset - 4) <= 0xFFFF) { // 66 E9 00 00 - jmp rel16
+			} else if ((unTrampolineJumpOffset - 4) <= 0xFFFE) { // 66 E9 00 00 - jmp rel16
 				pJumpToOriginal[0] = 0x66;
 				pJumpToOriginal[1] = 0xE9;
 				unsigned short unOffset = static_cast<unsigned short>(unTrampolineJumpOffset & 0xFFFF) - 4;
 				memcpy(pJumpToOriginal + 2, &unOffset, 2);
-			} else if ((unTrampolineJumpOffset - 5) <= 0xFFFFFFFF) { // E9 00 00 00 00 - jmp rel32
+			} else if ((unTrampolineJumpOffset - 5) <= 0xFFFFFFFE) { // E9 00 00 00 00 - jmp rel32
 				pJumpToOriginal[0] = 0xE9;
 				unsigned int unOffset = static_cast<unsigned int>(unTrampolineJumpOffset & 0xFFFFFFFF) - 5;
 				memcpy(pJumpToOriginal + 1, &unOffset, 4);
@@ -82495,8 +82494,8 @@ namespace Detours {
 
 				const size_t unAddress = reinterpret_cast<size_t>(m_pAddress) + unJumpToOriginalSize;
 
-				const size_t unAddressLow = unAddress & 0xFFFFFFFF;
-				const size_t unAddressHigh = (unAddress >> 32) & 0xFFFFFFFF;
+				const unsigned int unAddressLow = unAddress & 0xFFFFFFFF;
+				const unsigned int unAddressHigh = (unAddress >> 32) & 0xFFFFFFFF;
 
 				pJumpToOriginal[ 0] = 0xC7;
 				pJumpToOriginal[ 1] = 0x44;
@@ -82565,16 +82564,16 @@ namespace Detours {
 			memset(m_pAddress, 0x90, unCopyingSize);
 
 			unsigned char* pJumpToHook = reinterpret_cast<unsigned char*>(m_pAddress);
-			if ((unJumpToHookOffset - 2) <= 0xFF) { // EB 00 - jmp rel8
+			if ((unJumpToHookOffset - 2) <= 0xFE) { // EB 00 - jmp rel8
 				pJumpToHook[0] = 0xEB;
 				unsigned char unOffset = static_cast<unsigned char>(unJumpToHookOffset & 0xFF) - 2;
 				memcpy(pJumpToHook + 1, &unOffset, 1);
-			} else if ((unJumpToHookOffset - 4) <= 0xFFFF) { // 66 E9 00 00 - jmp rel16
+			} else if ((unJumpToHookOffset - 4) <= 0xFFFE) { // 66 E9 00 00 - jmp rel16
 				pJumpToHook[0] = 0x66;
 				pJumpToHook[1] = 0xE9;
 				unsigned short unOffset = static_cast<unsigned short>(unJumpToHookOffset & 0xFFFF) - 4;
 				memcpy(pJumpToHook + 2, &unOffset, 2);
-			} else if ((unJumpToHookOffset - 5) <= 0xFFFFFFFF) { // E9 00 00 00 00 - jmp rel32
+			} else if ((unJumpToHookOffset - 5) <= 0xFFFFFFFE) { // E9 00 00 00 00 - jmp rel32
 				pJumpToHook[0] = 0xE9;
 				unsigned int unOffset = static_cast<unsigned int>(unJumpToHookOffset & 0xFFFFFFFF) - 5;
 				memcpy(pJumpToHook + 1, &unOffset, 4);
@@ -82586,8 +82585,8 @@ namespace Detours {
 
 				const size_t unAddress = reinterpret_cast<size_t>(pHookAddress);
 
-				const size_t unAddressLow = unAddress & 0xFFFFFFFF;
-				const size_t unAddressHigh = (unAddress >> 32) & 0xFFFFFFFF;
+				const unsigned int unAddressLow = unAddress & 0xFFFFFFFF;
+				const unsigned int unAddressHigh = (unAddress >> 32) & 0xFFFFFFFF;
 
 				pJumpToHook[ 0] = 0xC7;
 				pJumpToHook[ 1] = 0x44;
@@ -82785,8 +82784,8 @@ namespace Detours {
 
 				const size_t unAddress = reinterpret_cast<size_t>(pCallBack);
 
-				const size_t unAddressLow = unAddress & 0xFFFFFFFF;
-				const size_t unAddressHigh = (unAddress >> 32) & 0xFFFFFFFF;
+				const unsigned int unAddressLow = unAddress & 0xFFFFFFFF;
+				const unsigned int unAddressHigh = (unAddress >> 32) & 0xFFFFFFFF;
 
 				memcpy(reinterpret_cast<unsigned char*>(m_pWrapper) + 0x240 + 4, &unAddressLow, 4);
 				memcpy(reinterpret_cast<unsigned char*>(m_pWrapper) + 0x248 + 4, &unAddressHigh, 4);
@@ -82796,8 +82795,8 @@ namespace Detours {
 
 				const size_t unAddress = reinterpret_cast<size_t>(pCallBack);
 
-				const size_t unAddressLow = unAddress & 0xFFFFFFFF;
-				const size_t unAddressHigh = (unAddress >> 32) & 0xFFFFFFFF;
+				const unsigned int unAddressLow = unAddress & 0xFFFFFFFF;
+				const unsigned int unAddressHigh = (unAddress >> 32) & 0xFFFFFFFF;
 
 				memcpy(reinterpret_cast<unsigned char*>(m_pWrapper) + 0x170 + 4, &unAddressLow, 4);
 				memcpy(reinterpret_cast<unsigned char*>(m_pWrapper) + 0x178 + 4, &unAddressHigh, 4);
@@ -82807,8 +82806,8 @@ namespace Detours {
 
 				const size_t unAddress = reinterpret_cast<size_t>(pCallBack);
 
-				const size_t unAddressLow = unAddress & 0xFFFFFFFF;
-				const size_t unAddressHigh = (unAddress >> 32) & 0xFFFFFFFF;
+				const unsigned int unAddressLow = unAddress & 0xFFFFFFFF;
+				const unsigned int unAddressHigh = (unAddress >> 32) & 0xFFFFFFFF;
 
 				memcpy(reinterpret_cast<unsigned char*>(m_pWrapper) + 0x170 + 4, &unAddressLow, 4);
 				memcpy(reinterpret_cast<unsigned char*>(m_pWrapper) + 0x178 + 4, &unAddressHigh, 4);
@@ -82818,8 +82817,8 @@ namespace Detours {
 
 				const size_t unAddress = reinterpret_cast<size_t>(pCallBack);
 
-				const size_t unAddressLow = unAddress & 0xFFFFFFFF;
-				const size_t unAddressHigh = (unAddress >> 32) & 0xFFFFFFFF;
+				const unsigned int unAddressLow = unAddress & 0xFFFFFFFF;
+				const unsigned int unAddressHigh = (unAddress >> 32) & 0xFFFFFFFF;
 
 				memcpy(reinterpret_cast<unsigned char*>(m_pWrapper) + 0xE0 + 4, &unAddressLow, 4);
 				memcpy(reinterpret_cast<unsigned char*>(m_pWrapper) + 0xE8 + 4, &unAddressHigh, 4);
@@ -82829,8 +82828,8 @@ namespace Detours {
 
 				const size_t unAddress = reinterpret_cast<size_t>(pCallBack);
 
-				const size_t unAddressLow = unAddress & 0xFFFFFFFF;
-				const size_t unAddressHigh = (unAddress >> 32) & 0xFFFFFFFF;
+				const unsigned int unAddressLow = unAddress & 0xFFFFFFFF;
+				const unsigned int unAddressHigh = (unAddress >> 32) & 0xFFFFFFFF;
 
 				memcpy(reinterpret_cast<unsigned char*>(m_pWrapper) + 0xA0 + 4, &unAddressLow, 4);
 				memcpy(reinterpret_cast<unsigned char*>(m_pWrapper) + 0xA8 + 4, &unAddressHigh, 4);
@@ -82840,8 +82839,8 @@ namespace Detours {
 
 				const size_t unAddress = reinterpret_cast<size_t>(pCallBack);
 
-				const size_t unAddressLow = unAddress & 0xFFFFFFFF;
-				const size_t unAddressHigh = (unAddress >> 32) & 0xFFFFFFFF;
+				const unsigned int unAddressLow = unAddress & 0xFFFFFFFF;
+				const unsigned int unAddressHigh = (unAddress >> 32) & 0xFFFFFFFF;
 
 				memcpy(reinterpret_cast<unsigned char*>(m_pWrapper) + 0x98 + 4, &unAddressLow, 4);
 				memcpy(reinterpret_cast<unsigned char*>(m_pWrapper) + 0xA0 + 4, &unAddressHigh, 4);
@@ -82853,7 +82852,7 @@ namespace Detours {
 
 				unsigned char* pCallCallBack = reinterpret_cast<unsigned char*>(m_pWrapper) + 0xED;
 				const size_t unCallCallBackOffset = reinterpret_cast<size_t>(pCallBack) - (reinterpret_cast<size_t>(m_pWrapper) + 0xED);
-				if ((unCallCallBackOffset - 5) <= 0xFFFFFFFF) { // E8 00 00 00 00 - call rel32
+				if ((unCallCallBackOffset - 5) <= 0xFFFFFFFE) { // E8 00 00 00 00 - call rel32
 					const unsigned int unOffset = static_cast<unsigned int>(unCallCallBackOffset & 0xFFFFFFFF) - 5;
 					memcpy(pCallCallBack + 1, &unOffset, 4);
 				} else {
@@ -82869,7 +82868,7 @@ namespace Detours {
 
 				unsigned char* pCallCallBack = reinterpret_cast<unsigned char*>(m_pWrapper) + 0xDD;
 				const size_t unCallCallBackOffset = reinterpret_cast<size_t>(pCallBack) - (reinterpret_cast<size_t>(m_pWrapper) + 0xDD);
-				if ((unCallCallBackOffset - 5) <= 0xFFFFFFFF) { // E8 00 00 00 00 - call rel32
+				if ((unCallCallBackOffset - 5) <= 0xFFFFFFFE) { // E8 00 00 00 00 - call rel32
 					const unsigned int unOffset = static_cast<unsigned int>(unCallCallBackOffset & 0xFFFFFFFF) - 5;
 					memcpy(pCallCallBack + 1, &unOffset, 4);
 				} else {
@@ -82885,7 +82884,7 @@ namespace Detours {
 
 				unsigned char* pCallCallBack = reinterpret_cast<unsigned char*>(m_pWrapper) + 0xDD;
 				const size_t unCallCallBackOffset = reinterpret_cast<size_t>(pCallBack) - (reinterpret_cast<size_t>(m_pWrapper) + 0xDD);
-				if ((unCallCallBackOffset - 5) <= 0xFFFFFFFF) { // E8 00 00 00 00 - call rel32
+				if ((unCallCallBackOffset - 5) <= 0xFFFFFFFE) { // E8 00 00 00 00 - call rel32
 					const unsigned int unOffset = static_cast<unsigned int>(unCallCallBackOffset & 0xFFFFFFFF) - 5;
 					memcpy(pCallCallBack + 1, &unOffset, 4);
 				} else {
@@ -82901,7 +82900,7 @@ namespace Detours {
 
 				unsigned char* pCallCallBack = reinterpret_cast<unsigned char*>(m_pWrapper) + 0x95;
 				const size_t unCallCallBackOffset = reinterpret_cast<size_t>(pCallBack) - (reinterpret_cast<size_t>(m_pWrapper) + 0x95);
-				if ((unCallCallBackOffset - 5) <= 0xFFFFFFFF) { // E8 00 00 00 00 - call rel32
+				if ((unCallCallBackOffset - 5) <= 0xFFFFFFFE) { // E8 00 00 00 00 - call rel32
 					const unsigned int unOffset = static_cast<unsigned int>(unCallCallBackOffset & 0xFFFFFFFF) - 5;
 					memcpy(pCallCallBack + 1, &unOffset, 4);
 				} else {
@@ -82917,7 +82916,7 @@ namespace Detours {
 
 				unsigned char* pCallCallBack = reinterpret_cast<unsigned char*>(m_pWrapper) + 0x55;
 				const size_t unCallCallBackOffset = reinterpret_cast<size_t>(pCallBack) - (reinterpret_cast<size_t>(m_pWrapper) + 0x55);
-				if ((unCallCallBackOffset - 5) <= 0xFFFFFFFF) { // E8 00 00 00 00 - call rel32
+				if ((unCallCallBackOffset - 5) <= 0xFFFFFFFE) { // E8 00 00 00 00 - call rel32
 					const unsigned int unOffset = static_cast<unsigned int>(unCallCallBackOffset & 0xFFFFFFFF) - 5;
 					memcpy(pCallCallBack + 1, &unOffset, 4);
 				} else {
@@ -82933,7 +82932,7 @@ namespace Detours {
 
 				unsigned char* pCallCallBack = reinterpret_cast<unsigned char*>(m_pWrapper) + 0x50;
 				const size_t unCallCallBackOffset = reinterpret_cast<size_t>(pCallBack) - (reinterpret_cast<size_t>(m_pWrapper) + 0x50);
-				if ((unCallCallBackOffset - 5) <= 0xFFFFFFFF) { // E8 00 00 00 00 - call rel32
+				if ((unCallCallBackOffset - 5) <= 0xFFFFFFFE) { // E8 00 00 00 00 - call rel32
 					const unsigned int unOffset = static_cast<unsigned int>(unCallCallBackOffset & 0xFFFFFFFF) - 5;
 					memcpy(pCallCallBack + 1, &unOffset, 4);
 				} else {
@@ -82948,11 +82947,11 @@ namespace Detours {
 
 			const size_t unJumpToWrapperOffset = reinterpret_cast<size_t>(m_pWrapper) - reinterpret_cast<size_t>(m_pAddress);
 			size_t unJumpToWrapperSize = 0;
-			if ((unJumpToWrapperOffset - 2) <= 0xFF) {
+			if ((unJumpToWrapperOffset - 2) <= 0xFE) {
 				unJumpToWrapperSize = 2; // EB 00 - jmp rel8
-			} else if ((unJumpToWrapperOffset - 4) <= 0xFFFF) {
+			} else if ((unJumpToWrapperOffset - 4) <= 0xFFFE) {
 				unJumpToWrapperSize = 4; // 66 E9 00 00 - jmp rel16
-			} else if ((unJumpToWrapperOffset - 5) <= 0xFFFFFFFF) {
+			} else if ((unJumpToWrapperOffset - 5) <= 0xFFFFFFFE) {
 				unJumpToWrapperSize = 5; // E9 00 00 00 00 - jmp rel32
 			} else {
 #ifdef _M_X64
@@ -83019,16 +83018,16 @@ namespace Detours {
 			if (bHaveAVX512) {
 				unsigned char* pJumpToTrampoline = reinterpret_cast<unsigned char*>(m_pWrapper) + 0x491;
 				const size_t unTrampolineJumpOffset = reinterpret_cast<size_t>(m_pTrampoline) - (reinterpret_cast<size_t>(m_pWrapper) + 0x491);
-				if ((unTrampolineJumpOffset - 2) <= 0xFF) { // EB 00 - jmp rel8
+				if ((unTrampolineJumpOffset - 2) <= 0xFE) { // EB 00 - jmp rel8
 					pJumpToTrampoline[0] = 0xEB;
 					const unsigned char unOffset = static_cast<unsigned char>(unTrampolineJumpOffset & 0xFF) - 2;
 					memcpy(pJumpToTrampoline + 1, &unOffset, 1);
-				} else if ((unTrampolineJumpOffset - 4) <= 0xFFFF) { // 66 E9 00 00 - jmp rel16
+				} else if ((unTrampolineJumpOffset - 4) <= 0xFFFE) { // 66 E9 00 00 - jmp rel16
 					pJumpToTrampoline[0] = 0x66;
 					pJumpToTrampoline[1] = 0xE9;
 					const unsigned short unOffset = static_cast<unsigned short>(unTrampolineJumpOffset & 0xFFFF) - 4;
 					memcpy(pJumpToTrampoline + 2, &unOffset, 2);
-				} else if ((unTrampolineJumpOffset - 5) <= 0xFFFFFFFF) { // E9 00 00 00 00 - jmp rel32
+				} else if ((unTrampolineJumpOffset - 5) <= 0xFFFFFFFE) { // E9 00 00 00 00 - jmp rel32
 					pJumpToTrampoline[0] = 0xE9;
 					const unsigned int unOffset = static_cast<unsigned int>(unTrampolineJumpOffset & 0xFFFFFFFF) - 5;
 					memcpy(pJumpToTrampoline + 1, &unOffset, 4);
@@ -83039,8 +83038,8 @@ namespace Detours {
 
 					const size_t unAddress = reinterpret_cast<size_t>(m_pTrampoline);
 
-					const size_t unAddressLow = unAddress & 0xFFFFFFFF;
-					const size_t unAddressHigh = (unAddress >> 32) & 0xFFFFFFFF;
+					const unsigned int unAddressLow = unAddress & 0xFFFFFFFF;
+					const unsigned int unAddressHigh = (unAddress >> 32) & 0xFFFFFFFF;
 
 					pJumpToTrampoline[ 0] = 0xC7;
 					pJumpToTrampoline[ 1] = 0x44;
@@ -83064,16 +83063,16 @@ namespace Detours {
 			} else if (bHaveAVX) {
 				unsigned char* pJumpToTrampoline = reinterpret_cast<unsigned char*>(m_pWrapper) + 0x2F1;
 				const size_t unTrampolineJumpOffset = reinterpret_cast<size_t>(m_pTrampoline) - (reinterpret_cast<size_t>(m_pWrapper) + 0x2F1);
-				if ((unTrampolineJumpOffset - 2) <= 0xFF) { // EB 00 - jmp rel8
+				if ((unTrampolineJumpOffset - 2) <= 0xFE) { // EB 00 - jmp rel8
 					pJumpToTrampoline[0] = 0xEB;
 					const unsigned char unOffset = static_cast<unsigned char>(unTrampolineJumpOffset & 0xFF) - 2;
 					memcpy(pJumpToTrampoline + 1, &unOffset, 1);
-				} else if ((unTrampolineJumpOffset - 4) <= 0xFFFF) { // 66 E9 00 00 - jmp rel16
+				} else if ((unTrampolineJumpOffset - 4) <= 0xFFFE) { // 66 E9 00 00 - jmp rel16
 					pJumpToTrampoline[0] = 0x66;
 					pJumpToTrampoline[1] = 0xE9;
 					const unsigned short unOffset = static_cast<unsigned short>(unTrampolineJumpOffset & 0xFFFF) - 4;
 					memcpy(pJumpToTrampoline + 2, &unOffset, 2);
-				} else if ((unTrampolineJumpOffset - 5) <= 0xFFFFFFFF) { // E9 00 00 00 00 - jmp rel32
+				} else if ((unTrampolineJumpOffset - 5) <= 0xFFFFFFFE) { // E9 00 00 00 00 - jmp rel32
 					pJumpToTrampoline[0] = 0xE9;
 					const unsigned int unOffset = static_cast<unsigned int>(unTrampolineJumpOffset & 0xFFFFFFFF) - 5;
 					memcpy(pJumpToTrampoline + 1, &unOffset, 4);
@@ -83084,8 +83083,8 @@ namespace Detours {
 
 					const size_t unAddress = reinterpret_cast<size_t>(m_pTrampoline);
 
-					const size_t unAddressLow = unAddress & 0xFFFFFFFF;
-					const size_t unAddressHigh = (unAddress >> 32) & 0xFFFFFFFF;
+					const unsigned int unAddressLow = unAddress & 0xFFFFFFFF;
+					const unsigned int unAddressHigh = (unAddress >> 32) & 0xFFFFFFFF;
 
 					pJumpToTrampoline[ 0] = 0xC7;
 					pJumpToTrampoline[ 1] = 0x44;
@@ -83109,16 +83108,16 @@ namespace Detours {
 			} else if (bHaveSSE) {
 				unsigned char* pJumpToTrampoline = reinterpret_cast<unsigned char*>(m_pWrapper) + 0x2F1;
 				const size_t unTrampolineJumpOffset = reinterpret_cast<size_t>(m_pTrampoline) - (reinterpret_cast<size_t>(m_pWrapper) + 0x2F1);
-				if ((unTrampolineJumpOffset - 2) <= 0xFF) { // EB 00 - jmp rel8
+				if ((unTrampolineJumpOffset - 2) <= 0xFE) { // EB 00 - jmp rel8
 					pJumpToTrampoline[0] = 0xEB;
 					const unsigned char unOffset = static_cast<unsigned char>(unTrampolineJumpOffset & 0xFF) - 2;
 					memcpy(pJumpToTrampoline + 1, &unOffset, 1);
-				} else if ((unTrampolineJumpOffset - 4) <= 0xFFFF) { // 66 E9 00 00 - jmp rel16
+				} else if ((unTrampolineJumpOffset - 4) <= 0xFFFE) { // 66 E9 00 00 - jmp rel16
 					pJumpToTrampoline[0] = 0x66;
 					pJumpToTrampoline[1] = 0xE9;
 					const unsigned short unOffset = static_cast<unsigned short>(unTrampolineJumpOffset & 0xFFFF) - 4;
 					memcpy(pJumpToTrampoline + 2, &unOffset, 2);
-				} else if ((unTrampolineJumpOffset - 5) <= 0xFFFFFFFF) { // E9 00 00 00 00 - jmp rel32
+				} else if ((unTrampolineJumpOffset - 5) <= 0xFFFFFFFE) { // E9 00 00 00 00 - jmp rel32
 					pJumpToTrampoline[0] = 0xE9;
 					const unsigned int unOffset = static_cast<unsigned int>(unTrampolineJumpOffset & 0xFFFFFFFF) - 5;
 					memcpy(pJumpToTrampoline + 1, &unOffset, 4);
@@ -83129,8 +83128,8 @@ namespace Detours {
 
 					const size_t unAddress = reinterpret_cast<size_t>(m_pTrampoline);
 
-					const size_t unAddressLow = unAddress & 0xFFFFFFFF;
-					const size_t unAddressHigh = (unAddress >> 32) & 0xFFFFFFFF;
+					const unsigned int unAddressLow = unAddress & 0xFFFFFFFF;
+					const unsigned int unAddressHigh = (unAddress >> 32) & 0xFFFFFFFF;
 
 					pJumpToTrampoline[ 0] = 0xC7;
 					pJumpToTrampoline[ 1] = 0x44;
@@ -83154,16 +83153,16 @@ namespace Detours {
 			} else if (bHaveMMX) {
 				unsigned char* pJumpToTrampoline = reinterpret_cast<unsigned char*>(m_pWrapper) + 0x1D1;
 				const size_t unTrampolineJumpOffset = reinterpret_cast<size_t>(m_pTrampoline) - (reinterpret_cast<size_t>(m_pWrapper) + 0x1D1);
-				if ((unTrampolineJumpOffset - 2) <= 0xFF) { // EB 00 - jmp rel8
+				if ((unTrampolineJumpOffset - 2) <= 0xFE) { // EB 00 - jmp rel8
 					pJumpToTrampoline[0] = 0xEB;
 					const unsigned char unOffset = static_cast<unsigned char>(unTrampolineJumpOffset & 0xFF) - 2;
 					memcpy(pJumpToTrampoline + 1, &unOffset, 1);
-				} else if ((unTrampolineJumpOffset - 4) <= 0xFFFF) { // 66 E9 00 00 - jmp rel16
+				} else if ((unTrampolineJumpOffset - 4) <= 0xFFFE) { // 66 E9 00 00 - jmp rel16
 					pJumpToTrampoline[0] = 0x66;
 					pJumpToTrampoline[1] = 0xE9;
 					const unsigned short unOffset = static_cast<unsigned short>(unTrampolineJumpOffset & 0xFFFF) - 4;
 					memcpy(pJumpToTrampoline + 2, &unOffset, 2);
-				} else if ((unTrampolineJumpOffset - 5) <= 0xFFFFFFFF) { // E9 00 00 00 00 - jmp rel32
+				} else if ((unTrampolineJumpOffset - 5) <= 0xFFFFFFFE) { // E9 00 00 00 00 - jmp rel32
 					pJumpToTrampoline[0] = 0xE9;
 					const unsigned int unOffset = static_cast<unsigned int>(unTrampolineJumpOffset & 0xFFFFFFFF) - 5;
 					memcpy(pJumpToTrampoline + 1, &unOffset, 4);
@@ -83174,8 +83173,8 @@ namespace Detours {
 
 					const size_t unAddress = reinterpret_cast<size_t>(m_pTrampoline);
 
-					const size_t unAddressLow = unAddress & 0xFFFFFFFF;
-					const size_t unAddressHigh = (unAddress >> 32) & 0xFFFFFFFF;
+					const unsigned int unAddressLow = unAddress & 0xFFFFFFFF;
+					const unsigned int unAddressHigh = (unAddress >> 32) & 0xFFFFFFFF;
 
 					pJumpToTrampoline[ 0] = 0xC7;
 					pJumpToTrampoline[ 1] = 0x44;
@@ -83199,16 +83198,16 @@ namespace Detours {
 			} else if (bHaveFPU) {
 				unsigned char* pJumpToTrampoline = reinterpret_cast<unsigned char*>(m_pWrapper) + 0x151;
 				const size_t unTrampolineJumpOffset = reinterpret_cast<size_t>(m_pTrampoline) - (reinterpret_cast<size_t>(m_pWrapper) + 0x151);
-				if ((unTrampolineJumpOffset - 2) <= 0xFF) { // EB 00 - jmp rel8
+				if ((unTrampolineJumpOffset - 2) <= 0xFE) { // EB 00 - jmp rel8
 					pJumpToTrampoline[0] = 0xEB;
 					const unsigned char unOffset = static_cast<unsigned char>(unTrampolineJumpOffset & 0xFF) - 2;
 					memcpy(pJumpToTrampoline + 1, &unOffset, 1);
-				} else if ((unTrampolineJumpOffset - 4) <= 0xFFFF) { // 66 E9 00 00 - jmp rel16
+				} else if ((unTrampolineJumpOffset - 4) <= 0xFFFE) { // 66 E9 00 00 - jmp rel16
 					pJumpToTrampoline[0] = 0x66;
 					pJumpToTrampoline[1] = 0xE9;
 					const unsigned short unOffset = static_cast<unsigned short>(unTrampolineJumpOffset & 0xFFFF) - 4;
 					memcpy(pJumpToTrampoline + 2, &unOffset, 2);
-				} else if ((unTrampolineJumpOffset - 5) <= 0xFFFFFFFF) { // E9 00 00 00 00 - jmp rel32
+				} else if ((unTrampolineJumpOffset - 5) <= 0xFFFFFFFE) { // E9 00 00 00 00 - jmp rel32
 					pJumpToTrampoline[0] = 0xE9;
 					const unsigned int unOffset = static_cast<unsigned int>(unTrampolineJumpOffset & 0xFFFFFFFF) - 5;
 					memcpy(pJumpToTrampoline + 1, &unOffset, 4);
@@ -83219,8 +83218,8 @@ namespace Detours {
 
 					const size_t unAddress = reinterpret_cast<size_t>(m_pTrampoline);
 
-					const size_t unAddressLow = unAddress & 0xFFFFFFFF;
-					const size_t unAddressHigh = (unAddress >> 32) & 0xFFFFFFFF;
+					const unsigned int unAddressLow = unAddress & 0xFFFFFFFF;
+					const unsigned int unAddressHigh = (unAddress >> 32) & 0xFFFFFFFF;
 
 					pJumpToTrampoline[ 0] = 0xC7;
 					pJumpToTrampoline[ 1] = 0x44;
@@ -83244,16 +83243,16 @@ namespace Detours {
 			} else {
 				unsigned char* pJumpToTrampoline = reinterpret_cast<unsigned char*>(m_pWrapper) + 0x142;
 				const size_t unTrampolineJumpOffset = reinterpret_cast<size_t>(m_pTrampoline) - (reinterpret_cast<size_t>(m_pWrapper) + 0x142);
-				if ((unTrampolineJumpOffset - 2) <= 0xFF) { // EB 00 - jmp rel8
+				if ((unTrampolineJumpOffset - 2) <= 0xFE) { // EB 00 - jmp rel8
 					pJumpToTrampoline[0] = 0xEB;
 					const unsigned char unOffset = static_cast<unsigned char>(unTrampolineJumpOffset & 0xFF) - 2;
 					memcpy(pJumpToTrampoline + 1, &unOffset, 1);
-				} else if ((unTrampolineJumpOffset - 4) <= 0xFFFF) { // 66 E9 00 00 - jmp rel16
+				} else if ((unTrampolineJumpOffset - 4) <= 0xFFFE) { // 66 E9 00 00 - jmp rel16
 					pJumpToTrampoline[0] = 0x66;
 					pJumpToTrampoline[1] = 0xE9;
 					const unsigned short unOffset = static_cast<unsigned short>(unTrampolineJumpOffset & 0xFFFF) - 4;
 					memcpy(pJumpToTrampoline + 2, &unOffset, 2);
-				} else if ((unTrampolineJumpOffset - 5) <= 0xFFFFFFFF) { // E9 00 00 00 00 - jmp rel32
+				} else if ((unTrampolineJumpOffset - 5) <= 0xFFFFFFFE) { // E9 00 00 00 00 - jmp rel32
 					pJumpToTrampoline[0] = 0xE9;
 					const unsigned int unOffset = static_cast<unsigned int>(unTrampolineJumpOffset & 0xFFFFFFFF) - 5;
 					memcpy(pJumpToTrampoline + 1, &unOffset, 4);
@@ -83264,8 +83263,8 @@ namespace Detours {
 
 					const size_t unAddress = reinterpret_cast<size_t>(m_pTrampoline);
 
-					const size_t unAddressLow = unAddress & 0xFFFFFFFF;
-					const size_t unAddressHigh = (unAddress >> 32) & 0xFFFFFFFF;
+					const unsigned int unAddressLow = unAddress & 0xFFFFFFFF;
+					const unsigned int unAddressHigh = (unAddress >> 32) & 0xFFFFFFFF;
 
 					pJumpToTrampoline[ 0] = 0xC7;
 					pJumpToTrampoline[ 1] = 0x44;
@@ -83291,16 +83290,16 @@ namespace Detours {
 			if (bHaveAVX512) {
 				unsigned char* pJumpToTrampoline = reinterpret_cast<unsigned char*>(m_pWrapper) + 0x1D9;
 				const size_t unTrampolineJumpOffset = reinterpret_cast<size_t>(m_pTrampoline) - (reinterpret_cast<size_t>(m_pWrapper) + 0x1D9);
-				if ((unTrampolineJumpOffset - 2) <= 0xFF) { // EB 00 - jmp rel8
+				if ((unTrampolineJumpOffset - 2) <= 0xFE) { // EB 00 - jmp rel8
 					pJumpToTrampoline[0] = 0xEB;
 					const unsigned char unOffset = static_cast<unsigned char>(unTrampolineJumpOffset & 0xFF) - 2;
 					memcpy(pJumpToTrampoline + 1, &unOffset, 1);
-				} else if ((unTrampolineJumpOffset - 4) <= 0xFFFF) { // 66 E9 00 00 - jmp rel16
+				} else if ((unTrampolineJumpOffset - 4) <= 0xFFFE) { // 66 E9 00 00 - jmp rel16
 					pJumpToTrampoline[0] = 0x66;
 					pJumpToTrampoline[1] = 0xE9;
 					const unsigned short unOffset = static_cast<unsigned short>(unTrampolineJumpOffset & 0xFFFF) - 4;
 					memcpy(pJumpToTrampoline + 2, &unOffset, 2);
-				} else if ((unTrampolineJumpOffset - 5) <= 0xFFFFFFFF) { // E9 00 00 00 00 - jmp rel32
+				} else if ((unTrampolineJumpOffset - 5) <= 0xFFFFFFFE) { // E9 00 00 00 00 - jmp rel32
 					pJumpToTrampoline[0] = 0xE9;
 					const unsigned int unOffset = static_cast<unsigned int>(unTrampolineJumpOffset & 0xFFFFFFFF) - 5;
 					memcpy(pJumpToTrampoline + 1, &unOffset, 4);
@@ -83317,16 +83316,16 @@ namespace Detours {
 			} else if (bHaveAVX) {
 				unsigned char* pJumpToTrampoline = reinterpret_cast<unsigned char*>(m_pWrapper) + 0x1B9;
 				const size_t unTrampolineJumpOffset = reinterpret_cast<size_t>(m_pTrampoline) - (reinterpret_cast<size_t>(m_pWrapper) + 0x1B9);
-				if ((unTrampolineJumpOffset - 2) <= 0xFF) { // EB 00 - jmp rel8
+				if ((unTrampolineJumpOffset - 2) <= 0xFE) { // EB 00 - jmp rel8
 					pJumpToTrampoline[0] = 0xEB;
 					const unsigned char unOffset = static_cast<unsigned char>(unTrampolineJumpOffset & 0xFF) - 2;
 					memcpy(pJumpToTrampoline + 1, &unOffset, 1);
-				} else if ((unTrampolineJumpOffset - 4) <= 0xFFFF) { // 66 E9 00 00 - jmp rel16
+				} else if ((unTrampolineJumpOffset - 4) <= 0xFFFE) { // 66 E9 00 00 - jmp rel16
 					pJumpToTrampoline[0] = 0x66;
 					pJumpToTrampoline[1] = 0xE9;
 					const unsigned short unOffset = static_cast<unsigned short>(unTrampolineJumpOffset & 0xFFFF) - 4;
 					memcpy(pJumpToTrampoline + 2, &unOffset, 2);
-				} else if ((unTrampolineJumpOffset - 5) <= 0xFFFFFFFF) { // E9 00 00 00 00 - jmp rel32
+				} else if ((unTrampolineJumpOffset - 5) <= 0xFFFFFFFE) { // E9 00 00 00 00 - jmp rel32
 					pJumpToTrampoline[0] = 0xE9;
 					const unsigned int unOffset = static_cast<unsigned int>(unTrampolineJumpOffset & 0xFFFFFFFF) - 5;
 					memcpy(pJumpToTrampoline + 1, &unOffset, 4);
@@ -83343,16 +83342,16 @@ namespace Detours {
 			} else if (bHaveSSE) {
 				unsigned char* pJumpToTrampoline = reinterpret_cast<unsigned char*>(m_pWrapper) + 0x1B9;
 				const size_t unTrampolineJumpOffset = reinterpret_cast<size_t>(m_pTrampoline) - (reinterpret_cast<size_t>(m_pWrapper) + 0x1B9);
-				if ((unTrampolineJumpOffset - 2) <= 0xFF) { // EB 00 - jmp rel8
+				if ((unTrampolineJumpOffset - 2) <= 0xFE) { // EB 00 - jmp rel8
 					pJumpToTrampoline[0] = 0xEB;
 					const unsigned char unOffset = static_cast<unsigned char>(unTrampolineJumpOffset & 0xFF) - 2;
 					memcpy(pJumpToTrampoline + 1, &unOffset, 1);
-				} else if ((unTrampolineJumpOffset - 4) <= 0xFFFF) { // 66 E9 00 00 - jmp rel16
+				} else if ((unTrampolineJumpOffset - 4) <= 0xFFFE) { // 66 E9 00 00 - jmp rel16
 					pJumpToTrampoline[0] = 0x66;
 					pJumpToTrampoline[1] = 0xE9;
 					const unsigned short unOffset = static_cast<unsigned short>(unTrampolineJumpOffset & 0xFFFF) - 4;
 					memcpy(pJumpToTrampoline + 2, &unOffset, 2);
-				} else if ((unTrampolineJumpOffset - 5) <= 0xFFFFFFFF) { // E9 00 00 00 00 - jmp rel32
+				} else if ((unTrampolineJumpOffset - 5) <= 0xFFFFFFFE) { // E9 00 00 00 00 - jmp rel32
 					pJumpToTrampoline[0] = 0xE9;
 					const unsigned int unOffset = static_cast<unsigned int>(unTrampolineJumpOffset & 0xFFFFFFFF) - 5;
 					memcpy(pJumpToTrampoline + 1, &unOffset, 4);
@@ -83369,16 +83368,16 @@ namespace Detours {
 			} else if (bHaveMMX) {
 				unsigned char* pJumpToTrampoline = reinterpret_cast<unsigned char*>(m_pWrapper) + 0x125;
 				const size_t unTrampolineJumpOffset = reinterpret_cast<size_t>(m_pTrampoline) - (reinterpret_cast<size_t>(m_pWrapper) + 0x125);
-				if ((unTrampolineJumpOffset - 2) <= 0xFF) { // EB 00 - jmp rel8
+				if ((unTrampolineJumpOffset - 2) <= 0xFE) { // EB 00 - jmp rel8
 					pJumpToTrampoline[0] = 0xEB;
 					const unsigned char unOffset = static_cast<unsigned char>(unTrampolineJumpOffset & 0xFF) - 2;
 					memcpy(pJumpToTrampoline + 1, &unOffset, 1);
-				} else if ((unTrampolineJumpOffset - 4) <= 0xFFFF) { // 66 E9 00 00 - jmp rel16
+				} else if ((unTrampolineJumpOffset - 4) <= 0xFFFE) { // 66 E9 00 00 - jmp rel16
 					pJumpToTrampoline[0] = 0x66;
 					pJumpToTrampoline[1] = 0xE9;
 					const unsigned short unOffset = static_cast<unsigned short>(unTrampolineJumpOffset & 0xFFFF) - 4;
 					memcpy(pJumpToTrampoline + 2, &unOffset, 2);
-				} else if ((unTrampolineJumpOffset - 5) <= 0xFFFFFFFF) { // E9 00 00 00 00 - jmp rel32
+				} else if ((unTrampolineJumpOffset - 5) <= 0xFFFFFFFE) { // E9 00 00 00 00 - jmp rel32
 					pJumpToTrampoline[0] = 0xE9;
 					const unsigned int unOffset = static_cast<unsigned int>(unTrampolineJumpOffset & 0xFFFFFFFF) - 5;
 					memcpy(pJumpToTrampoline + 1, &unOffset, 4);
@@ -83395,16 +83394,16 @@ namespace Detours {
 			} else if (bHaveFPU) {
 				unsigned char* pJumpToTrampoline = reinterpret_cast<unsigned char*>(m_pWrapper) + 0xA5;
 				const size_t unTrampolineJumpOffset = reinterpret_cast<size_t>(m_pTrampoline) - (reinterpret_cast<size_t>(m_pWrapper) + 0xA5);
-				if ((unTrampolineJumpOffset - 2) <= 0xFF) { // EB 00 - jmp rel8
+				if ((unTrampolineJumpOffset - 2) <= 0xFE) { // EB 00 - jmp rel8
 					pJumpToTrampoline[0] = 0xEB;
 					const unsigned char unOffset = static_cast<unsigned char>(unTrampolineJumpOffset & 0xFF) - 2;
 					memcpy(pJumpToTrampoline + 1, &unOffset, 1);
-				} else if ((unTrampolineJumpOffset - 4) <= 0xFFFF) { // 66 E9 00 00 - jmp rel16
+				} else if ((unTrampolineJumpOffset - 4) <= 0xFFFE) { // 66 E9 00 00 - jmp rel16
 					pJumpToTrampoline[0] = 0x66;
 					pJumpToTrampoline[1] = 0xE9;
 					const unsigned short unOffset = static_cast<unsigned short>(unTrampolineJumpOffset & 0xFFFF) - 4;
 					memcpy(pJumpToTrampoline + 2, &unOffset, 2);
-				} else if ((unTrampolineJumpOffset - 5) <= 0xFFFFFFFF) { // E9 00 00 00 00 - jmp rel32
+				} else if ((unTrampolineJumpOffset - 5) <= 0xFFFFFFFE) { // E9 00 00 00 00 - jmp rel32
 					pJumpToTrampoline[0] = 0xE9;
 					const unsigned int unOffset = static_cast<unsigned int>(unTrampolineJumpOffset & 0xFFFFFFFF) - 5;
 					memcpy(pJumpToTrampoline + 1, &unOffset, 4);
@@ -83421,16 +83420,16 @@ namespace Detours {
 			} else {
 				unsigned char* pJumpToTrampoline = reinterpret_cast<unsigned char*>(m_pWrapper) + 0x9C;
 				const size_t unTrampolineJumpOffset = reinterpret_cast<size_t>(m_pTrampoline) - (reinterpret_cast<size_t>(m_pWrapper) + 0x9C);
-				if ((unTrampolineJumpOffset - 2) <= 0xFF) { // EB 00 - jmp rel8
+				if ((unTrampolineJumpOffset - 2) <= 0xFE) { // EB 00 - jmp rel8
 					pJumpToTrampoline[0] = 0xEB;
 					const unsigned char unOffset = static_cast<unsigned char>(unTrampolineJumpOffset & 0xFF) - 2;
 					memcpy(pJumpToTrampoline + 1, &unOffset, 1);
-				} else if ((unTrampolineJumpOffset - 4) <= 0xFFFF) { // 66 E9 00 00 - jmp rel16
+				} else if ((unTrampolineJumpOffset - 4) <= 0xFFFE) { // 66 E9 00 00 - jmp rel16
 					pJumpToTrampoline[0] = 0x66;
 					pJumpToTrampoline[1] = 0xE9;
 					const unsigned short unOffset = static_cast<unsigned short>(unTrampolineJumpOffset & 0xFFFF) - 4;
 					memcpy(pJumpToTrampoline + 2, &unOffset, 2);
-				} else if ((unTrampolineJumpOffset - 5) <= 0xFFFFFFFF) { // E9 00 00 00 00 - jmp rel32
+				} else if ((unTrampolineJumpOffset - 5) <= 0xFFFFFFFE) { // E9 00 00 00 00 - jmp rel32
 					pJumpToTrampoline[0] = 0xE9;
 					const unsigned int unOffset = static_cast<unsigned int>(unTrampolineJumpOffset & 0xFFFFFFFF) - 5;
 					memcpy(pJumpToTrampoline + 1, &unOffset, 4);
@@ -83461,11 +83460,11 @@ namespace Detours {
 
 			const size_t unJumpToOriginalOffset = (reinterpret_cast<size_t>(m_pAddress) + unJumpToWrapperSize) - (reinterpret_cast<size_t>(m_pTrampoline) + unCopyingSize);
 			size_t unJumpToOriginalSize = 0;
-			if ((unJumpToOriginalOffset - 2) <= 0xFF) { // EB 00 - jmp rel8
+			if ((unJumpToOriginalOffset - 2) <= 0xFE) { // EB 00 - jmp rel8
 				unJumpToOriginalSize = 2;
-			} else if ((unJumpToOriginalOffset - 4) <= 0xFFFF) { // 66 E9 00 00 - jmp rel16
+			} else if ((unJumpToOriginalOffset - 4) <= 0xFFFE) { // 66 E9 00 00 - jmp rel16
 				unJumpToOriginalSize = 4;
-			} else if ((unJumpToOriginalOffset - 5) <= 0xFFFFFFFF) { // E9 00 00 00 00 - jmp rel32
+			} else if ((unJumpToOriginalOffset - 5) <= 0xFFFFFFFE) { // E9 00 00 00 00 - jmp rel32
 				unJumpToOriginalSize = 5;
 			} else {
 #ifdef _M_X64
@@ -83566,16 +83565,16 @@ namespace Detours {
 
 			unsigned char* pJumpToOriginal = reinterpret_cast<unsigned char*>(m_pTrampoline) + unCopyingSize;
 			const size_t unTrampolineJumpOffset = (reinterpret_cast<size_t>(m_pAddress) + unJumpToWrapperSize) - (reinterpret_cast<size_t>(m_pTrampoline) + unCopyingSize);
-			if ((unTrampolineJumpOffset - 2) <= 0xFF) { // EB 00 - jmp rel8
+			if ((unTrampolineJumpOffset - 2) <= 0xFE) { // EB 00 - jmp rel8
 				pJumpToOriginal[0] = 0xEB;
 				const unsigned char unOffset = static_cast<unsigned char>(unTrampolineJumpOffset & 0xFF) - 2;
 				memcpy(pJumpToOriginal + 1, &unOffset, 1);
-			} else if ((unTrampolineJumpOffset - 4) <= 0xFFFF) { // 66 E9 00 00 - jmp rel16
+			} else if ((unTrampolineJumpOffset - 4) <= 0xFFFE) { // 66 E9 00 00 - jmp rel16
 				pJumpToOriginal[0] = 0x66;
 				pJumpToOriginal[1] = 0xE9;
 				const unsigned short unOffset = static_cast<unsigned short>(unTrampolineJumpOffset & 0xFFFF) - 4;
 				memcpy(pJumpToOriginal + 2, &unOffset, 2);
-			} else if ((unTrampolineJumpOffset - 5) <= 0xFFFFFFFF) { // E9 00 00 00 00 - jmp rel32
+			} else if ((unTrampolineJumpOffset - 5) <= 0xFFFFFFFE) { // E9 00 00 00 00 - jmp rel32
 				pJumpToOriginal[0] = 0xE9;
 				const unsigned int unOffset = static_cast<unsigned int>(unTrampolineJumpOffset & 0xFFFFFFFF) - 5;
 				memcpy(pJumpToOriginal + 1, &unOffset, 4);
@@ -83587,8 +83586,8 @@ namespace Detours {
 
 				const size_t unAddress = reinterpret_cast<size_t>(m_pAddress) + unJumpToOriginalSize;
 
-				const size_t unAddressLow = unAddress & 0xFFFFFFFF;
-				const size_t unAddressHigh = (unAddress >> 32) & 0xFFFFFFFF;
+				const unsigned int unAddressLow = unAddress & 0xFFFFFFFF;
+				const unsigned int unAddressHigh = (unAddress >> 32) & 0xFFFFFFFF;
 
 				pJumpToOriginal[ 0] = 0xC7;
 				pJumpToOriginal[ 1] = 0x44;
@@ -83669,16 +83668,16 @@ namespace Detours {
 			memset(m_pAddress, 0x90, unCopyingSize);
 
 			unsigned char* pJumpToWrapper = reinterpret_cast<unsigned char*>(m_pAddress);
-			if ((unJumpToWrapperOffset - 2) <= 0xFF) { // EB 00 - jmp rel8
+			if ((unJumpToWrapperOffset - 2) <= 0xFE) { // EB 00 - jmp rel8
 				pJumpToWrapper[0] = 0xEB;
 				const unsigned char unOffset = static_cast<unsigned char>(unJumpToWrapperOffset & 0xFF) - 2;
 				memcpy(pJumpToWrapper + 1, &unOffset, 1);
-			} else if ((unJumpToWrapperOffset - 4) <= 0xFFFF) { // 66 E9 00 00 - jmp rel16
+			} else if ((unJumpToWrapperOffset - 4) <= 0xFFFE) { // 66 E9 00 00 - jmp rel16
 				pJumpToWrapper[0] = 0x66;
 				pJumpToWrapper[1] = 0xE9;
 				const unsigned short unOffset = static_cast<unsigned short>(unJumpToWrapperOffset & 0xFFFF) - 4;
 				memcpy(pJumpToWrapper + 2, &unOffset, 2);
-			} else if ((unJumpToWrapperOffset - 5) <= 0xFFFFFFFF) { // E9 00 00 00 00 - jmp rel32
+			} else if ((unJumpToWrapperOffset - 5) <= 0xFFFFFFFE) { // E9 00 00 00 00 - jmp rel32
 				pJumpToWrapper[0] = 0xE9;
 				const unsigned int unOffset = static_cast<unsigned int>(unJumpToWrapperOffset & 0xFFFFFFFF) - 5;
 				memcpy(pJumpToWrapper + 1, &unOffset, 4);
@@ -83690,8 +83689,8 @@ namespace Detours {
 
 				const size_t unAddress = reinterpret_cast<size_t>(m_pWrapper);
 
-				const size_t unAddressLow = unAddress & 0xFFFFFFFF;
-				const size_t unAddressHigh = (unAddress >> 32) & 0xFFFFFFFF;
+				const unsigned int unAddressLow = unAddress & 0xFFFFFFFF;
+				const unsigned int unAddressHigh = (unAddress >> 32) & 0xFFFFFFFF;
 
 				pJumpToWrapper[ 0] = 0xC7;
 				pJumpToWrapper[ 1] = 0x44;
