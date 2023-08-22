@@ -599,6 +599,23 @@
 #define RD_FPU_FLAG_MODIFIED 2
 #define RD_FPU_FLAG_UNDEFINED 3
 
+// Hook
+#ifndef HOOK_STORAGE_CAPACITY
+#define HOOK_STORAGE_CAPACITY 0x800000 // 8 MiB
+#endif // !HOOK_STORAGE_CAPACITY
+
+#ifndef HOOK_INLINE_TRAMPOLINE_SIZE
+#define HOOK_INLINE_TRAMPOLINE_SIZE 45 // Max instruction size is 15 bytes. Reserving the trampoline for 3 instructions.
+#endif // !HOOK_INLINE_TRAMPOLINE_SIZE
+
+#ifndef HOOK_RAW_WRAPPER_SIZE
+#define HOOK_RAW_WRAPPER_SIZE 0x800 // Max wrapper size. (Reserved)
+#endif // !HOOK_RAW_WRAPPER_SIZE
+
+#ifndef HOOK_RAW_TRAMPOLINE_SIZE
+#define HOOK_RAW_TRAMPOLINE_SIZE 45 // Max instruction size is 15 bytes. Reserving the trampoline for 3 instructions.
+#endif // !HOOK_RAW_TRAMPOLINE_SIZE
+
 // ----------------------------------------------------------------
 // Detours
 // ----------------------------------------------------------------
@@ -1694,6 +1711,7 @@ namespace Detours {
 			bool DeAllocAll();
 
 		public:
+			void* GetAddress() const;
 			size_t GetCapacity() const;
 			size_t GetSize() const;
 			bool IsEmpty() const;
@@ -1733,6 +1751,7 @@ namespace Detours {
 			bool DeAllocAll();
 
 		public:
+			void* GetAddress() const;
 			size_t GetCapacity() const;
 			size_t GetSize() const;
 			bool IsEmpty() const;
@@ -1790,11 +1809,11 @@ namespace Detours {
 
 		class NearStorage {
 		public:
-			NearStorage(size_t unTotalCapacity = 0, size_t unPageCapacity = 0, void* pDesiredAddress = nullptr);
+			NearStorage(size_t unTotalCapacity = 0, size_t unPageCapacity = 0);
 			~NearStorage() = default;
 
 		public:
-			void* Alloc(size_t unSize);
+			void* Alloc(size_t unSize, void* pDesiredAddress = nullptr);
 			bool DeAlloc(void* pAddress);
 			bool DeAllocAll();
 
@@ -1806,7 +1825,6 @@ namespace Detours {
 		private:
 			size_t m_unTotalCapacity;
 			size_t m_unPageCapacity;
-			void* m_pDesiredAddress;
 			size_t m_unUsedSpace;
 			std::list<NearPage> m_Pages;
 		};
@@ -5005,11 +5023,6 @@ namespace Detours {
 		private:
 			bool m_bInitialized;
 			void* m_pAddress;
-#ifdef _M_X64
-			std::unique_ptr<Detours::Memory::NearPage> m_Trampoline;
-#elif _M_IX86
-			std::unique_ptr<Detours::Memory::Page> m_Trampoline;
-#endif
 			void* m_pTrampoline;
 			void* m_pAddressAfterJump;
 			size_t m_unOriginalBytes;
@@ -5763,18 +5776,8 @@ namespace Detours {
 		private:
 			bool m_bInitialized;
 			void* m_pAddress;
-#ifdef _M_X64
-			std::unique_ptr<Detours::Memory::NearPage> m_Wrapper;
-#elif _M_IX86
-			std::unique_ptr<Detours::Memory::Page> m_Wrapper;
-#endif
 			void* m_pWrapper;
 			void* m_pAddressAfterJump;
-#ifdef _M_X64
-			std::unique_ptr<Detours::Memory::NearPage> m_Trampoline;
-#elif _M_IX86
-			std::unique_ptr<Detours::Memory::Page> m_Trampoline;
-#endif
 			void* m_pTrampoline;
 			size_t m_unOriginalBytes;
 			std::unique_ptr<unsigned char[]> m_pOriginalBytes;

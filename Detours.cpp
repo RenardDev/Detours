@@ -142,6 +142,11 @@ namespace Detours {
 	static std::unordered_map<void*, std::unique_ptr<Protection>> g_Protections;
 	static std::unordered_map<void*, std::unique_ptr<MemoryHook>> g_MemoryHooks;
 	static std::unordered_map<void*, std::unique_ptr<InterruptHook>> g_InterruptHooks;
+#ifdef _M_X64
+	static NearStorage g_HookStorage(HOOK_STORAGE_CAPACITY);
+#elif _M_IX86
+	static Storage g_HookStorage(HOOK_STORAGE_CAPACITY);
+#endif
 
 	// ----------------------------------------------------------------
 	// KUSER_SHARED_DATA
@@ -3599,7 +3604,7 @@ namespace Detours {
 			}
 
 			if (!m_ActiveBlocks.empty()) {
-				for (auto& block : m_ActiveBlocks) {
+				for (const auto& block : m_ActiveBlocks) {
 					m_FreeBlocks.emplace(block);
 				}
 
@@ -3608,6 +3613,10 @@ namespace Detours {
 			}
 
 			return false;
+		}
+
+		void* Page::GetAddress() const {
+			return m_pPageAddress;
 		}
 
 		size_t Page::GetCapacity() const {
@@ -3742,7 +3751,7 @@ namespace Detours {
 			}
 
 			if (!m_ActiveBlocks.empty()) {
-				for (auto& block : m_ActiveBlocks) {
+				for (const auto& block : m_ActiveBlocks) {
 					m_FreeBlocks.emplace(block);
 				}
 
@@ -3751,6 +3760,10 @@ namespace Detours {
 			}
 
 			return false;
+		}
+
+		void* NearPage::GetAddress() const {
+			return m_pPageAddress;
 		}
 
 		size_t NearPage::GetCapacity() const {
@@ -3802,8 +3815,6 @@ namespace Detours {
 			m_unTotalCapacity = unTotalCapacity;
 			m_unPageCapacity = unPageCapacity;
 			m_unUsedSpace = 0;
-
-			m_Pages.emplace_back(unPageCapacity);
 		}
 
 		void* Storage::Alloc(size_t unSize) {
@@ -3811,13 +3822,19 @@ namespace Detours {
 				return nullptr;
 			}
 
+			if (m_Pages.empty()) {
+				m_Pages.emplace_back(m_unPageCapacity);
+			}
+
 			for (auto& Page : m_Pages) {
 				if ((Page.GetCapacity() - Page.GetSize()) >= unSize) {
 					void* pMemory = Page.Alloc(unSize);
-					if (pMemory) {
-						m_unUsedSpace += unSize;
-						return pMemory;
+					if (!pMemory) {
+						continue;
 					}
+
+					m_unUsedSpace += unSize;
+					return pMemory;
 				}
 			}
 
@@ -3890,7 +3907,7 @@ namespace Detours {
 		// NearStorage
 		// ----------------------------------------------------------------
 
-		NearStorage::NearStorage(size_t unTotalCapacity, size_t unPageCapacity, void* pDesiredAddress) {
+		NearStorage::NearStorage(size_t unTotalCapacity, size_t unPageCapacity) {
 			SYSTEM_INFO sysinf;
 			GetSystemInfo(&sysinf);
 
@@ -3916,21 +3933,45 @@ namespace Detours {
 
 			m_unTotalCapacity = unTotalCapacity;
 			m_unPageCapacity = unPageCapacity;
-			m_pDesiredAddress = pDesiredAddress;
 			m_unUsedSpace = 0;
-
-			m_Pages.emplace_back(unPageCapacity, pDesiredAddress);
 		}
 
-		void* NearStorage::Alloc(size_t unSize) {
+		void* NearStorage::Alloc(size_t unSize, void* pDesiredAddress) {
 			if (m_unUsedSpace + unSize > m_unTotalCapacity) {
 				return nullptr;
 			}
 
-			for (auto& Page : m_Pages) {
-				if ((Page.GetCapacity() - Page.GetSize()) >= unSize) {
-					void* pMemory = Page.Alloc(unSize);
-					if (pMemory) {
+			if (m_Pages.empty()) {
+				m_Pages.emplace_back(m_unPageCapacity, pDesiredAddress);
+			}
+
+			if (pDesiredAddress) {
+				for (auto& Page : m_Pages) {
+					if ((Page.GetCapacity() - Page.GetSize()) >= unSize) {
+						const size_t unBegin = reinterpret_cast<size_t>(pDesiredAddress) - 0x7FFFFFFF + 1;
+						const size_t unEnd = reinterpret_cast<size_t>(pDesiredAddress) + 0x7FFFFFFF - (Page.GetCapacity() - Page.GetSize());
+						const size_t unAddress = reinterpret_cast<size_t>(Page.GetAddress()) + Page.GetSize();
+						if ((unAddress < unBegin) || (unAddress > unEnd)) {
+							continue;
+						}
+
+						void* pMemory = Page.Alloc(unSize);
+						if (!pMemory) {
+							continue;
+						}
+
+						m_unUsedSpace += unSize;
+						return pMemory;
+					}
+				}
+			} else {
+				for (auto& Page : m_Pages) {
+					if ((Page.GetCapacity() - Page.GetSize()) >= unSize) {
+						void* pMemory = Page.Alloc(unSize);
+						if (!pMemory) {
+							continue;
+						}
+
 						m_unUsedSpace += unSize;
 						return pMemory;
 					}
@@ -3938,7 +3979,7 @@ namespace Detours {
 			}
 
 			if (m_unUsedSpace + m_unPageCapacity <= m_unTotalCapacity) {
-				m_Pages.emplace_back(m_unPageCapacity);
+				m_Pages.emplace_back(m_unPageCapacity, pDesiredAddress);
 				void* pMemory = m_Pages.back().Alloc(unSize);
 				m_unUsedSpace += unSize;
 				return pMemory;
@@ -78539,9 +78580,9 @@ namespace Detours {
 				pInstruction->Exs.rp = 0;
 				pInstruction->Exs.v &= 0x7;
 
-				if (pInstruction->Exs.vp == 1) {
-					return RD_STATUS_BAD_EVEX_V_PRIME;
-				}
+				//if (pInstruction->Exs.vp == 1) {
+				//	return RD_STATUS_BAD_EVEX_V_PRIME;
+				//}
 			}
 
 			pInstruction->Length += 4;
@@ -81172,7 +81213,7 @@ namespace Detours {
 					}
 				}
 
-				if ((pInstruction->Operands[i].Type == RD_OP_REG) && pInstruction->Operands->Flags.IsDefault) {
+				if ((pInstruction->Operands[i].Type == RD_OP_REG) && pInstruction->Operands[0].Flags.IsDefault) {
 					switch (pInstruction->Operands[i].Info.Register.Type) {
 						case RD_REG_FLG:
 							pRlut->Flags = &pInstruction->Operands[i];
@@ -81714,9 +81755,7 @@ namespace Detours {
 				return false;
 			}
 
-			if (!UnHook()) {
-				return false;
-			}
+			UnHook();
 
 			m_pVTable = nullptr;
 			m_unIndex = 0;
@@ -81843,9 +81882,7 @@ namespace Detours {
 				return false;
 			}
 
-			if (!UnHook()) {
-				return false;
-			}
+			UnHook();
 
 			m_pVTable = nullptr;
 			m_unCount = 0;
@@ -81897,8 +81934,8 @@ namespace Detours {
 		InlineHook::InlineHook() {
 			m_bInitialized = false;
 			m_pAddress = nullptr;
-			m_Trampoline = nullptr;
 			m_pTrampoline = nullptr;
+			m_pAddressAfterJump = nullptr;
 			m_pOriginalBytes = nullptr;
 			m_unOriginalBytes = 0;
 		}
@@ -81906,8 +81943,8 @@ namespace Detours {
 		InlineHook::InlineHook(void* pAddress) {
 			m_bInitialized = true;
 			m_pAddress = pAddress;
-			m_Trampoline = nullptr;
 			m_pTrampoline = nullptr;
+			m_pAddressAfterJump = nullptr;
 			m_pOriginalBytes = nullptr;
 			m_unOriginalBytes = 0;
 		}
@@ -81922,8 +81959,8 @@ namespace Detours {
 			}
 
 			m_pAddress = pAddress;
-			m_Trampoline = nullptr;
 			m_pTrampoline = nullptr;
+			m_pAddressAfterJump = nullptr;
 			m_pOriginalBytes = nullptr;
 			m_unOriginalBytes = 0;
 
@@ -81936,13 +81973,11 @@ namespace Detours {
 				return false;
 			}
 
-			if (!UnHook()) {
-				return false;
-			}
+			UnHook();
 
 			m_pAddress = nullptr;
-			m_Trampoline = nullptr;
 			m_pTrampoline = nullptr;
+			m_pAddressAfterJump = nullptr;
 			m_pOriginalBytes = nullptr;
 			m_unOriginalBytes = 0;
 
@@ -81953,18 +81988,18 @@ namespace Detours {
 		bool InlineHook::Hook(void* pHookAddress) {
 			g_ThreadSuspender.SuspendThreads();
 
-			if (!m_bInitialized || !m_pAddress || m_Trampoline || m_pTrampoline || !pHookAddress) {
+			if (!m_bInitialized || !m_pAddress || m_pTrampoline || !pHookAddress) {
 				g_ThreadSuspender.ResumeThreads();
 				return false;
 			}
 
 			const size_t unJumpToHookOffset = reinterpret_cast<size_t>(pHookAddress) - reinterpret_cast<size_t>(m_pAddress);
 			size_t unJumpToHookSize = 0;
-			if ((unJumpToHookOffset - 2) <= 0xFF) {
+			if ((unJumpToHookOffset - 2) <= 0xFE) {
 				unJumpToHookSize = 2; // EB 00 - jmp rel8
-			} else if ((unJumpToHookOffset - 4) <= 0xFFFF) {
+			} else if ((unJumpToHookOffset - 4) <= 0xFFFE) {
 				unJumpToHookSize = 4; // 66 E9 00 00 - jmp rel16
-			} else if ((unJumpToHookOffset - 5) <= 0xFFFFFFFF) {
+			} else if ((unJumpToHookOffset - 5) <= 0xFFFFFFFE) {
 				unJumpToHookSize = 5; // E9 00 00 00 00 - jmp rel32
 			} else {
 #ifdef _M_X64
@@ -81996,20 +82031,26 @@ namespace Detours {
 				unCopyingSize += ins.Length;
 			}
 
-#ifdef _M_X64
-			m_Trampoline = std::make_unique<NearPage>(0x1000, m_pAddress);
-#elif _M_IX86
-			m_Trampoline = std::make_unique<Page>(0x1000);
-#endif
-			if (!m_Trampoline) {
+			if (unCopyingSize >= HOOK_INLINE_TRAMPOLINE_SIZE) {
 				m_pAddressAfterJump = nullptr;
 				g_ThreadSuspender.ResumeThreads();
 				return false;
 			}
 
-			m_pTrampoline = m_Trampoline->Alloc(0x1000);
+#ifdef _M_X64
+			m_pTrampoline = g_HookStorage.Alloc(HOOK_INLINE_TRAMPOLINE_SIZE, m_pAddress);
+#elif _M_IX86
+			m_pTrampoline = g_HookStorage.Alloc(HOOK_INLINE_TRAMPOLINE_SIZE);
+#endif
 			if (!m_pTrampoline) {
-				m_Trampoline = nullptr;
+				m_pAddressAfterJump = nullptr;
+				g_ThreadSuspender.ResumeThreads();
+				return false;
+			}
+
+			if (!Protection(m_pTrampoline, HOOK_INLINE_TRAMPOLINE_SIZE, false).ChangeProtection(PAGE_READWRITE)) {
+				g_HookStorage.DeAlloc(m_pTrampoline);
+				m_pTrampoline = nullptr;
 				m_pAddressAfterJump = nullptr;
 				g_ThreadSuspender.ResumeThreads();
 				return false;
@@ -82017,11 +82058,11 @@ namespace Detours {
 
 			const size_t unJumpToOriginalOffset = (reinterpret_cast<size_t>(m_pAddress) + unJumpToHookSize) - (reinterpret_cast<size_t>(m_pTrampoline) + unCopyingSize);
 			size_t unJumpToOriginalSize = 0;
-			if ((unJumpToOriginalOffset - 2) <= 0xFF) { // EB 00 - jmp rel8
+			if ((unJumpToOriginalOffset - 2) <= 0xFE) { // EB 00 - jmp rel8
 				unJumpToOriginalSize = 2;
-			} else if ((unJumpToOriginalOffset - 4) <= 0xFFFF) { // 66 E9 00 00 - jmp rel16
+			} else if ((unJumpToOriginalOffset - 4) <= 0xFFFE) { // 66 E9 00 00 - jmp rel16
 				unJumpToOriginalSize = 4;
-			} else if ((unJumpToOriginalOffset - 5) <= 0xFFFFFFFF) { // E9 00 00 00 00 - jmp rel32
+			} else if ((unJumpToOriginalOffset - 5) <= 0xFFFFFFFE) { // E9 00 00 00 00 - jmp rel32
 				unJumpToOriginalSize = 5;
 			} else {
 #ifdef _M_X64
@@ -82030,16 +82071,23 @@ namespace Detours {
 				// FF 64 24 F8 - jmp [rsp-8]
 				unJumpToOriginalSize = 20;
 #elif _M_IX86
-				m_Trampoline->DeAlloc(m_pTrampoline);
+				g_HookStorage.DeAlloc(m_pTrampoline);
 				m_pTrampoline = nullptr;
-				m_Trampoline = nullptr;
 				m_pAddressAfterJump = nullptr;
 				g_ThreadSuspender.ResumeThreads();
 				return false;
 #endif
 			}
 
-			memset(m_pTrampoline, 0xC3, 0x1000);
+			if (unCopyingSize + unJumpToOriginalSize > HOOK_INLINE_TRAMPOLINE_SIZE) {
+				g_HookStorage.DeAlloc(m_pTrampoline);
+				m_pTrampoline = nullptr;
+				m_pAddressAfterJump = nullptr;
+				g_ThreadSuspender.ResumeThreads();
+				return false;
+			}
+
+			memset(m_pTrampoline, 0xC3, HOOK_INLINE_TRAMPOLINE_SIZE);
 			memcpy(m_pTrampoline, m_pAddress, unCopyingSize);
 
 			for (size_t unIndex = 0; unIndex < unCopyingSize;) {
@@ -82048,9 +82096,8 @@ namespace Detours {
 #elif _M_IX86
 				if (!RD_SUCCESS(RdDecode(&ins, reinterpret_cast<unsigned char*>(m_pTrampoline) + unIndex, RD_CODE_32, RD_DATA_32))) {
 #endif
-					m_Trampoline->DeAlloc(m_pTrampoline);
+					g_HookStorage.DeAlloc(m_pTrampoline);
 					m_pTrampoline = nullptr;
-					m_Trampoline = nullptr;
 					m_pAddressAfterJump = nullptr;
 					g_ThreadSuspender.ResumeThreads();
 					return false;
@@ -82074,9 +82121,8 @@ namespace Detours {
 							*reinterpret_cast<unsigned int*>(reinterpret_cast<size_t>(m_pTrampoline) + unIndex + ins.DispOffset) = static_cast<unsigned int>(unNewDisp & 0xFFFFFFFF);
 							break;
 						default:
-							m_Trampoline->DeAlloc(m_pTrampoline);
+							g_HookStorage.DeAlloc(m_pTrampoline);
 							m_pTrampoline = nullptr;
-							m_Trampoline = nullptr;
 							m_pAddressAfterJump = nullptr;
 							g_ThreadSuspender.ResumeThreads();
 							return false;
@@ -82096,9 +82142,8 @@ namespace Detours {
 							*reinterpret_cast<unsigned int*>(reinterpret_cast<size_t>(m_pTrampoline) + unIndex + ins.RelOffsOffset) = static_cast<unsigned int>(unNewOffset & 0xFFFFFFFF);
 							break;
 						default:
-							m_Trampoline->DeAlloc(m_pTrampoline);
+							g_HookStorage.DeAlloc(m_pTrampoline);
 							m_pTrampoline = nullptr;
-							m_Trampoline = nullptr;
 							m_pAddressAfterJump = nullptr;
 							g_ThreadSuspender.ResumeThreads();
 							return false;
@@ -82110,16 +82155,16 @@ namespace Detours {
 
 			unsigned char* pJumpToOriginal = reinterpret_cast<unsigned char*>(m_pTrampoline) + unCopyingSize;
 			const size_t unTrampolineJumpOffset = (reinterpret_cast<size_t>(m_pAddress) + unJumpToOriginalSize) - (reinterpret_cast<size_t>(m_pTrampoline) + unCopyingSize);
-			if ((unTrampolineJumpOffset - 2) <= 0xFF) { // EB 00 - jmp rel8
+			if ((unTrampolineJumpOffset - 2) <= 0xFE) { // EB 00 - jmp rel8
 				pJumpToOriginal[0] = 0xEB;
 				unsigned char unOffset = static_cast<unsigned char>(unTrampolineJumpOffset & 0xFF) - 2;
 				memcpy(pJumpToOriginal + 1, &unOffset, 1);
-			} else if ((unTrampolineJumpOffset - 4) <= 0xFFFF) { // 66 E9 00 00 - jmp rel16
+			} else if ((unTrampolineJumpOffset - 4) <= 0xFFFE) { // 66 E9 00 00 - jmp rel16
 				pJumpToOriginal[0] = 0x66;
 				pJumpToOriginal[1] = 0xE9;
 				unsigned short unOffset = static_cast<unsigned short>(unTrampolineJumpOffset & 0xFFFF) - 4;
 				memcpy(pJumpToOriginal + 2, &unOffset, 2);
-			} else if ((unTrampolineJumpOffset - 5) <= 0xFFFFFFFF) { // E9 00 00 00 00 - jmp rel32
+			} else if ((unTrampolineJumpOffset - 5) <= 0xFFFFFFFE) { // E9 00 00 00 00 - jmp rel32
 				pJumpToOriginal[0] = 0xE9;
 				unsigned int unOffset = static_cast<unsigned int>(unTrampolineJumpOffset & 0xFFFFFFFF) - 5;
 				memcpy(pJumpToOriginal + 1, &unOffset, 4);
@@ -82131,8 +82176,8 @@ namespace Detours {
 
 				const size_t unAddress = reinterpret_cast<size_t>(m_pAddress) + unJumpToOriginalSize;
 
-				const size_t unAddressLow = unAddress & 0xFFFFFFFF;
-				const size_t unAddressHigh = (unAddress >> 32) & 0xFFFFFFFF;
+				const unsigned int unAddressLow = unAddress & 0xFFFFFFFF;
+				const unsigned int unAddressHigh = (unAddress >> 32) & 0xFFFFFFFF;
 
 				pJumpToOriginal[ 0] = 0xC7;
 				pJumpToOriginal[ 1] = 0x44;
@@ -82153,19 +82198,17 @@ namespace Detours {
 				pJumpToOriginal[18] = 0x24;
 				pJumpToOriginal[19] = 0xF8;
 #elif _M_IX86
-				m_Trampoline->DeAlloc(m_pTrampoline);
+				g_HookStorage.DeAlloc(m_pTrampoline);
 				m_pTrampoline = nullptr;
-				m_Trampoline = nullptr;
 				m_pAddressAfterJump = nullptr;
 				g_ThreadSuspender.ResumeThreads();
 				return false;
 #endif
 			}
 
-			if (!Protection(m_pTrampoline, 0x1000, false).ChangeProtection(PAGE_EXECUTE_READ)) {
-				m_Trampoline->DeAlloc(m_pTrampoline);
+			if (!Protection(m_pTrampoline, HOOK_INLINE_TRAMPOLINE_SIZE, false).ChangeProtection(PAGE_EXECUTE_READ)) {
+				g_HookStorage.DeAlloc(m_pTrampoline);
 				m_pTrampoline = nullptr;
-				m_Trampoline = nullptr;
 				m_pAddressAfterJump = nullptr;
 				g_ThreadSuspender.ResumeThreads();
 				return false;
@@ -82176,9 +82219,8 @@ namespace Detours {
 			m_pOriginalBytes = std::make_unique<unsigned char[]>(unCopyingSize);
 			if (!m_pOriginalBytes) {
 				m_unOriginalBytes = 0;
-				m_Trampoline->DeAlloc(m_pTrampoline);
+				g_HookStorage.DeAlloc(m_pTrampoline);
 				m_pTrampoline = nullptr;
-				m_Trampoline = nullptr;
 				m_pAddressAfterJump = nullptr;
 				g_ThreadSuspender.ResumeThreads();
 				return false;
@@ -82190,9 +82232,8 @@ namespace Detours {
 			if (!JumpToHookProtection.ChangeProtection(PAGE_READWRITE)) {
 				m_pOriginalBytes = nullptr;
 				m_unOriginalBytes = 0;
-				m_Trampoline->DeAlloc(m_pTrampoline);
+				g_HookStorage.DeAlloc(m_pTrampoline);
 				m_pTrampoline = nullptr;
-				m_Trampoline = nullptr;
 				m_pAddressAfterJump = nullptr;
 				g_ThreadSuspender.ResumeThreads();
 				return false;
@@ -82201,16 +82242,16 @@ namespace Detours {
 			memset(m_pAddress, 0x90, unCopyingSize);
 
 			unsigned char* pJumpToHook = reinterpret_cast<unsigned char*>(m_pAddress);
-			if ((unJumpToHookOffset - 2) <= 0xFF) { // EB 00 - jmp rel8
+			if ((unJumpToHookOffset - 2) <= 0xFE) { // EB 00 - jmp rel8
 				pJumpToHook[0] = 0xEB;
 				unsigned char unOffset = static_cast<unsigned char>(unJumpToHookOffset & 0xFF) - 2;
 				memcpy(pJumpToHook + 1, &unOffset, 1);
-			} else if ((unJumpToHookOffset - 4) <= 0xFFFF) { // 66 E9 00 00 - jmp rel16
+			} else if ((unJumpToHookOffset - 4) <= 0xFFFE) { // 66 E9 00 00 - jmp rel16
 				pJumpToHook[0] = 0x66;
 				pJumpToHook[1] = 0xE9;
 				unsigned short unOffset = static_cast<unsigned short>(unJumpToHookOffset & 0xFFFF) - 4;
 				memcpy(pJumpToHook + 2, &unOffset, 2);
-			} else if ((unJumpToHookOffset - 5) <= 0xFFFFFFFF) { // E9 00 00 00 00 - jmp rel32
+			} else if ((unJumpToHookOffset - 5) <= 0xFFFFFFFE) { // E9 00 00 00 00 - jmp rel32
 				pJumpToHook[0] = 0xE9;
 				unsigned int unOffset = static_cast<unsigned int>(unJumpToHookOffset & 0xFFFFFFFF) - 5;
 				memcpy(pJumpToHook + 1, &unOffset, 4);
@@ -82222,8 +82263,8 @@ namespace Detours {
 
 				const size_t unAddress = reinterpret_cast<size_t>(pHookAddress);
 
-				const size_t unAddressLow = unAddress & 0xFFFFFFFF;
-				const size_t unAddressHigh = (unAddress >> 32) & 0xFFFFFFFF;
+				const unsigned int unAddressLow = unAddress & 0xFFFFFFFF;
+				const unsigned int unAddressHigh = (unAddress >> 32) & 0xFFFFFFFF;
 
 				pJumpToHook[ 0] = 0xC7;
 				pJumpToHook[ 1] = 0x44;
@@ -82248,9 +82289,8 @@ namespace Detours {
 				JumpToHookProtection.RestoreProtection();
 				m_pOriginalBytes = nullptr;
 				m_unOriginalBytes = 0;
-				m_Trampoline->DeAlloc(m_pTrampoline);
+				g_HookStorage.DeAlloc(m_pTrampoline);
 				m_pTrampoline = nullptr;
-				m_Trampoline = nullptr;
 				m_pAddressAfterJump = nullptr;
 				g_ThreadSuspender.ResumeThreads();
 				return false;
@@ -82271,7 +82311,7 @@ namespace Detours {
 				return false;
 			}
 
-			for (size_t unIndex = 0; unIndex < 0x1000; ++unIndex) {
+			for (size_t unIndex = 0; unIndex < HOOK_INLINE_TRAMPOLINE_SIZE; ++unIndex) {
 				g_ThreadSuspender.FixExecutionAddress(reinterpret_cast<unsigned char*>(m_pTrampoline) + unIndex, reinterpret_cast<unsigned char*>(m_pAddress) + unIndex);
 			}
 
@@ -82288,8 +82328,8 @@ namespace Detours {
 			m_pOriginalBytes = nullptr;
 			m_unOriginalBytes = 0;
 			m_pAddressAfterJump = nullptr;
+			g_HookStorage.DeAlloc(m_pTrampoline);
 			m_pTrampoline = nullptr;
-			m_Trampoline = nullptr;
 
 			g_ThreadSuspender.ResumeThreads();
 			return true;
@@ -82310,10 +82350,8 @@ namespace Detours {
 		RawHook::RawHook() {
 			m_bInitialized = false;
 			m_pAddress = nullptr;
-			m_Wrapper = nullptr;
 			m_pWrapper = nullptr;
 			m_pAddressAfterJump = nullptr;
-			m_Trampoline = nullptr;
 			m_pTrampoline = nullptr;
 			m_pOriginalBytes = nullptr;
 			m_unOriginalBytes = 0;
@@ -82322,10 +82360,8 @@ namespace Detours {
 		RawHook::RawHook(void* pAddress) {
 			m_bInitialized = true;
 			m_pAddress = pAddress;
-			m_Wrapper = nullptr;
 			m_pWrapper = nullptr;
 			m_pAddressAfterJump = nullptr;
-			m_Trampoline = nullptr;
 			m_pTrampoline = nullptr;
 			m_pOriginalBytes = nullptr;
 			m_unOriginalBytes = 0;
@@ -82341,9 +82377,7 @@ namespace Detours {
 			}
 
 			m_pAddress = pAddress;
-			m_Wrapper = nullptr;
 			m_pWrapper = nullptr;
-			m_Trampoline = nullptr;
 			m_pTrampoline = nullptr;
 			m_pAddressAfterJump = nullptr;
 			m_pOriginalBytes = nullptr;
@@ -82358,14 +82392,10 @@ namespace Detours {
 				return false;
 			}
 
-			if (!UnHook()) {
-				return false;
-			}
+			UnHook();
 
 			m_pAddress = nullptr;
-			m_Wrapper = nullptr;
 			m_pWrapper = nullptr;
-			m_Trampoline = nullptr;
 			m_pTrampoline = nullptr;
 			m_pAddressAfterJump = nullptr;
 			m_pOriginalBytes = nullptr;
@@ -82378,29 +82408,29 @@ namespace Detours {
 		bool RawHook::Hook(const fnRawHookCallBack pCallBack) {
 			g_ThreadSuspender.SuspendThreads();
 
-			if (!m_bInitialized || !m_pAddress || m_Wrapper || m_pWrapper || m_Trampoline || m_pTrampoline || !pCallBack) {
+			if (!m_bInitialized || !m_pAddress || m_pWrapper || m_pTrampoline || !pCallBack) {
 				g_ThreadSuspender.ResumeThreads();
 				return false;
 			}
 
 #ifdef _M_X64
-			m_Wrapper = std::make_unique<NearPage>(0x1000, m_pAddress);
+			m_pWrapper = g_HookStorage.Alloc(HOOK_RAW_WRAPPER_SIZE, m_pAddress);
 #elif _M_IX86
-			m_Wrapper = std::make_unique<Page>(0x1000);
+			m_pWrapper = g_HookStorage.Alloc(HOOK_RAW_WRAPPER_SIZE);
 #endif
-			if (!m_Wrapper) {
-				g_ThreadSuspender.ResumeThreads();
-				return false;
-			}
-
-			m_pWrapper = m_Wrapper->Alloc(0x1000);
 			if (!m_pWrapper) {
-				m_Wrapper = nullptr;
 				g_ThreadSuspender.ResumeThreads();
 				return false;
 			}
 
-			memset(m_pWrapper, 0xC3, 0x1000);
+			if (!Protection(m_pWrapper, HOOK_RAW_WRAPPER_SIZE, false).ChangeProtection(PAGE_READWRITE)) {
+				g_HookStorage.DeAlloc(m_pWrapper);
+				m_pWrapper = nullptr;
+				g_ThreadSuspender.ResumeThreads();
+				return false;
+			}
+
+			memset(m_pWrapper, 0xC3, HOOK_RAW_WRAPPER_SIZE);
 
 			int cpuinfo[4];
 			__cpuid(cpuinfo, 1);
@@ -82421,8 +82451,8 @@ namespace Detours {
 
 				const size_t unAddress = reinterpret_cast<size_t>(pCallBack);
 
-				const size_t unAddressLow = unAddress & 0xFFFFFFFF;
-				const size_t unAddressHigh = (unAddress >> 32) & 0xFFFFFFFF;
+				const unsigned int unAddressLow = unAddress & 0xFFFFFFFF;
+				const unsigned int unAddressHigh = (unAddress >> 32) & 0xFFFFFFFF;
 
 				memcpy(reinterpret_cast<unsigned char*>(m_pWrapper) + 0x240 + 4, &unAddressLow, 4);
 				memcpy(reinterpret_cast<unsigned char*>(m_pWrapper) + 0x248 + 4, &unAddressHigh, 4);
@@ -82432,8 +82462,8 @@ namespace Detours {
 
 				const size_t unAddress = reinterpret_cast<size_t>(pCallBack);
 
-				const size_t unAddressLow = unAddress & 0xFFFFFFFF;
-				const size_t unAddressHigh = (unAddress >> 32) & 0xFFFFFFFF;
+				const unsigned int unAddressLow = unAddress & 0xFFFFFFFF;
+				const unsigned int unAddressHigh = (unAddress >> 32) & 0xFFFFFFFF;
 
 				memcpy(reinterpret_cast<unsigned char*>(m_pWrapper) + 0x170 + 4, &unAddressLow, 4);
 				memcpy(reinterpret_cast<unsigned char*>(m_pWrapper) + 0x178 + 4, &unAddressHigh, 4);
@@ -82443,8 +82473,8 @@ namespace Detours {
 
 				const size_t unAddress = reinterpret_cast<size_t>(pCallBack);
 
-				const size_t unAddressLow = unAddress & 0xFFFFFFFF;
-				const size_t unAddressHigh = (unAddress >> 32) & 0xFFFFFFFF;
+				const unsigned int unAddressLow = unAddress & 0xFFFFFFFF;
+				const unsigned int unAddressHigh = (unAddress >> 32) & 0xFFFFFFFF;
 
 				memcpy(reinterpret_cast<unsigned char*>(m_pWrapper) + 0x170 + 4, &unAddressLow, 4);
 				memcpy(reinterpret_cast<unsigned char*>(m_pWrapper) + 0x178 + 4, &unAddressHigh, 4);
@@ -82454,8 +82484,8 @@ namespace Detours {
 
 				const size_t unAddress = reinterpret_cast<size_t>(pCallBack);
 
-				const size_t unAddressLow = unAddress & 0xFFFFFFFF;
-				const size_t unAddressHigh = (unAddress >> 32) & 0xFFFFFFFF;
+				const unsigned int unAddressLow = unAddress & 0xFFFFFFFF;
+				const unsigned int unAddressHigh = (unAddress >> 32) & 0xFFFFFFFF;
 
 				memcpy(reinterpret_cast<unsigned char*>(m_pWrapper) + 0xE0 + 4, &unAddressLow, 4);
 				memcpy(reinterpret_cast<unsigned char*>(m_pWrapper) + 0xE8 + 4, &unAddressHigh, 4);
@@ -82465,8 +82495,8 @@ namespace Detours {
 
 				const size_t unAddress = reinterpret_cast<size_t>(pCallBack);
 
-				const size_t unAddressLow = unAddress & 0xFFFFFFFF;
-				const size_t unAddressHigh = (unAddress >> 32) & 0xFFFFFFFF;
+				const unsigned int unAddressLow = unAddress & 0xFFFFFFFF;
+				const unsigned int unAddressHigh = (unAddress >> 32) & 0xFFFFFFFF;
 
 				memcpy(reinterpret_cast<unsigned char*>(m_pWrapper) + 0xA0 + 4, &unAddressLow, 4);
 				memcpy(reinterpret_cast<unsigned char*>(m_pWrapper) + 0xA8 + 4, &unAddressHigh, 4);
@@ -82476,8 +82506,8 @@ namespace Detours {
 
 				const size_t unAddress = reinterpret_cast<size_t>(pCallBack);
 
-				const size_t unAddressLow = unAddress & 0xFFFFFFFF;
-				const size_t unAddressHigh = (unAddress >> 32) & 0xFFFFFFFF;
+				const unsigned int unAddressLow = unAddress & 0xFFFFFFFF;
+				const unsigned int unAddressHigh = (unAddress >> 32) & 0xFFFFFFFF;
 
 				memcpy(reinterpret_cast<unsigned char*>(m_pWrapper) + 0x98 + 4, &unAddressLow, 4);
 				memcpy(reinterpret_cast<unsigned char*>(m_pWrapper) + 0xA0 + 4, &unAddressHigh, 4);
@@ -82489,13 +82519,12 @@ namespace Detours {
 
 				unsigned char* pCallCallBack = reinterpret_cast<unsigned char*>(m_pWrapper) + 0xED;
 				const size_t unCallCallBackOffset = reinterpret_cast<size_t>(pCallBack) - (reinterpret_cast<size_t>(m_pWrapper) + 0xED);
-				if ((unCallCallBackOffset - 5) <= 0xFFFFFFFF) { // E8 00 00 00 00 - call rel32
+				if ((unCallCallBackOffset - 5) <= 0xFFFFFFFE) { // E8 00 00 00 00 - call rel32
 					const unsigned int unOffset = static_cast<unsigned int>(unCallCallBackOffset & 0xFFFFFFFF) - 5;
 					memcpy(pCallCallBack + 1, &unOffset, 4);
 				} else {
-					m_Wrapper->DeAlloc(m_pWrapper);
+					g_HookStorage.DeAlloc(m_pWrapper);
 					m_pWrapper = nullptr;
-					m_Wrapper = nullptr;
 					g_ThreadSuspender.ResumeThreads();
 					return false;
 				}
@@ -82505,13 +82534,12 @@ namespace Detours {
 
 				unsigned char* pCallCallBack = reinterpret_cast<unsigned char*>(m_pWrapper) + 0xDD;
 				const size_t unCallCallBackOffset = reinterpret_cast<size_t>(pCallBack) - (reinterpret_cast<size_t>(m_pWrapper) + 0xDD);
-				if ((unCallCallBackOffset - 5) <= 0xFFFFFFFF) { // E8 00 00 00 00 - call rel32
+				if ((unCallCallBackOffset - 5) <= 0xFFFFFFFE) { // E8 00 00 00 00 - call rel32
 					const unsigned int unOffset = static_cast<unsigned int>(unCallCallBackOffset & 0xFFFFFFFF) - 5;
 					memcpy(pCallCallBack + 1, &unOffset, 4);
 				} else {
-					m_Wrapper->DeAlloc(m_pWrapper);
+					g_HookStorage.DeAlloc(m_pWrapper);
 					m_pWrapper = nullptr;
-					m_Wrapper = nullptr;
 					g_ThreadSuspender.ResumeThreads();
 					return false;
 				}
@@ -82521,13 +82549,12 @@ namespace Detours {
 
 				unsigned char* pCallCallBack = reinterpret_cast<unsigned char*>(m_pWrapper) + 0xDD;
 				const size_t unCallCallBackOffset = reinterpret_cast<size_t>(pCallBack) - (reinterpret_cast<size_t>(m_pWrapper) + 0xDD);
-				if ((unCallCallBackOffset - 5) <= 0xFFFFFFFF) { // E8 00 00 00 00 - call rel32
+				if ((unCallCallBackOffset - 5) <= 0xFFFFFFFE) { // E8 00 00 00 00 - call rel32
 					const unsigned int unOffset = static_cast<unsigned int>(unCallCallBackOffset & 0xFFFFFFFF) - 5;
 					memcpy(pCallCallBack + 1, &unOffset, 4);
 				} else {
-					m_Wrapper->DeAlloc(m_pWrapper);
+					g_HookStorage.DeAlloc(m_pWrapper);
 					m_pWrapper = nullptr;
-					m_Wrapper = nullptr;
 					g_ThreadSuspender.ResumeThreads();
 					return false;
 				}
@@ -82537,13 +82564,12 @@ namespace Detours {
 
 				unsigned char* pCallCallBack = reinterpret_cast<unsigned char*>(m_pWrapper) + 0x95;
 				const size_t unCallCallBackOffset = reinterpret_cast<size_t>(pCallBack) - (reinterpret_cast<size_t>(m_pWrapper) + 0x95);
-				if ((unCallCallBackOffset - 5) <= 0xFFFFFFFF) { // E8 00 00 00 00 - call rel32
+				if ((unCallCallBackOffset - 5) <= 0xFFFFFFFE) { // E8 00 00 00 00 - call rel32
 					const unsigned int unOffset = static_cast<unsigned int>(unCallCallBackOffset & 0xFFFFFFFF) - 5;
 					memcpy(pCallCallBack + 1, &unOffset, 4);
 				} else {
-					m_Wrapper->DeAlloc(m_pWrapper);
+					g_HookStorage.DeAlloc(m_pWrapper);
 					m_pWrapper = nullptr;
-					m_Wrapper = nullptr;
 					g_ThreadSuspender.ResumeThreads();
 					return false;
 				}
@@ -82553,13 +82579,12 @@ namespace Detours {
 
 				unsigned char* pCallCallBack = reinterpret_cast<unsigned char*>(m_pWrapper) + 0x55;
 				const size_t unCallCallBackOffset = reinterpret_cast<size_t>(pCallBack) - (reinterpret_cast<size_t>(m_pWrapper) + 0x55);
-				if ((unCallCallBackOffset - 5) <= 0xFFFFFFFF) { // E8 00 00 00 00 - call rel32
+				if ((unCallCallBackOffset - 5) <= 0xFFFFFFFE) { // E8 00 00 00 00 - call rel32
 					const unsigned int unOffset = static_cast<unsigned int>(unCallCallBackOffset & 0xFFFFFFFF) - 5;
 					memcpy(pCallCallBack + 1, &unOffset, 4);
 				} else {
-					m_Wrapper->DeAlloc(m_pWrapper);
+					g_HookStorage.DeAlloc(m_pWrapper);
 					m_pWrapper = nullptr;
-					m_Wrapper = nullptr;
 					g_ThreadSuspender.ResumeThreads();
 					return false;
 				}
@@ -82569,13 +82594,12 @@ namespace Detours {
 
 				unsigned char* pCallCallBack = reinterpret_cast<unsigned char*>(m_pWrapper) + 0x50;
 				const size_t unCallCallBackOffset = reinterpret_cast<size_t>(pCallBack) - (reinterpret_cast<size_t>(m_pWrapper) + 0x50);
-				if ((unCallCallBackOffset - 5) <= 0xFFFFFFFF) { // E8 00 00 00 00 - call rel32
+				if ((unCallCallBackOffset - 5) <= 0xFFFFFFFE) { // E8 00 00 00 00 - call rel32
 					const unsigned int unOffset = static_cast<unsigned int>(unCallCallBackOffset & 0xFFFFFFFF) - 5;
 					memcpy(pCallCallBack + 1, &unOffset, 4);
 				} else {
-					m_Wrapper->DeAlloc(m_pWrapper);
+					g_HookStorage.DeAlloc(m_pWrapper);
 					m_pWrapper = nullptr;
-					m_Wrapper = nullptr;
 					g_ThreadSuspender.ResumeThreads();
 					return false;
 				}
@@ -82584,11 +82608,11 @@ namespace Detours {
 
 			const size_t unJumpToWrapperOffset = reinterpret_cast<size_t>(m_pWrapper) - reinterpret_cast<size_t>(m_pAddress);
 			size_t unJumpToWrapperSize = 0;
-			if ((unJumpToWrapperOffset - 2) <= 0xFF) {
+			if ((unJumpToWrapperOffset - 2) <= 0xFE) {
 				unJumpToWrapperSize = 2; // EB 00 - jmp rel8
-			} else if ((unJumpToWrapperOffset - 4) <= 0xFFFF) {
+			} else if ((unJumpToWrapperOffset - 4) <= 0xFFFE) {
 				unJumpToWrapperSize = 4; // 66 E9 00 00 - jmp rel16
-			} else if ((unJumpToWrapperOffset - 5) <= 0xFFFFFFFF) {
+			} else if ((unJumpToWrapperOffset - 5) <= 0xFFFFFFFE) {
 				unJumpToWrapperSize = 5; // E9 00 00 00 00 - jmp rel32
 			} else {
 #ifdef _M_X64
@@ -82597,9 +82621,8 @@ namespace Detours {
 				// FF 64 24 F8 - jmp [rsp-8]
 				unJumpToWrapperSize = 20;
 #elif _M_IX86
-				m_Wrapper->DeAlloc(m_pWrapper);
+				g_HookStorage.DeAlloc(m_pWrapper);
 				m_pWrapper = nullptr;
-				m_Wrapper = nullptr;
 				g_ThreadSuspender.ResumeThreads();
 				return false;
 #endif
@@ -82616,9 +82639,8 @@ namespace Detours {
 				if (!RD_SUCCESS(RdDecode(&ins, reinterpret_cast<unsigned char*>(m_pAddress) + unCopyingSize, RD_CODE_32, RD_DATA_32))) {
 #endif
 					m_pAddressAfterJump = nullptr;
-					m_Wrapper->DeAlloc(m_pWrapper);
+					g_HookStorage.DeAlloc(m_pWrapper);
 					m_pWrapper = nullptr;
-					m_Wrapper = nullptr;
 					g_ThreadSuspender.ResumeThreads();
 					return false;
 				}
@@ -82627,26 +82649,24 @@ namespace Detours {
 			}
 
 #ifdef _M_X64
-			m_Trampoline = std::make_unique<NearPage>(0x1000, m_pAddress);
+			m_pTrampoline = g_HookStorage.Alloc(HOOK_RAW_TRAMPOLINE_SIZE, m_pAddress);
 #elif _M_IX86
-			m_Trampoline = std::make_unique<Page>(0x1000);
+			m_pTrampoline = g_HookStorage.Alloc(HOOK_RAW_TRAMPOLINE_SIZE);
 #endif
-			if (!m_Trampoline) {
+			if (!m_pTrampoline) {
 				m_pAddressAfterJump = nullptr;
-				m_Wrapper->DeAlloc(m_pWrapper);
+				g_HookStorage.DeAlloc(m_pWrapper);
 				m_pWrapper = nullptr;
-				m_Wrapper = nullptr;
 				g_ThreadSuspender.ResumeThreads();
 				return false;
 			}
 
-			m_pTrampoline = m_Trampoline->Alloc(0x1000);
-			if (!m_pTrampoline) {
-				m_Trampoline = nullptr;
+			if (!Protection(m_pTrampoline, HOOK_RAW_TRAMPOLINE_SIZE, false).ChangeProtection(PAGE_READWRITE)) {
+				g_HookStorage.DeAlloc(m_pTrampoline);
+				m_pTrampoline = nullptr;
 				m_pAddressAfterJump = nullptr;
-				m_Wrapper->DeAlloc(m_pWrapper);
+				g_HookStorage.DeAlloc(m_pWrapper);
 				m_pWrapper = nullptr;
-				m_Wrapper = nullptr;
 				g_ThreadSuspender.ResumeThreads();
 				return false;
 			}
@@ -82655,16 +82675,16 @@ namespace Detours {
 			if (bHaveAVX512) {
 				unsigned char* pJumpToTrampoline = reinterpret_cast<unsigned char*>(m_pWrapper) + 0x491;
 				const size_t unTrampolineJumpOffset = reinterpret_cast<size_t>(m_pTrampoline) - (reinterpret_cast<size_t>(m_pWrapper) + 0x491);
-				if ((unTrampolineJumpOffset - 2) <= 0xFF) { // EB 00 - jmp rel8
+				if ((unTrampolineJumpOffset - 2) <= 0xFE) { // EB 00 - jmp rel8
 					pJumpToTrampoline[0] = 0xEB;
 					const unsigned char unOffset = static_cast<unsigned char>(unTrampolineJumpOffset & 0xFF) - 2;
 					memcpy(pJumpToTrampoline + 1, &unOffset, 1);
-				} else if ((unTrampolineJumpOffset - 4) <= 0xFFFF) { // 66 E9 00 00 - jmp rel16
+				} else if ((unTrampolineJumpOffset - 4) <= 0xFFFE) { // 66 E9 00 00 - jmp rel16
 					pJumpToTrampoline[0] = 0x66;
 					pJumpToTrampoline[1] = 0xE9;
 					const unsigned short unOffset = static_cast<unsigned short>(unTrampolineJumpOffset & 0xFFFF) - 4;
 					memcpy(pJumpToTrampoline + 2, &unOffset, 2);
-				} else if ((unTrampolineJumpOffset - 5) <= 0xFFFFFFFF) { // E9 00 00 00 00 - jmp rel32
+				} else if ((unTrampolineJumpOffset - 5) <= 0xFFFFFFFE) { // E9 00 00 00 00 - jmp rel32
 					pJumpToTrampoline[0] = 0xE9;
 					const unsigned int unOffset = static_cast<unsigned int>(unTrampolineJumpOffset & 0xFFFFFFFF) - 5;
 					memcpy(pJumpToTrampoline + 1, &unOffset, 4);
@@ -82675,8 +82695,8 @@ namespace Detours {
 
 					const size_t unAddress = reinterpret_cast<size_t>(m_pTrampoline);
 
-					const size_t unAddressLow = unAddress & 0xFFFFFFFF;
-					const size_t unAddressHigh = (unAddress >> 32) & 0xFFFFFFFF;
+					const unsigned int unAddressLow = unAddress & 0xFFFFFFFF;
+					const unsigned int unAddressHigh = (unAddress >> 32) & 0xFFFFFFFF;
 
 					pJumpToTrampoline[ 0] = 0xC7;
 					pJumpToTrampoline[ 1] = 0x44;
@@ -82700,16 +82720,16 @@ namespace Detours {
 			} else if (bHaveAVX) {
 				unsigned char* pJumpToTrampoline = reinterpret_cast<unsigned char*>(m_pWrapper) + 0x2F1;
 				const size_t unTrampolineJumpOffset = reinterpret_cast<size_t>(m_pTrampoline) - (reinterpret_cast<size_t>(m_pWrapper) + 0x2F1);
-				if ((unTrampolineJumpOffset - 2) <= 0xFF) { // EB 00 - jmp rel8
+				if ((unTrampolineJumpOffset - 2) <= 0xFE) { // EB 00 - jmp rel8
 					pJumpToTrampoline[0] = 0xEB;
 					const unsigned char unOffset = static_cast<unsigned char>(unTrampolineJumpOffset & 0xFF) - 2;
 					memcpy(pJumpToTrampoline + 1, &unOffset, 1);
-				} else if ((unTrampolineJumpOffset - 4) <= 0xFFFF) { // 66 E9 00 00 - jmp rel16
+				} else if ((unTrampolineJumpOffset - 4) <= 0xFFFE) { // 66 E9 00 00 - jmp rel16
 					pJumpToTrampoline[0] = 0x66;
 					pJumpToTrampoline[1] = 0xE9;
 					const unsigned short unOffset = static_cast<unsigned short>(unTrampolineJumpOffset & 0xFFFF) - 4;
 					memcpy(pJumpToTrampoline + 2, &unOffset, 2);
-				} else if ((unTrampolineJumpOffset - 5) <= 0xFFFFFFFF) { // E9 00 00 00 00 - jmp rel32
+				} else if ((unTrampolineJumpOffset - 5) <= 0xFFFFFFFE) { // E9 00 00 00 00 - jmp rel32
 					pJumpToTrampoline[0] = 0xE9;
 					const unsigned int unOffset = static_cast<unsigned int>(unTrampolineJumpOffset & 0xFFFFFFFF) - 5;
 					memcpy(pJumpToTrampoline + 1, &unOffset, 4);
@@ -82720,8 +82740,8 @@ namespace Detours {
 
 					const size_t unAddress = reinterpret_cast<size_t>(m_pTrampoline);
 
-					const size_t unAddressLow = unAddress & 0xFFFFFFFF;
-					const size_t unAddressHigh = (unAddress >> 32) & 0xFFFFFFFF;
+					const unsigned int unAddressLow = unAddress & 0xFFFFFFFF;
+					const unsigned int unAddressHigh = (unAddress >> 32) & 0xFFFFFFFF;
 
 					pJumpToTrampoline[ 0] = 0xC7;
 					pJumpToTrampoline[ 1] = 0x44;
@@ -82745,16 +82765,16 @@ namespace Detours {
 			} else if (bHaveSSE) {
 				unsigned char* pJumpToTrampoline = reinterpret_cast<unsigned char*>(m_pWrapper) + 0x2F1;
 				const size_t unTrampolineJumpOffset = reinterpret_cast<size_t>(m_pTrampoline) - (reinterpret_cast<size_t>(m_pWrapper) + 0x2F1);
-				if ((unTrampolineJumpOffset - 2) <= 0xFF) { // EB 00 - jmp rel8
+				if ((unTrampolineJumpOffset - 2) <= 0xFE) { // EB 00 - jmp rel8
 					pJumpToTrampoline[0] = 0xEB;
 					const unsigned char unOffset = static_cast<unsigned char>(unTrampolineJumpOffset & 0xFF) - 2;
 					memcpy(pJumpToTrampoline + 1, &unOffset, 1);
-				} else if ((unTrampolineJumpOffset - 4) <= 0xFFFF) { // 66 E9 00 00 - jmp rel16
+				} else if ((unTrampolineJumpOffset - 4) <= 0xFFFE) { // 66 E9 00 00 - jmp rel16
 					pJumpToTrampoline[0] = 0x66;
 					pJumpToTrampoline[1] = 0xE9;
 					const unsigned short unOffset = static_cast<unsigned short>(unTrampolineJumpOffset & 0xFFFF) - 4;
 					memcpy(pJumpToTrampoline + 2, &unOffset, 2);
-				} else if ((unTrampolineJumpOffset - 5) <= 0xFFFFFFFF) { // E9 00 00 00 00 - jmp rel32
+				} else if ((unTrampolineJumpOffset - 5) <= 0xFFFFFFFE) { // E9 00 00 00 00 - jmp rel32
 					pJumpToTrampoline[0] = 0xE9;
 					const unsigned int unOffset = static_cast<unsigned int>(unTrampolineJumpOffset & 0xFFFFFFFF) - 5;
 					memcpy(pJumpToTrampoline + 1, &unOffset, 4);
@@ -82765,8 +82785,8 @@ namespace Detours {
 
 					const size_t unAddress = reinterpret_cast<size_t>(m_pTrampoline);
 
-					const size_t unAddressLow = unAddress & 0xFFFFFFFF;
-					const size_t unAddressHigh = (unAddress >> 32) & 0xFFFFFFFF;
+					const unsigned int unAddressLow = unAddress & 0xFFFFFFFF;
+					const unsigned int unAddressHigh = (unAddress >> 32) & 0xFFFFFFFF;
 
 					pJumpToTrampoline[ 0] = 0xC7;
 					pJumpToTrampoline[ 1] = 0x44;
@@ -82790,16 +82810,16 @@ namespace Detours {
 			} else if (bHaveMMX) {
 				unsigned char* pJumpToTrampoline = reinterpret_cast<unsigned char*>(m_pWrapper) + 0x1D1;
 				const size_t unTrampolineJumpOffset = reinterpret_cast<size_t>(m_pTrampoline) - (reinterpret_cast<size_t>(m_pWrapper) + 0x1D1);
-				if ((unTrampolineJumpOffset - 2) <= 0xFF) { // EB 00 - jmp rel8
+				if ((unTrampolineJumpOffset - 2) <= 0xFE) { // EB 00 - jmp rel8
 					pJumpToTrampoline[0] = 0xEB;
 					const unsigned char unOffset = static_cast<unsigned char>(unTrampolineJumpOffset & 0xFF) - 2;
 					memcpy(pJumpToTrampoline + 1, &unOffset, 1);
-				} else if ((unTrampolineJumpOffset - 4) <= 0xFFFF) { // 66 E9 00 00 - jmp rel16
+				} else if ((unTrampolineJumpOffset - 4) <= 0xFFFE) { // 66 E9 00 00 - jmp rel16
 					pJumpToTrampoline[0] = 0x66;
 					pJumpToTrampoline[1] = 0xE9;
 					const unsigned short unOffset = static_cast<unsigned short>(unTrampolineJumpOffset & 0xFFFF) - 4;
 					memcpy(pJumpToTrampoline + 2, &unOffset, 2);
-				} else if ((unTrampolineJumpOffset - 5) <= 0xFFFFFFFF) { // E9 00 00 00 00 - jmp rel32
+				} else if ((unTrampolineJumpOffset - 5) <= 0xFFFFFFFE) { // E9 00 00 00 00 - jmp rel32
 					pJumpToTrampoline[0] = 0xE9;
 					const unsigned int unOffset = static_cast<unsigned int>(unTrampolineJumpOffset & 0xFFFFFFFF) - 5;
 					memcpy(pJumpToTrampoline + 1, &unOffset, 4);
@@ -82810,8 +82830,8 @@ namespace Detours {
 
 					const size_t unAddress = reinterpret_cast<size_t>(m_pTrampoline);
 
-					const size_t unAddressLow = unAddress & 0xFFFFFFFF;
-					const size_t unAddressHigh = (unAddress >> 32) & 0xFFFFFFFF;
+					const unsigned int unAddressLow = unAddress & 0xFFFFFFFF;
+					const unsigned int unAddressHigh = (unAddress >> 32) & 0xFFFFFFFF;
 
 					pJumpToTrampoline[ 0] = 0xC7;
 					pJumpToTrampoline[ 1] = 0x44;
@@ -82835,16 +82855,16 @@ namespace Detours {
 			} else if (bHaveFPU) {
 				unsigned char* pJumpToTrampoline = reinterpret_cast<unsigned char*>(m_pWrapper) + 0x151;
 				const size_t unTrampolineJumpOffset = reinterpret_cast<size_t>(m_pTrampoline) - (reinterpret_cast<size_t>(m_pWrapper) + 0x151);
-				if ((unTrampolineJumpOffset - 2) <= 0xFF) { // EB 00 - jmp rel8
+				if ((unTrampolineJumpOffset - 2) <= 0xFE) { // EB 00 - jmp rel8
 					pJumpToTrampoline[0] = 0xEB;
 					const unsigned char unOffset = static_cast<unsigned char>(unTrampolineJumpOffset & 0xFF) - 2;
 					memcpy(pJumpToTrampoline + 1, &unOffset, 1);
-				} else if ((unTrampolineJumpOffset - 4) <= 0xFFFF) { // 66 E9 00 00 - jmp rel16
+				} else if ((unTrampolineJumpOffset - 4) <= 0xFFFE) { // 66 E9 00 00 - jmp rel16
 					pJumpToTrampoline[0] = 0x66;
 					pJumpToTrampoline[1] = 0xE9;
 					const unsigned short unOffset = static_cast<unsigned short>(unTrampolineJumpOffset & 0xFFFF) - 4;
 					memcpy(pJumpToTrampoline + 2, &unOffset, 2);
-				} else if ((unTrampolineJumpOffset - 5) <= 0xFFFFFFFF) { // E9 00 00 00 00 - jmp rel32
+				} else if ((unTrampolineJumpOffset - 5) <= 0xFFFFFFFE) { // E9 00 00 00 00 - jmp rel32
 					pJumpToTrampoline[0] = 0xE9;
 					const unsigned int unOffset = static_cast<unsigned int>(unTrampolineJumpOffset & 0xFFFFFFFF) - 5;
 					memcpy(pJumpToTrampoline + 1, &unOffset, 4);
@@ -82855,8 +82875,8 @@ namespace Detours {
 
 					const size_t unAddress = reinterpret_cast<size_t>(m_pTrampoline);
 
-					const size_t unAddressLow = unAddress & 0xFFFFFFFF;
-					const size_t unAddressHigh = (unAddress >> 32) & 0xFFFFFFFF;
+					const unsigned int unAddressLow = unAddress & 0xFFFFFFFF;
+					const unsigned int unAddressHigh = (unAddress >> 32) & 0xFFFFFFFF;
 
 					pJumpToTrampoline[ 0] = 0xC7;
 					pJumpToTrampoline[ 1] = 0x44;
@@ -82880,16 +82900,16 @@ namespace Detours {
 			} else {
 				unsigned char* pJumpToTrampoline = reinterpret_cast<unsigned char*>(m_pWrapper) + 0x142;
 				const size_t unTrampolineJumpOffset = reinterpret_cast<size_t>(m_pTrampoline) - (reinterpret_cast<size_t>(m_pWrapper) + 0x142);
-				if ((unTrampolineJumpOffset - 2) <= 0xFF) { // EB 00 - jmp rel8
+				if ((unTrampolineJumpOffset - 2) <= 0xFE) { // EB 00 - jmp rel8
 					pJumpToTrampoline[0] = 0xEB;
 					const unsigned char unOffset = static_cast<unsigned char>(unTrampolineJumpOffset & 0xFF) - 2;
 					memcpy(pJumpToTrampoline + 1, &unOffset, 1);
-				} else if ((unTrampolineJumpOffset - 4) <= 0xFFFF) { // 66 E9 00 00 - jmp rel16
+				} else if ((unTrampolineJumpOffset - 4) <= 0xFFFE) { // 66 E9 00 00 - jmp rel16
 					pJumpToTrampoline[0] = 0x66;
 					pJumpToTrampoline[1] = 0xE9;
 					const unsigned short unOffset = static_cast<unsigned short>(unTrampolineJumpOffset & 0xFFFF) - 4;
 					memcpy(pJumpToTrampoline + 2, &unOffset, 2);
-				} else if ((unTrampolineJumpOffset - 5) <= 0xFFFFFFFF) { // E9 00 00 00 00 - jmp rel32
+				} else if ((unTrampolineJumpOffset - 5) <= 0xFFFFFFFE) { // E9 00 00 00 00 - jmp rel32
 					pJumpToTrampoline[0] = 0xE9;
 					const unsigned int unOffset = static_cast<unsigned int>(unTrampolineJumpOffset & 0xFFFFFFFF) - 5;
 					memcpy(pJumpToTrampoline + 1, &unOffset, 4);
@@ -82900,8 +82920,8 @@ namespace Detours {
 
 					const size_t unAddress = reinterpret_cast<size_t>(m_pTrampoline);
 
-					const size_t unAddressLow = unAddress & 0xFFFFFFFF;
-					const size_t unAddressHigh = (unAddress >> 32) & 0xFFFFFFFF;
+					const unsigned int unAddressLow = unAddress & 0xFFFFFFFF;
+					const unsigned int unAddressHigh = (unAddress >> 32) & 0xFFFFFFFF;
 
 					pJumpToTrampoline[ 0] = 0xC7;
 					pJumpToTrampoline[ 1] = 0x44;
@@ -82927,181 +82947,183 @@ namespace Detours {
 			if (bHaveAVX512) {
 				unsigned char* pJumpToTrampoline = reinterpret_cast<unsigned char*>(m_pWrapper) + 0x1D9;
 				const size_t unTrampolineJumpOffset = reinterpret_cast<size_t>(m_pTrampoline) - (reinterpret_cast<size_t>(m_pWrapper) + 0x1D9);
-				if ((unTrampolineJumpOffset - 2) <= 0xFF) { // EB 00 - jmp rel8
+				if ((unTrampolineJumpOffset - 2) <= 0xFE) { // EB 00 - jmp rel8
 					pJumpToTrampoline[0] = 0xEB;
 					const unsigned char unOffset = static_cast<unsigned char>(unTrampolineJumpOffset & 0xFF) - 2;
 					memcpy(pJumpToTrampoline + 1, &unOffset, 1);
-				} else if ((unTrampolineJumpOffset - 4) <= 0xFFFF) { // 66 E9 00 00 - jmp rel16
+				} else if ((unTrampolineJumpOffset - 4) <= 0xFFFE) { // 66 E9 00 00 - jmp rel16
 					pJumpToTrampoline[0] = 0x66;
 					pJumpToTrampoline[1] = 0xE9;
 					const unsigned short unOffset = static_cast<unsigned short>(unTrampolineJumpOffset & 0xFFFF) - 4;
 					memcpy(pJumpToTrampoline + 2, &unOffset, 2);
-				} else if ((unTrampolineJumpOffset - 5) <= 0xFFFFFFFF) { // E9 00 00 00 00 - jmp rel32
+				} else if ((unTrampolineJumpOffset - 5) <= 0xFFFFFFFE) { // E9 00 00 00 00 - jmp rel32
 					pJumpToTrampoline[0] = 0xE9;
 					const unsigned int unOffset = static_cast<unsigned int>(unTrampolineJumpOffset & 0xFFFFFFFF) - 5;
 					memcpy(pJumpToTrampoline + 1, &unOffset, 4);
 				} else {
-					m_Wrapper->DeAlloc(m_pWrapper);
-					m_pWrapper = nullptr;
-					m_Wrapper = nullptr;
-					m_Trampoline->DeAlloc(m_pTrampoline);
+					g_HookStorage.DeAlloc(m_pTrampoline);
 					m_pTrampoline = nullptr;
-					m_Trampoline = nullptr;
+					m_pAddressAfterJump = nullptr;
+					g_HookStorage.DeAlloc(m_pWrapper);
+					m_pWrapper = nullptr;
 					g_ThreadSuspender.ResumeThreads();
 					return false;
 				}
 			} else if (bHaveAVX) {
 				unsigned char* pJumpToTrampoline = reinterpret_cast<unsigned char*>(m_pWrapper) + 0x1B9;
 				const size_t unTrampolineJumpOffset = reinterpret_cast<size_t>(m_pTrampoline) - (reinterpret_cast<size_t>(m_pWrapper) + 0x1B9);
-				if ((unTrampolineJumpOffset - 2) <= 0xFF) { // EB 00 - jmp rel8
+				if ((unTrampolineJumpOffset - 2) <= 0xFE) { // EB 00 - jmp rel8
 					pJumpToTrampoline[0] = 0xEB;
 					const unsigned char unOffset = static_cast<unsigned char>(unTrampolineJumpOffset & 0xFF) - 2;
 					memcpy(pJumpToTrampoline + 1, &unOffset, 1);
-				} else if ((unTrampolineJumpOffset - 4) <= 0xFFFF) { // 66 E9 00 00 - jmp rel16
+				} else if ((unTrampolineJumpOffset - 4) <= 0xFFFE) { // 66 E9 00 00 - jmp rel16
 					pJumpToTrampoline[0] = 0x66;
 					pJumpToTrampoline[1] = 0xE9;
 					const unsigned short unOffset = static_cast<unsigned short>(unTrampolineJumpOffset & 0xFFFF) - 4;
 					memcpy(pJumpToTrampoline + 2, &unOffset, 2);
-				} else if ((unTrampolineJumpOffset - 5) <= 0xFFFFFFFF) { // E9 00 00 00 00 - jmp rel32
+				} else if ((unTrampolineJumpOffset - 5) <= 0xFFFFFFFE) { // E9 00 00 00 00 - jmp rel32
 					pJumpToTrampoline[0] = 0xE9;
 					const unsigned int unOffset = static_cast<unsigned int>(unTrampolineJumpOffset & 0xFFFFFFFF) - 5;
 					memcpy(pJumpToTrampoline + 1, &unOffset, 4);
 				} else {
-					m_Wrapper->DeAlloc(m_pWrapper);
-					m_pWrapper = nullptr;
-					m_Wrapper = nullptr;
-					m_Trampoline->DeAlloc(m_pTrampoline);
+					g_HookStorage.DeAlloc(m_pTrampoline);
 					m_pTrampoline = nullptr;
-					m_Trampoline = nullptr;
+					m_pAddressAfterJump = nullptr;
+					g_HookStorage.DeAlloc(m_pWrapper);
+					m_pWrapper = nullptr;
 					g_ThreadSuspender.ResumeThreads();
 					return false;
 				}
 			} else if (bHaveSSE) {
 				unsigned char* pJumpToTrampoline = reinterpret_cast<unsigned char*>(m_pWrapper) + 0x1B9;
 				const size_t unTrampolineJumpOffset = reinterpret_cast<size_t>(m_pTrampoline) - (reinterpret_cast<size_t>(m_pWrapper) + 0x1B9);
-				if ((unTrampolineJumpOffset - 2) <= 0xFF) { // EB 00 - jmp rel8
+				if ((unTrampolineJumpOffset - 2) <= 0xFE) { // EB 00 - jmp rel8
 					pJumpToTrampoline[0] = 0xEB;
 					const unsigned char unOffset = static_cast<unsigned char>(unTrampolineJumpOffset & 0xFF) - 2;
 					memcpy(pJumpToTrampoline + 1, &unOffset, 1);
-				} else if ((unTrampolineJumpOffset - 4) <= 0xFFFF) { // 66 E9 00 00 - jmp rel16
+				} else if ((unTrampolineJumpOffset - 4) <= 0xFFFE) { // 66 E9 00 00 - jmp rel16
 					pJumpToTrampoline[0] = 0x66;
 					pJumpToTrampoline[1] = 0xE9;
 					const unsigned short unOffset = static_cast<unsigned short>(unTrampolineJumpOffset & 0xFFFF) - 4;
 					memcpy(pJumpToTrampoline + 2, &unOffset, 2);
-				} else if ((unTrampolineJumpOffset - 5) <= 0xFFFFFFFF) { // E9 00 00 00 00 - jmp rel32
+				} else if ((unTrampolineJumpOffset - 5) <= 0xFFFFFFFE) { // E9 00 00 00 00 - jmp rel32
 					pJumpToTrampoline[0] = 0xE9;
 					const unsigned int unOffset = static_cast<unsigned int>(unTrampolineJumpOffset & 0xFFFFFFFF) - 5;
 					memcpy(pJumpToTrampoline + 1, &unOffset, 4);
 				} else {
-					m_Wrapper->DeAlloc(m_pWrapper);
-					m_pWrapper = nullptr;
-					m_Wrapper = nullptr;
-					m_Trampoline->DeAlloc(m_pTrampoline);
+					g_HookStorage.DeAlloc(m_pTrampoline);
 					m_pTrampoline = nullptr;
-					m_Trampoline = nullptr;
+					m_pAddressAfterJump = nullptr;
+					g_HookStorage.DeAlloc(m_pWrapper);
+					m_pWrapper = nullptr;
 					g_ThreadSuspender.ResumeThreads();
 					return false;
 				}
 			} else if (bHaveMMX) {
 				unsigned char* pJumpToTrampoline = reinterpret_cast<unsigned char*>(m_pWrapper) + 0x125;
 				const size_t unTrampolineJumpOffset = reinterpret_cast<size_t>(m_pTrampoline) - (reinterpret_cast<size_t>(m_pWrapper) + 0x125);
-				if ((unTrampolineJumpOffset - 2) <= 0xFF) { // EB 00 - jmp rel8
+				if ((unTrampolineJumpOffset - 2) <= 0xFE) { // EB 00 - jmp rel8
 					pJumpToTrampoline[0] = 0xEB;
 					const unsigned char unOffset = static_cast<unsigned char>(unTrampolineJumpOffset & 0xFF) - 2;
 					memcpy(pJumpToTrampoline + 1, &unOffset, 1);
-				} else if ((unTrampolineJumpOffset - 4) <= 0xFFFF) { // 66 E9 00 00 - jmp rel16
+				} else if ((unTrampolineJumpOffset - 4) <= 0xFFFE) { // 66 E9 00 00 - jmp rel16
 					pJumpToTrampoline[0] = 0x66;
 					pJumpToTrampoline[1] = 0xE9;
 					const unsigned short unOffset = static_cast<unsigned short>(unTrampolineJumpOffset & 0xFFFF) - 4;
 					memcpy(pJumpToTrampoline + 2, &unOffset, 2);
-				} else if ((unTrampolineJumpOffset - 5) <= 0xFFFFFFFF) { // E9 00 00 00 00 - jmp rel32
+				} else if ((unTrampolineJumpOffset - 5) <= 0xFFFFFFFE) { // E9 00 00 00 00 - jmp rel32
 					pJumpToTrampoline[0] = 0xE9;
 					const unsigned int unOffset = static_cast<unsigned int>(unTrampolineJumpOffset & 0xFFFFFFFF) - 5;
 					memcpy(pJumpToTrampoline + 1, &unOffset, 4);
 				} else {
-					m_Wrapper->DeAlloc(m_pWrapper);
-					m_pWrapper = nullptr;
-					m_Wrapper = nullptr;
-					m_Trampoline->DeAlloc(m_pTrampoline);
+					g_HookStorage.DeAlloc(m_pTrampoline);
 					m_pTrampoline = nullptr;
-					m_Trampoline = nullptr;
+					m_pAddressAfterJump = nullptr;
+					g_HookStorage.DeAlloc(m_pWrapper);
+					m_pWrapper = nullptr;
 					g_ThreadSuspender.ResumeThreads();
 					return false;
 				}
 			} else if (bHaveFPU) {
 				unsigned char* pJumpToTrampoline = reinterpret_cast<unsigned char*>(m_pWrapper) + 0xA5;
 				const size_t unTrampolineJumpOffset = reinterpret_cast<size_t>(m_pTrampoline) - (reinterpret_cast<size_t>(m_pWrapper) + 0xA5);
-				if ((unTrampolineJumpOffset - 2) <= 0xFF) { // EB 00 - jmp rel8
+				if ((unTrampolineJumpOffset - 2) <= 0xFE) { // EB 00 - jmp rel8
 					pJumpToTrampoline[0] = 0xEB;
 					const unsigned char unOffset = static_cast<unsigned char>(unTrampolineJumpOffset & 0xFF) - 2;
 					memcpy(pJumpToTrampoline + 1, &unOffset, 1);
-				} else if ((unTrampolineJumpOffset - 4) <= 0xFFFF) { // 66 E9 00 00 - jmp rel16
+				} else if ((unTrampolineJumpOffset - 4) <= 0xFFFE) { // 66 E9 00 00 - jmp rel16
 					pJumpToTrampoline[0] = 0x66;
 					pJumpToTrampoline[1] = 0xE9;
 					const unsigned short unOffset = static_cast<unsigned short>(unTrampolineJumpOffset & 0xFFFF) - 4;
 					memcpy(pJumpToTrampoline + 2, &unOffset, 2);
-				} else if ((unTrampolineJumpOffset - 5) <= 0xFFFFFFFF) { // E9 00 00 00 00 - jmp rel32
+				} else if ((unTrampolineJumpOffset - 5) <= 0xFFFFFFFE) { // E9 00 00 00 00 - jmp rel32
 					pJumpToTrampoline[0] = 0xE9;
 					const unsigned int unOffset = static_cast<unsigned int>(unTrampolineJumpOffset & 0xFFFFFFFF) - 5;
 					memcpy(pJumpToTrampoline + 1, &unOffset, 4);
 				} else {
-					m_Wrapper->DeAlloc(m_pWrapper);
-					m_pWrapper = nullptr;
-					m_Wrapper = nullptr;
-					m_Trampoline->DeAlloc(m_pTrampoline);
+					g_HookStorage.DeAlloc(m_pTrampoline);
 					m_pTrampoline = nullptr;
-					m_Trampoline = nullptr;
+					m_pAddressAfterJump = nullptr;
+					g_HookStorage.DeAlloc(m_pWrapper);
+					m_pWrapper = nullptr;
 					g_ThreadSuspender.ResumeThreads();
 					return false;
 				}
 			} else {
 				unsigned char* pJumpToTrampoline = reinterpret_cast<unsigned char*>(m_pWrapper) + 0x9C;
 				const size_t unTrampolineJumpOffset = reinterpret_cast<size_t>(m_pTrampoline) - (reinterpret_cast<size_t>(m_pWrapper) + 0x9C);
-				if ((unTrampolineJumpOffset - 2) <= 0xFF) { // EB 00 - jmp rel8
+				if ((unTrampolineJumpOffset - 2) <= 0xFE) { // EB 00 - jmp rel8
 					pJumpToTrampoline[0] = 0xEB;
 					const unsigned char unOffset = static_cast<unsigned char>(unTrampolineJumpOffset & 0xFF) - 2;
 					memcpy(pJumpToTrampoline + 1, &unOffset, 1);
-				} else if ((unTrampolineJumpOffset - 4) <= 0xFFFF) { // 66 E9 00 00 - jmp rel16
+				} else if ((unTrampolineJumpOffset - 4) <= 0xFFFE) { // 66 E9 00 00 - jmp rel16
 					pJumpToTrampoline[0] = 0x66;
 					pJumpToTrampoline[1] = 0xE9;
 					const unsigned short unOffset = static_cast<unsigned short>(unTrampolineJumpOffset & 0xFFFF) - 4;
 					memcpy(pJumpToTrampoline + 2, &unOffset, 2);
-				} else if ((unTrampolineJumpOffset - 5) <= 0xFFFFFFFF) { // E9 00 00 00 00 - jmp rel32
+				} else if ((unTrampolineJumpOffset - 5) <= 0xFFFFFFFE) { // E9 00 00 00 00 - jmp rel32
 					pJumpToTrampoline[0] = 0xE9;
 					const unsigned int unOffset = static_cast<unsigned int>(unTrampolineJumpOffset & 0xFFFFFFFF) - 5;
 					memcpy(pJumpToTrampoline + 1, &unOffset, 4);
 				} else {
-					m_Wrapper->DeAlloc(m_pWrapper);
-					m_pWrapper = nullptr;
-					m_Wrapper = nullptr;
-					m_Trampoline->DeAlloc(m_pTrampoline);
+					g_HookStorage.DeAlloc(m_pTrampoline);
 					m_pTrampoline = nullptr;
-					m_Trampoline = nullptr;
+					m_pAddressAfterJump = nullptr;
+					g_HookStorage.DeAlloc(m_pWrapper);
+					m_pWrapper = nullptr;
 					g_ThreadSuspender.ResumeThreads();
 					return false;
 				}
 			}
 #endif
 
-			if (!Protection(m_pWrapper, 0x1000, false).ChangeProtection(PAGE_EXECUTE_READ)) {
-				m_Trampoline->DeAlloc(m_pTrampoline);
+			if (!Protection(m_pWrapper, HOOK_RAW_WRAPPER_SIZE, false).ChangeProtection(PAGE_EXECUTE_READ)) {
+				g_HookStorage.DeAlloc(m_pTrampoline);
 				m_pTrampoline = nullptr;
-				m_Trampoline = nullptr;
 				m_pAddressAfterJump = nullptr;
-				m_Wrapper->DeAlloc(m_pWrapper);
+				g_HookStorage.DeAlloc(m_pWrapper);
 				m_pWrapper = nullptr;
-				m_Wrapper = nullptr;
+				g_ThreadSuspender.ResumeThreads();
+				return false;
+			}
+
+			if (!Protection(m_pTrampoline, HOOK_RAW_TRAMPOLINE_SIZE, false).ChangeProtection(PAGE_READWRITE)) {
+				g_HookStorage.DeAlloc(m_pTrampoline);
+				m_pTrampoline = nullptr;
+				m_pAddressAfterJump = nullptr;
+				g_HookStorage.DeAlloc(m_pWrapper);
+				m_pWrapper = nullptr;
 				g_ThreadSuspender.ResumeThreads();
 				return false;
 			}
 
 			const size_t unJumpToOriginalOffset = (reinterpret_cast<size_t>(m_pAddress) + unJumpToWrapperSize) - (reinterpret_cast<size_t>(m_pTrampoline) + unCopyingSize);
 			size_t unJumpToOriginalSize = 0;
-			if ((unJumpToOriginalOffset - 2) <= 0xFF) { // EB 00 - jmp rel8
+			if ((unJumpToOriginalOffset - 2) <= 0xFE) { // EB 00 - jmp rel8
 				unJumpToOriginalSize = 2;
-			} else if ((unJumpToOriginalOffset - 4) <= 0xFFFF) { // 66 E9 00 00 - jmp rel16
+			} else if ((unJumpToOriginalOffset - 4) <= 0xFFFE) { // 66 E9 00 00 - jmp rel16
 				unJumpToOriginalSize = 4;
-			} else if ((unJumpToOriginalOffset - 5) <= 0xFFFFFFFF) { // E9 00 00 00 00 - jmp rel32
+			} else if ((unJumpToOriginalOffset - 5) <= 0xFFFFFFFE) { // E9 00 00 00 00 - jmp rel32
 				unJumpToOriginalSize = 5;
 			} else {
 #ifdef _M_X64
@@ -83110,19 +83132,17 @@ namespace Detours {
 				// FF 64 24 F8 - jmp [rsp-8]
 				unJumpToOriginalSize = 20;
 #elif _M_IX86
-				m_Trampoline->DeAlloc(m_pTrampoline);
+				g_HookStorage.DeAlloc(m_pTrampoline);
 				m_pTrampoline = nullptr;
-				m_Trampoline = nullptr;
 				m_pAddressAfterJump = nullptr;
-				m_Wrapper->DeAlloc(m_pWrapper);
+				g_HookStorage.DeAlloc(m_pWrapper);
 				m_pWrapper = nullptr;
-				m_Wrapper = nullptr;
 				g_ThreadSuspender.ResumeThreads();
 				return false;
 #endif
 			}
 
-			memset(m_pTrampoline, 0xC3, 0x1000);
+			memset(m_pTrampoline, 0xC3, HOOK_RAW_TRAMPOLINE_SIZE);
 			memcpy(m_pTrampoline, m_pAddress, unCopyingSize);
 
 			for (size_t unIndex = 0; unIndex < unCopyingSize;) {
@@ -83131,13 +83151,11 @@ namespace Detours {
 #elif _M_IX86
 				if (!RD_SUCCESS(RdDecode(&ins, reinterpret_cast<unsigned char*>(m_pTrampoline) + unIndex, RD_CODE_32, RD_DATA_32))) {
 #endif
-					m_Trampoline->DeAlloc(m_pTrampoline);
+					g_HookStorage.DeAlloc(m_pTrampoline);
 					m_pTrampoline = nullptr;
-					m_Trampoline = nullptr;
 					m_pAddressAfterJump = nullptr;
-					m_Wrapper->DeAlloc(m_pWrapper);
+					g_HookStorage.DeAlloc(m_pWrapper);
 					m_pWrapper = nullptr;
-					m_Wrapper = nullptr;
 					g_ThreadSuspender.ResumeThreads();
 					return false;
 				}
@@ -83160,13 +83178,11 @@ namespace Detours {
 							*reinterpret_cast<unsigned int*>(reinterpret_cast<size_t>(m_pTrampoline) + unIndex + ins.DispOffset) = static_cast<unsigned int>(unNewDisp & 0xFFFFFFFF);
 							break;
 						default:
-							m_Trampoline->DeAlloc(m_pTrampoline);
+							g_HookStorage.DeAlloc(m_pTrampoline);
 							m_pTrampoline = nullptr;
-							m_Trampoline = nullptr;
 							m_pAddressAfterJump = nullptr;
-							m_Wrapper->DeAlloc(m_pWrapper);
+							g_HookStorage.DeAlloc(m_pWrapper);
 							m_pWrapper = nullptr;
-							m_Wrapper = nullptr;
 							g_ThreadSuspender.ResumeThreads();
 							return false;
 					}
@@ -83185,13 +83201,11 @@ namespace Detours {
 							*reinterpret_cast<unsigned int*>(reinterpret_cast<size_t>(m_pTrampoline) + unIndex + ins.RelOffsOffset) = static_cast<unsigned int>(unNewOffset & 0xFFFFFFFF);
 							break;
 						default:
-							m_Trampoline->DeAlloc(m_pTrampoline);
+							g_HookStorage.DeAlloc(m_pTrampoline);
 							m_pTrampoline = nullptr;
-							m_Trampoline = nullptr;
 							m_pAddressAfterJump = nullptr;
-							m_Wrapper->DeAlloc(m_pWrapper);
+							g_HookStorage.DeAlloc(m_pWrapper);
 							m_pWrapper = nullptr;
-							m_Wrapper = nullptr;
 							g_ThreadSuspender.ResumeThreads();
 							return false;
 					}
@@ -83202,16 +83216,16 @@ namespace Detours {
 
 			unsigned char* pJumpToOriginal = reinterpret_cast<unsigned char*>(m_pTrampoline) + unCopyingSize;
 			const size_t unTrampolineJumpOffset = (reinterpret_cast<size_t>(m_pAddress) + unJumpToWrapperSize) - (reinterpret_cast<size_t>(m_pTrampoline) + unCopyingSize);
-			if ((unTrampolineJumpOffset - 2) <= 0xFF) { // EB 00 - jmp rel8
+			if ((unTrampolineJumpOffset - 2) <= 0xFE) { // EB 00 - jmp rel8
 				pJumpToOriginal[0] = 0xEB;
 				const unsigned char unOffset = static_cast<unsigned char>(unTrampolineJumpOffset & 0xFF) - 2;
 				memcpy(pJumpToOriginal + 1, &unOffset, 1);
-			} else if ((unTrampolineJumpOffset - 4) <= 0xFFFF) { // 66 E9 00 00 - jmp rel16
+			} else if ((unTrampolineJumpOffset - 4) <= 0xFFFE) { // 66 E9 00 00 - jmp rel16
 				pJumpToOriginal[0] = 0x66;
 				pJumpToOriginal[1] = 0xE9;
 				const unsigned short unOffset = static_cast<unsigned short>(unTrampolineJumpOffset & 0xFFFF) - 4;
 				memcpy(pJumpToOriginal + 2, &unOffset, 2);
-			} else if ((unTrampolineJumpOffset - 5) <= 0xFFFFFFFF) { // E9 00 00 00 00 - jmp rel32
+			} else if ((unTrampolineJumpOffset - 5) <= 0xFFFFFFFE) { // E9 00 00 00 00 - jmp rel32
 				pJumpToOriginal[0] = 0xE9;
 				const unsigned int unOffset = static_cast<unsigned int>(unTrampolineJumpOffset & 0xFFFFFFFF) - 5;
 				memcpy(pJumpToOriginal + 1, &unOffset, 4);
@@ -83223,8 +83237,8 @@ namespace Detours {
 
 				const size_t unAddress = reinterpret_cast<size_t>(m_pAddress) + unJumpToOriginalSize;
 
-				const size_t unAddressLow = unAddress & 0xFFFFFFFF;
-				const size_t unAddressHigh = (unAddress >> 32) & 0xFFFFFFFF;
+				const unsigned int unAddressLow = unAddress & 0xFFFFFFFF;
+				const unsigned int unAddressHigh = (unAddress >> 32) & 0xFFFFFFFF;
 
 				pJumpToOriginal[ 0] = 0xC7;
 				pJumpToOriginal[ 1] = 0x44;
@@ -83245,26 +83259,22 @@ namespace Detours {
 				pJumpToOriginal[18] = 0x24;
 				pJumpToOriginal[19] = 0xF8;
 #elif _M_IX86
-				m_Trampoline->DeAlloc(m_pTrampoline);
+				g_HookStorage.DeAlloc(m_pTrampoline);
 				m_pTrampoline = nullptr;
-				m_Trampoline = nullptr;
 				m_pAddressAfterJump = nullptr;
-				m_Wrapper->DeAlloc(m_pWrapper);
+				g_HookStorage.DeAlloc(m_pWrapper);
 				m_pWrapper = nullptr;
-				m_Wrapper = nullptr;
 				g_ThreadSuspender.ResumeThreads();
 				return false;
 #endif
 			}
 
-			if (!Protection(m_pTrampoline, 0x1000, false).ChangeProtection(PAGE_EXECUTE_READ)) {
-				m_Trampoline->DeAlloc(m_pTrampoline);
+			if (!Protection(m_pTrampoline, HOOK_RAW_TRAMPOLINE_SIZE, false).ChangeProtection(PAGE_EXECUTE_READ)) {
+				g_HookStorage.DeAlloc(m_pTrampoline);
 				m_pTrampoline = nullptr;
-				m_Trampoline = nullptr;
 				m_pAddressAfterJump = nullptr;
-				m_Wrapper->DeAlloc(m_pWrapper);
+				g_HookStorage.DeAlloc(m_pWrapper);
 				m_pWrapper = nullptr;
-				m_Wrapper = nullptr;
 				g_ThreadSuspender.ResumeThreads();
 				return false;
 			}
@@ -83274,13 +83284,11 @@ namespace Detours {
 			m_pOriginalBytes = std::make_unique<unsigned char[]>(unCopyingSize);
 			if (!m_pOriginalBytes) {
 				m_unOriginalBytes = 0;
-				m_Trampoline->DeAlloc(m_pTrampoline);
+				g_HookStorage.DeAlloc(m_pTrampoline);
 				m_pTrampoline = nullptr;
-				m_Trampoline = nullptr;
 				m_pAddressAfterJump = nullptr;
-				m_Wrapper->DeAlloc(m_pWrapper);
+				g_HookStorage.DeAlloc(m_pWrapper);
 				m_pWrapper = nullptr;
-				m_Wrapper = nullptr;
 				g_ThreadSuspender.ResumeThreads();
 				return false;
 			}
@@ -83291,13 +83299,11 @@ namespace Detours {
 			if (!JumpToHookProtection.ChangeProtection(PAGE_READWRITE)) {
 				m_pOriginalBytes = nullptr;
 				m_unOriginalBytes = 0;
-				m_Trampoline->DeAlloc(m_pTrampoline);
+				g_HookStorage.DeAlloc(m_pTrampoline);
 				m_pTrampoline = nullptr;
-				m_Trampoline = nullptr;
 				m_pAddressAfterJump = nullptr;
-				m_Wrapper->DeAlloc(m_pWrapper);
+				g_HookStorage.DeAlloc(m_pWrapper);
 				m_pWrapper = nullptr;
-				m_Wrapper = nullptr;
 				g_ThreadSuspender.ResumeThreads();
 				return false;
 			}
@@ -83305,16 +83311,16 @@ namespace Detours {
 			memset(m_pAddress, 0x90, unCopyingSize);
 
 			unsigned char* pJumpToWrapper = reinterpret_cast<unsigned char*>(m_pAddress);
-			if ((unJumpToWrapperOffset - 2) <= 0xFF) { // EB 00 - jmp rel8
+			if ((unJumpToWrapperOffset - 2) <= 0xFE) { // EB 00 - jmp rel8
 				pJumpToWrapper[0] = 0xEB;
 				const unsigned char unOffset = static_cast<unsigned char>(unJumpToWrapperOffset & 0xFF) - 2;
 				memcpy(pJumpToWrapper + 1, &unOffset, 1);
-			} else if ((unJumpToWrapperOffset - 4) <= 0xFFFF) { // 66 E9 00 00 - jmp rel16
+			} else if ((unJumpToWrapperOffset - 4) <= 0xFFFE) { // 66 E9 00 00 - jmp rel16
 				pJumpToWrapper[0] = 0x66;
 				pJumpToWrapper[1] = 0xE9;
 				const unsigned short unOffset = static_cast<unsigned short>(unJumpToWrapperOffset & 0xFFFF) - 4;
 				memcpy(pJumpToWrapper + 2, &unOffset, 2);
-			} else if ((unJumpToWrapperOffset - 5) <= 0xFFFFFFFF) { // E9 00 00 00 00 - jmp rel32
+			} else if ((unJumpToWrapperOffset - 5) <= 0xFFFFFFFE) { // E9 00 00 00 00 - jmp rel32
 				pJumpToWrapper[0] = 0xE9;
 				const unsigned int unOffset = static_cast<unsigned int>(unJumpToWrapperOffset & 0xFFFFFFFF) - 5;
 				memcpy(pJumpToWrapper + 1, &unOffset, 4);
@@ -83326,8 +83332,8 @@ namespace Detours {
 
 				const size_t unAddress = reinterpret_cast<size_t>(m_pWrapper);
 
-				const size_t unAddressLow = unAddress & 0xFFFFFFFF;
-				const size_t unAddressHigh = (unAddress >> 32) & 0xFFFFFFFF;
+				const unsigned int unAddressLow = unAddress & 0xFFFFFFFF;
+				const unsigned int unAddressHigh = (unAddress >> 32) & 0xFFFFFFFF;
 
 				pJumpToWrapper[ 0] = 0xC7;
 				pJumpToWrapper[ 1] = 0x44;
@@ -83352,13 +83358,11 @@ namespace Detours {
 				JumpToHookProtection.RestoreProtection();
 				m_pOriginalBytes = nullptr;
 				m_unOriginalBytes = 0;
-				m_Trampoline->DeAlloc(m_pTrampoline);
+				g_HookStorage.DeAlloc(m_pTrampoline);
 				m_pTrampoline = nullptr;
-				m_Trampoline = nullptr;
 				m_pAddressAfterJump = nullptr;
-				m_Wrapper->DeAlloc(m_pWrapper);
+				g_HookStorage.DeAlloc(m_pWrapper);
 				m_pWrapper = nullptr;
-				m_Wrapper = nullptr;
 				g_ThreadSuspender.ResumeThreads();
 				return false;
 #endif
@@ -83378,8 +83382,11 @@ namespace Detours {
 				return false;
 			}
 
-			for (size_t unIndex = 0; unIndex < 0x1000; ++unIndex) {
+			for (size_t unIndex = 0; unIndex < HOOK_RAW_WRAPPER_SIZE; ++unIndex) {
 				g_ThreadSuspender.FixExecutionAddress(reinterpret_cast<unsigned char*>(m_pWrapper) + unIndex, reinterpret_cast<unsigned char*>(m_pAddress));
+			}
+
+			for (size_t unIndex = 0; unIndex < HOOK_RAW_TRAMPOLINE_SIZE; ++unIndex) {
 				g_ThreadSuspender.FixExecutionAddress(reinterpret_cast<unsigned char*>(m_pTrampoline) + unIndex, reinterpret_cast<unsigned char*>(m_pAddress) + unIndex);
 			}
 
@@ -83395,11 +83402,12 @@ namespace Detours {
 
 			m_pOriginalBytes = nullptr;
 			m_unOriginalBytes = 0;
+			g_HookStorage.DeAlloc(m_pTrampoline);
 			m_pTrampoline = nullptr;
-			m_Trampoline = nullptr;
 			m_pAddressAfterJump = nullptr;
+			g_HookStorage.DeAlloc(m_pWrapper);
 			m_pWrapper = nullptr;
-			m_Wrapper = nullptr;
+			g_ThreadSuspender.ResumeThreads();
 
 			g_ThreadSuspender.ResumeThreads();
 			return true;

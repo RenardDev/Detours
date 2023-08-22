@@ -1730,6 +1730,7 @@ int _tmain(int nArguments, PTCHAR* pArguments) {
 		_tprintf_s(_T("RawSleepHook.Hook = %d\n"), RawSleepHook.Hook(Sleep_RawHook));
 		Sleep(1000);
 		_tprintf_s(_T("RawSleepHook.UnHook = %d\n"), RawSleepHook.UnHook());
+		_tprintf_s(_T("RawSleepHook.Release = %d\n"), RawSleepHook.Release());
 	}
 
 	// RawHook #2
