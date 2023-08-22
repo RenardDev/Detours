@@ -90,10 +90,11 @@ private:
 	bool m_bBoo;
 };
 
-DATA_SECTION_BEGIN(r1, ".dat"); // Will be in a new `.dat` segment
-__declspec(dllexport) BaseTestingRTTI* g_pBaseTestingRTTI = nullptr;
-__declspec(dllexport) TestingRTTI* g_pTestingRTTI = nullptr;
-DATA_SECTION_END(r1);
+DECLARE_SECTION(".cdata", SECTION_READWRITE)
+DEFINE_SECTION(".cdata")
+
+DEFINE_IN_SECTION(".cdata") __declspec(dllexport) BaseTestingRTTI * g_pBaseTestingRTTI = nullptr;
+DEFINE_IN_SECTION(".cdata")__declspec(dllexport) TestingRTTI* g_pTestingRTTI = nullptr;
 
 DWORD GetUBR() {
 	HKEY hKey = nullptr;

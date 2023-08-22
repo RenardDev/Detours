@@ -81604,7 +81604,10 @@ namespace Detours {
 				HANDLE hThread = nullptr;
 
 				while (true) {
+#pragma warning(push)
+#pragma warning(disable: 6001)
 					const NTSTATUS unStatus = m_pNtGetNextThread(GetCurrentProcess(), hThread, THREAD_QUERY_LIMITED_INFORMATION | THREAD_SUSPEND_RESUME | THREAD_GET_CONTEXT | THREAD_SET_CONTEXT, 0, 0, &hThread);
+#pragma warning(pop)
 					if (!(unStatus >= 0)) {
 						break;
 					}
