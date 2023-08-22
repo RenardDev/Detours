@@ -90,8 +90,8 @@ private:
 	bool m_bBoo;
 };
 
-DECLARE_SECTION(".cdata", SECTION_READWRITE)
-DEFINE_SECTION(".cdata")
+DECLARE_SECTION(".cdata")
+DEFINE_SECTION(".cdata", SECTION_READWRITE)
 
 DEFINE_IN_SECTION(".cdata") __declspec(dllexport) BaseTestingRTTI* g_pBaseTestingRTTI = nullptr;
 DEFINE_IN_SECTION(".cdata") __declspec(dllexport) TestingRTTI* g_pTestingRTTI = nullptr;
