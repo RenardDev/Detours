@@ -1318,30 +1318,6 @@ namespace Detours {
 #endif
 
 		// ----------------------------------------------------------------
-		// FindSignature (AVX)
-		// ----------------------------------------------------------------
-
-		void const* FindSignatureAVX(void const* const pAddress, const size_t unSize, char const* const szSignature, const size_t unOffset = 0, const unsigned int unHash = 0, const unsigned char unIgnoredByte = 0x2A) noexcept;
-		void const* FindSignatureAVX(const HMODULE hModule, char const* const szSignature, const size_t unOffset = 0, const unsigned int unHash = 0, const unsigned char unIgnoredByte = 0x2A) noexcept;
-		void const* FindSignatureAVX(const HMODULE hModule, const std::array<const unsigned char, 8>& SectionName, char const* const szSignature, const size_t unOffset = 0, const unsigned int unHash = 0, const unsigned char unIgnoredByte = 0x2A) noexcept;
-		void const* FindSignatureAVX(const HMODULE hModule, char const* const szSectionName, char const* const szSignature, const size_t unOffset = 0, const unsigned int unHash = 0, const unsigned char unIgnoredByte = 0x2A) noexcept;
-		void const* FindSignatureAVXA(char const* const szModuleName, char const* const szSignature, const size_t unOffset = 0, const unsigned int unHash = 0, const unsigned char unIgnoredByte = 0x2A) noexcept;
-		void const* FindSignatureAVXA(char const* const szModuleName, const std::array<const unsigned char, 8>& SectionName, char const* const szSignature, const size_t unOffset = 0, const unsigned int unHash = 0, const unsigned char unIgnoredByte = 0x2A) noexcept;
-		void const* FindSignatureAVXA(char const* const szModuleName, char const* const szSectionName, char const* const szSignature, const size_t unOffset = 0, const unsigned int unHash = 0, const unsigned char unIgnoredByte = 0x2A) noexcept;
-		void const* FindSignatureAVXW(wchar_t const* const szModuleName, char const* const szSignature, const size_t unOffset = 0, const unsigned int unHash = 0, const unsigned char unIgnoredByte = 0x2A) noexcept;
-		void const* FindSignatureAVXW(wchar_t const* const szModuleName, const std::array<const unsigned char, 8>& SectionName, char const* const szSignature, const size_t unOffset = 0, const unsigned int unHash = 0, const unsigned char unIgnoredByte = 0x2A) noexcept;
-		void const* FindSignatureAVXW(wchar_t const* const szModuleName, char const* const szSectionName, char const* const szSignature, const size_t unOffset = 0, const unsigned int unHash = 0, const unsigned char unIgnoredByte = 0x2A) noexcept;
-#ifdef _UNICODE
-		void const* FindSignatureAVX(wchar_t const* const szModuleName, char const* const szSignature, const size_t unOffset = 0, const unsigned int unHash = 0, const unsigned char unIgnoredByte = 0x2A) noexcept;
-		void const* FindSignatureAVX(wchar_t const* const szModuleName, const std::array<const unsigned char, 8>& SectionName, char const* const szSignature, const size_t unOffset = 0, const unsigned int unHash = 0, const unsigned char unIgnoredByte = 0x2A) noexcept;
-		void const* FindSignatureAVX(wchar_t const* const szModuleName, char const* const szSectionName, char const* const szSignature, const size_t unOffset = 0, const unsigned int unHash = 0, const unsigned char unIgnoredByte = 0x2A) noexcept;
-#else
-		void const* FindSignatureAVX(char const* const szModuleName, char const* const szSignature, const size_t unOffset = 0, const unsigned int unHash = 0, const unsigned char unIgnoredByte = 0x2A) noexcept;
-		void const* FindSignatureAVX(char const* const szModuleName, const std::array<const unsigned char, 8>& SectionName, char const* const szSignature, const size_t unOffset = 0, const unsigned int unHash = 0, const unsigned char unIgnoredByte = 0x2A) noexcept;
-		void const* FindSignatureAVX(char const* const szModuleName, char const* const szSectionName, char const* const szSignature, const size_t unOffset = 0, const unsigned int unHash = 0, const unsigned char unIgnoredByte = 0x2A) noexcept;
-#endif
-
-		// ----------------------------------------------------------------
 		// FindSignature (AVX2)
 		// ----------------------------------------------------------------
 
@@ -1417,144 +1393,120 @@ namespace Detours {
 		// FindData (Native)
 		// ----------------------------------------------------------------
 
-		void const* FindDataNative(void const* const pAddress, const size_t unSize, const unsigned char* const pData, const size_t unDataSize) noexcept;
-		void const* FindDataNative(const HMODULE hModule, const unsigned char* const pData, const size_t unDataSize) noexcept;
-		void const* FindDataNative(const HMODULE hModule, const std::array<const unsigned char, 8>& SectionName, const unsigned char* const pData, const size_t unDataSize) noexcept;
-		void const* FindDataNative(const HMODULE hModule, char const* const szSectionName, const unsigned char* const pData, const size_t unDataSize) noexcept;
-		void const* FindDataNativeA(char const* const szModuleName, const unsigned char* const pData, const size_t unDataSize) noexcept;
-		void const* FindDataNativeA(char const* const szModuleName, const std::array<const unsigned char, 8>& SectionName, const unsigned char* const pData, const size_t unDataSize) noexcept;
-		void const* FindDataNativeA(char const* const szModuleName, char const* const szSectionName, const unsigned char* const pData, const size_t unDataSize) noexcept;
-		void const* FindDataNativeW(wchar_t const* const szModuleName, const unsigned char* const pData, const size_t unDataSize) noexcept;
-		void const* FindDataNativeW(wchar_t const* const szModuleName, const std::array<const unsigned char, 8>& SectionName, const unsigned char* const pData, const size_t unDataSize) noexcept;
-		void const* FindDataNativeW(wchar_t const* const szModuleName, char const* const szSectionName, const unsigned char* const pData, const size_t unDataSize) noexcept;
+		void const* FindDataNative(void const* const pAddress, const size_t unSize, unsigned char const* const pData, const size_t unDataSize) noexcept;
+		void const* FindDataNative(const HMODULE hModule, unsigned char const* const pData, const size_t unDataSize) noexcept;
+		void const* FindDataNative(const HMODULE hModule, const std::array<const unsigned char, 8>& SectionName, unsigned char const* const pData, const size_t unDataSize) noexcept;
+		void const* FindDataNative(const HMODULE hModule, char const* const szSectionName, unsigned char const* const pData, const size_t unDataSize) noexcept;
+		void const* FindDataNativeA(char const* const szModuleName, unsigned char const* const pData, const size_t unDataSize) noexcept;
+		void const* FindDataNativeA(char const* const szModuleName, const std::array<const unsigned char, 8>& SectionName, unsigned char const* const pData, const size_t unDataSize) noexcept;
+		void const* FindDataNativeA(char const* const szModuleName, char const* const szSectionName, unsigned char const* const pData, const size_t unDataSize) noexcept;
+		void const* FindDataNativeW(wchar_t const* const szModuleName, unsigned char const* const pData, const size_t unDataSize) noexcept;
+		void const* FindDataNativeW(wchar_t const* const szModuleName, const std::array<const unsigned char, 8>& SectionName, unsigned char const* const pData, const size_t unDataSize) noexcept;
+		void const* FindDataNativeW(wchar_t const* const szModuleName, char const* const szSectionName, unsigned char const* const pData, const size_t unDataSize) noexcept;
 #ifdef _UNICODE
-		void const* FindDataNative(wchar_t const* const szModuleName, const unsigned char* const pData, const size_t unDataSize) noexcept;
-		void const* FindDataNative(wchar_t const* const szModuleName, const std::array<const unsigned char, 8>& SectionName, const unsigned char* const pData, const size_t unDataSize) noexcept;
-		void const* FindDataNative(wchar_t const* const szModuleName, char const* const szSectionName, const unsigned char* const pData, const size_t unDataSize) noexcept;
+		void const* FindDataNative(wchar_t const* const szModuleName, unsigned char const* const pData, const size_t unDataSize) noexcept;
+		void const* FindDataNative(wchar_t const* const szModuleName, const std::array<const unsigned char, 8>& SectionName, unsigned char const* const pData, const size_t unDataSize) noexcept;
+		void const* FindDataNative(wchar_t const* const szModuleName, char const* const szSectionName, unsigned char const* const pData, const size_t unDataSize) noexcept;
 #else
-		void const* FindDataNative(char const* const szModuleName, const unsigned char* const pData, const size_t unDataSize) noexcept;
-		void const* FindDataNative(char const* const szModuleName, const std::array<const unsigned char, 8>& SectionName, const unsigned char* const pData, const size_t unDataSize) noexcept;
-		void const* FindDataNative(char const* const szModuleName, char const* const szSectionName, const unsigned char* const pData, const size_t unDataSize) noexcept;
+		void const* FindDataNative(char const* const szModuleName, unsigned char const* const pData, const size_t unDataSize) noexcept;
+		void const* FindDataNative(char const* const szModuleName, const std::array<const unsigned char, 8>& SectionName, unsigned char const* const pData, const size_t unDataSize) noexcept;
+		void const* FindDataNative(char const* const szModuleName, char const* const szSectionName, unsigned char const* const pData, const size_t unDataSize) noexcept;
 #endif
 
 		// ----------------------------------------------------------------
 		// FindData (SSE2)
 		// ----------------------------------------------------------------
 
-		void const* FindDataSSE2(void const* const pAddress, const size_t unSize, const unsigned char* const pData, const size_t unDataSize) noexcept;
-		void const* FindDataSSE2(const HMODULE hModule, const unsigned char* const pData, const size_t unDataSize) noexcept;
-		void const* FindDataSSE2(const HMODULE hModule, const std::array<const unsigned char, 8>& SectionName, const unsigned char* const pData, const size_t unDataSize) noexcept;
-		void const* FindDataSSE2(const HMODULE hModule, char const* const szSectionName, const unsigned char* const pData, const size_t unDataSize) noexcept;
-		void const* FindDataSSE2A(char const* const szModuleName, const unsigned char* const pData, const size_t unDataSize) noexcept;
-		void const* FindDataSSE2A(char const* const szModuleName, const std::array<const unsigned char, 8>& SectionName, const unsigned char* const pData, const size_t unDataSize) noexcept;
-		void const* FindDataSSE2A(char const* const szModuleName, char const* const szSectionName, const unsigned char* const pData, const size_t unDataSize) noexcept;
-		void const* FindDataSSE2W(wchar_t const* const szModuleName, const unsigned char* const pData, const size_t unDataSize) noexcept;
-		void const* FindDataSSE2W(wchar_t const* const szModuleName, const std::array<const unsigned char, 8>& SectionName, const unsigned char* const pData, const size_t unDataSize) noexcept;
-		void const* FindDataSSE2W(wchar_t const* const szModuleName, char const* const szSectionName, const unsigned char* const pData, const size_t unDataSize) noexcept;
+		void const* FindDataSSE2(void const* const pAddress, const size_t unSize, unsigned char const* const pData, const size_t unDataSize) noexcept;
+		void const* FindDataSSE2(const HMODULE hModule, unsigned char const* const pData, const size_t unDataSize) noexcept;
+		void const* FindDataSSE2(const HMODULE hModule, const std::array<const unsigned char, 8>& SectionName, unsigned char const* const pData, const size_t unDataSize) noexcept;
+		void const* FindDataSSE2(const HMODULE hModule, char const* const szSectionName, unsigned char const* const pData, const size_t unDataSize) noexcept;
+		void const* FindDataSSE2A(char const* const szModuleName, unsigned char const* const pData, const size_t unDataSize) noexcept;
+		void const* FindDataSSE2A(char const* const szModuleName, const std::array<const unsigned char, 8>& SectionName, unsigned char const* const pData, const size_t unDataSize) noexcept;
+		void const* FindDataSSE2A(char const* const szModuleName, char const* const szSectionName, unsigned char const* const pData, const size_t unDataSize) noexcept;
+		void const* FindDataSSE2W(wchar_t const* const szModuleName, unsigned char const* const pData, const size_t unDataSize) noexcept;
+		void const* FindDataSSE2W(wchar_t const* const szModuleName, const std::array<const unsigned char, 8>& SectionName, unsigned char const* const pData, const size_t unDataSize) noexcept;
+		void const* FindDataSSE2W(wchar_t const* const szModuleName, char const* const szSectionName, unsigned char const* const pData, const size_t unDataSize) noexcept;
 #ifdef _UNICODE
-		void const* FindDataSSE2(wchar_t const* const szModuleName, const unsigned char* const pData, const size_t unDataSize) noexcept;
-		void const* FindDataSSE2(wchar_t const* const szModuleName, const std::array<const unsigned char, 8>& SectionName, const unsigned char* const pData, const size_t unDataSize) noexcept;
-		void const* FindDataSSE2(wchar_t const* const szModuleName, char const* const szSectionName, const unsigned char* const pData, const size_t unDataSize) noexcept;
+		void const* FindDataSSE2(wchar_t const* const szModuleName, unsigned char const* const pData, const size_t unDataSize) noexcept;
+		void const* FindDataSSE2(wchar_t const* const szModuleName, const std::array<const unsigned char, 8>& SectionName, unsigned char const* const pData, const size_t unDataSize) noexcept;
+		void const* FindDataSSE2(wchar_t const* const szModuleName, char const* const szSectionName, unsigned char const* const pData, const size_t unDataSize) noexcept;
 #else
-		void const* FindDataSSE2(char const* const szModuleName, const unsigned char* const pData, const size_t unDataSize) noexcept;
-		void const* FindDataSSE2(char const* const szModuleName, const std::array<const unsigned char, 8>& SectionName, const unsigned char* const pData, const size_t unDataSize) noexcept;
-		void const* FindDataSSE2(char const* const szModuleName, char const* const szSectionName, const unsigned char* const pData, const size_t unDataSize) noexcept;
-#endif
-
-		// ----------------------------------------------------------------
-		// FindData (AVX)
-		// ----------------------------------------------------------------
-
-		void const* FindDataAVX(void const* const pAddress, const size_t unSize, const unsigned char* const pData, const size_t unDataSize) noexcept;
-		void const* FindDataAVX(const HMODULE hModule, const unsigned char* const pData, const size_t unDataSize) noexcept;
-		void const* FindDataAVX(const HMODULE hModule, const std::array<const unsigned char, 8>& SectionName, const unsigned char* const pData, const size_t unDataSize) noexcept;
-		void const* FindDataAVX(const HMODULE hModule, char const* const szSectionName, const unsigned char* const pData, const size_t unDataSize) noexcept;
-		void const* FindDataAVXA(char const* const szModuleName, const unsigned char* const pData, const size_t unDataSize) noexcept;
-		void const* FindDataAVXA(char const* const szModuleName, const std::array<const unsigned char, 8>& SectionName, const unsigned char* const pData, const size_t unDataSize) noexcept;
-		void const* FindDataAVXA(char const* const szModuleName, char const* const szSectionName, const unsigned char* const pData, const size_t unDataSize) noexcept;
-		void const* FindDataAVXW(wchar_t const* const szModuleName, const unsigned char* const pData, const size_t unDataSize) noexcept;
-		void const* FindDataAVXW(wchar_t const* const szModuleName, const std::array<const unsigned char, 8>& SectionName, const unsigned char* const pData, const size_t unDataSize) noexcept;
-		void const* FindDataAVXW(wchar_t const* const szModuleName, char const* const szSectionName, const unsigned char* const pData, const size_t unDataSize) noexcept;
-#ifdef _UNICODE
-		void const* FindDataAVX(wchar_t const* const szModuleName, const unsigned char* const pData, const size_t unDataSize) noexcept;
-		void const* FindDataAVX(wchar_t const* const szModuleName, const std::array<const unsigned char, 8>& SectionName, const unsigned char* const pData, const size_t unDataSize) noexcept;
-		void const* FindDataAVX(wchar_t const* const szModuleName, char const* const szSectionName, const unsigned char* const pData, const size_t unDataSize) noexcept;
-#else
-		void const* FindDataAVX(char const* const szModuleName, const unsigned char* const pData, const size_t unDataSize) noexcept;
-		void const* FindDataAVX(char const* const szModuleName, const std::array<const unsigned char, 8>& SectionName, const unsigned char* const pData, const size_t unDataSize) noexcept;
-		void const* FindDataAVX(char const* const szModuleName, char const* const szSectionName, const unsigned char* const pData, const size_t unDataSize) noexcept;
+		void const* FindDataSSE2(char const* const szModuleName, unsigned char const* const pData, const size_t unDataSize) noexcept;
+		void const* FindDataSSE2(char const* const szModuleName, const std::array<const unsigned char, 8>& SectionName, unsigned char const* const pData, const size_t unDataSize) noexcept;
+		void const* FindDataSSE2(char const* const szModuleName, char const* const szSectionName, unsigned char const* const pData, const size_t unDataSize) noexcept;
 #endif
 
 		// ----------------------------------------------------------------
 		// FindData (AVX2)
 		// ----------------------------------------------------------------
 
-		void const* FindDataAVX2(void const* const pAddress, const size_t unSize, const unsigned char* const pData, const size_t unDataSize) noexcept;
-		void const* FindDataAVX2(const HMODULE hModule, const unsigned char* const pData, const size_t unDataSize) noexcept;
-		void const* FindDataAVX2(const HMODULE hModule, const std::array<const unsigned char, 8>& SectionName, const unsigned char* const pData, const size_t unDataSize) noexcept;
-		void const* FindDataAVX2(const HMODULE hModule, char const* const szSectionName, const unsigned char* const pData, const size_t unDataSize) noexcept;
-		void const* FindDataAVX2A(char const* const szModuleName, const unsigned char* const pData, const size_t unDataSize) noexcept;
-		void const* FindDataAVX2A(char const* const szModuleName, const std::array<const unsigned char, 8>& SectionName, const unsigned char* const pData, const size_t unDataSize) noexcept;
-		void const* FindDataAVX2A(char const* const szModuleName, char const* const szSectionName, const unsigned char* const pData, const size_t unDataSize) noexcept;
-		void const* FindDataAVX2W(wchar_t const* const szModuleName, const unsigned char* const pData, const size_t unDataSize) noexcept;
-		void const* FindDataAVX2W(wchar_t const* const szModuleName, const std::array<const unsigned char, 8>& SectionName, const unsigned char* const pData, const size_t unDataSize) noexcept;
-		void const* FindDataAVX2W(wchar_t const* const szModuleName, char const* const szSectionName, const unsigned char* const pData, const size_t unDataSize) noexcept;
+		void const* FindDataAVX2(void const* const pAddress, const size_t unSize, unsigned char const* const pData, const size_t unDataSize) noexcept;
+		void const* FindDataAVX2(const HMODULE hModule, unsigned char const* const pData, const size_t unDataSize) noexcept;
+		void const* FindDataAVX2(const HMODULE hModule, const std::array<const unsigned char, 8>& SectionName, unsigned char const* const pData, const size_t unDataSize) noexcept;
+		void const* FindDataAVX2(const HMODULE hModule, char const* const szSectionName, unsigned char const* const pData, const size_t unDataSize) noexcept;
+		void const* FindDataAVX2A(char const* const szModuleName, unsigned char const* const pData, const size_t unDataSize) noexcept;
+		void const* FindDataAVX2A(char const* const szModuleName, const std::array<const unsigned char, 8>& SectionName, unsigned char const* const pData, const size_t unDataSize) noexcept;
+		void const* FindDataAVX2A(char const* const szModuleName, char const* const szSectionName, unsigned char const* const pData, const size_t unDataSize) noexcept;
+		void const* FindDataAVX2W(wchar_t const* const szModuleName, unsigned char const* const pData, const size_t unDataSize) noexcept;
+		void const* FindDataAVX2W(wchar_t const* const szModuleName, const std::array<const unsigned char, 8>& SectionName, unsigned char const* const pData, const size_t unDataSize) noexcept;
+		void const* FindDataAVX2W(wchar_t const* const szModuleName, char const* const szSectionName, unsigned char const* const pData, const size_t unDataSize) noexcept;
 #ifdef _UNICODE
-		void const* FindDataAVX2(wchar_t const* const szModuleName, const unsigned char* const pData, const size_t unDataSize) noexcept;
-		void const* FindDataAVX2(wchar_t const* const szModuleName, const std::array<const unsigned char, 8>& SectionName, const unsigned char* const pData, const size_t unDataSize) noexcept;
-		void const* FindDataAVX2(wchar_t const* const szModuleName, char const* const szSectionName, const unsigned char* const pData, const size_t unDataSize) noexcept;
+		void const* FindDataAVX2(wchar_t const* const szModuleName, unsigned char const* const pData, const size_t unDataSize) noexcept;
+		void const* FindDataAVX2(wchar_t const* const szModuleName, const std::array<const unsigned char, 8>& SectionName, unsigned char const* const pData, const size_t unDataSize) noexcept;
+		void const* FindDataAVX2(wchar_t const* const szModuleName, char const* const szSectionName, unsigned char const* const pData, const size_t unDataSize) noexcept;
 #else
-		void const* FindDataAVX2(char const* const szModuleName, const unsigned char* const pData, const size_t unDataSize) noexcept;
-		void const* FindDataAVX2(char const* const szModuleName, const std::array<const unsigned char, 8>& SectionName, const unsigned char* const pData, const size_t unDataSize) noexcept;
-		void const* FindDataAVX2(char const* const szModuleName, char const* const szSectionName, const unsigned char* const pData, const size_t unDataSize) noexcept;
+		void const* FindDataAVX2(char const* const szModuleName, unsigned char const* const pData, const size_t unDataSize) noexcept;
+		void const* FindDataAVX2(char const* const szModuleName, const std::array<const unsigned char, 8>& SectionName, unsigned char const* const pData, const size_t unDataSize) noexcept;
+		void const* FindDataAVX2(char const* const szModuleName, char const* const szSectionName, unsigned char const* const pData, const size_t unDataSize) noexcept;
 #endif
 
 		// ----------------------------------------------------------------
 		// FindData (AVX512) [AVX512BW]
 		// ----------------------------------------------------------------
 
-		void const* FindDataAVX512(void const* const pAddress, const size_t unSize, const unsigned char* const pData, const size_t unDataSize) noexcept;
-		void const* FindDataAVX512(const HMODULE hModule, const unsigned char* const pData, const size_t unDataSize) noexcept;
-		void const* FindDataAVX512(const HMODULE hModule, const std::array<const unsigned char, 8>& SectionName, const unsigned char* const pData, const size_t unDataSize) noexcept;
-		void const* FindDataAVX512(const HMODULE hModule, char const* const szSectionName, const unsigned char* const pData, const size_t unDataSize) noexcept;
-		void const* FindDataAVX512A(char const* const szModuleName, const unsigned char* const pData, const size_t unDataSize) noexcept;
-		void const* FindDataAVX512A(char const* const szModuleName, const std::array<const unsigned char, 8>& SectionName, const unsigned char* const pData, const size_t unDataSize) noexcept;
-		void const* FindDataAVX512A(char const* const szModuleName, char const* const szSectionName, const unsigned char* const pData, const size_t unDataSize) noexcept;
-		void const* FindDataAVX512W(wchar_t const* const szModuleName, const unsigned char* const pData, const size_t unDataSize) noexcept;
-		void const* FindDataAVX512W(wchar_t const* const szModuleName, const std::array<const unsigned char, 8>& SectionName, const unsigned char* const pData, const size_t unDataSize) noexcept;
-		void const* FindDataAVX512W(wchar_t const* const szModuleName, char const* const szSectionName, const unsigned char* const pData, const size_t unDataSize) noexcept;
+		void const* FindDataAVX512(void const* const pAddress, const size_t unSize, unsigned char const* const pData, const size_t unDataSize) noexcept;
+		void const* FindDataAVX512(const HMODULE hModule, unsigned char const* const pData, const size_t unDataSize) noexcept;
+		void const* FindDataAVX512(const HMODULE hModule, const std::array<const unsigned char, 8>& SectionName, unsigned char const* const pData, const size_t unDataSize) noexcept;
+		void const* FindDataAVX512(const HMODULE hModule, char const* const szSectionName, unsigned char const* const pData, const size_t unDataSize) noexcept;
+		void const* FindDataAVX512A(char const* const szModuleName, unsigned char const* const pData, const size_t unDataSize) noexcept;
+		void const* FindDataAVX512A(char const* const szModuleName, const std::array<const unsigned char, 8>& SectionName, unsigned char const* const pData, const size_t unDataSize) noexcept;
+		void const* FindDataAVX512A(char const* const szModuleName, char const* const szSectionName, unsigned char const* const pData, const size_t unDataSize) noexcept;
+		void const* FindDataAVX512W(wchar_t const* const szModuleName, unsigned char const* const pData, const size_t unDataSize) noexcept;
+		void const* FindDataAVX512W(wchar_t const* const szModuleName, const std::array<const unsigned char, 8>& SectionName, unsigned char const* const pData, const size_t unDataSize) noexcept;
+		void const* FindDataAVX512W(wchar_t const* const szModuleName, char const* const szSectionName, unsigned char const* const pData, const size_t unDataSize) noexcept;
 #ifdef _UNICODE
-		void const* FindDataAVX512(wchar_t const* const szModuleName, const unsigned char* const pData, const size_t unDataSize) noexcept;
-		void const* FindDataAVX512(wchar_t const* const szModuleName, const std::array<const unsigned char, 8>& SectionName, const unsigned char* const pData, const size_t unDataSize) noexcept;
-		void const* FindDataAVX512(wchar_t const* const szModuleName, char const* const szSectionName, const unsigned char* const pData, const size_t unDataSize) noexcept;
+		void const* FindDataAVX512(wchar_t const* const szModuleName, unsigned char const* const pData, const size_t unDataSize) noexcept;
+		void const* FindDataAVX512(wchar_t const* const szModuleName, const std::array<const unsigned char, 8>& SectionName, unsigned char const* const pData, const size_t unDataSize) noexcept;
+		void const* FindDataAVX512(wchar_t const* const szModuleName, char const* const szSectionName, unsigned char const* const pData, const size_t unDataSize) noexcept;
 #else
-		void const* FindDataAVX512(char const* const szModuleName, const unsigned char* const pData, const size_t unDataSize) noexcept;
-		void const* FindDataAVX512(char const* const szModuleName, const std::array<const unsigned char, 8>& SectionName, const unsigned char* const pData, const size_t unDataSize) noexcept;
-		void const* FindDataAVX512(char const* const szModuleName, char const* const szSectionName, const unsigned char* const pData, const size_t unDataSize) noexcept;
+		void const* FindDataAVX512(char const* const szModuleName, unsigned char const* const pData, const size_t unDataSize) noexcept;
+		void const* FindDataAVX512(char const* const szModuleName, const std::array<const unsigned char, 8>& SectionName, unsigned char const* const pData, const size_t unDataSize) noexcept;
+		void const* FindDataAVX512(char const* const szModuleName, char const* const szSectionName, unsigned char const* const pData, const size_t unDataSize) noexcept;
 #endif
 
 		// ----------------------------------------------------------------
 		// FindData (Auto)
 		// ----------------------------------------------------------------
 
-		void const* FindData(void const* const pAddress, const size_t unSize, const unsigned char* const pData, const size_t unDataSize) noexcept;
-		void const* FindData(const HMODULE hModule, const unsigned char* const pData, const size_t unDataSize) noexcept;
-		void const* FindData(const HMODULE hModule, const std::array<const unsigned char, 8>& SectionName, const unsigned char* const pData, const size_t unDataSize) noexcept;
-		void const* FindData(const HMODULE hModule, char const* const szSectionName, const unsigned char* const pData, const size_t unDataSize) noexcept;
-		void const* FindDataA(char const* const szModuleName, const unsigned char* const pData, const size_t unDataSize) noexcept;
-		void const* FindDataA(char const* const szModuleName, const std::array<const unsigned char, 8>& SectionName, const unsigned char* const pData, const size_t unDataSize) noexcept;
-		void const* FindDataA(char const* const szModuleName, char const* const szSectionName, const unsigned char* const pData, const size_t unDataSize) noexcept;
-		void const* FindDataW(wchar_t const* const szModuleName, const unsigned char* const pData, const size_t unDataSize) noexcept;
-		void const* FindDataW(wchar_t const* const szModuleName, const std::array<const unsigned char, 8>& SectionName, const unsigned char* const pData, const size_t unDataSize) noexcept;
-		void const* FindDataW(wchar_t const* const szModuleName, char const* const szSectionName, const unsigned char* const pData, const size_t unDataSize) noexcept;
+		void const* FindData(void const* const pAddress, const size_t unSize, unsigned char const* const pData, const size_t unDataSize) noexcept;
+		void const* FindData(const HMODULE hModule, unsigned char const* const pData, const size_t unDataSize) noexcept;
+		void const* FindData(const HMODULE hModule, const std::array<const unsigned char, 8>& SectionName, unsigned char const* const pData, const size_t unDataSize) noexcept;
+		void const* FindData(const HMODULE hModule, char const* const szSectionName, unsigned char const* const pData, const size_t unDataSize) noexcept;
+		void const* FindDataA(char const* const szModuleName, unsigned char const* const pData, const size_t unDataSize) noexcept;
+		void const* FindDataA(char const* const szModuleName, const std::array<const unsigned char, 8>& SectionName, unsigned char const* const pData, const size_t unDataSize) noexcept;
+		void const* FindDataA(char const* const szModuleName, char const* const szSectionName, unsigned char const* const pData, const size_t unDataSize) noexcept;
+		void const* FindDataW(wchar_t const* const szModuleName, unsigned char const* const pData, const size_t unDataSize) noexcept;
+		void const* FindDataW(wchar_t const* const szModuleName, const std::array<const unsigned char, 8>& SectionName, unsigned char const* const pData, const size_t unDataSize) noexcept;
+		void const* FindDataW(wchar_t const* const szModuleName, char const* const szSectionName, unsigned char const* const pData, const size_t unDataSize) noexcept;
 #ifdef _UNICODE
-		void const* FindData(wchar_t const* const szModuleName, const unsigned char* const pData, const size_t unDataSize) noexcept;
-		void const* FindData(wchar_t const* const szModuleName, const std::array<const unsigned char, 8>& SectionName, const unsigned char* const pData, const size_t unDataSize) noexcept;
-		void const* FindData(wchar_t const* const szModuleName, char const* const szSectionName, const unsigned char* const pData, const size_t unDataSize) noexcept;
+		void const* FindData(wchar_t const* const szModuleName, unsigned char const* const pData, const size_t unDataSize) noexcept;
+		void const* FindData(wchar_t const* const szModuleName, const std::array<const unsigned char, 8>& SectionName, unsigned char const* const pData, const size_t unDataSize) noexcept;
+		void const* FindData(wchar_t const* const szModuleName, char const* const szSectionName, unsigned char const* const pData, const size_t unDataSize) noexcept;
 #else
-		void const* FindData(char const* const szModuleName, const unsigned char* const pData, const size_t unDataSize) noexcept;
-		void const* FindData(char const* const szModuleName, const std::array<const unsigned char, 8>& SectionName, const unsigned char* const pData, const size_t unDataSize) noexcept;
-		void const* FindData(char const* const szModuleName, char const* const szSectionName, const unsigned char* const pData, const size_t unDataSize) noexcept;
+		void const* FindData(char const* const szModuleName, unsigned char const* const pData, const size_t unDataSize) noexcept;
+		void const* FindData(char const* const szModuleName, const std::array<const unsigned char, 8>& SectionName, unsigned char const* const pData, const size_t unDataSize) noexcept;
+		void const* FindData(char const* const szModuleName, char const* const szSectionName, unsigned char const* const pData, const size_t unDataSize) noexcept;
 #endif
 	}
 
