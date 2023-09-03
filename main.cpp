@@ -647,7 +647,12 @@ void WINAPI Sleep_Hook(DWORD dwMilliseconds) {
 }
 
 Detours::Hook::RawHook RawSleepHook;
+#ifdef _M_X64
+bool __fastcall Sleep_RawHook(Detours::Hook::PRAW_HOOK_CONTEXT pCTX) {
+#elif _M_IX86
 bool __cdecl Sleep_RawHook(Detours::Hook::PRAW_HOOK_CONTEXT pCTX) {
+#endif
+#if defined(_DEBUG) || !defined(_M_X64) // NOTE: Using a stack inside a RawHook callback will produce unpredictable results.
 	_tprintf_s(_T("[Sleep_RawHook] Hook called!\n"));
 
 	int cpuinfo[4];
@@ -785,7 +790,6 @@ bool __cdecl Sleep_RawHook(Detours::Hook::PRAW_HOOK_CONTEXT pCTX) {
 			_tprintf_s(_T("%02X"), pCTX->m_ZMM6.m_un8[i]);
 		}
 		_tprintf_s(_T("\n"));
-
 
 		_tprintf_s(_T("  -> ZMM7  = 0x"));
 		for (int i = 63; i >= 0; --i) {
@@ -1135,9 +1139,11 @@ bool __cdecl Sleep_RawHook(Detours::Hook::PRAW_HOOK_CONTEXT pCTX) {
 		_tprintf_s(_T("\n"));
 #endif
 	}
+#endif // _DEBUG || !_M_X64
 
 #ifdef _M_X64
-	// Not needed for x86_64
+	pCTX->m_unRSP -= 8;
+	*reinterpret_cast<unsigned long long*>(pCTX->m_unRSP) = reinterpret_cast<unsigned long long>(RawSleepHook.GetTrampoline());
 #elif _M_IX86
 	unsigned int unIP = *reinterpret_cast<unsigned int*>(pCTX->m_unESP); // Getting return address
 	pCTX->m_unESP += 4; // Clearing argument
@@ -1149,14 +1155,18 @@ bool __cdecl Sleep_RawHook(Detours::Hook::PRAW_HOOK_CONTEXT pCTX) {
 
 Detours::Hook::RAW_HOOK_M128 g_LastXMM7;
 
+#ifdef _M_X64
+bool __fastcall Sleep_RawHookMod(Detours::Hook::PRAW_HOOK_CONTEXT pCTX) {
+#elif _M_IX86
 bool __cdecl Sleep_RawHookMod(Detours::Hook::PRAW_HOOK_CONTEXT pCTX) {
-
+#endif
 	g_LastXMM7 = pCTX->m_XMM7;
 	pCTX->m_XMM7.m_un64[0] = 0x1122334455667788;
 	pCTX->m_XMM7.m_un64[1] = 0x1122334455667788;
 
 #ifdef _M_X64
-	// Not needed for x86_64
+	pCTX->m_unRSP -= 8;
+	*reinterpret_cast<unsigned long long*>(pCTX->m_unRSP) = reinterpret_cast<unsigned long long>(RawSleepHook.GetTrampoline());
 #elif _M_IX86
 	unsigned int unIP = *reinterpret_cast<unsigned int*>(pCTX->m_unESP); // Getting return address
 	pCTX->m_unESP += 4; // Clearing argument
@@ -1167,15 +1177,20 @@ bool __cdecl Sleep_RawHookMod(Detours::Hook::PRAW_HOOK_CONTEXT pCTX) {
 }
 
 Detours::Hook::RawHook RawCPUIDHook;
-bool __cdecl CPUID_RawHook(Detours::Hook::PRAW_HOOK_CONTEXT pCTX) {
 
+#ifdef _M_X64
+bool __fastcall CPUID_RawHook(Detours::Hook::PRAW_HOOK_CONTEXT pCTX) {
+#elif _M_IX86
+bool __cdecl CPUID_RawHook(Detours::Hook::PRAW_HOOK_CONTEXT pCTX) {
+#endif
 #ifdef _M_X64
 	pCTX->m_unEBX = 0x11223344;
 	pCTX->m_unRSP -= 8;
 	*reinterpret_cast<unsigned long long*>(pCTX->m_unRSP) = reinterpret_cast<unsigned long long>(RawCPUIDHook.GetTrampoline()) + 2; // Trampoline + Skip `cpuid`
 #elif _M_IX86
-	pCTX->m_unESI = 0x11223344;
-	*reinterpret_cast<unsigned int*>(pCTX->m_unESP) = reinterpret_cast<unsigned int>(RawCPUIDHook.GetAddressAfterJump());
+	pCTX->m_unEBX = 0x11223344;
+	pCTX->m_unESP -= 4;
+	*reinterpret_cast<unsigned int*>(pCTX->m_unESP) = reinterpret_cast<unsigned int>(RawCPUIDHook.GetTrampoline()) + 2; // Trampoline + Skip `cpuid`
 #endif
 
 	return true;
@@ -1197,7 +1212,7 @@ void DemoRawHook() { SELF_EXPORT("DemoHook");
 		}
 
 		if (ins.Instruction == Detours::rddisasm::RD_INS_CLASS::RD_INS_CPUID) {
-			_tprintf_s(_T("Found cpuid instruction!\n"));
+			_tprintf_s(_T("Found `cpuid` instruction!\n"));
 			pFoundCPUID = reinterpret_cast<void*>(reinterpret_cast<char*>(DemoRawHook) + unOffset);
 			break;
 		}
@@ -1525,8 +1540,8 @@ int _tmain(int nArguments, PTCHAR* pArguments) {
 		if (pVTable) {
 			// __thiscall - 1st arg (this) = ecx
 			// __fastcall - 1st arg = ecx, 2nd arg = edx
-			using fnFoo = bool(__fastcall*)(void* pThis, void* /* unused */);
-			using fnBoo = bool(__fastcall*)(void* pThis, void* /* unused */);
+			using fnFoo = bool(__fastcall*)(void* pThis, void*);
+			using fnBoo = bool(__fastcall*)(void* pThis, void*);
 
 			_tprintf_s(_T("  > foo() = %d\n"), reinterpret_cast<fnFoo>(pVTable[0])(g_pTestingRTTI, nullptr));
 			_tprintf_s(_T("  > boo() = %d\n"), reinterpret_cast<fnBoo>(pVTable[1])(g_pTestingRTTI, nullptr));
@@ -1680,8 +1695,8 @@ int _tmain(int nArguments, PTCHAR* pArguments) {
 		if (pHookingVTable) {
 			// __thiscall - 1st arg (this) = ecx
 			// __fastcall - 1st arg = ecx, 2nd arg = edx
-			using fnFoo = bool(__fastcall*)(void* pThis, void* /* unused */);
-			using fnBoo = bool(__fastcall*)(void* pThis, void* /* unused */);
+			using fnFoo = bool(__fastcall*)(void* pThis, void*);
+			using fnBoo = bool(__fastcall*)(void* pThis, void*);
 
 			_tprintf_s(_T("  > foo() = %d\n"), reinterpret_cast<fnFoo>(pHookingVTable[0])(g_pTestingRTTI, nullptr));
 			_tprintf_s(_T("  > boo() = %d\n"), reinterpret_cast<fnBoo>(pHookingVTable[1])(g_pTestingRTTI, nullptr));

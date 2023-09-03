@@ -8,6 +8,7 @@
 
 // Default
 #include <Windows.h>
+#include <TlHelp32.h>
 
 // Advanced
 #include <intrin.h>
@@ -601,19 +602,19 @@
 
 // Hook
 #ifndef HOOK_STORAGE_CAPACITY
-#define HOOK_STORAGE_CAPACITY 0x800000 // 8 MiB
+#define HOOK_STORAGE_CAPACITY 0x800000 // 8 MiB - Max memory usage for hooks.
 #endif // !HOOK_STORAGE_CAPACITY
 
 #ifndef HOOK_INLINE_TRAMPOLINE_SIZE
-#define HOOK_INLINE_TRAMPOLINE_SIZE 45 // Max instruction size is 15 bytes. Reserving the trampoline for 3 instructions.
+#define HOOK_INLINE_TRAMPOLINE_SIZE 45 // Reserving the trampoline for 3 instructions - Max instruction size is 15 bytes.
 #endif // !HOOK_INLINE_TRAMPOLINE_SIZE
 
 #ifndef HOOK_RAW_WRAPPER_SIZE
-#define HOOK_RAW_WRAPPER_SIZE 0x800 // Max wrapper size. (Reserved)
+#define HOOK_RAW_WRAPPER_SIZE 0x800 // Max wrapper size.
 #endif // !HOOK_RAW_WRAPPER_SIZE
 
 #ifndef HOOK_RAW_TRAMPOLINE_SIZE
-#define HOOK_RAW_TRAMPOLINE_SIZE 45 // Max instruction size is 15 bytes. Reserving the trampoline for 3 instructions.
+#define HOOK_RAW_TRAMPOLINE_SIZE 45 // Reserving the trampoline for 3 instructions - Max instruction size is 15 bytes.
 #endif // !HOOK_RAW_TRAMPOLINE_SIZE
 
 // ----------------------------------------------------------------
@@ -1020,8 +1021,10 @@ namespace Detours {
 
 #ifdef _M_X64
 	typedef CLIENT_ID64 CLIENT_ID;
+	typedef PCLIENT_ID64 PCLIENT_ID;
 #elif _M_IX86
 	typedef CLIENT_ID32 CLIENT_ID;
+	typedef PCLIENT_ID32 PCLIENT_ID;
 #endif
 
 	typedef struct _ACTIVATION_CONTEXT_STACK {
@@ -1656,12 +1659,6 @@ namespace Detours {
 	namespace Memory {
 
 		// ----------------------------------------------------------------
-		// Definitions
-		// ----------------------------------------------------------------
-
-		using fnVirtualProtect = BOOL(WINAPI*)(LPVOID lpAddress, SIZE_T dwSize, DWORD flNewProtect, PDWORD lpflOldProtect);
-
-		// ----------------------------------------------------------------
 		// Server
 		// ----------------------------------------------------------------
 
@@ -1744,7 +1741,7 @@ namespace Detours {
 		class NearPage {
 		public:
 			NearPage(size_t unCapacity = 0, void* pDesiredAddress = nullptr);
-			~NearPage() = default;
+			~NearPage();
 
 			void* Alloc(size_t unSize);
 			bool DeAlloc(void* pAddress);
@@ -1852,7 +1849,6 @@ namespace Detours {
 			void const* const m_pAddress;
 			const size_t m_unSize;
 			const bool m_bAutoRestore;
-			fnVirtualProtect m_pVirtualProtect;
 			DWORD m_unOriginalProtection;
 		};
 	}
@@ -4835,28 +4831,21 @@ namespace Detours {
 		} THREAD_SUSPENDER_DATA, *PTHREAD_SUSPENDER_DATA;
 
 		// ----------------------------------------------------------------
-		// fnNtGetNextThread
-		// ----------------------------------------------------------------
-
-		typedef LONG(NTAPI* fnNtGetNextThread)(HANDLE ProcessHandle, HANDLE ThreadHandle, ACCESS_MASK DesiredAccess, ULONG HandleAttributes, ULONG Flags, PHANDLE NewThreadHandle);
-
-		// ----------------------------------------------------------------
 		// Thread Suspender
 		// ----------------------------------------------------------------
 
 		class ThreadSuspender {
 		public:
-			ThreadSuspender();
+			ThreadSuspender() = default;
 			~ThreadSuspender();
 
 		public:
-			void SuspendThreads();
+			bool SuspendThreads();
 			void ResumeThreads();
 			void FixExecutionAddress(void* pAddress, void* pNewAddress);
 
 		private:
 			std::deque<THREAD_SUSPENDER_DATA> m_Threads;
-			fnNtGetNextThread m_pNtGetNextThread;
 			std::mutex m_ThreadSuspenderMutex;
 		};
 
@@ -5109,13 +5098,15 @@ namespace Detours {
 			float m_f32[16];
 		} RAW_HOOK_M512, *PRAW_HOOK_M512;
 
+#pragma pack(pop, r1)
+
 		typedef struct _RAW_HOOK_CONTEXT32 {
 
 			// ----------------------------------------------------------------
 			// Flags
 			// ----------------------------------------------------------------
 
-			union { // Offset: 0x0000
+			union {
 				unsigned int m_unEFLAGS;
 				unsigned short m_unFLAGS;
 				struct {
@@ -5150,19 +5141,19 @@ namespace Detours {
 			// Segments
 			// ----------------------------------------------------------------
 
-			unsigned short m_unCS; // Offset: 0x0004
-			unsigned short m_unDS; // Offset: 0x0006
-			unsigned short m_unSS; // Offset: 0x0008
-			unsigned short m_unES; // Offset: 0x000A
-			unsigned short m_unFS; // Offset: 0x000C
-			unsigned short m_unGS; // Offset: 0x000E
+			unsigned short m_unCS;
+			unsigned short m_unDS;
+			unsigned short m_unSS;
+			unsigned short m_unES;
+			unsigned short m_unFS;
+			unsigned short m_unGS;
 
 			// ----------------------------------------------------------------
 			// Registers (General)
 			// ----------------------------------------------------------------
 
 			// EAX
-			union { // Offset: 0x0010
+			union {
 				unsigned int m_unEAX;
 				unsigned short m_unAX;
 				struct {
@@ -5172,7 +5163,7 @@ namespace Detours {
 			};
 
 			// ECX
-			union { // Offset: 0x0014
+			union {
 				unsigned int m_unECX;
 				unsigned short m_unCX;
 				struct {
@@ -5182,7 +5173,7 @@ namespace Detours {
 			};
 
 			// EDX
-			union { // Offset: 0x0018
+			union {
 				unsigned int m_unEDX;
 				unsigned short m_unDX;
 				struct {
@@ -5192,7 +5183,7 @@ namespace Detours {
 			};
 
 			// EBX
-			union { // Offset: 0x001C
+			union {
 				unsigned int m_unEBX;
 				unsigned short m_unBX;
 				struct {
@@ -5202,28 +5193,28 @@ namespace Detours {
 			};
 
 			// ESP
-			union { // Offset: 0x0020
+			union {
 				unsigned int m_unESP;
 				unsigned short m_unSP;
 				unsigned char m_unSPL;
 			};
 
 			// EBP
-			union { // Offset: 0x0024
+			union {
 				unsigned int m_unEBP;
 				unsigned short m_unBP;
 				unsigned char m_unBPL;
 			};
 
 			// ESI
-			union { // Offset: 0x0028
+			union {
 				unsigned int m_unESI;
 				unsigned short m_unSI;
 				unsigned char m_unSIL;
 			};
 
 			// EDI
-			union { // Offset: 0x002C
+			union {
 				unsigned int m_unEDI;
 				unsigned short m_unDI;
 				unsigned char m_unDIL;
@@ -5233,68 +5224,68 @@ namespace Detours {
 			// FPU
 			// ----------------------------------------------------------------
 
-			RAW_HOOK_FPU m_FPU; // Offset: 0x0030
+			RAW_HOOK_FPU m_FPU;
 
 			// ----------------------------------------------------------------
 			// Registers (MMX)
 			// ----------------------------------------------------------------
 
-			RAW_HOOK_M64 m_MM0; // Offset: 0x009C
-			RAW_HOOK_M64 m_MM1; // Offset: 0x00A4
-			RAW_HOOK_M64 m_MM2; // Offset: 0x00AC
-			RAW_HOOK_M64 m_MM3; // Offset: 0x00B4
-			RAW_HOOK_M64 m_MM4; // Offset: 0x00BC
-			RAW_HOOK_M64 m_MM5; // Offset: 0x00C4
-			RAW_HOOK_M64 m_MM6; // Offset: 0x00CC
-			RAW_HOOK_M64 m_MM7; // Offset: 0x00D4
+			RAW_HOOK_M64 m_MM0;
+			RAW_HOOK_M64 m_MM1;
+			RAW_HOOK_M64 m_MM2;
+			RAW_HOOK_M64 m_MM3;
+			RAW_HOOK_M64 m_MM4;
+			RAW_HOOK_M64 m_MM5;
+			RAW_HOOK_M64 m_MM6;
+			RAW_HOOK_M64 m_MM7;
 
 			// ----------------------------------------------------------------
 			// Registers (SIMD)
 			// ----------------------------------------------------------------
 
-			union { // Offset: 0x00DC
+			union {
 				RAW_HOOK_M512 m_ZMM0;
 				RAW_HOOK_M256 m_YMM0;
 				RAW_HOOK_M128 m_XMM0;
 			};
 
-			union { // Offset: 0x011C
+			union {
 				RAW_HOOK_M512 m_ZMM1;
 				RAW_HOOK_M256 m_YMM1;
 				RAW_HOOK_M128 m_XMM1;
 			};
 
-			union { // Offset: 0x015C
+			union {
 				RAW_HOOK_M512 m_ZMM2;
 				RAW_HOOK_M256 m_YMM2;
 				RAW_HOOK_M128 m_XMM2;
 			};
 
-			union { // Offset: 0x019C
+			union {
 				RAW_HOOK_M512 m_ZMM3;
 				RAW_HOOK_M256 m_YMM3;
 				RAW_HOOK_M128 m_XMM3;
 			};
 
-			union { // Offset: 0x01DC
+			union {
 				RAW_HOOK_M512 m_ZMM4;
 				RAW_HOOK_M256 m_YMM4;
 				RAW_HOOK_M128 m_XMM4;
 			};
 
-			union { // Offset: 0x021C
+			union {
 				RAW_HOOK_M512 m_ZMM5;
 				RAW_HOOK_M256 m_YMM5;
 				RAW_HOOK_M128 m_XMM5;
 			};
 
-			union { // Offset: 0x025C
+			union {
 				RAW_HOOK_M512 m_ZMM6;
 				RAW_HOOK_M256 m_YMM6;
 				RAW_HOOK_M128 m_XMM6;
 			};
 
-			union { // Offset: 0x029C
+			union {
 				RAW_HOOK_M512 m_ZMM7;
 				RAW_HOOK_M256 m_YMM7;
 				RAW_HOOK_M128 m_XMM7;
@@ -5307,7 +5298,7 @@ namespace Detours {
 			// Flags
 			// ----------------------------------------------------------------
 
-			union { // Offset: 0x0000
+			union {
 				unsigned long long m_unRFLAGS;
 				unsigned int m_unEFLAGS;
 				unsigned short m_unFLAGS;
@@ -5344,42 +5335,19 @@ namespace Detours {
 			// Segments
 			// ----------------------------------------------------------------
 
-			union { // Offset: 0x0008
-				unsigned long long m_unReserved1;
-				unsigned short m_unCS;
-			};
-
-			union { // Offset: 0x0010
-				unsigned long long m_unReserved2;
-				unsigned short m_unDS;
-			};
-
-			union { // Offset: 0x0018
-				unsigned long long m_unReserved3;
-				unsigned short m_unSS;
-			};
-
-			union { // Offset: 0x0020
-				unsigned long long m_unReserved4;
-				unsigned short m_unES;
-			};
-
-			union { // Offset: 0x0028
-				unsigned long long m_unReserved5;
-				unsigned short m_unFS;
-			};
-
-			union { // Offset: 0x0030
-				unsigned long long m_unReserved6;
-				unsigned short m_unGS;
-			};
+			unsigned short m_unCS;
+			unsigned short m_unDS;
+			unsigned short m_unSS;
+			unsigned short m_unES;
+			unsigned short m_unFS;
+			unsigned short m_unGS;
 
 			// ----------------------------------------------------------------
 			// Registers (General)
 			// ----------------------------------------------------------------
 
 			// RAX
-			union { // Offset: 0x0038
+			union {
 				unsigned long long m_unRAX;
 				unsigned int m_unEAX;
 				unsigned short m_unAX;
@@ -5390,7 +5358,7 @@ namespace Detours {
 			};
 
 			// RCX
-			union { // Offset: 0x0040
+			union {
 				unsigned long long m_unRCX;
 				unsigned int m_unECX;
 				unsigned short m_unCX;
@@ -5401,7 +5369,7 @@ namespace Detours {
 			};
 
 			// RDX
-			union { // Offset: 0x0048
+			union {
 				unsigned long long m_unRDX;
 				unsigned int m_unEDX;
 				unsigned short m_unDX;
@@ -5412,7 +5380,7 @@ namespace Detours {
 			};
 
 			// RBX
-			union { // Offset: 0x0050
+			union {
 				unsigned long long m_unRBX;
 				unsigned int m_unEBX;
 				unsigned short m_unBX;
@@ -5423,7 +5391,7 @@ namespace Detours {
 			};
 
 			// RSP
-			union { // Offset: 0x0058
+			union {
 				unsigned long long m_unRSP;
 				unsigned int m_unESP;
 				unsigned short m_unSP;
@@ -5431,7 +5399,7 @@ namespace Detours {
 			};
 
 			// RBP
-			union { // Offset: 0x0060
+			union {
 				unsigned long long m_unRBP;
 				unsigned int m_unEBP;
 				unsigned short m_unBP;
@@ -5439,7 +5407,7 @@ namespace Detours {
 			};
 
 			// RSI
-			union { // Offset: 0x0068
+			union {
 				unsigned long long m_unRSI;
 				unsigned int m_unESI;
 				unsigned short m_unSI;
@@ -5447,7 +5415,7 @@ namespace Detours {
 			};
 
 			// RDI
-			union { // Offset: 0x0070
+			union {
 				unsigned long long m_unRDI;
 				unsigned int m_unEDI;
 				unsigned short m_unDI;
@@ -5455,7 +5423,7 @@ namespace Detours {
 			};
 
 			// R8
-			union { // Offset: 0x0078
+			union {
 				unsigned long long m_unR8;
 				unsigned int m_unR8D;
 				unsigned short m_unR8W;
@@ -5463,7 +5431,7 @@ namespace Detours {
 			};
 
 			// R9
-			union { // Offset: 0x0080
+			union {
 				unsigned long long m_unR9;
 				unsigned int m_unR9D;
 				unsigned short m_unR9W;
@@ -5471,7 +5439,7 @@ namespace Detours {
 			};
 
 			// R10
-			union { // Offset: 0x0088
+			union {
 				unsigned long long m_unR10;
 				unsigned int m_unR10D;
 				unsigned short m_unR10W;
@@ -5479,7 +5447,7 @@ namespace Detours {
 			};
 
 			// R11
-			union { // Offset: 0x0090
+			union {
 				unsigned long long m_unR11;
 				unsigned int m_unR11D;
 				unsigned short m_unR11W;
@@ -5487,7 +5455,7 @@ namespace Detours {
 			};
 
 			// R12
-			union { // Offset: 0x0098
+			union {
 				unsigned long long m_unR12;
 				unsigned int m_unR12D;
 				unsigned short m_unR12W;
@@ -5495,7 +5463,7 @@ namespace Detours {
 			};
 
 			// R13
-			union { // Offset: 0x00A0
+			union {
 				unsigned long long m_unR13;
 				unsigned int m_unR13D;
 				unsigned short m_unR13W;
@@ -5503,7 +5471,7 @@ namespace Detours {
 			};
 
 			// R14
-			union { // Offset: 0x00A8
+			union {
 				unsigned long long m_unR14;
 				unsigned int m_unR14D;
 				unsigned short m_unR14W;
@@ -5511,7 +5479,7 @@ namespace Detours {
 			};
 
 			// R15
-			union { // Offset: 0x00B0
+			union {
 				unsigned long long m_unR15;
 				unsigned int m_unR15D;
 				unsigned short m_unR15W;
@@ -5522,220 +5490,217 @@ namespace Detours {
 			// FPU
 			// ----------------------------------------------------------------
 
-			RAW_HOOK_FPU m_FPU; // Offset: 0x00B8
-			unsigned int m_unReserved7; // Offset: 0x0124
+			RAW_HOOK_FPU m_FPU;
 
 			// ----------------------------------------------------------------
 			// Registers (MMX)
 			// ----------------------------------------------------------------
 
-			RAW_HOOK_M64 m_MM0; // Offset: 0x0128
-			RAW_HOOK_M64 m_MM1; // Offset: 0x0130
-			RAW_HOOK_M64 m_MM2; // Offset: 0x0138
-			RAW_HOOK_M64 m_MM3; // Offset: 0x0140
-			RAW_HOOK_M64 m_MM4; // Offset: 0x0148
-			RAW_HOOK_M64 m_MM5; // Offset: 0x0150
-			RAW_HOOK_M64 m_MM6; // Offset: 0x0158
-			RAW_HOOK_M64 m_MM7; // Offset: 0x0160
+			RAW_HOOK_M64 m_MM0;
+			RAW_HOOK_M64 m_MM1;
+			RAW_HOOK_M64 m_MM2;
+			RAW_HOOK_M64 m_MM3;
+			RAW_HOOK_M64 m_MM4;
+			RAW_HOOK_M64 m_MM5;
+			RAW_HOOK_M64 m_MM6;
+			RAW_HOOK_M64 m_MM7;
 
 			// ----------------------------------------------------------------
 			// Registers (SIMD)
 			// ----------------------------------------------------------------
 
-			union { // Offset: 0x0168
+			union {
 				RAW_HOOK_M512 m_ZMM0;
 				RAW_HOOK_M256 m_YMM0;
 				RAW_HOOK_M128 m_XMM0;
 			};
 
-			union { // Offset: 0x01A8
+			union {
 				RAW_HOOK_M512 m_ZMM1;
 				RAW_HOOK_M256 m_YMM1;
 				RAW_HOOK_M128 m_XMM1;
 			};
 
-			union { // Offset: 0x01E8
+			union {
 				RAW_HOOK_M512 m_ZMM2;
 				RAW_HOOK_M256 m_YMM2;
 				RAW_HOOK_M128 m_XMM2;
 			};
 
-			union { // Offset: 0x0228
+			union {
 				RAW_HOOK_M512 m_ZMM3;
 				RAW_HOOK_M256 m_YMM3;
 				RAW_HOOK_M128 m_XMM3;
 			};
 
-			union { // Offset: 0x0268
+			union {
 				RAW_HOOK_M512 m_ZMM4;
 				RAW_HOOK_M256 m_YMM4;
 				RAW_HOOK_M128 m_XMM4;
 			};
 
-			union { // Offset: 0x02A8
+			union {
 				RAW_HOOK_M512 m_ZMM5;
 				RAW_HOOK_M256 m_YMM5;
 				RAW_HOOK_M128 m_XMM5;
 			};
 
-			union { // Offset: 0x02E8
+			union {
 				RAW_HOOK_M512 m_ZMM6;
 				RAW_HOOK_M256 m_YMM6;
 				RAW_HOOK_M128 m_XMM6;
 			};
 
-			union { // Offset: 0x0328
+			union {
 				RAW_HOOK_M512 m_ZMM7;
 				RAW_HOOK_M256 m_YMM7;
 				RAW_HOOK_M128 m_XMM7;
 			};
 
-			union { // Offset: 0x0368
+			union {
 				RAW_HOOK_M512 m_ZMM8;
 				RAW_HOOK_M256 m_YMM8;
 				RAW_HOOK_M128 m_XMM8;
 			};
 
-			union { // Offset: 0x03A8
+			union {
 				RAW_HOOK_M512 m_ZMM9;
 				RAW_HOOK_M256 m_YMM9;
 				RAW_HOOK_M128 m_XMM9;
 			};
 
-			union { // Offset: 0x03E8
+			union {
 				RAW_HOOK_M512 m_ZMM10;
 				RAW_HOOK_M256 m_YMM10;
 				RAW_HOOK_M128 m_XMM10;
 			};
 
-			union { // Offset: 0x0428
+			union {
 				RAW_HOOK_M512 m_ZMM11;
 				RAW_HOOK_M256 m_YMM11;
 				RAW_HOOK_M128 m_XMM11;
 			};
 
-			union { // Offset: 0x0468
+			union {
 				RAW_HOOK_M512 m_ZMM12;
 				RAW_HOOK_M256 m_YMM12;
 				RAW_HOOK_M128 m_XMM12;
 			};
 
-			union { // Offset: 0x04A8
+			union {
 				RAW_HOOK_M512 m_ZMM13;
 				RAW_HOOK_M256 m_YMM13;
 				RAW_HOOK_M128 m_XMM13;
 			};
 
-			union { // Offset: 0x04E8
+			union {
 				RAW_HOOK_M512 m_ZMM14;
 				RAW_HOOK_M256 m_YMM14;
 				RAW_HOOK_M128 m_XMM14;
 			};
 
-			union { // Offset: 0x0528
+			union {
 				RAW_HOOK_M512 m_ZMM15;
 				RAW_HOOK_M256 m_YMM15;
 				RAW_HOOK_M128 m_XMM15;
 			};
 
-			union { // Offset: 0x0568
+			union {
 				RAW_HOOK_M512 m_ZMM16;
 				RAW_HOOK_M256 m_YMM16;
 				RAW_HOOK_M128 m_XMM16;
 			};
 
-			union { // Offset: 0x05A8
+			union {
 				RAW_HOOK_M512 m_ZMM17;
 				RAW_HOOK_M256 m_YMM17;
 				RAW_HOOK_M128 m_XMM17;
 			};
 
-			union { // Offset: 0x05E8
+			union {
 				RAW_HOOK_M512 m_ZMM18;
 				RAW_HOOK_M256 m_YMM18;
 				RAW_HOOK_M128 m_XMM18;
 			};
 
-			union { // Offset: 0x0628
+			union {
 				RAW_HOOK_M512 m_ZMM19;
 				RAW_HOOK_M256 m_YMM19;
 				RAW_HOOK_M128 m_XMM19;
 			};
 
-			union { // Offset: 0x0668
+			union {
 				RAW_HOOK_M512 m_ZMM20;
 				RAW_HOOK_M256 m_YMM20;
 				RAW_HOOK_M128 m_XMM20;
 			};
 
-			union { // Offset: 0x06A8
+			union {
 				RAW_HOOK_M512 m_ZMM21;
 				RAW_HOOK_M256 m_YMM21;
 				RAW_HOOK_M128 m_XMM21;
 			};
 
-			union { // Offset: 0x06E8
+			union {
 				RAW_HOOK_M512 m_ZMM22;
 				RAW_HOOK_M256 m_YMM22;
 				RAW_HOOK_M128 m_XMM22;
 			};
 
-			union { // Offset: 0x0728
+			union {
 				RAW_HOOK_M512 m_ZMM23;
 				RAW_HOOK_M256 m_YMM23;
 				RAW_HOOK_M128 m_XMM23;
 			};
 
-			union { // Offset: 0x0768
+			union {
 				RAW_HOOK_M512 m_ZMM24;
 				RAW_HOOK_M256 m_YMM24;
 				RAW_HOOK_M128 m_XMM24;
 			};
 
-			union { // Offset: 0x07A8
+			union {
 				RAW_HOOK_M512 m_ZMM25;
 				RAW_HOOK_M256 m_YMM25;
 				RAW_HOOK_M128 m_XMM25;
 			};
 
-			union { // Offset: 0x07E8
+			union {
 				RAW_HOOK_M512 m_ZMM26;
 				RAW_HOOK_M256 m_YMM26;
 				RAW_HOOK_M128 m_XMM26;
 			};
 
-			union { // Offset: 0x0828
+			union {
 				RAW_HOOK_M512 m_ZMM27;
 				RAW_HOOK_M256 m_YMM27;
 				RAW_HOOK_M128 m_XMM27;
 			};
 
-			union { // Offset: 0x0868
+			union {
 				RAW_HOOK_M512 m_ZMM28;
 				RAW_HOOK_M256 m_YMM28;
 				RAW_HOOK_M128 m_XMM28;
 			};
 
-			union { // Offset: 0x08A8
+			union {
 				RAW_HOOK_M512 m_ZMM29;
 				RAW_HOOK_M256 m_YMM29;
 				RAW_HOOK_M128 m_XMM29;
 			};
 
-			union { // Offset: 0x08E8
+			union {
 				RAW_HOOK_M512 m_ZMM30;
 				RAW_HOOK_M256 m_YMM30;
 				RAW_HOOK_M128 m_XMM30;
 			};
 
-			union { // Offset: 0x0928
+			union {
 				RAW_HOOK_M512 m_ZMM31;
 				RAW_HOOK_M256 m_YMM31;
 				RAW_HOOK_M128 m_XMM31;
 			};
 		} RAW_HOOK_CONTEXT64, *PRAW_HOOK_CONTEXT64;
-
-#pragma pack(pop, r1)
 
 #ifdef _M_X64
 		typedef RAW_HOOK_CONTEXT64 RAW_HOOK_CONTEXT;
@@ -5749,7 +5714,11 @@ namespace Detours {
 		// Raw Hook CallBack
 		// ----------------------------------------------------------------
 
+#ifdef _M_X64
+		using fnRawHookCallBack = bool(__fastcall*)(PRAW_HOOK_CONTEXT pCTX);
+#elif _M_IX86
 		using fnRawHookCallBack = bool(__cdecl*)(PRAW_HOOK_CONTEXT pCTX);
+#endif
 
 		// ----------------------------------------------------------------
 		// Raw Hook
