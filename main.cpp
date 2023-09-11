@@ -1236,6 +1236,49 @@ void DemoRawHook() { SELF_EXPORT("DemoHook");
 	_tprintf_s(_T("\n"));
 }
 
+#ifdef _M_X64
+bool __fastcall new_foo(void* pThis) {
+#elif _M_IX86
+bool __cdecl new_foo(void* pThis) {
+#endif
+
+#ifdef _M_X64
+	_tprintf_s(_T("[new_foo] pThis = 0x%016llX\n"), reinterpret_cast<unsigned long long>(pThis));
+#elif _M_IX86
+	_tprintf_s(_T("[new_foo] pThis = 0x%08X\n"), reinterpret_cast<unsigned int>(pThis));
+#endif
+
+	return false;
+}
+
+Detours::Hook::RawHook RawHook_CallConv_Convert;
+#ifdef _M_X64
+bool __fastcall CallConv_Convert_RawHook(Detours::Hook::PRAW_HOOK_CONTEXT pCTX) {
+#elif _M_IX86
+bool __cdecl CallConv_Convert_RawHook(Detours::Hook::PRAW_HOOK_CONTEXT pCTX) {
+#endif
+
+	// Converting __thiscall to __fastcall/__cdecl and redirect it
+
+#ifdef _M_X64
+	pCTX->m_unRSP -= 8;
+	*reinterpret_cast<unsigned long long*>(pCTX->m_unRSP) = reinterpret_cast<unsigned long long>(new_foo);
+#elif _M_IX86
+	const unsigned int unIP = *reinterpret_cast<unsigned int*>(pCTX->m_unESP);
+
+	pCTX->m_unESP -= 4;
+	*reinterpret_cast<unsigned int*>(pCTX->m_unESP) = pCTX->m_unECX; // Store `this` as argument for new_foo
+
+	pCTX->m_unESP -= 4;
+	*reinterpret_cast<unsigned int*>(pCTX->m_unESP) = unIP;
+
+	pCTX->m_unESP -= 4;
+	*reinterpret_cast<unsigned int*>(pCTX->m_unESP) = reinterpret_cast<unsigned int>(new_foo);
+#endif
+
+	return true;
+}
+
 int _tmain(int nArguments, PTCHAR* pArguments) {
 	g_pBaseTestingRTTI = new BaseTestingRTTI();
 	g_pTestingRTTI = new TestingRTTI();
@@ -1674,8 +1717,7 @@ int _tmain(int nArguments, PTCHAR* pArguments) {
 
 	// VTableFunctionHook & VTableHook
 
-	const auto& pHookingObject = Detours::RTTI::FindObject(_T("Detours.exe"), ".?AVTestingRTTI@@");
-	if (pHookingObject) {
+	if (const auto& pHookingObject = Detours::RTTI::FindObject(_T("Detours.exe"), ".?AVTestingRTTI@@")) {
 		void** pHookingVTable = pHookingObject->GetVTable();
 
 #ifdef _M_X64
@@ -1777,8 +1819,23 @@ int _tmain(int nArguments, PTCHAR* pArguments) {
 
 		_tprintf_s(_T("RawSleepHook.UnHook = %d\n"), RawSleepHook.UnHook());
 	}
-	
+
 	_tprintf_s(_T("\n"));
+
+	// RawHook #3
+
+	if (const auto& pHookingObject = Detours::RTTI::FindObject(_T("Detours.exe"), ".?AVTestingRTTI@@")) {
+		void** pHookingVTable = pHookingObject->GetVTable();
+
+		_tprintf_s(_T("RawHook_CallConv_Convert.Set = %d\n"), RawHook_CallConv_Convert.Set(pHookingVTable[0]));
+		_tprintf_s(_T("RawHook_CallConv_Convert.Hook = %d\n"), RawHook_CallConv_Convert.Hook(CallConv_Convert_RawHook));
+
+		_tprintf_s(_T("g_pTestingRTTI->foo = %d\n"), g_pTestingRTTI->foo());
+
+		_tprintf_s(_T("RawHook_CallConv_Convert.UnHook = %d\n"), RawHook_CallConv_Convert.UnHook());
+
+		_tprintf_s(_T("\n"));
+	}
 
 	// RawHook + rddisasm
 
