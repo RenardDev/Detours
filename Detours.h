@@ -606,7 +606,7 @@
 #endif // !HOOK_STORAGE_CAPACITY
 
 #ifndef HOOK_INLINE_TRAMPOLINE_SIZE
-#define HOOK_INLINE_TRAMPOLINE_SIZE 15 // Max trampoline size.
+#define HOOK_INLINE_TRAMPOLINE_SIZE 45 // Max trampoline size.
 #endif // !HOOK_INLINE_TRAMPOLINE_SIZE
 
 #ifndef HOOK_RAW_WRAPPER_SIZE
@@ -618,7 +618,7 @@
 #endif // !HOOK_RAW_WRAPPER_SIZE
 
 #ifndef HOOK_RAW_TRAMPOLINE_SIZE
-#define HOOK_RAW_TRAMPOLINE_SIZE 15 // Max trampoline size.
+#define HOOK_RAW_TRAMPOLINE_SIZE 45 // Max trampoline size.
 #endif // !HOOK_RAW_TRAMPOLINE_SIZE
 
 // ----------------------------------------------------------------
