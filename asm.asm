@@ -4,13 +4,6 @@ sub esp, 0x7FFFFFFF
 pushfd
 pop dword ptr [esp+0x7FFFFFFF]
 
-mov word ptr [esp+0x7FFFFFFF], cs
-mov word ptr [esp+0x7FFFFFFF], ds
-mov word ptr [esp+0x7FFFFFFF], ss
-mov word ptr [esp+0x7FFFFFFF], es
-mov word ptr [esp+0x7FFFFFFF], fs
-mov word ptr [esp+0x7FFFFFFF], gs
-
 mov dword ptr [esp+0x7FFFFFFF], eax
 mov dword ptr [esp+0x7FFFFFFF], ecx
 mov dword ptr [esp+0x7FFFFFFF], edx
@@ -21,14 +14,7 @@ mov dword ptr [esp+0x7FFFFFFF], ebp
 mov dword ptr [esp+0x7FFFFFFF], esi
 mov dword ptr [esp+0x7FFFFFFF], edi
 
-movq [esp+0x7FFFFFFF], mm0
-movq [esp+0x7FFFFFFF], mm1
-movq [esp+0x7FFFFFFF], mm2
-movq [esp+0x7FFFFFFF], mm3
-movq [esp+0x7FFFFFFF], mm4
-movq [esp+0x7FFFFFFF], mm5
-movq [esp+0x7FFFFFFF], mm6
-movq [esp+0x7FFFFFFF], mm7
+stmxcsr [esp+0x7FFFFFFF]
 
 vmovups [esp+0x7FFFFFFF], xmm0
 vmovups [esp+0x7FFFFFFF], xmm1
@@ -101,14 +87,7 @@ vmovups xmm2, [esp+0x7FFFFFFF]
 vmovups xmm1, [esp+0x7FFFFFFF]
 vmovups xmm0, [esp+0x7FFFFFFF]
 
-movq mm7, [esp+0x7FFFFFFF]
-movq mm6, [esp+0x7FFFFFFF]
-movq mm5, [esp+0x7FFFFFFF]
-movq mm4, [esp+0x7FFFFFFF]
-movq mm3, [esp+0x7FFFFFFF]
-movq mm2, [esp+0x7FFFFFFF]
-movq mm1, [esp+0x7FFFFFFF]
-movq mm0, [esp+0x7FFFFFFF]
+ldmxcsr [esp+0x7FFFFFFF]
 
 mov edi, dword ptr [esp+0x7FFFFFFF]
 mov esi, dword ptr [esp+0x7FFFFFFF]
@@ -118,12 +97,6 @@ mov ebx, dword ptr [esp+0x7FFFFFFF]
 mov edx, dword ptr [esp+0x7FFFFFFF]
 mov ecx, dword ptr [esp+0x7FFFFFFF]
 mov eax, dword ptr [esp+0x7FFFFFFF]
-
-mov gs, word ptr [esp+0x7FFFFFFF]
-
-mov es, word ptr [esp+0x7FFFFFFF]
-mov ss, word ptr [esp+0x7FFFFFFF]
-mov ds, word ptr [esp+0x7FFFFFFF]
 
 push dword ptr [esp+0x7FFFFFFF]
 popfd

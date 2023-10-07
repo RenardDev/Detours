@@ -4,13 +4,6 @@ sub rsp, 0x7FFFFFFF
 pushfq
 pop qword ptr [rsp+0x7FFFFFFF]
 
-mov word ptr [rsp+0x7FFFFFFF], cs
-mov word ptr [rsp+0x7FFFFFFF], ds
-mov word ptr [rsp+0x7FFFFFFF], ss
-mov word ptr [rsp+0x7FFFFFFF], es
-mov word ptr [rsp+0x7FFFFFFF], fs
-mov word ptr [rsp+0x7FFFFFFF], gs
-
 mov qword ptr [rsp+0x7FFFFFFF], rax
 mov qword ptr [rsp+0x7FFFFFFF], rcx
 mov qword ptr [rsp+0x7FFFFFFF], rdx
@@ -29,14 +22,7 @@ mov qword ptr [rsp+0x7FFFFFFF], r13
 mov qword ptr [rsp+0x7FFFFFFF], r14
 mov qword ptr [rsp+0x7FFFFFFF], r15
 
-movq [rsp+0x7FFFFFFF], mm0
-movq [rsp+0x7FFFFFFF], mm1
-movq [rsp+0x7FFFFFFF], mm2
-movq [rsp+0x7FFFFFFF], mm3
-movq [rsp+0x7FFFFFFF], mm4
-movq [rsp+0x7FFFFFFF], mm5
-movq [rsp+0x7FFFFFFF], mm6
-movq [rsp+0x7FFFFFFF], mm7
+stmxcsr [rsp+0x7FFFFFFF]
 
 vmovups [rsp+0x7FFFFFFF], xmm0
 vmovups [rsp+0x7FFFFFFF], xmm1
@@ -190,14 +176,7 @@ vmovups  xmm2, [rsp+0x7FFFFFFF]
 vmovups  xmm1, [rsp+0x7FFFFFFF]
 vmovups  xmm0, [rsp+0x7FFFFFFF]
 
-movq mm7, [rsp+0x7FFFFFFF]
-movq mm6, [rsp+0x7FFFFFFF]
-movq mm5, [rsp+0x7FFFFFFF]
-movq mm4, [rsp+0x7FFFFFFF]
-movq mm3, [rsp+0x7FFFFFFF]
-movq mm2, [rsp+0x7FFFFFFF]
-movq mm1, [rsp+0x7FFFFFFF]
-movq mm0, [rsp+0x7FFFFFFF]
+ldmxcsr [rsp+0x7FFFFFFF]
 
 mov r15, qword ptr [rsp+0x7FFFFFFF]
 mov r14, qword ptr [rsp+0x7FFFFFFF]
@@ -215,12 +194,6 @@ mov rbx, qword ptr [rsp+0x7FFFFFFF]
 mov rdx, qword ptr [rsp+0x7FFFFFFF]
 mov rcx, qword ptr [rsp+0x7FFFFFFF]
 mov rax, qword ptr [rsp+0x7FFFFFFF]
-
-mov gs, word ptr [rsp+0x7FFFFFFF]
-mov fs, word ptr [rsp+0x7FFFFFFF]
-mov es, word ptr [rsp+0x7FFFFFFF]
-mov ss, word ptr [rsp+0x7FFFFFFF]
-mov ds, word ptr [rsp+0x7FFFFFFF]
 
 push qword ptr [rsp+0x7FFFFFFF]
 popfq

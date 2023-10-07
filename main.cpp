@@ -648,9 +648,9 @@ void WINAPI Sleep_Hook(DWORD dwMilliseconds) {
 
 Detours::Hook::RawHook RawSleepHook;
 #ifdef _M_X64
-bool __fastcall Sleep_RawHook(Detours::Hook::PRAW_HOOK_CONTEXT pCTX) {
+bool __fastcall Sleep_RawHook(Detours::Hook::PRAW_CONTEXT pCTX) {
 #elif _M_IX86
-bool __cdecl Sleep_RawHook(Detours::Hook::PRAW_HOOK_CONTEXT pCTX) {
+bool __cdecl Sleep_RawHook(Detours::Hook::PRAW_CONTEXT pCTX) {
 #endif
 #if defined(_DEBUG) || !defined(_M_X64) // NOTE: Using a stack inside a RawHook callback will produce unpredictable results.
 	_tprintf_s(_T("[Sleep_RawHook] Hook called!\n"));
@@ -659,7 +659,6 @@ bool __cdecl Sleep_RawHook(Detours::Hook::PRAW_HOOK_CONTEXT pCTX) {
 	__cpuid(cpuinfo, 1);
 
 	const bool bHaveFPU = (cpuinfo[3] & 1) != 0;
-	const bool bHaveMMX = (cpuinfo[3] & (1 << 23)) != 0;
 	const bool bHaveSSE = (cpuinfo[3] & (1 << 25)) != 0;
 	const bool bHaveAVX = (cpuinfo[2] & (1 << 28)) != 0;
 
@@ -691,13 +690,6 @@ bool __cdecl Sleep_RawHook(Detours::Hook::PRAW_HOOK_CONTEXT pCTX) {
 	_tprintf_s(_T("     -> VIP  = %hhu\n"), pCTX->m_unVIP);
 	_tprintf_s(_T("     -> ID   = %hhu\n"), pCTX->m_unID);
 	_tprintf_s(_T("     -> AI   = %hhu\n"), pCTX->m_unAI);
-
-	_tprintf_s(_T("  -> CS = 0x%04X\n"), pCTX->m_unCS);
-	_tprintf_s(_T("  -> DS = 0x%04X\n"), pCTX->m_unDS);
-	_tprintf_s(_T("  -> SS = 0x%04X\n"), pCTX->m_unSS);
-	_tprintf_s(_T("  -> ES = 0x%04X\n"), pCTX->m_unES);
-	_tprintf_s(_T("  -> FS = 0x%04X\n"), pCTX->m_unFS);
-	_tprintf_s(_T("  -> GS = 0x%04X\n"), pCTX->m_unGS);
 
 #ifdef _M_X64
 	_tprintf_s(_T("  -> RAX = 0x%016llX\n"), pCTX->m_unRAX);
@@ -737,18 +729,9 @@ bool __cdecl Sleep_RawHook(Detours::Hook::PRAW_HOOK_CONTEXT pCTX) {
 		}
 	}
 
-	if (bHaveMMX) {
-		_tprintf_s(_T("  -> MM0 = 0x%016llX\n"), pCTX->m_MM0.m_un64);
-		_tprintf_s(_T("  -> MM1 = 0x%016llX\n"), pCTX->m_MM1.m_un64);
-		_tprintf_s(_T("  -> MM2 = 0x%016llX\n"), pCTX->m_MM2.m_un64);
-		_tprintf_s(_T("  -> MM3 = 0x%016llX\n"), pCTX->m_MM3.m_un64);
-		_tprintf_s(_T("  -> MM4 = 0x%016llX\n"), pCTX->m_MM4.m_un64);
-		_tprintf_s(_T("  -> MM5 = 0x%016llX\n"), pCTX->m_MM5.m_un64);
-		_tprintf_s(_T("  -> MM6 = 0x%016llX\n"), pCTX->m_MM6.m_un64);
-		_tprintf_s(_T("  -> MM7 = 0x%016llX\n"), pCTX->m_MM7.m_un64);
-	}
-
 	if (bHaveAVX512) {
+		_tprintf_s(_T("  -> MXCSR  = 0x%08X\n"), pCTX->m_unMXCSR);
+		
 		_tprintf_s(_T("  -> ZMM0  = 0x"));
 		for (int i = 63; i >= 0; --i) {
 			_tprintf_s(_T("%02X"), pCTX->m_ZMM0.m_un8[i]);
@@ -943,6 +926,8 @@ bool __cdecl Sleep_RawHook(Detours::Hook::PRAW_HOOK_CONTEXT pCTX) {
 		_tprintf_s(_T("\n"));
 #endif
 	} else if (bHaveAVX) {
+		_tprintf_s(_T("  -> MXCSR  = 0x%08X\n"), pCTX->m_unMXCSR);
+
 		_tprintf_s(_T("  -> YMM0  = 0x"));
 		for (int i = 31; i >= 0; --i) {
 			_tprintf_s(_T("%02X"), pCTX->m_YMM0.m_un8[i]);
@@ -1041,6 +1026,8 @@ bool __cdecl Sleep_RawHook(Detours::Hook::PRAW_HOOK_CONTEXT pCTX) {
 		_tprintf_s(_T("\n"));
 #endif
 	} else if (bHaveSSE) {
+		_tprintf_s(_T("  -> MXCSR  = 0x%08X\n"), pCTX->m_unMXCSR);
+
 		_tprintf_s(_T("  -> XMM0  = 0x"));
 		for (int i = 15; i >= 0; --i) {
 			_tprintf_s(_T("%02X"), pCTX->m_XMM0.m_un8[i]);
@@ -1156,9 +1143,9 @@ bool __cdecl Sleep_RawHook(Detours::Hook::PRAW_HOOK_CONTEXT pCTX) {
 Detours::Hook::RAW_HOOK_M128 g_LastXMM7;
 
 #ifdef _M_X64
-bool __fastcall Sleep_RawHookMod(Detours::Hook::PRAW_HOOK_CONTEXT pCTX) {
+bool __fastcall Sleep_RawHookMod(Detours::Hook::PRAW_CONTEXT pCTX) {
 #elif _M_IX86
-bool __cdecl Sleep_RawHookMod(Detours::Hook::PRAW_HOOK_CONTEXT pCTX) {
+bool __cdecl Sleep_RawHookMod(Detours::Hook::PRAW_CONTEXT pCTX) {
 #endif
 	g_LastXMM7 = pCTX->m_XMM7;
 	pCTX->m_XMM7.m_un64[0] = 0x1122334455667788;
@@ -1179,9 +1166,9 @@ bool __cdecl Sleep_RawHookMod(Detours::Hook::PRAW_HOOK_CONTEXT pCTX) {
 Detours::Hook::RawHook RawCPUIDHook;
 
 #ifdef _M_X64
-bool __fastcall CPUID_RawHook(Detours::Hook::PRAW_HOOK_CONTEXT pCTX) {
+bool __fastcall CPUID_RawHook(Detours::Hook::PRAW_CONTEXT pCTX) {
 #elif _M_IX86
-bool __cdecl CPUID_RawHook(Detours::Hook::PRAW_HOOK_CONTEXT pCTX) {
+bool __cdecl CPUID_RawHook(Detours::Hook::PRAW_CONTEXT pCTX) {
 #endif
 #ifdef _M_X64
 	pCTX->m_unEBX = 0x11223344;
@@ -1225,7 +1212,7 @@ void DemoRawHook() { SELF_EXPORT("DemoHook");
 	}
 
 	_tprintf_s(_T("RawCPUIDHook.Set = %d\n"), RawCPUIDHook.Set(pFoundCPUID));
-	_tprintf_s(_T("RawCPUIDHook.Hook = %d\n"), RawCPUIDHook.Hook(CPUID_RawHook));
+	_tprintf_s(_T("RawCPUIDHook.Hook = %d\n"), RawCPUIDHook.Hook(CPUID_RawHook, true));
 
 	int cpuinfo[4];
 	__cpuidex(cpuinfo, 7, 0); // Hooking `cpuid` in this function.
@@ -1253,9 +1240,9 @@ bool __cdecl new_foo(void* pThis) {
 
 Detours::Hook::RawHook RawHook_CallConv_Convert;
 #ifdef _M_X64
-bool __fastcall CallConv_Convert_RawHook(Detours::Hook::PRAW_HOOK_CONTEXT pCTX) {
+bool __fastcall CallConv_Convert_RawHook(Detours::Hook::PRAW_CONTEXT pCTX) {
 #elif _M_IX86
-bool __cdecl CallConv_Convert_RawHook(Detours::Hook::PRAW_HOOK_CONTEXT pCTX) {
+bool __cdecl CallConv_Convert_RawHook(Detours::Hook::PRAW_CONTEXT pCTX) {
 #endif
 
 	// Converting __thiscall to __fastcall/__cdecl and redirect it
@@ -1828,7 +1815,7 @@ int _tmain(int nArguments, PTCHAR* pArguments) {
 		void** pHookingVTable = pHookingObject->GetVTable();
 
 		_tprintf_s(_T("RawHook_CallConv_Convert.Set = %d\n"), RawHook_CallConv_Convert.Set(pHookingVTable[0]));
-		_tprintf_s(_T("RawHook_CallConv_Convert.Hook = %d\n"), RawHook_CallConv_Convert.Hook(CallConv_Convert_RawHook));
+		_tprintf_s(_T("RawHook_CallConv_Convert.Hook = %d\n"), RawHook_CallConv_Convert.Hook(CallConv_Convert_RawHook, true));
 
 		_tprintf_s(_T("g_pTestingRTTI->foo = %d\n"), g_pTestingRTTI->foo());
 
