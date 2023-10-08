@@ -153,7 +153,6 @@ namespace Detours {
 	// ----------------------------------------------------------------
 
 	const volatile KUSER_SHARED_DATA& KUserSharedData = *reinterpret_cast<PKUSER_SHARED_DATA>(0x7FFE0000);
-	//const volatile UNKNOWN& KUserSharedDataUnknown = *reinterpret_cast<PUNKNOWN>(0x7FFEA000);
 
 	// ----------------------------------------------------------------
 	// PEB
@@ -82046,24 +82045,24 @@ namespace Detours {
 				return false;
 			}
 
-			const size_t unJumpToOriginalOffset = (reinterpret_cast<size_t>(m_pAddress) + unJumpToHookSize) - (reinterpret_cast<size_t>(m_pTrampoline) + unCopyingSize);
-			size_t unJumpToOriginalSize = 0;
-			if ((unJumpToOriginalOffset - 5) <= 0x7FFFFFFF) { // E9 00 00 00 00 - jmp rel32
-				unJumpToOriginalSize = 5;
+			const size_t unJumpFromTampolineOffset = (reinterpret_cast<size_t>(m_pAddress) + unJumpToHookSize) - (reinterpret_cast<size_t>(m_pTrampoline) + unCopyingSize);
+			size_t unJumpFromTrampolineSize = 0;
+			if ((unJumpFromTampolineOffset - 5) <= 0x7FFFFFFF) { // E9 00 00 00 00 - jmp rel32
+				unJumpFromTrampolineSize = 5;
 			} else {
 #ifdef _M_X64
 				// C7 44 24 F8 44332211 - mov [rsp-0x8], 0x11223344
 				// C7 44 24 FC 44332211 - mov [rsp-0x4], 0x11223344
 				// FF 64 24 F8 - jmp [rsp-8]
-				unJumpToOriginalSize = 20;
+				unJumpFromTrampolineSize = 20;
 #elif _M_IX86
 				// C7 44 24 FC 44332211 - mov [esp-0x4], 0x11223344
 				// FF 64 24 FC - jmp [esp-4]
-				unJumpToOriginalSize = 12;
+				unJumpFromTrampolineSize = 12;
 #endif
 			}
 
-			if (unCopyingSize + unJumpToOriginalSize > HOOK_INLINE_TRAMPOLINE_SIZE) {
+			if (unCopyingSize + unJumpFromTrampolineSize > HOOK_INLINE_TRAMPOLINE_SIZE) {
 				g_HookStorage.DeAlloc(m_pTrampoline);
 				m_pTrampoline = nullptr;
 				m_pAddressAfterJump = nullptr;
@@ -82137,52 +82136,52 @@ namespace Detours {
 				unIndex += ins.Length;
 			}
 
-			unsigned char* pJumpToOriginal = reinterpret_cast<unsigned char*>(m_pTrampoline) + unCopyingSize;
-			const size_t unTrampolineJumpOffset = (reinterpret_cast<size_t>(m_pAddress) + unJumpToOriginalSize) - (reinterpret_cast<size_t>(m_pTrampoline) + unCopyingSize);
-			if ((unTrampolineJumpOffset - 5) <= 0x7FFFFFFF) { // E9 00 00 00 00 - jmp rel32
-				pJumpToOriginal[0] = 0xE9;
-				*reinterpret_cast<unsigned int*>(pJumpToOriginal + 1) = static_cast<unsigned int>(unTrampolineJumpOffset & 0xFFFFFFFF) - 5;
+			unsigned char* pJumpFromTrampoline = reinterpret_cast<unsigned char*>(m_pTrampoline) + unCopyingSize;
+			const size_t unJumpFromTrampolineOffset = (reinterpret_cast<size_t>(m_pAddress) + unJumpToHookSize) - reinterpret_cast<size_t>(pJumpFromTrampoline);
+			if ((unJumpFromTrampolineOffset - 5) <= 0x7FFFFFFF) { // E9 00 00 00 00 - jmp rel32
+				pJumpFromTrampoline[0] = 0xE9;
+				*reinterpret_cast<unsigned int*>(pJumpFromTrampoline + 1) = static_cast<unsigned int>(unJumpFromTrampolineOffset & 0xFFFFFFFF) - 5;
 			} else {
 #ifdef _M_X64
 				// C7 44 24 F8 44332211 - mov [rsp-0x8], 0x11223344
 				// C7 44 24 FC 44332211 - mov [rsp-0x4], 0x11223344
 				// FF 64 24 F8 - jmp [rsp-8]
 
-				const size_t unAddress = reinterpret_cast<size_t>(m_pAddress) + unJumpToOriginalSize;
+				const size_t unAddress = reinterpret_cast<size_t>(m_pAddress) + unJumpToHookSize;
 
-				pJumpToOriginal[ 0] = 0xC7;
-				pJumpToOriginal[ 1] = 0x44;
-				pJumpToOriginal[ 2] = 0x24;
-				pJumpToOriginal[ 3] = 0xF8;
+				pJumpFromTrampoline[ 0] = 0xC7;
+				pJumpFromTrampoline[ 1] = 0x44;
+				pJumpFromTrampoline[ 2] = 0x24;
+				pJumpFromTrampoline[ 3] = 0xF8;
 				
-				*reinterpret_cast<unsigned int*>(pJumpToOriginal + 4) = unAddress & 0xFFFFFFFF;
+				*reinterpret_cast<unsigned int*>(pJumpFromTrampoline + 4) = unAddress & 0xFFFFFFFF;
 				
-				pJumpToOriginal[ 8] = 0xC7;
-				pJumpToOriginal[ 9] = 0x44;
-				pJumpToOriginal[10] = 0x24;
-				pJumpToOriginal[11] = 0xFC;
+				pJumpFromTrampoline[ 8] = 0xC7;
+				pJumpFromTrampoline[ 9] = 0x44;
+				pJumpFromTrampoline[10] = 0x24;
+				pJumpFromTrampoline[11] = 0xFC;
 
-				*reinterpret_cast<unsigned int*>(pJumpToOriginal + 12) = (unAddress >> 32) & 0xFFFFFFFF;
+				*reinterpret_cast<unsigned int*>(pJumpFromTrampoline + 12) = (unAddress >> 32) & 0xFFFFFFFF;
 
-				pJumpToOriginal[16] = 0xFF;
-				pJumpToOriginal[17] = 0x64;
-				pJumpToOriginal[18] = 0x24;
-				pJumpToOriginal[19] = 0xF8;
+				pJumpFromTrampoline[16] = 0xFF;
+				pJumpFromTrampoline[17] = 0x64;
+				pJumpFromTrampoline[18] = 0x24;
+				pJumpFromTrampoline[19] = 0xF8;
 #elif _M_IX86
 				// C7 44 24 FC 44332211 - mov [esp-0x4], 0x11223344
 				// FF 64 24 FC - jmp [esp-4]
 
-				pJumpToOriginal[0] = 0xC7;
-				pJumpToOriginal[1] = 0x44;
-				pJumpToOriginal[2] = 0x24;
-				pJumpToOriginal[3] = 0xF8;
+				pJumpFromTrampoline[0] = 0xC7;
+				pJumpFromTrampoline[1] = 0x44;
+				pJumpFromTrampoline[2] = 0x24;
+				pJumpFromTrampoline[3] = 0xFC;
 
-				*reinterpret_cast<unsigned int*>(pJumpToOriginal + 4) = reinterpret_cast<unsigned int>(m_pAddress) + static_cast<unsigned int>(unJumpToOriginalSize & 0xFFFFFFFF);
+				*reinterpret_cast<unsigned int*>(pJumpFromTrampoline + 4) = reinterpret_cast<unsigned int>(m_pAddress) + static_cast<unsigned int>(unJumpToHookSize & 0xFFFFFFFF);
 
-				pJumpToOriginal[ 8] = 0xFF;
-				pJumpToOriginal[ 9] = 0x64;
-				pJumpToOriginal[10] = 0x24;
-				pJumpToOriginal[11] = 0xF8;
+				pJumpFromTrampoline[ 8] = 0xFF;
+				pJumpFromTrampoline[ 9] = 0x64;
+				pJumpFromTrampoline[10] = 0x24;
+				pJumpFromTrampoline[11] = 0xFC;
 #endif
 			}
 
@@ -82224,8 +82223,7 @@ namespace Detours {
 			unsigned char* pJumpToHook = reinterpret_cast<unsigned char*>(m_pAddress);
 			if ((unJumpToHookOffset - 5) <= 0x7FFFFFFF) { // E9 00 00 00 00 - jmp rel32
 				pJumpToHook[0] = 0xE9;
-				unsigned int unOffset = static_cast<unsigned int>(unJumpToHookOffset & 0xFFFFFFFF) - 5;
-				memcpy(pJumpToHook + 1, &unOffset, 4);
+				*reinterpret_cast<unsigned int*>(pJumpToHook + 1) = static_cast<unsigned int>(unJumpToHookOffset & 0xFFFFFFFF) - 5;
 			} else {
 #ifdef _M_X64
 				// C7 44 24 F8 44332211 - mov [rsp-0x8], 0x11223344 ; Low
@@ -82259,14 +82257,14 @@ namespace Detours {
 				pJumpToHook[0] = 0xC7;
 				pJumpToHook[1] = 0x44;
 				pJumpToHook[2] = 0x24;
-				pJumpToHook[3] = 0xF8;
+				pJumpToHook[3] = 0xFC;
 
 				*reinterpret_cast<unsigned int*>(pJumpToHook + 4) = reinterpret_cast<unsigned int>(pHookAddress);
 
-				pJumpToHook[8] = 0xFF;
-				pJumpToHook[9] = 0x64;
+				pJumpToHook[ 8] = 0xFF;
+				pJumpToHook[ 9] = 0x64;
 				pJumpToHook[10] = 0x24;
-				pJumpToHook[11] = 0xF8;
+				pJumpToHook[11] = 0xFC;
 #endif
 			}
 
