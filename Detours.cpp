@@ -81925,7 +81925,6 @@ namespace Detours {
 			m_bInitialized = false;
 			m_pAddress = nullptr;
 			m_pTrampoline = nullptr;
-			m_pAddressAfterJump = nullptr;
 			m_pOriginalBytes = nullptr;
 			m_unOriginalBytes = 0;
 		}
@@ -81934,7 +81933,6 @@ namespace Detours {
 			m_bInitialized = true;
 			m_pAddress = pAddress;
 			m_pTrampoline = nullptr;
-			m_pAddressAfterJump = nullptr;
 			m_pOriginalBytes = nullptr;
 			m_unOriginalBytes = 0;
 		}
@@ -81950,7 +81948,6 @@ namespace Detours {
 
 			m_pAddress = pAddress;
 			m_pTrampoline = nullptr;
-			m_pAddressAfterJump = nullptr;
 			m_pOriginalBytes = nullptr;
 			m_unOriginalBytes = 0;
 
@@ -81967,7 +81964,6 @@ namespace Detours {
 
 			m_pAddress = nullptr;
 			m_pTrampoline = nullptr;
-			m_pAddressAfterJump = nullptr;
 			m_pOriginalBytes = nullptr;
 			m_unOriginalBytes = 0;
 
@@ -82002,8 +81998,6 @@ namespace Detours {
 #endif
 			}
 
-			m_pAddressAfterJump = reinterpret_cast<void*>(reinterpret_cast<size_t>(m_pAddress) + unJumpToHookSize);
-
 			INSTRUCTION ins;
 			size_t unCopyingSize = 0;
 			while (unCopyingSize < unJumpToHookSize) {
@@ -82012,7 +82006,6 @@ namespace Detours {
 #elif _M_IX86
 				if (!RD_SUCCESS(RdDecode(&ins, reinterpret_cast<unsigned char*>(m_pAddress) + unCopyingSize, RD_CODE_32, RD_DATA_32))) {
 #endif
-					m_pAddressAfterJump = nullptr;
 					g_ThreadSuspender.ResumeThreads();
 					return false;
 				}
@@ -82021,7 +82014,6 @@ namespace Detours {
 			}
 
 			if (unCopyingSize >= HOOK_INLINE_TRAMPOLINE_SIZE) {
-				m_pAddressAfterJump = nullptr;
 				g_ThreadSuspender.ResumeThreads();
 				return false;
 			}
@@ -82032,7 +82024,6 @@ namespace Detours {
 			m_pTrampoline = g_HookStorage.Alloc(HOOK_INLINE_TRAMPOLINE_SIZE);
 #endif
 			if (!m_pTrampoline) {
-				m_pAddressAfterJump = nullptr;
 				g_ThreadSuspender.ResumeThreads();
 				return false;
 			}
@@ -82040,7 +82031,6 @@ namespace Detours {
 			if (!Protection(m_pTrampoline, HOOK_INLINE_TRAMPOLINE_SIZE, false).ChangeProtection(PAGE_READWRITE)) {
 				g_HookStorage.DeAlloc(m_pTrampoline);
 				m_pTrampoline = nullptr;
-				m_pAddressAfterJump = nullptr;
 				g_ThreadSuspender.ResumeThreads();
 				return false;
 			}
@@ -82065,7 +82055,6 @@ namespace Detours {
 			if (unCopyingSize + unJumpFromTrampolineSize > HOOK_INLINE_TRAMPOLINE_SIZE) {
 				g_HookStorage.DeAlloc(m_pTrampoline);
 				m_pTrampoline = nullptr;
-				m_pAddressAfterJump = nullptr;
 				g_ThreadSuspender.ResumeThreads();
 				return false;
 			}
@@ -82081,7 +82070,6 @@ namespace Detours {
 #endif
 					g_HookStorage.DeAlloc(m_pTrampoline);
 					m_pTrampoline = nullptr;
-					m_pAddressAfterJump = nullptr;
 					g_ThreadSuspender.ResumeThreads();
 					return false;
 				}
@@ -82106,7 +82094,6 @@ namespace Detours {
 						default:
 							g_HookStorage.DeAlloc(m_pTrampoline);
 							m_pTrampoline = nullptr;
-							m_pAddressAfterJump = nullptr;
 							g_ThreadSuspender.ResumeThreads();
 							return false;
 					}
@@ -82127,7 +82114,6 @@ namespace Detours {
 						default:
 							g_HookStorage.DeAlloc(m_pTrampoline);
 							m_pTrampoline = nullptr;
-							m_pAddressAfterJump = nullptr;
 							g_ThreadSuspender.ResumeThreads();
 							return false;
 					}
@@ -82188,7 +82174,6 @@ namespace Detours {
 			if (!Protection(m_pTrampoline, HOOK_INLINE_TRAMPOLINE_SIZE, false).ChangeProtection(PAGE_EXECUTE_READ)) {
 				g_HookStorage.DeAlloc(m_pTrampoline);
 				m_pTrampoline = nullptr;
-				m_pAddressAfterJump = nullptr;
 				g_ThreadSuspender.ResumeThreads();
 				return false;
 			}
@@ -82200,7 +82185,6 @@ namespace Detours {
 				m_unOriginalBytes = 0;
 				g_HookStorage.DeAlloc(m_pTrampoline);
 				m_pTrampoline = nullptr;
-				m_pAddressAfterJump = nullptr;
 				g_ThreadSuspender.ResumeThreads();
 				return false;
 			}
@@ -82213,7 +82197,6 @@ namespace Detours {
 				m_unOriginalBytes = 0;
 				g_HookStorage.DeAlloc(m_pTrampoline);
 				m_pTrampoline = nullptr;
-				m_pAddressAfterJump = nullptr;
 				g_ThreadSuspender.ResumeThreads();
 				return false;
 			}
@@ -82300,7 +82283,6 @@ namespace Detours {
 
 			m_pOriginalBytes = nullptr;
 			m_unOriginalBytes = 0;
-			m_pAddressAfterJump = nullptr;
 			g_HookStorage.DeAlloc(m_pTrampoline);
 			m_pTrampoline = nullptr;
 
@@ -82312,10 +82294,6 @@ namespace Detours {
 			return m_pTrampoline;
 		}
 
-		void* InlineHook::GetAddressAfterJump() const {
-			return m_pAddressAfterJump;
-		}
-
 		// ----------------------------------------------------------------
 		// Raw Hook
 		// ----------------------------------------------------------------
@@ -82324,7 +82302,7 @@ namespace Detours {
 			m_bInitialized = false;
 			m_pAddress = nullptr;
 			m_pWrapper = nullptr;
-			m_pAddressAfterJump = nullptr;
+			m_unFirstInstructionSize = 0;
 			m_pTrampoline = nullptr;
 			m_pOriginalBytes = nullptr;
 			m_unOriginalBytes = 0;
@@ -82334,7 +82312,7 @@ namespace Detours {
 			m_bInitialized = true;
 			m_pAddress = pAddress;
 			m_pWrapper = nullptr;
-			m_pAddressAfterJump = nullptr;
+			m_unFirstInstructionSize = 0;
 			m_pTrampoline = nullptr;
 			m_pOriginalBytes = nullptr;
 			m_unOriginalBytes = 0;
@@ -82352,7 +82330,7 @@ namespace Detours {
 			m_pAddress = pAddress;
 			m_pWrapper = nullptr;
 			m_pTrampoline = nullptr;
-			m_pAddressAfterJump = nullptr;
+			m_unFirstInstructionSize = 0;
 			m_pOriginalBytes = nullptr;
 			m_unOriginalBytes = 0;
 
@@ -82370,7 +82348,7 @@ namespace Detours {
 			m_pAddress = nullptr;
 			m_pWrapper = nullptr;
 			m_pTrampoline = nullptr;
-			m_pAddressAfterJump = nullptr;
+			m_unFirstInstructionSize = 0;
 			m_pOriginalBytes = nullptr;
 			m_unOriginalBytes = 0;
 
@@ -82378,7 +82356,7 @@ namespace Detours {
 			return true;
 		}
 
-		bool RawHook::Hook(const fnRawHookCallBack pCallBack, bool bNative) {
+		bool RawHook::Hook(const fnRawHookCallBack pCallBack, bool bNative, const unsigned int unReservedStackSize) {
 			if (!g_ThreadSuspender.SuspendThreads()) {
 				return false;
 			}
@@ -82418,7 +82396,7 @@ namespace Detours {
 
 			const bool bHaveAVX512 = ((cpuinfo[1] & (1 << 16)) != 0) && !bNative;
 
-			const unsigned int unContextSize = __align_up<unsigned int>((bNative ? sizeof(RAW_NATIVE_CONTEXT) : sizeof(RAW_CONTEXT)) + sizeof(void*), (bNative ? alignof(RAW_NATIVE_CONTEXT) : alignof(RAW_CONTEXT)));
+			const unsigned int unContextSize = __align_up<unsigned int>((bNative ? sizeof(RAW_NATIVE_CONTEXT) : sizeof(RAW_CONTEXT)) + (unReservedStackSize ? __align_up<unsigned int>(unReservedStackSize, alignof(void*)) : sizeof(void*)), (bNative ? alignof(RAW_NATIVE_CONTEXT) : alignof(RAW_CONTEXT)));
 
 #ifdef _M_X64
 			if (bHaveAVX512) {
@@ -83412,8 +83390,6 @@ namespace Detours {
 #endif
 			}
 
-			m_pAddressAfterJump = reinterpret_cast<void*>(reinterpret_cast<size_t>(m_pAddress) + unJumpToWrapperSize);
-
 			INSTRUCTION ins;
 			size_t unCopyingSize = 0;
 			while (unCopyingSize < unJumpToWrapperSize) {
@@ -83422,11 +83398,15 @@ namespace Detours {
 #elif _M_IX86
 				if (!RD_SUCCESS(RdDecode(&ins, reinterpret_cast<unsigned char*>(m_pAddress) + unCopyingSize, RD_CODE_32, RD_DATA_32))) {
 #endif
-					m_pAddressAfterJump = nullptr;
+					m_unFirstInstructionSize = 0;
 					g_HookStorage.DeAlloc(m_pWrapper);
 					m_pWrapper = nullptr;
 					g_ThreadSuspender.ResumeThreads();
 					return false;
+				}
+
+				if (!m_unFirstInstructionSize) {
+					m_unFirstInstructionSize = ins.Length;
 				}
 
 				unCopyingSize += ins.Length;
@@ -83438,7 +83418,7 @@ namespace Detours {
 			m_pTrampoline = g_HookStorage.Alloc(HOOK_RAW_TRAMPOLINE_SIZE);
 #endif
 			if (!m_pTrampoline) {
-				m_pAddressAfterJump = nullptr;
+				m_unFirstInstructionSize = 0;
 				g_HookStorage.DeAlloc(m_pWrapper);
 				m_pWrapper = nullptr;
 				g_ThreadSuspender.ResumeThreads();
@@ -83448,7 +83428,7 @@ namespace Detours {
 			if (!Protection(m_pTrampoline, HOOK_RAW_TRAMPOLINE_SIZE, false).ChangeProtection(PAGE_READWRITE)) {
 				g_HookStorage.DeAlloc(m_pTrampoline);
 				m_pTrampoline = nullptr;
-				m_pAddressAfterJump = nullptr;
+				m_unFirstInstructionSize = 0;
 				g_HookStorage.DeAlloc(m_pWrapper);
 				m_pWrapper = nullptr;
 				g_ThreadSuspender.ResumeThreads();
@@ -83534,7 +83514,7 @@ namespace Detours {
 			if (!Protection(m_pWrapper, HOOK_RAW_WRAPPER_SIZE, false).ChangeProtection(PAGE_EXECUTE_READ)) {
 				g_HookStorage.DeAlloc(m_pTrampoline);
 				m_pTrampoline = nullptr;
-				m_pAddressAfterJump = nullptr;
+				m_unFirstInstructionSize = 0;
 				g_HookStorage.DeAlloc(m_pWrapper);
 				m_pWrapper = nullptr;
 				g_ThreadSuspender.ResumeThreads();
@@ -83544,7 +83524,7 @@ namespace Detours {
 			if (!Protection(m_pTrampoline, HOOK_RAW_TRAMPOLINE_SIZE, false).ChangeProtection(PAGE_READWRITE)) {
 				g_HookStorage.DeAlloc(m_pTrampoline);
 				m_pTrampoline = nullptr;
-				m_pAddressAfterJump = nullptr;
+				m_unFirstInstructionSize = 0;
 				g_HookStorage.DeAlloc(m_pWrapper);
 				m_pWrapper = nullptr;
 				g_ThreadSuspender.ResumeThreads();
@@ -83579,7 +83559,7 @@ namespace Detours {
 #endif
 					g_HookStorage.DeAlloc(m_pTrampoline);
 					m_pTrampoline = nullptr;
-					m_pAddressAfterJump = nullptr;
+					m_unFirstInstructionSize = 0;
 					g_HookStorage.DeAlloc(m_pWrapper);
 					m_pWrapper = nullptr;
 					g_ThreadSuspender.ResumeThreads();
@@ -83606,7 +83586,7 @@ namespace Detours {
 						default:
 							g_HookStorage.DeAlloc(m_pTrampoline);
 							m_pTrampoline = nullptr;
-							m_pAddressAfterJump = nullptr;
+							m_unFirstInstructionSize = 0;
 							g_HookStorage.DeAlloc(m_pWrapper);
 							m_pWrapper = nullptr;
 							g_ThreadSuspender.ResumeThreads();
@@ -83629,7 +83609,7 @@ namespace Detours {
 						default:
 							g_HookStorage.DeAlloc(m_pTrampoline);
 							m_pTrampoline = nullptr;
-							m_pAddressAfterJump = nullptr;
+							m_unFirstInstructionSize = 0;
 							g_HookStorage.DeAlloc(m_pWrapper);
 							m_pWrapper = nullptr;
 							g_ThreadSuspender.ResumeThreads();
@@ -83694,7 +83674,7 @@ namespace Detours {
 			if (!Protection(m_pTrampoline, HOOK_RAW_TRAMPOLINE_SIZE, false).ChangeProtection(PAGE_EXECUTE_READ)) {
 				g_HookStorage.DeAlloc(m_pTrampoline);
 				m_pTrampoline = nullptr;
-				m_pAddressAfterJump = nullptr;
+				m_unFirstInstructionSize = 0;
 				g_HookStorage.DeAlloc(m_pWrapper);
 				m_pWrapper = nullptr;
 				g_ThreadSuspender.ResumeThreads();
@@ -83708,7 +83688,7 @@ namespace Detours {
 				m_unOriginalBytes = 0;
 				g_HookStorage.DeAlloc(m_pTrampoline);
 				m_pTrampoline = nullptr;
-				m_pAddressAfterJump = nullptr;
+				m_unFirstInstructionSize = 0;
 				g_HookStorage.DeAlloc(m_pWrapper);
 				m_pWrapper = nullptr;
 				g_ThreadSuspender.ResumeThreads();
@@ -83723,7 +83703,7 @@ namespace Detours {
 				m_unOriginalBytes = 0;
 				g_HookStorage.DeAlloc(m_pTrampoline);
 				m_pTrampoline = nullptr;
-				m_pAddressAfterJump = nullptr;
+				m_unFirstInstructionSize = 0;
 				g_HookStorage.DeAlloc(m_pWrapper);
 				m_pWrapper = nullptr;
 				g_ThreadSuspender.ResumeThreads();
@@ -83820,7 +83800,7 @@ namespace Detours {
 			m_unOriginalBytes = 0;
 			g_HookStorage.DeAlloc(m_pTrampoline);
 			m_pTrampoline = nullptr;
-			m_pAddressAfterJump = nullptr;
+			m_unFirstInstructionSize = 0;
 			g_HookStorage.DeAlloc(m_pWrapper);
 			m_pWrapper = nullptr;
 			g_ThreadSuspender.ResumeThreads();
@@ -83833,8 +83813,8 @@ namespace Detours {
 			return m_pTrampoline;
 		}
 
-		void* RawHook::GetAddressAfterJump() const {
-			return m_pAddressAfterJump;
+		unsigned char RawHook::GetFirstInstructionSize() const {
+			return m_unFirstInstructionSize;
 		}
 	}
 }

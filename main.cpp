@@ -1129,18 +1129,17 @@ bool __cdecl Sleep_RawHook(Detours::Hook::PRAW_CONTEXT pCTX) {
 #endif // _DEBUG || !_M_X64
 
 #ifdef _M_X64
-	pCTX->m_unRSP -= 8;
-	*reinterpret_cast<unsigned long long*>(pCTX->m_unRSP) = reinterpret_cast<unsigned long long>(RawSleepHook.GetTrampoline());
+	pCTX->Stack.push(RawSleepHook.GetTrampoline());
 #elif _M_IX86
-	unsigned int unIP = *reinterpret_cast<unsigned int*>(pCTX->m_unESP); // Getting return address
-	pCTX->m_unESP += 4; // Clearing argument
-	*reinterpret_cast<unsigned int*>(pCTX->m_unESP) = unIP; // Restoring return address
+	unsigned int unIP = pCTX->Stack.pop();
+	pCTX->Stack.pop();
+	pCTX->Stack.push(unIP);
 #endif
 
 	return true;
 }
 
-Detours::Hook::RAW_HOOK_M128 g_LastXMM7;
+Detours::Hook::RAW_CONTEXT_M128 g_LastXMM7;
 
 #ifdef _M_X64
 bool __fastcall Sleep_RawHookMod(Detours::Hook::PRAW_CONTEXT pCTX) {
@@ -1152,12 +1151,11 @@ bool __cdecl Sleep_RawHookMod(Detours::Hook::PRAW_CONTEXT pCTX) {
 	pCTX->m_XMM7.m_un64[1] = 0x1122334455667788;
 
 #ifdef _M_X64
-	pCTX->m_unRSP -= 8;
-	*reinterpret_cast<unsigned long long*>(pCTX->m_unRSP) = reinterpret_cast<unsigned long long>(RawSleepHook.GetTrampoline());
+	pCTX->Stack.push(RawSleepHook.GetTrampoline());
 #elif _M_IX86
-	unsigned int unIP = *reinterpret_cast<unsigned int*>(pCTX->m_unESP); // Getting return address
-	pCTX->m_unESP += 4; // Clearing argument
-	*reinterpret_cast<unsigned int*>(pCTX->m_unESP) = unIP; // Restoring return address
+	unsigned int unIP = pCTX->Stack.pop();
+	pCTX->Stack.pop();
+	pCTX->Stack.push(unIP);
 #endif
 
 	return true;
@@ -1170,15 +1168,9 @@ bool __fastcall CPUID_RawHook(Detours::Hook::PRAW_CONTEXT pCTX) {
 #elif _M_IX86
 bool __cdecl CPUID_RawHook(Detours::Hook::PRAW_CONTEXT pCTX) {
 #endif
-#ifdef _M_X64
+
 	pCTX->m_unEBX = 0x11223344;
-	pCTX->m_unRSP -= 8;
-	*reinterpret_cast<unsigned long long*>(pCTX->m_unRSP) = reinterpret_cast<unsigned long long>(RawCPUIDHook.GetTrampoline()) + 2; // Trampoline + Skip `cpuid`
-#elif _M_IX86
-	pCTX->m_unEBX = 0x11223344;
-	pCTX->m_unESP -= 4;
-	*reinterpret_cast<unsigned int*>(pCTX->m_unESP) = reinterpret_cast<unsigned int>(RawCPUIDHook.GetTrampoline()) + 2; // Trampoline + Skip `cpuid`
-#endif
+	pCTX->Stack.push(reinterpret_cast<char*>(RawCPUIDHook.GetTrampoline()) + RawCPUIDHook.GetFirstInstructionSize());
 
 	return true;
 }
@@ -1226,7 +1218,7 @@ void DemoRawHook() { SELF_EXPORT("DemoHook");
 #ifdef _M_X64
 bool __fastcall new_foo(void* pThis) {
 #elif _M_IX86
-bool __cdecl new_foo(void* pThis) {
+bool __stdcall new_foo(void* pThis) {
 #endif
 
 #ifdef _M_X64
@@ -1245,22 +1237,16 @@ bool __fastcall CallConv_Convert_RawHook(Detours::Hook::PRAW_CONTEXT pCTX) {
 bool __cdecl CallConv_Convert_RawHook(Detours::Hook::PRAW_CONTEXT pCTX) {
 #endif
 
-	// Converting __thiscall to __fastcall/__cdecl and redirect it
+	// Converting __thiscall to __fastcall/__stdcall and redirect it
 
 #ifdef _M_X64
 	pCTX->m_unRSP -= 8;
 	*reinterpret_cast<unsigned long long*>(pCTX->m_unRSP) = reinterpret_cast<unsigned long long>(new_foo);
 #elif _M_IX86
-	const unsigned int unIP = *reinterpret_cast<unsigned int*>(pCTX->m_unESP);
-
-	pCTX->m_unESP -= 4;
-	*reinterpret_cast<unsigned int*>(pCTX->m_unESP) = pCTX->m_unECX; // Store `this` as argument for new_foo
-
-	pCTX->m_unESP -= 4;
-	*reinterpret_cast<unsigned int*>(pCTX->m_unESP) = unIP;
-
-	pCTX->m_unESP -= 4;
-	*reinterpret_cast<unsigned int*>(pCTX->m_unESP) = reinterpret_cast<unsigned int>(new_foo);
+	void* pReturnAddress = pCTX->Stack.pop();
+	pCTX->Stack.push(pCTX->m_unECX);
+	pCTX->Stack.push(pReturnAddress);
+	pCTX->Stack.push(new_foo);
 #endif
 
 	return true;
@@ -1815,7 +1801,7 @@ int _tmain(int nArguments, PTCHAR* pArguments) {
 		void** pHookingVTable = pHookingObject->GetVTable();
 
 		_tprintf_s(_T("RawHook_CallConv_Convert.Set = %d\n"), RawHook_CallConv_Convert.Set(pHookingVTable[0]));
-		_tprintf_s(_T("RawHook_CallConv_Convert.Hook = %d\n"), RawHook_CallConv_Convert.Hook(CallConv_Convert_RawHook, true));
+		_tprintf_s(_T("RawHook_CallConv_Convert.Hook = %d\n"), RawHook_CallConv_Convert.Hook(CallConv_Convert_RawHook, true, 0x10));
 
 		_tprintf_s(_T("g_pTestingRTTI->foo = %d\n"), g_pTestingRTTI->foo());
 

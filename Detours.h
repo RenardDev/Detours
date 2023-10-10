@@ -5017,13 +5017,11 @@ namespace Detours {
 
 		public:
 			void* GetTrampoline() const;
-			void* GetAddressAfterJump() const;
 
 		private:
 			bool m_bInitialized;
 			void* m_pAddress;
 			void* m_pTrampoline;
-			void* m_pAddressAfterJump;
 			size_t m_unOriginalBytes;
 			std::unique_ptr<unsigned char[]> m_pOriginalBytes;
 		};
@@ -5034,13 +5032,31 @@ namespace Detours {
 
 #pragma pack(push, r1, 1)
 
-		typedef union _RAW_HOOK_FPU_REGISTER {
+		typedef struct _RAW_CONTEXT_STACK {
+			template <typename T = void*>
+			inline void push(const T Value) {
+				m_pAddress = reinterpret_cast<void*>(reinterpret_cast<size_t>(m_pAddress) - sizeof(T));
+				*reinterpret_cast<T*>(m_pAddress) = Value;
+			}
+
+			template <typename T = void*>
+			inline T& pop() {
+				T& Value = *reinterpret_cast<T*>(m_pAddress);
+				m_pAddress = reinterpret_cast<void*>(reinterpret_cast<size_t>(m_pAddress) + sizeof(T));
+				return Value;
+			}
+
+		private:
+			void* m_pAddress;
+		} RAW_CONTEXT_STACK, *PRAW_CONTEXT_STACK;
+
+		typedef union _RAW_CONTEXT_FPU_REGISTER {
 			unsigned char m_pRAW[10];
 			double m_f64;
 			float m_f32;
-		} RAW_HOOK_FPU_REGISTER, *PRAW_HOOK_FPU_REGISTER;
+		} RAW_CONTEXT_FPU_REGISTER, *PRAW_CONTEXT_FPU_REGISTER;
 
-		typedef struct _RAW_HOOK_FPU {
+		typedef struct _RAW_CONTEXT_FPU {
 			union {
 				unsigned short m_unControlWord;
 				struct {
@@ -5087,10 +5103,10 @@ namespace Detours {
 			unsigned int m_unDP;   // FPU data pointer offset
 			unsigned short m_unDS; // FPU data pointer segment selector
 			unsigned short m_unReserved4;
-			RAW_HOOK_FPU_REGISTER m_Registers[8];
-		} RAW_HOOK_FPU, *PRAW_HOOK_FPU;
+			RAW_CONTEXT_FPU_REGISTER m_Registers[8];
+		} RAW_CONTEXT_FPU, *PRAW_CONTEXT_FPU;
 
-		typedef union _RAW_HOOK_M128 {
+		typedef union _RAW_CONTEXT_M128 {
 			unsigned long long m_un64[2];
 			unsigned int m_un32[4];
 			unsigned short m_un16[8];
@@ -5101,9 +5117,9 @@ namespace Detours {
 			char m_n8[16];
 			double m_f64[2];
 			float m_f32[4];
-		} RAW_HOOK_M128, *PRAW_HOOK_M128;
+		} RAW_CONTEXT_M128, *PRAW_CONTEXT_M128;
 
-		typedef union _RAW_HOOK_M256 {
+		typedef union _RAW_CONTEXT_M256 {
 			unsigned long long m_un64[4];
 			unsigned int m_un32[8];
 			unsigned short m_un16[16];
@@ -5114,9 +5130,9 @@ namespace Detours {
 			char m_n8[32];
 			double m_f64[4];
 			float m_f32[8];
-		} RAW_HOOK_M256, *PRAW_HOOK_M256;
+		} RAW_CONTEXT_M256, *PRAW_CONTEXT_M256;
 
-		typedef union _RAW_HOOK_M512 {
+		typedef union _RAW_CONTEXT_M512 {
 			unsigned long long m_un64[8];
 			unsigned int m_un32[16];
 			unsigned short m_un16[32];
@@ -5127,7 +5143,7 @@ namespace Detours {
 			char m_n8[64];
 			double m_f64[8];
 			float m_f32[16];
-		} RAW_HOOK_M512, *PRAW_HOOK_M512;
+		} RAW_CONTEXT_M512, *PRAW_CONTEXT_M512;
 
 #pragma pack(pop, r1)
 
@@ -5214,6 +5230,7 @@ namespace Detours {
 
 			// ESP
 			union {
+				RAW_CONTEXT_STACK Stack;
 				unsigned int m_unESP;
 				unsigned short m_unSP;
 				unsigned char m_unSPL;
@@ -5270,58 +5287,58 @@ namespace Detours {
 			};
 
 			union {
-				RAW_HOOK_M512 m_ZMM0;
-				RAW_HOOK_M256 m_YMM0;
-				RAW_HOOK_M128 m_XMM0;
+				RAW_CONTEXT_M512 m_ZMM0;
+				RAW_CONTEXT_M256 m_YMM0;
+				RAW_CONTEXT_M128 m_XMM0;
 			};
 
 			union {
-				RAW_HOOK_M512 m_ZMM1;
-				RAW_HOOK_M256 m_YMM1;
-				RAW_HOOK_M128 m_XMM1;
+				RAW_CONTEXT_M512 m_ZMM1;
+				RAW_CONTEXT_M256 m_YMM1;
+				RAW_CONTEXT_M128 m_XMM1;
 			};
 
 			union {
-				RAW_HOOK_M512 m_ZMM2;
-				RAW_HOOK_M256 m_YMM2;
-				RAW_HOOK_M128 m_XMM2;
+				RAW_CONTEXT_M512 m_ZMM2;
+				RAW_CONTEXT_M256 m_YMM2;
+				RAW_CONTEXT_M128 m_XMM2;
 			};
 
 			union {
-				RAW_HOOK_M512 m_ZMM3;
-				RAW_HOOK_M256 m_YMM3;
-				RAW_HOOK_M128 m_XMM3;
+				RAW_CONTEXT_M512 m_ZMM3;
+				RAW_CONTEXT_M256 m_YMM3;
+				RAW_CONTEXT_M128 m_XMM3;
 			};
 
 			union {
-				RAW_HOOK_M512 m_ZMM4;
-				RAW_HOOK_M256 m_YMM4;
-				RAW_HOOK_M128 m_XMM4;
+				RAW_CONTEXT_M512 m_ZMM4;
+				RAW_CONTEXT_M256 m_YMM4;
+				RAW_CONTEXT_M128 m_XMM4;
 			};
 
 			union {
-				RAW_HOOK_M512 m_ZMM5;
-				RAW_HOOK_M256 m_YMM5;
-				RAW_HOOK_M128 m_XMM5;
+				RAW_CONTEXT_M512 m_ZMM5;
+				RAW_CONTEXT_M256 m_YMM5;
+				RAW_CONTEXT_M128 m_XMM5;
 			};
 
 			union {
-				RAW_HOOK_M512 m_ZMM6;
-				RAW_HOOK_M256 m_YMM6;
-				RAW_HOOK_M128 m_XMM6;
+				RAW_CONTEXT_M512 m_ZMM6;
+				RAW_CONTEXT_M256 m_YMM6;
+				RAW_CONTEXT_M128 m_XMM6;
 			};
 
 			union {
-				RAW_HOOK_M512 m_ZMM7;
-				RAW_HOOK_M256 m_YMM7;
-				RAW_HOOK_M128 m_XMM7;
+				RAW_CONTEXT_M512 m_ZMM7;
+				RAW_CONTEXT_M256 m_YMM7;
+				RAW_CONTEXT_M128 m_XMM7;
 			};
 
 			// ----------------------------------------------------------------
 			// FPU
 			// ----------------------------------------------------------------
 
-			RAW_HOOK_FPU m_FPU;
+			RAW_CONTEXT_FPU m_FPU;
 		} RAW_CONTEXT32, *PRAW_CONTEXT32;
 
 		typedef struct _RAW_NATIVE_CONTEXT64 {
@@ -5413,6 +5430,7 @@ namespace Detours {
 
 			// RSP
 			union {
+				RAW_CONTEXT_STACK Stack;
 				unsigned long long m_unRSP;
 				unsigned int m_unESP;
 				unsigned short m_unSP;
@@ -5537,202 +5555,202 @@ namespace Detours {
 			};
 
 			union {
-				RAW_HOOK_M512 m_ZMM0;
-				RAW_HOOK_M256 m_YMM0;
-				RAW_HOOK_M128 m_XMM0;
+				RAW_CONTEXT_M512 m_ZMM0;
+				RAW_CONTEXT_M256 m_YMM0;
+				RAW_CONTEXT_M128 m_XMM0;
 			};
 
 			union {
-				RAW_HOOK_M512 m_ZMM1;
-				RAW_HOOK_M256 m_YMM1;
-				RAW_HOOK_M128 m_XMM1;
+				RAW_CONTEXT_M512 m_ZMM1;
+				RAW_CONTEXT_M256 m_YMM1;
+				RAW_CONTEXT_M128 m_XMM1;
 			};
 
 			union {
-				RAW_HOOK_M512 m_ZMM2;
-				RAW_HOOK_M256 m_YMM2;
-				RAW_HOOK_M128 m_XMM2;
+				RAW_CONTEXT_M512 m_ZMM2;
+				RAW_CONTEXT_M256 m_YMM2;
+				RAW_CONTEXT_M128 m_XMM2;
 			};
 
 			union {
-				RAW_HOOK_M512 m_ZMM3;
-				RAW_HOOK_M256 m_YMM3;
-				RAW_HOOK_M128 m_XMM3;
+				RAW_CONTEXT_M512 m_ZMM3;
+				RAW_CONTEXT_M256 m_YMM3;
+				RAW_CONTEXT_M128 m_XMM3;
 			};
 
 			union {
-				RAW_HOOK_M512 m_ZMM4;
-				RAW_HOOK_M256 m_YMM4;
-				RAW_HOOK_M128 m_XMM4;
+				RAW_CONTEXT_M512 m_ZMM4;
+				RAW_CONTEXT_M256 m_YMM4;
+				RAW_CONTEXT_M128 m_XMM4;
 			};
 
 			union {
-				RAW_HOOK_M512 m_ZMM5;
-				RAW_HOOK_M256 m_YMM5;
-				RAW_HOOK_M128 m_XMM5;
+				RAW_CONTEXT_M512 m_ZMM5;
+				RAW_CONTEXT_M256 m_YMM5;
+				RAW_CONTEXT_M128 m_XMM5;
 			};
 
 			union {
-				RAW_HOOK_M512 m_ZMM6;
-				RAW_HOOK_M256 m_YMM6;
-				RAW_HOOK_M128 m_XMM6;
+				RAW_CONTEXT_M512 m_ZMM6;
+				RAW_CONTEXT_M256 m_YMM6;
+				RAW_CONTEXT_M128 m_XMM6;
 			};
 
 			union {
-				RAW_HOOK_M512 m_ZMM7;
-				RAW_HOOK_M256 m_YMM7;
-				RAW_HOOK_M128 m_XMM7;
+				RAW_CONTEXT_M512 m_ZMM7;
+				RAW_CONTEXT_M256 m_YMM7;
+				RAW_CONTEXT_M128 m_XMM7;
 			};
 
 			union {
-				RAW_HOOK_M512 m_ZMM8;
-				RAW_HOOK_M256 m_YMM8;
-				RAW_HOOK_M128 m_XMM8;
+				RAW_CONTEXT_M512 m_ZMM8;
+				RAW_CONTEXT_M256 m_YMM8;
+				RAW_CONTEXT_M128 m_XMM8;
 			};
 
 			union {
-				RAW_HOOK_M512 m_ZMM9;
-				RAW_HOOK_M256 m_YMM9;
-				RAW_HOOK_M128 m_XMM9;
+				RAW_CONTEXT_M512 m_ZMM9;
+				RAW_CONTEXT_M256 m_YMM9;
+				RAW_CONTEXT_M128 m_XMM9;
 			};
 
 			union {
-				RAW_HOOK_M512 m_ZMM10;
-				RAW_HOOK_M256 m_YMM10;
-				RAW_HOOK_M128 m_XMM10;
+				RAW_CONTEXT_M512 m_ZMM10;
+				RAW_CONTEXT_M256 m_YMM10;
+				RAW_CONTEXT_M128 m_XMM10;
 			};
 
 			union {
-				RAW_HOOK_M512 m_ZMM11;
-				RAW_HOOK_M256 m_YMM11;
-				RAW_HOOK_M128 m_XMM11;
+				RAW_CONTEXT_M512 m_ZMM11;
+				RAW_CONTEXT_M256 m_YMM11;
+				RAW_CONTEXT_M128 m_XMM11;
 			};
 
 			union {
-				RAW_HOOK_M512 m_ZMM12;
-				RAW_HOOK_M256 m_YMM12;
-				RAW_HOOK_M128 m_XMM12;
+				RAW_CONTEXT_M512 m_ZMM12;
+				RAW_CONTEXT_M256 m_YMM12;
+				RAW_CONTEXT_M128 m_XMM12;
 			};
 
 			union {
-				RAW_HOOK_M512 m_ZMM13;
-				RAW_HOOK_M256 m_YMM13;
-				RAW_HOOK_M128 m_XMM13;
+				RAW_CONTEXT_M512 m_ZMM13;
+				RAW_CONTEXT_M256 m_YMM13;
+				RAW_CONTEXT_M128 m_XMM13;
 			};
 
 			union {
-				RAW_HOOK_M512 m_ZMM14;
-				RAW_HOOK_M256 m_YMM14;
-				RAW_HOOK_M128 m_XMM14;
+				RAW_CONTEXT_M512 m_ZMM14;
+				RAW_CONTEXT_M256 m_YMM14;
+				RAW_CONTEXT_M128 m_XMM14;
 			};
 
 			union {
-				RAW_HOOK_M512 m_ZMM15;
-				RAW_HOOK_M256 m_YMM15;
-				RAW_HOOK_M128 m_XMM15;
+				RAW_CONTEXT_M512 m_ZMM15;
+				RAW_CONTEXT_M256 m_YMM15;
+				RAW_CONTEXT_M128 m_XMM15;
 			};
 
 			union {
-				RAW_HOOK_M512 m_ZMM16;
-				RAW_HOOK_M256 m_YMM16;
-				RAW_HOOK_M128 m_XMM16;
+				RAW_CONTEXT_M512 m_ZMM16;
+				RAW_CONTEXT_M256 m_YMM16;
+				RAW_CONTEXT_M128 m_XMM16;
 			};
 
 			union {
-				RAW_HOOK_M512 m_ZMM17;
-				RAW_HOOK_M256 m_YMM17;
-				RAW_HOOK_M128 m_XMM17;
+				RAW_CONTEXT_M512 m_ZMM17;
+				RAW_CONTEXT_M256 m_YMM17;
+				RAW_CONTEXT_M128 m_XMM17;
 			};
 
 			union {
-				RAW_HOOK_M512 m_ZMM18;
-				RAW_HOOK_M256 m_YMM18;
-				RAW_HOOK_M128 m_XMM18;
+				RAW_CONTEXT_M512 m_ZMM18;
+				RAW_CONTEXT_M256 m_YMM18;
+				RAW_CONTEXT_M128 m_XMM18;
 			};
 
 			union {
-				RAW_HOOK_M512 m_ZMM19;
-				RAW_HOOK_M256 m_YMM19;
-				RAW_HOOK_M128 m_XMM19;
+				RAW_CONTEXT_M512 m_ZMM19;
+				RAW_CONTEXT_M256 m_YMM19;
+				RAW_CONTEXT_M128 m_XMM19;
 			};
 
 			union {
-				RAW_HOOK_M512 m_ZMM20;
-				RAW_HOOK_M256 m_YMM20;
-				RAW_HOOK_M128 m_XMM20;
+				RAW_CONTEXT_M512 m_ZMM20;
+				RAW_CONTEXT_M256 m_YMM20;
+				RAW_CONTEXT_M128 m_XMM20;
 			};
 
 			union {
-				RAW_HOOK_M512 m_ZMM21;
-				RAW_HOOK_M256 m_YMM21;
-				RAW_HOOK_M128 m_XMM21;
+				RAW_CONTEXT_M512 m_ZMM21;
+				RAW_CONTEXT_M256 m_YMM21;
+				RAW_CONTEXT_M128 m_XMM21;
 			};
 
 			union {
-				RAW_HOOK_M512 m_ZMM22;
-				RAW_HOOK_M256 m_YMM22;
-				RAW_HOOK_M128 m_XMM22;
+				RAW_CONTEXT_M512 m_ZMM22;
+				RAW_CONTEXT_M256 m_YMM22;
+				RAW_CONTEXT_M128 m_XMM22;
 			};
 
 			union {
-				RAW_HOOK_M512 m_ZMM23;
-				RAW_HOOK_M256 m_YMM23;
-				RAW_HOOK_M128 m_XMM23;
+				RAW_CONTEXT_M512 m_ZMM23;
+				RAW_CONTEXT_M256 m_YMM23;
+				RAW_CONTEXT_M128 m_XMM23;
 			};
 
 			union {
-				RAW_HOOK_M512 m_ZMM24;
-				RAW_HOOK_M256 m_YMM24;
-				RAW_HOOK_M128 m_XMM24;
+				RAW_CONTEXT_M512 m_ZMM24;
+				RAW_CONTEXT_M256 m_YMM24;
+				RAW_CONTEXT_M128 m_XMM24;
 			};
 
 			union {
-				RAW_HOOK_M512 m_ZMM25;
-				RAW_HOOK_M256 m_YMM25;
-				RAW_HOOK_M128 m_XMM25;
+				RAW_CONTEXT_M512 m_ZMM25;
+				RAW_CONTEXT_M256 m_YMM25;
+				RAW_CONTEXT_M128 m_XMM25;
 			};
 
 			union {
-				RAW_HOOK_M512 m_ZMM26;
-				RAW_HOOK_M256 m_YMM26;
-				RAW_HOOK_M128 m_XMM26;
+				RAW_CONTEXT_M512 m_ZMM26;
+				RAW_CONTEXT_M256 m_YMM26;
+				RAW_CONTEXT_M128 m_XMM26;
 			};
 
 			union {
-				RAW_HOOK_M512 m_ZMM27;
-				RAW_HOOK_M256 m_YMM27;
-				RAW_HOOK_M128 m_XMM27;
+				RAW_CONTEXT_M512 m_ZMM27;
+				RAW_CONTEXT_M256 m_YMM27;
+				RAW_CONTEXT_M128 m_XMM27;
 			};
 
 			union {
-				RAW_HOOK_M512 m_ZMM28;
-				RAW_HOOK_M256 m_YMM28;
-				RAW_HOOK_M128 m_XMM28;
+				RAW_CONTEXT_M512 m_ZMM28;
+				RAW_CONTEXT_M256 m_YMM28;
+				RAW_CONTEXT_M128 m_XMM28;
 			};
 
 			union {
-				RAW_HOOK_M512 m_ZMM29;
-				RAW_HOOK_M256 m_YMM29;
-				RAW_HOOK_M128 m_XMM29;
+				RAW_CONTEXT_M512 m_ZMM29;
+				RAW_CONTEXT_M256 m_YMM29;
+				RAW_CONTEXT_M128 m_XMM29;
 			};
 
 			union {
-				RAW_HOOK_M512 m_ZMM30;
-				RAW_HOOK_M256 m_YMM30;
-				RAW_HOOK_M128 m_XMM30;
+				RAW_CONTEXT_M512 m_ZMM30;
+				RAW_CONTEXT_M256 m_YMM30;
+				RAW_CONTEXT_M128 m_XMM30;
 			};
 
 			union {
-				RAW_HOOK_M512 m_ZMM31;
-				RAW_HOOK_M256 m_YMM31;
-				RAW_HOOK_M128 m_XMM31;
+				RAW_CONTEXT_M512 m_ZMM31;
+				RAW_CONTEXT_M256 m_YMM31;
+				RAW_CONTEXT_M128 m_XMM31;
 			};
 
 			// ----------------------------------------------------------------
 			// FPU
 			// ----------------------------------------------------------------
 
-			RAW_HOOK_FPU m_FPU;
+			RAW_CONTEXT_FPU m_FPU;
 		} RAW_CONTEXT64, *PRAW_CONTEXT64;
 
 #ifdef _M_X64
@@ -5770,18 +5788,18 @@ namespace Detours {
 			bool Release();
 
 		public:
-			bool Hook(const fnRawHookCallBack pCallBack, bool bNative = false);
+			bool Hook(const fnRawHookCallBack pCallBack, bool bNative = false, const unsigned int unReserveStackSize = 0);
 			bool UnHook();
 
 		public:
 			void* GetTrampoline() const;
-			void* GetAddressAfterJump() const;
+			unsigned char GetFirstInstructionSize() const;
 
 		private:
 			bool m_bInitialized;
 			void* m_pAddress;
 			void* m_pWrapper;
-			void* m_pAddressAfterJump;
+			unsigned char m_unFirstInstructionSize;
 			void* m_pTrampoline;
 			size_t m_unOriginalBytes;
 			std::unique_ptr<unsigned char[]> m_pOriginalBytes;
