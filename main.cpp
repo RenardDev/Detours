@@ -1131,9 +1131,9 @@ bool __cdecl Sleep_RawHook(Detours::Hook::PRAW_CONTEXT pCTX) {
 #ifdef _M_X64
 	pCTX->Stack.push(RawSleepHook.GetTrampoline());
 #elif _M_IX86
-	unsigned int unIP = pCTX->Stack.pop();
+	void* pReturnAddress = pCTX->Stack.pop();
 	pCTX->Stack.pop();
-	pCTX->Stack.push(unIP);
+	pCTX->Stack.push(pReturnAddress);
 #endif
 
 	return true;
@@ -1153,9 +1153,9 @@ bool __cdecl Sleep_RawHookMod(Detours::Hook::PRAW_CONTEXT pCTX) {
 #ifdef _M_X64
 	pCTX->Stack.push(RawSleepHook.GetTrampoline());
 #elif _M_IX86
-	unsigned int unIP = pCTX->Stack.pop();
+	void* pReturnAddress = pCTX->Stack.pop();
 	pCTX->Stack.pop();
-	pCTX->Stack.push(unIP);
+	pCTX->Stack.push(pReturnAddress);
 #endif
 
 	return true;
