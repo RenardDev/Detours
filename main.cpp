@@ -1240,8 +1240,7 @@ bool __cdecl CallConv_Convert_RawHook(Detours::Hook::PRAW_CONTEXT pCTX) {
 	// Converting __thiscall to __fastcall/__stdcall and redirect it
 
 #ifdef _M_X64
-	pCTX->m_unRSP -= 8;
-	*reinterpret_cast<unsigned long long*>(pCTX->m_unRSP) = reinterpret_cast<unsigned long long>(new_foo);
+	pCTX->Stack.push(new_foo);
 #elif _M_IX86
 	void* pReturnAddress = pCTX->Stack.pop();
 	pCTX->Stack.push(pCTX->m_unECX);
