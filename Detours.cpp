@@ -82396,7 +82396,7 @@ namespace Detours {
 
 			const bool bHaveAVX512 = ((cpuinfo[1] & (1 << 16)) != 0) && !bNative;
 
-			const unsigned int unContextSize = __align_up<unsigned int>((bNative ? sizeof(RAW_NATIVE_CONTEXT) : sizeof(RAW_CONTEXT)) + (unReservedStackSize ? __align_up<unsigned int>(unReservedStackSize, alignof(void*)) : sizeof(void*)), (bNative ? alignof(RAW_NATIVE_CONTEXT) : alignof(RAW_CONTEXT)));
+			const unsigned int unContextSize = __align_up<unsigned int>((bNative ? sizeof(RAW_NATIVE_CONTEXT) : sizeof(RAW_CONTEXT)) + (unReservedStackSize ? __align_up<unsigned int>(unReservedStackSize, alignof(void*)) : sizeof(void*) * 2), (bNative ? alignof(RAW_NATIVE_CONTEXT) : alignof(RAW_CONTEXT)));
 
 #ifdef _M_X64
 			if (bHaveAVX512) {
@@ -83817,4 +83817,120 @@ namespace Detours {
 			return m_unFirstInstructionSize;
 		}
 	}
+
+	// ----------------------------------------------------------------
+	// Fibers
+	// ----------------------------------------------------------------
+
+	namespace Fibers {
+
+		// ----------------------------------------------------------------
+		// FiberRoutine
+		// ----------------------------------------------------------------
+
+		void WINAPI FiberRoutine(PVOID lpFiberParameter) {
+			auto pFD = reinterpret_cast<PFIBER_DATA>(lpFiberParameter);
+			if (!pFD) {
+				return;
+			}
+
+			if (!pFD->m_pFiberMain) {
+				return;
+			}
+
+			if (!pFD->m_pFiber) {
+				SwitchToFiber(pFD->m_pFiberMain);
+				return;
+			}
+
+			Fiber* pFiber = reinterpret_cast<Fiber*>(pFD->m_pParameter);
+			if (!pFiber) {
+				SwitchToFiber(pFD->m_pFiberMain);
+				return;
+			}
+
+			auto pCallback = pFiber->GetCallBack();
+			if (pCallback) {
+				pCallback(pFiber->GetData());
+			}
+
+			SwitchToFiber(pFD->m_pFiberMain);
+		}
+
+		// ----------------------------------------------------------------
+		// Fiber
+		// ----------------------------------------------------------------
+
+		Fiber::Fiber() {
+			m_pCallBack = nullptr;
+			m_pData = nullptr;
+		}
+
+		Fiber::Fiber(const fnFiberCallBack pCallBack) {
+			m_pCallBack = pCallBack;
+			m_pData = nullptr;
+		}
+
+		Fiber::Fiber(const fnFiberCallBack pCallBack, void* pData) {
+			m_pCallBack = pCallBack;
+			m_pData = pData;
+		}
+
+		bool Fiber::SetCallBack(const fnFiberCallBack pCallBack) {
+			if (!pCallBack) {
+				return false;
+			}
+
+			m_pCallBack = pCallBack;
+
+			return true;
+		}
+
+		bool Fiber::SetData(void* pData) {
+			if (!pData) {
+				return false;
+			}
+
+			m_pData = pData;
+
+			return true;
+		}
+
+		bool Fiber::Switch() {
+			if (!m_pCallBack) {
+				return false;
+			}
+
+			auto pFD = std::make_unique<FIBER_DATA>();
+			if (!pFD) {
+				return false;
+			}
+
+			memset(pFD.get(), 0, sizeof(FIBER_DATA));
+
+			pFD->m_pFiberMain = ConvertThreadToFiber(nullptr);
+			if (!pFD->m_pFiberMain) {
+				return false;
+			}
+
+			pFD->m_pFiber = CreateFiber(NULL, FiberRoutine, pFD.get());
+			if (!pFD->m_pFiber) {
+				return false;
+			}
+
+			pFD->m_pParameter = this;
+
+			SwitchToFiber(pFD->m_pFiber);
+			DeleteFiber(pFD->m_pFiber);
+			return true;
+		}
+
+		fnFiberCallBack Fiber::GetCallBack() const {
+			return m_pCallBack;
+		}
+
+		void* Fiber::GetData() const {
+			return m_pData;
+		}
+	};
 }

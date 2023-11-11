@@ -647,12 +647,17 @@ void WINAPI Sleep_Hook(DWORD dwMilliseconds) {
 }
 
 Detours::Hook::RawHook RawSleepHook;
-#ifdef _M_X64
-bool __fastcall Sleep_RawHook(Detours::Hook::PRAW_CONTEXT pCTX) {
-#elif _M_IX86
-bool __cdecl Sleep_RawHook(Detours::Hook::PRAW_CONTEXT pCTX) {
-#endif
-#if defined(_DEBUG) || !defined(_M_X64) // NOTE: Using a stack inside a RawHook callback will produce unpredictable results.
+
+void Sleep_RawHookFiber(void* pData) {
+	if (!pData) {
+		return;
+	}
+
+	auto pCTX = reinterpret_cast<Detours::Hook::PRAW_CONTEXT>(reinterpret_cast<void**>(pData)[0]);
+	if (!pCTX) {
+		return;
+	}
+
 	_tprintf_s(_T("[Sleep_RawHook] Hook called!\n"));
 
 	int cpuinfo[4];
@@ -730,8 +735,8 @@ bool __cdecl Sleep_RawHook(Detours::Hook::PRAW_CONTEXT pCTX) {
 	}
 
 	if (bHaveAVX512) {
-		_tprintf_s(_T("  -> MXCSR  = 0x%08X\n"), pCTX->m_unMXCSR);
-		
+		_tprintf_s(_T("  -> MXCSR = 0x%08X\n"), pCTX->m_unMXCSR);
+
 		_tprintf_s(_T("  -> ZMM0  = 0x"));
 		for (int i = 63; i >= 0; --i) {
 			_tprintf_s(_T("%02X"), pCTX->m_ZMM0.m_un8[i]);
@@ -925,8 +930,9 @@ bool __cdecl Sleep_RawHook(Detours::Hook::PRAW_CONTEXT pCTX) {
 		}
 		_tprintf_s(_T("\n"));
 #endif
-	} else if (bHaveAVX) {
-		_tprintf_s(_T("  -> MXCSR  = 0x%08X\n"), pCTX->m_unMXCSR);
+	}
+	else if (bHaveAVX) {
+		_tprintf_s(_T("  -> MXCSR = 0x%08X\n"), pCTX->m_unMXCSR);
 
 		_tprintf_s(_T("  -> YMM0  = 0x"));
 		for (int i = 31; i >= 0; --i) {
@@ -1025,8 +1031,9 @@ bool __cdecl Sleep_RawHook(Detours::Hook::PRAW_CONTEXT pCTX) {
 		}
 		_tprintf_s(_T("\n"));
 #endif
-	} else if (bHaveSSE) {
-		_tprintf_s(_T("  -> MXCSR  = 0x%08X\n"), pCTX->m_unMXCSR);
+	}
+	else if (bHaveSSE) {
+		_tprintf_s(_T("  -> MXCSR = 0x%08X\n"), pCTX->m_unMXCSR);
 
 		_tprintf_s(_T("  -> XMM0  = 0x"));
 		for (int i = 15; i >= 0; --i) {
@@ -1126,7 +1133,6 @@ bool __cdecl Sleep_RawHook(Detours::Hook::PRAW_CONTEXT pCTX) {
 		_tprintf_s(_T("\n"));
 #endif
 	}
-#endif // _DEBUG || !_M_X64
 
 #ifdef _M_X64
 	pCTX->Stack.push(RawSleepHook.GetTrampoline());
@@ -1135,6 +1141,21 @@ bool __cdecl Sleep_RawHook(Detours::Hook::PRAW_CONTEXT pCTX) {
 	pCTX->Stack.pop();
 	pCTX->Stack.push(pReturnAddress);
 #endif
+
+	reinterpret_cast<void**>(pData)[1] = reinterpret_cast<void**>(pData)[0];
+}
+
+#ifdef _M_X64
+bool __fastcall Sleep_RawHook(Detours::Hook::PRAW_CONTEXT pCTX) {
+#elif _M_IX86
+bool __cdecl Sleep_RawHook(Detours::Hook::PRAW_CONTEXT pCTX) {
+#endif
+
+	void* pData[2] = { pCTX, nullptr };
+	Detours::Fibers::Fiber(Sleep_RawHookFiber, pData).Switch();
+	if (pData[0] != pData[1]) {
+		return false;
+	}
 
 	return true;
 }

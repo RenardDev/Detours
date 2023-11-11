@@ -5157,30 +5157,30 @@ namespace Detours {
 				unsigned int m_unEFLAGS;
 				unsigned short m_unFLAGS;
 				struct {
-					unsigned int m_unCF : 1;  // Bit 0: Carry Flag
-					unsigned int : 1;  // Bit 1: Reserved
-					unsigned int m_unPF : 1;  // Bit 2: Parity Flag
-					unsigned int : 1;  // Bit 3: Reserved
-					unsigned int m_unAF : 1;  // Bit 4: Auxiliary Carry Flag
-					unsigned int : 1;  // Bit 5: Reserved
-					unsigned int m_unZF : 1;  // Bit 6: Zero Flag
-					unsigned int m_unSF : 1;  // Bit 7: Sign Flag
-					unsigned int m_unTF : 1;  // Bit 8: Trap Flag
-					unsigned int m_unIF : 1;  // Bit 9: Interrupt Enable Flag
-					unsigned int m_unDF : 1;  // Bit 10: Direction Flag
-					unsigned int m_unOF : 1;  // Bit 11: Overflow Flag
+					unsigned int m_unCF : 1;    // Bit 0: Carry Flag
+					unsigned int : 1;           // Bit 1: Reserved
+					unsigned int m_unPF : 1;    // Bit 2: Parity Flag
+					unsigned int : 1;           // Bit 3: Reserved
+					unsigned int m_unAF : 1;    // Bit 4: Auxiliary Carry Flag
+					unsigned int : 1;           // Bit 5: Reserved
+					unsigned int m_unZF : 1;    // Bit 6: Zero Flag
+					unsigned int m_unSF : 1;    // Bit 7: Sign Flag
+					unsigned int m_unTF : 1;    // Bit 8: Trap Flag
+					unsigned int m_unIF : 1;    // Bit 9: Interrupt Enable Flag
+					unsigned int m_unDF : 1;    // Bit 10: Direction Flag
+					unsigned int m_unOF : 1;    // Bit 11: Overflow Flag
 					unsigned int m_unIOPL : 2;  // Bit 12-13: I/O Privilege Level
-					unsigned int m_unNT : 1;  // Bit 14: Nested Task
-					unsigned int m_unMD : 1;  // Bit 15: Mode Flag
-					unsigned int m_unRF : 1;  // Bit 16: Resume Flag
-					unsigned int m_unVM : 1;  // Bit 17: Virtual 8086 Mode Flag
-					unsigned int m_unAC : 1;  // Bit 18: Alignment Check
-					unsigned int m_unVIF : 1;  // Bit 19: Virtual Interrupt Flag
-					unsigned int m_unVIP : 1;  // Bit 20: Virtual Interrupt Pending
-					unsigned int m_unID : 1;  // Bit 21: ID Flag
-					unsigned int : 8;  // Bit 22-29: Reserved
-					unsigned int : 1;  // Bit 30: Reserved
-					unsigned int m_unAI : 1;  // Bit 31: Alignment Indicator
+					unsigned int m_unNT : 1;    // Bit 14: Nested Task
+					unsigned int m_unMD : 1;    // Bit 15: Mode Flag
+					unsigned int m_unRF : 1;    // Bit 16: Resume Flag
+					unsigned int m_unVM : 1;    // Bit 17: Virtual 8086 Mode Flag
+					unsigned int m_unAC : 1;    // Bit 18: Alignment Check
+					unsigned int m_unVIF : 1;   // Bit 19: Virtual Interrupt Flag
+					unsigned int m_unVIP : 1;   // Bit 20: Virtual Interrupt Pending
+					unsigned int m_unID : 1;    // Bit 21: ID Flag
+					unsigned int : 8;           // Bit 22-29: Reserved
+					unsigned int : 1;           // Bit 30: Reserved
+					unsigned int m_unAI : 1;    // Bit 31: Alignment Indicator
 				};
 			};
 
@@ -5352,31 +5352,31 @@ namespace Detours {
 				unsigned int m_unEFLAGS;
 				unsigned short m_unFLAGS;
 				struct {
-					unsigned int m_unCF : 1;  // Bit 0: Carry Flag
-					unsigned int : 1;  // Bit 1: Reserved
-					unsigned int m_unPF : 1;  // Bit 2: Parity Flag
-					unsigned int : 1;  // Bit 3: Reserved
-					unsigned int m_unAF : 1;  // Bit 4: Auxiliary Carry Flag
-					unsigned int : 1;  // Bit 5: Reserved
-					unsigned int m_unZF : 1;  // Bit 6: Zero Flag
-					unsigned int m_unSF : 1;  // Bit 7: Sign Flag
-					unsigned int m_unTF : 1;  // Bit 8: Trap Flag
-					unsigned int m_unIF : 1;  // Bit 9: Interrupt Enable Flag
-					unsigned int m_unDF : 1;  // Bit 10: Direction Flag
-					unsigned int m_unOF : 1;  // Bit 11: Overflow Flag
+					unsigned int m_unCF : 1;    // Bit 0: Carry Flag
+					unsigned int : 1;           // Bit 1: Reserved
+					unsigned int m_unPF : 1;    // Bit 2: Parity Flag
+					unsigned int : 1;           // Bit 3: Reserved
+					unsigned int m_unAF : 1;    // Bit 4: Auxiliary Carry Flag
+					unsigned int : 1;           // Bit 5: Reserved
+					unsigned int m_unZF : 1;    // Bit 6: Zero Flag
+					unsigned int m_unSF : 1;    // Bit 7: Sign Flag
+					unsigned int m_unTF : 1;    // Bit 8: Trap Flag
+					unsigned int m_unIF : 1;    // Bit 9: Interrupt Enable Flag
+					unsigned int m_unDF : 1;    // Bit 10: Direction Flag
+					unsigned int m_unOF : 1;    // Bit 11: Overflow Flag
 					unsigned int m_unIOPL : 2;  // Bit 12-13: I/O Privilege Level
-					unsigned int m_unNT : 1;  // Bit 14: Nested Task
-					unsigned int m_unMD : 1;  // Bit 15: Mode Flag
-					unsigned int m_unRF : 1;  // Bit 16: Resume Flag
-					unsigned int m_unVM : 1;  // Bit 17: Virtual 8086 Mode Flag
-					unsigned int m_unAC : 1;  // Bit 18: Alignment Check
-					unsigned int m_unVIF : 1;  // Bit 19: Virtual Interrupt Flag
-					unsigned int m_unVIP : 1;  // Bit 20: Virtual Interrupt Pending
-					unsigned int m_unID : 1;  // Bit 21: ID Flag
-					unsigned int : 8;  // Bit 22-29: Reserved
-					unsigned int : 1;  // Bit 30: Reserved
-					unsigned int m_unAI : 1;  // Bit 31: Alignment Indicator
-					unsigned int : 32; // Bit 32-63: Reserved
+					unsigned int m_unNT : 1;    // Bit 14: Nested Task
+					unsigned int m_unMD : 1;    // Bit 15: Mode Flag
+					unsigned int m_unRF : 1;    // Bit 16: Resume Flag
+					unsigned int m_unVM : 1;    // Bit 17: Virtual 8086 Mode Flag
+					unsigned int m_unAC : 1;    // Bit 18: Alignment Check
+					unsigned int m_unVIF : 1;   // Bit 19: Virtual Interrupt Flag
+					unsigned int m_unVIP : 1;   // Bit 20: Virtual Interrupt Pending
+					unsigned int m_unID : 1;    // Bit 21: ID Flag
+					unsigned int : 8;           // Bit 22-29: Reserved
+					unsigned int : 1;           // Bit 30: Reserved
+					unsigned int m_unAI : 1;    // Bit 31: Alignment Indicator
+					unsigned int : 32;          // Bit 32-63: Reserved
 				};
 			};
 
@@ -5805,6 +5805,54 @@ namespace Detours {
 			std::unique_ptr<unsigned char[]> m_pOriginalBytes;
 		};
 	}
+
+	// ----------------------------------------------------------------
+	// Fibers
+	// ----------------------------------------------------------------
+
+	namespace Fibers {
+
+		// ----------------------------------------------------------------
+		// Fiber Data
+		// ----------------------------------------------------------------
+
+		typedef struct _FIBER_DATA {
+			void* m_pFiberMain;
+			void* m_pFiber;
+			void* m_pParameter;
+		} FIBER_DATA, *PFIBER_DATA;
+
+		// ----------------------------------------------------------------
+		// Fiber CallBack
+		// ----------------------------------------------------------------
+
+		using fnFiberCallBack = void(*)(void* pData);
+
+		// ----------------------------------------------------------------
+		// Fiber
+		// ----------------------------------------------------------------
+
+		class Fiber {
+		public:
+			Fiber();
+			Fiber(const fnFiberCallBack pCallBack);
+			Fiber(const fnFiberCallBack pCallBack, void* pData);
+
+		public:
+			bool SetCallBack(const fnFiberCallBack pCallBack);
+			bool SetData(void* pData);
+			bool Switch();
+
+		public:
+			fnFiberCallBack GetCallBack() const;
+			void* GetData() const;
+
+		private:
+			fnFiberCallBack m_pCallBack;
+			void* m_pData;
+		};
+
+	};
 }
 
 #pragma warning(pop)
