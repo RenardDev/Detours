@@ -5851,7 +5851,6 @@ namespace Detours {
 			fnFiberCallBack m_pCallBack;
 			void* m_pData;
 		};
-
 	};
 }
 

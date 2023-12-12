@@ -81983,7 +81983,11 @@ namespace Detours {
 
 			const size_t unJumpToHookOffset = reinterpret_cast<size_t>(pHookAddress) - reinterpret_cast<size_t>(m_pAddress);
 			size_t unJumpToHookSize = 0;
-			if ((unJumpToHookOffset - 5) <= 0x7FFFFFFF) {
+#ifdef _M_X64
+			if ((static_cast<long long>(unJumpToHookSize) >= INT_MIN) && (static_cast<long long>(unJumpToHookSize) <= INT_MAX)) { // E9 00 00 00 00 - jmp rel32
+#elif _M_IX86
+			if ((static_cast<int>(unJumpToHookSize) >= INT_MIN) && (static_cast<int>(unJumpToHookSize) <= INT_MAX)) { // E9 00 00 00 00 - jmp rel32
+#endif
 				unJumpToHookSize = 5; // E9 00 00 00 00 - jmp rel32
 			} else {
 #ifdef _M_X64
@@ -82037,7 +82041,11 @@ namespace Detours {
 
 			const size_t unJumpFromTampolineOffset = (reinterpret_cast<size_t>(m_pAddress) + unJumpToHookSize) - (reinterpret_cast<size_t>(m_pTrampoline) + unCopyingSize);
 			size_t unJumpFromTrampolineSize = 0;
-			if ((unJumpFromTampolineOffset - 5) <= 0x7FFFFFFF) { // E9 00 00 00 00 - jmp rel32
+#ifdef _M_X64
+			if ((static_cast<long long>(unJumpFromTampolineOffset) >= INT_MIN) && (static_cast<long long>(unJumpFromTampolineOffset) <= INT_MAX)) { // E9 00 00 00 00 - jmp rel32
+#elif _M_IX86
+			if ((static_cast<int>(unJumpFromTampolineOffset) >= INT_MIN) && (static_cast<int>(unJumpFromTampolineOffset) <= INT_MAX)) { // E9 00 00 00 00 - jmp rel32
+#endif
 				unJumpFromTrampolineSize = 5;
 			} else {
 #ifdef _M_X64
@@ -82124,7 +82132,11 @@ namespace Detours {
 
 			unsigned char* pJumpFromTrampoline = reinterpret_cast<unsigned char*>(m_pTrampoline) + unCopyingSize;
 			const size_t unJumpFromTrampolineOffset = (reinterpret_cast<size_t>(m_pAddress) + unJumpToHookSize) - reinterpret_cast<size_t>(pJumpFromTrampoline);
-			if ((unJumpFromTrampolineOffset - 5) <= 0x7FFFFFFF) { // E9 00 00 00 00 - jmp rel32
+#ifdef _M_X64
+			if ((static_cast<long long>(unJumpFromTrampolineOffset) >= INT_MIN) && (static_cast<long long>(unJumpFromTrampolineOffset) <= INT_MAX)) { // E9 00 00 00 00 - jmp rel32
+#elif _M_IX86
+			if ((static_cast<int>(unJumpFromTrampolineOffset) >= INT_MIN) && (static_cast<int>(unJumpFromTrampolineOffset) <= INT_MAX)) { // E9 00 00 00 00 - jmp rel32
+#endif
 				pJumpFromTrampoline[0] = 0xE9;
 				*reinterpret_cast<unsigned int*>(pJumpFromTrampoline + 1) = static_cast<unsigned int>(unJumpFromTrampolineOffset & 0xFFFFFFFF) - 5;
 			} else {
@@ -82204,7 +82216,11 @@ namespace Detours {
 			memset(m_pAddress, 0x90, unCopyingSize);
 
 			unsigned char* pJumpToHook = reinterpret_cast<unsigned char*>(m_pAddress);
-			if ((unJumpToHookOffset - 5) <= 0x7FFFFFFF) { // E9 00 00 00 00 - jmp rel32
+#ifdef _M_X64
+			if ((static_cast<long long>(unJumpToHookOffset) >= INT_MIN) && (static_cast<long long>(unJumpToHookOffset) <= INT_MAX)) { // E9 00 00 00 00 - jmp rel32
+#elif _M_IX86
+			if ((static_cast<int>(unJumpToHookOffset) >= INT_MIN) && (static_cast<int>(unJumpToHookOffset) <= INT_MAX)) { // E9 00 00 00 00 - jmp rel32
+#endif
 				pJumpToHook[0] = 0xE9;
 				*reinterpret_cast<unsigned int*>(pJumpToHook + 1) = static_cast<unsigned int>(unJumpToHookOffset & 0xFFFFFFFF) - 5;
 			} else {
@@ -83375,7 +83391,11 @@ namespace Detours {
 
 			const size_t unJumpToWrapperOffset = reinterpret_cast<size_t>(m_pWrapper) - reinterpret_cast<size_t>(m_pAddress);
 			size_t unJumpToWrapperSize = 0;
-			if ((unJumpToWrapperOffset - 5) <= 0x7FFFFFFF) {
+#ifdef _M_X64
+			if ((static_cast<long long>(unJumpToWrapperOffset) >= INT_MIN) && (static_cast<long long>(unJumpToWrapperOffset) <= INT_MAX)) { // E9 00 00 00 00 - jmp rel32
+#elif _M_IX86
+			if ((static_cast<int>(unJumpToWrapperOffset) >= INT_MIN) && (static_cast<int>(unJumpToWrapperOffset) <= INT_MAX)) { // E9 00 00 00 00 - jmp rel32
+#endif
 				unJumpToWrapperSize = 5; // E9 00 00 00 00 - jmp rel32
 			} else {
 #ifdef _M_X64
@@ -83464,7 +83484,11 @@ namespace Detours {
 #endif
 
 			const size_t unToTrampolineJumpOffset = reinterpret_cast<size_t>(m_pTrampoline) - reinterpret_cast<size_t>(pJumpToTrampoline);
-			if ((unToTrampolineJumpOffset - 5) <= 0x7FFFFFFF) { // E9 00 00 00 00 - jmp rel32
+#ifdef _M_X64
+			if ((static_cast<long long>(unToTrampolineJumpOffset) >= INT_MIN) && (static_cast<long long>(unToTrampolineJumpOffset) <= INT_MAX)) { // E9 00 00 00 00 - jmp rel32
+#elif _M_IX86
+			if ((static_cast<int>(unToTrampolineJumpOffset) >= INT_MIN) && (static_cast<int>(unToTrampolineJumpOffset) <= INT_MAX)) { // E9 00 00 00 00 - jmp rel32
+#endif
 				pJumpToTrampoline[0] = 0xE9;
 				*reinterpret_cast<unsigned int*>(pJumpToTrampoline + 1) = static_cast<unsigned int>(unToTrampolineJumpOffset & 0xFFFFFFFF) - 5;
 			} else {
@@ -83533,7 +83557,11 @@ namespace Detours {
 
 			const size_t unJumpToOriginalOffset = (reinterpret_cast<size_t>(m_pAddress) + unJumpToWrapperSize) - (reinterpret_cast<size_t>(m_pTrampoline) + unCopyingSize);
 			size_t unJumpToOriginalSize = 0;
-			if ((unJumpToOriginalOffset - 5) <= 0x7FFFFFFF) { // E9 00 00 00 00 - jmp rel32
+#ifdef _M_X64
+			if ((static_cast<long long>(unJumpToOriginalOffset) >= INT_MIN) && (static_cast<long long>(unJumpToOriginalOffset) <= INT_MAX)) { // E9 00 00 00 00 - jmp rel32
+#elif _M_IX86
+			if ((static_cast<int>(unJumpToOriginalOffset) >= INT_MIN) && (static_cast<int>(unJumpToOriginalOffset) <= INT_MAX)) { // E9 00 00 00 00 - jmp rel32
+#endif
 				unJumpToOriginalSize = 5;
 			} else {
 #ifdef _M_X64
@@ -83622,7 +83650,11 @@ namespace Detours {
 
 			unsigned char* pJumpToOriginal = reinterpret_cast<unsigned char*>(m_pTrampoline) + unCopyingSize;
 			const size_t unFromTrampolineJumpOffset = (reinterpret_cast<size_t>(m_pAddress) + unJumpToWrapperSize) - (reinterpret_cast<size_t>(m_pTrampoline) + unCopyingSize);
-			if ((unFromTrampolineJumpOffset - 5) <= 0x7FFFFFFF) { // E9 00 00 00 00 - jmp rel32
+#ifdef _M_X64
+			if ((static_cast<long long>(unFromTrampolineJumpOffset) >= INT_MIN) && (static_cast<long long>(unFromTrampolineJumpOffset) <= INT_MAX)) { // E9 00 00 00 00 - jmp rel32
+#elif _M_IX86
+			if ((static_cast<int>(unFromTrampolineJumpOffset) >= INT_MIN) && (static_cast<int>(unFromTrampolineJumpOffset) <= INT_MAX)) { // E9 00 00 00 00 - jmp rel32
+#endif
 				pJumpToOriginal[0] = 0xE9;
 				*reinterpret_cast<unsigned int*>(pJumpToOriginal + 1) = static_cast<unsigned int>(unFromTrampolineJumpOffset & 0xFFFFFFFF) - 5;
 			} else {
@@ -83713,7 +83745,11 @@ namespace Detours {
 			memset(m_pAddress, 0x90, unCopyingSize);
 
 			unsigned char* pJumpToWrapper = reinterpret_cast<unsigned char*>(m_pAddress);
-			if ((unJumpToWrapperOffset - 5) <= 0x7FFFFFFF) { // E9 00 00 00 00 - jmp rel32
+#ifdef _M_X64
+			if ((static_cast<long long>(unJumpToWrapperOffset) >= INT_MIN) && (static_cast<long long>(unJumpToWrapperOffset) <= INT_MAX)) { // E9 00 00 00 00 - jmp rel32
+#elif _M_IX86
+			if ((static_cast<int>(unJumpToWrapperOffset) >= INT_MIN) && (static_cast<int>(unJumpToWrapperOffset) <= INT_MAX)) { // E9 00 00 00 00 - jmp rel32
+#endif
 				pJumpToWrapper[0] = 0xE9;
 				*reinterpret_cast<unsigned int*>(pJumpToWrapper + 1) = static_cast<unsigned int>(unJumpToWrapperOffset & 0xFFFFFFFF) - 5;
 			} else {
