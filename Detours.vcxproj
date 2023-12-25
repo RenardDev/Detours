@@ -172,6 +172,7 @@
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
+      <LargeAddressAware>true</LargeAddressAware>
     </Link>
     <MASM>
       <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
@@ -210,6 +211,7 @@
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <DataExecutionPrevention>true</DataExecutionPrevention>
       <SetChecksum>true</SetChecksum>
+      <LargeAddressAware>true</LargeAddressAware>
     </Link>
     <MASM>
       <TreatWarningsAsErrors>true</TreatWarningsAsErrors>

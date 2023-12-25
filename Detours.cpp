@@ -142,11 +142,7 @@ namespace Detours {
 	static std::unordered_map<void*, std::unique_ptr<Protection>> g_Protections;
 	static std::unordered_map<void*, std::unique_ptr<MemoryHook>> g_MemoryHooks;
 	static std::unordered_map<void*, std::unique_ptr<InterruptHook>> g_InterruptHooks;
-#ifdef _M_X64
 	static NearStorage g_HookStorage(HOOK_STORAGE_CAPACITY);
-#elif _M_IX86
-	static Storage g_HookStorage(HOOK_STORAGE_CAPACITY);
-#endif
 
 	// ----------------------------------------------------------------
 	// KUSER_SHARED_DATA
@@ -3409,6 +3405,20 @@ namespace Detours {
 	namespace Memory {
 
 		// ----------------------------------------------------------------
+		// __is_relative
+		// ----------------------------------------------------------------
+
+		static size_t inline __is_relative(void const* const pSourceAddress, void const* const pDestinationAddress, const size_t unMaxDistance = 0x7FFFFFFF) {
+			const size_t unRelativeOffset = reinterpret_cast<size_t>(pSourceAddress) - reinterpret_cast<size_t>(pDestinationAddress);
+			const size_t unDistance = (pSourceAddress > pDestinationAddress) ? unRelativeOffset : reinterpret_cast<size_t>(pDestinationAddress) - reinterpret_cast<size_t>(pSourceAddress);
+			if (unDistance <= unMaxDistance) {
+				return unRelativeOffset;
+			}
+
+			return 0;
+		};
+
+		// ----------------------------------------------------------------
 		// Server
 		// ----------------------------------------------------------------
 
@@ -3539,16 +3549,22 @@ namespace Detours {
 		// ----------------------------------------------------------------
 
 		Page::Page(size_t unCapacity) {
-			SYSTEM_INFO sysinf;
-			GetSystemInfo(&sysinf);
+			static DWORD unPageSize = 0;
+			static DWORD unAllocationGranularity = 0;
+			if (!unPageSize || !unAllocationGranularity) {
+				SYSTEM_INFO sysinf;
+				GetSystemInfo(&sysinf);
+				unPageSize = sysinf.dwPageSize;
+				unAllocationGranularity = sysinf.dwAllocationGranularity;
+			}
 
 			if (!unCapacity) {
-				unCapacity = sysinf.dwPageSize;
+				unCapacity = unPageSize;
 			} else {
-				if (unCapacity < sysinf.dwPageSize) {
-					unCapacity = sysinf.dwPageSize;
+				if (unCapacity < unPageSize) {
+					unCapacity = unPageSize;
 				} else {
-					unCapacity = __align_up(unCapacity, static_cast<size_t>(sysinf.dwAllocationGranularity));
+					unCapacity = __align_up(unCapacity, static_cast<size_t>(unAllocationGranularity));
 				}
 			}
 
@@ -3669,16 +3685,22 @@ namespace Detours {
 		// ----------------------------------------------------------------
 
 		NearPage::NearPage(size_t unCapacity, void* pDesiredAddress) {
-			SYSTEM_INFO sysinf;
-			GetSystemInfo(&sysinf);
+			static DWORD unPageSize = 0;
+			static DWORD unAllocationGranularity = 0;
+			if (!unPageSize || !unAllocationGranularity) {
+				SYSTEM_INFO sysinf;
+				GetSystemInfo(&sysinf);
+				unPageSize = sysinf.dwPageSize;
+				unAllocationGranularity = sysinf.dwAllocationGranularity;
+			}
 
 			if (!unCapacity) {
-				unCapacity = sysinf.dwPageSize;
+				unCapacity = unPageSize;
 			} else {
-				if (unCapacity < sysinf.dwPageSize) {
-					unCapacity = sysinf.dwPageSize;
+				if (unCapacity < unPageSize) {
+					unCapacity = unPageSize;
 				} else {
-					unCapacity = __align_up(unCapacity, static_cast<size_t>(sysinf.dwAllocationGranularity));
+					unCapacity = __align_up(unCapacity, static_cast<size_t>(unAllocationGranularity));
 				}
 			}
 
@@ -3693,35 +3715,43 @@ namespace Detours {
 				memset(&mbi, 0, sizeof(mbi));
 
 				// [unAddress; unEnd] - From unAddress to unEnd (Forward)
-				for (size_t unAddress = reinterpret_cast<size_t>(pDesiredAddress); unAddress < unEnd; unAddress += mbi.RegionSize) {
+				for (size_t unAddress = reinterpret_cast<size_t>(pDesiredAddress); unAddress < unEnd; unAddress = __align_up(unAddress + static_cast<size_t>(unAllocationGranularity) - 1, static_cast<size_t>(unAllocationGranularity))) {
 					if (!VirtualQuery(reinterpret_cast<void*>(unAddress), &mbi, sizeof(mbi))) {
 						break;
 					}
 
-					if (mbi.State != MEM_FREE) {
-						continue;
-					}
+					if (mbi.State == MEM_FREE && mbi.RegionSize >= unCapacity) {
+						void* pPageAddress = VirtualAlloc(reinterpret_cast<void*>(unAddress), unCapacity, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
+						if (pPageAddress) {
+							if (__is_relative(pDesiredAddress, pPageAddress)) {
+								m_pPageAddress = pPageAddress;
+							} else {
+								VirtualFree(pPageAddress, 0, MEM_RELEASE);
+							}
 
-					m_pPageAddress = VirtualAlloc(reinterpret_cast<void*>(unAddress), unCapacity, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
-					if (m_pPageAddress) {
-						break;
+							break;
+						}
 					}
 				}
 
+				// [unAddress; unBegin] - From unAddress to unBegin (Backward)
 				if (!m_pPageAddress) {
-					// [unAddress; unBegin] - From unAddress to unBegin (Backward)
-					for (size_t unAddress = reinterpret_cast<size_t>(pDesiredAddress); unAddress > unBegin; unAddress = __align_down(reinterpret_cast<size_t>(mbi.AllocationBase) - 1, static_cast<size_t>(sysinf.dwAllocationGranularity))) {
+					for (size_t unAddress = reinterpret_cast<size_t>(pDesiredAddress); unAddress > unBegin; unAddress = __align_down(unAddress - 1, static_cast<size_t>(unAllocationGranularity))) {
 						if (!VirtualQuery(reinterpret_cast<void*>(unAddress), &mbi, sizeof(mbi))) {
 							break;
 						}
 
-						if (mbi.State != MEM_FREE) {
-							continue;
-						}
+						if (mbi.State == MEM_FREE && mbi.RegionSize >= unCapacity) {
+							void* pPageAddress = VirtualAlloc(reinterpret_cast<void*>(unAddress), unCapacity, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
+							if (pPageAddress) {
+								if (__is_relative(pDesiredAddress, pPageAddress)) {
+									m_pPageAddress = pPageAddress;
+								} else {
+									VirtualFree(pPageAddress, 0, MEM_RELEASE);
+								}
 
-						m_pPageAddress = VirtualAlloc(reinterpret_cast<void*>(unAddress), unCapacity, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
-						if (m_pPageAddress) {
-							break;
+								break;
+							}
 						}
 					}
 				}
@@ -3844,26 +3874,32 @@ namespace Detours {
 		// ----------------------------------------------------------------
 
 		Storage::Storage(size_t unTotalCapacity, size_t unPageCapacity) {
-			SYSTEM_INFO sysinf;
-			GetSystemInfo(&sysinf);
+			static DWORD unPageSize = 0;
+			static DWORD unAllocationGranularity = 0;
+			if (!unPageSize || !unAllocationGranularity) {
+				SYSTEM_INFO sysinf;
+				GetSystemInfo(&sysinf);
+				unPageSize = sysinf.dwPageSize;
+				unAllocationGranularity = sysinf.dwAllocationGranularity;
+			}
 
 			if (!unTotalCapacity) {
-				unTotalCapacity = sysinf.dwPageSize;
+				unTotalCapacity = unPageSize;
 			} else {
-				if (unTotalCapacity < sysinf.dwPageSize) {
-					unTotalCapacity = sysinf.dwPageSize;
+				if (unTotalCapacity < unPageSize) {
+					unTotalCapacity = unPageSize;
 				} else {
-					unTotalCapacity = __align_up(unTotalCapacity, static_cast<size_t>(sysinf.dwAllocationGranularity));
+					unTotalCapacity = __align_up(unTotalCapacity, static_cast<size_t>(unAllocationGranularity));
 				}
 			}
 
 			if (!unPageCapacity) {
-				unPageCapacity = sysinf.dwPageSize;
+				unPageCapacity = unPageSize;
 			} else {
-				if (unPageCapacity < sysinf.dwPageSize) {
-					unPageCapacity = sysinf.dwPageSize;
+				if (unPageCapacity < unPageSize) {
+					unPageCapacity = unPageSize;
 				} else {
-					unPageCapacity = __align_up(unPageCapacity, static_cast<size_t>(sysinf.dwAllocationGranularity));
+					unPageCapacity = __align_up(unPageCapacity, static_cast<size_t>(unAllocationGranularity));
 				}
 			}
 
@@ -3873,12 +3909,19 @@ namespace Detours {
 		}
 
 		void* Storage::Alloc(size_t unSize) {
+			if (unSize > m_unPageCapacity) {
+				return nullptr;
+			}
+
 			if (m_unUsedSpace + unSize > m_unTotalCapacity) {
 				return nullptr;
 			}
 
 			if (m_Pages.empty()) {
 				m_Pages.emplace_back(m_unPageCapacity);
+				if (!m_Pages.back().GetAddress()) {
+					m_Pages.pop_back();
+				}
 			}
 
 			for (auto& Page : m_Pages) {
@@ -3895,9 +3938,14 @@ namespace Detours {
 
 			if (m_unUsedSpace + m_unPageCapacity <= m_unTotalCapacity) {
 				m_Pages.emplace_back(m_unPageCapacity);
+
 				void* pMemory = m_Pages.back().Alloc(unSize);
-				m_unUsedSpace += unSize;
-				return pMemory;
+				if (pMemory) {
+					m_unUsedSpace += unSize;
+					return pMemory;
+				}
+
+				m_Pages.pop_back();
 			}
 
 			return nullptr;
@@ -3911,9 +3959,11 @@ namespace Detours {
 			for (auto it = m_Pages.begin(); it != m_Pages.end(); ++it) {
 				if (it->DeAlloc(pAddress)) {
 					m_unUsedSpace -= it->GetSize();
+
 					if (it->IsEmpty()) {
 						m_Pages.erase(it);
 					}
+
 					return true;
 				}
 			}
@@ -3963,26 +4013,32 @@ namespace Detours {
 		// ----------------------------------------------------------------
 
 		NearStorage::NearStorage(size_t unTotalCapacity, size_t unPageCapacity) {
-			SYSTEM_INFO sysinf;
-			GetSystemInfo(&sysinf);
+			static DWORD unPageSize = 0;
+			static DWORD unAllocationGranularity = 0;
+			if (!unPageSize || !unAllocationGranularity) {
+				SYSTEM_INFO sysinf;
+				GetSystemInfo(&sysinf);
+				unPageSize = sysinf.dwPageSize;
+				unAllocationGranularity = sysinf.dwAllocationGranularity;
+			}
 
 			if (!unTotalCapacity) {
-				unTotalCapacity = sysinf.dwPageSize;
+				unTotalCapacity = unPageSize;
 			} else {
-				if (unTotalCapacity < sysinf.dwPageSize) {
-					unTotalCapacity = sysinf.dwPageSize;
+				if (unTotalCapacity < unPageSize) {
+					unTotalCapacity = unPageSize;
 				} else {
-					unTotalCapacity = __align_up(unTotalCapacity, static_cast<size_t>(sysinf.dwAllocationGranularity));
+					unTotalCapacity = __align_up(unTotalCapacity, static_cast<size_t>(unAllocationGranularity));
 				}
 			}
 
 			if (!unPageCapacity) {
-				unPageCapacity = sysinf.dwPageSize;
+				unPageCapacity = unPageSize;
 			} else {
-				if (unPageCapacity < sysinf.dwPageSize) {
-					unPageCapacity = sysinf.dwPageSize;
+				if (unPageCapacity < unPageSize) {
+					unPageCapacity = unPageSize;
 				} else {
-					unPageCapacity = __align_up(unPageCapacity, static_cast<size_t>(sysinf.dwAllocationGranularity));
+					unPageCapacity = __align_up(unPageCapacity, static_cast<size_t>(unAllocationGranularity));
 				}
 			}
 
@@ -3992,21 +4048,25 @@ namespace Detours {
 		}
 
 		void* NearStorage::Alloc(size_t unSize, void* pDesiredAddress) {
+			if (unSize > m_unPageCapacity) {
+				return nullptr;
+			}
+
 			if (m_unUsedSpace + unSize > m_unTotalCapacity) {
 				return nullptr;
 			}
 
 			if (m_Pages.empty()) {
 				m_Pages.emplace_back(m_unPageCapacity, pDesiredAddress);
+				if (!m_Pages.back().GetAddress()) {
+					m_Pages.pop_back();
+				}
 			}
 
 			if (pDesiredAddress) {
 				for (auto& Page : m_Pages) {
 					if ((Page.GetCapacity() - Page.GetSize()) >= unSize) {
-						const size_t unBegin = reinterpret_cast<size_t>(pDesiredAddress) - 0x7FFFFFFF + 1;
-						const size_t unEnd = reinterpret_cast<size_t>(pDesiredAddress) + 0x7FFFFFFF - (Page.GetCapacity() - Page.GetSize());
-						const size_t unAddress = reinterpret_cast<size_t>(Page.GetAddress()) + Page.GetSize();
-						if ((unAddress < unBegin) || (unAddress > unEnd)) {
+						if (!__is_relative(pDesiredAddress, reinterpret_cast<char*>(Page.GetAddress()) + Page.GetSize())) {
 							continue;
 						}
 
@@ -4019,6 +4079,16 @@ namespace Detours {
 						return pMemory;
 					}
 				}
+
+				m_Pages.emplace_back(m_unPageCapacity, pDesiredAddress);
+
+				void* pMemory = m_Pages.back().Alloc(unSize);
+				if (pMemory) {
+					m_unUsedSpace += unSize;
+					return pMemory;
+				}
+
+				m_Pages.pop_back();
 			} else {
 				for (auto& Page : m_Pages) {
 					if ((Page.GetCapacity() - Page.GetSize()) >= unSize) {
@@ -4035,9 +4105,14 @@ namespace Detours {
 
 			if (m_unUsedSpace + m_unPageCapacity <= m_unTotalCapacity) {
 				m_Pages.emplace_back(m_unPageCapacity, pDesiredAddress);
+
 				void* pMemory = m_Pages.back().Alloc(unSize);
-				m_unUsedSpace += unSize;
-				return pMemory;
+				if (pMemory) {
+					m_unUsedSpace += unSize;
+					return pMemory;
+				}
+
+				m_Pages.pop_back();
 			}
 
 			return nullptr;
@@ -4051,9 +4126,11 @@ namespace Detours {
 			for (auto it = m_Pages.begin(); it != m_Pages.end(); ++it) {
 				if (it->DeAlloc(pAddress)) {
 					m_unUsedSpace -= it->GetSize();
+
 					if (it->IsEmpty()) {
 						m_Pages.erase(it);
 					}
+
 					return true;
 				}
 			}
@@ -4150,6 +4227,19 @@ namespace Detours {
 		bool Protection::ChangeProtection(const DWORD unNewProtection) {
 			if (!m_pAddress || !m_unSize) {
 				return false;
+			}
+
+			if (unNewProtection & (PAGE_EXECUTE | PAGE_EXECUTE_READ | PAGE_EXECUTE_READWRITE)) {
+				MEMORY_BASIC_INFORMATION mbi;
+				memset(&mbi, 0, sizeof(mbi));
+
+				if (!VirtualQuery(m_pAddress, &mbi, sizeof(mbi))) {
+					return false;
+				}
+
+				if (!FlushInstructionCache(reinterpret_cast<HANDLE>(-1), mbi.BaseAddress, mbi.RegionSize)) {
+					return false;
+				}
 			}
 
 			DWORD unProtection = 0;
@@ -81981,14 +82071,10 @@ namespace Detours {
 				return false;
 			}
 
-			const size_t unJumpToHookOffset = reinterpret_cast<size_t>(pHookAddress) - reinterpret_cast<size_t>(m_pAddress);
+			const size_t unJumpToHookOffset = __is_relative(pHookAddress, m_pAddress);
 			size_t unJumpToHookSize = 0;
-#ifdef _M_X64
-			if ((static_cast<long long>(unJumpToHookSize) >= INT_MIN) && (static_cast<long long>(unJumpToHookSize) <= INT_MAX)) { // E9 00 00 00 00 - jmp rel32
-#elif _M_IX86
-			if ((static_cast<int>(unJumpToHookSize) >= INT_MIN) && (static_cast<int>(unJumpToHookSize) <= INT_MAX)) { // E9 00 00 00 00 - jmp rel32
-#endif
-				unJumpToHookSize = 5; // E9 00 00 00 00 - jmp rel32
+			if (unJumpToHookOffset) { // E9 00 00 00 00 - jmp rel32
+				unJumpToHookSize = 5;
 			} else {
 #ifdef _M_X64
 				// C7 44 24 F8 44332211 - mov [rsp-0x8], 0x11223344
@@ -82022,11 +82108,7 @@ namespace Detours {
 				return false;
 			}
 
-#ifdef _M_X64
 			m_pTrampoline = g_HookStorage.Alloc(HOOK_INLINE_TRAMPOLINE_SIZE, m_pAddress);
-#elif _M_IX86
-			m_pTrampoline = g_HookStorage.Alloc(HOOK_INLINE_TRAMPOLINE_SIZE);
-#endif
 			if (!m_pTrampoline) {
 				g_ThreadSuspender.ResumeThreads();
 				return false;
@@ -82039,13 +82121,9 @@ namespace Detours {
 				return false;
 			}
 
-			const size_t unJumpFromTampolineOffset = (reinterpret_cast<size_t>(m_pAddress) + unJumpToHookSize) - (reinterpret_cast<size_t>(m_pTrampoline) + unCopyingSize);
+			const size_t unJumpFromTampolineOffset = __is_relative(reinterpret_cast<char*>(m_pAddress) + unJumpToHookSize, reinterpret_cast<char*>(m_pTrampoline) + unCopyingSize);
 			size_t unJumpFromTrampolineSize = 0;
-#ifdef _M_X64
-			if ((static_cast<long long>(unJumpFromTampolineOffset) >= INT_MIN) && (static_cast<long long>(unJumpFromTampolineOffset) <= INT_MAX)) { // E9 00 00 00 00 - jmp rel32
-#elif _M_IX86
-			if ((static_cast<int>(unJumpFromTampolineOffset) >= INT_MIN) && (static_cast<int>(unJumpFromTampolineOffset) <= INT_MAX)) { // E9 00 00 00 00 - jmp rel32
-#endif
+			if (unJumpFromTampolineOffset) { // E9 00 00 00 00 - jmp rel32
 				unJumpFromTrampolineSize = 5;
 			} else {
 #ifdef _M_X64
@@ -82131,12 +82209,8 @@ namespace Detours {
 			}
 
 			unsigned char* pJumpFromTrampoline = reinterpret_cast<unsigned char*>(m_pTrampoline) + unCopyingSize;
-			const size_t unJumpFromTrampolineOffset = (reinterpret_cast<size_t>(m_pAddress) + unJumpToHookSize) - reinterpret_cast<size_t>(pJumpFromTrampoline);
-#ifdef _M_X64
-			if ((static_cast<long long>(unJumpFromTrampolineOffset) >= INT_MIN) && (static_cast<long long>(unJumpFromTrampolineOffset) <= INT_MAX)) { // E9 00 00 00 00 - jmp rel32
-#elif _M_IX86
-			if ((static_cast<int>(unJumpFromTrampolineOffset) >= INT_MIN) && (static_cast<int>(unJumpFromTrampolineOffset) <= INT_MAX)) { // E9 00 00 00 00 - jmp rel32
-#endif
+			const size_t unJumpFromTrampolineOffset = __is_relative(reinterpret_cast<char*>(m_pAddress) + unJumpToHookSize, pJumpFromTrampoline);
+			if (unJumpFromTrampolineOffset) { // E9 00 00 00 00 - jmp rel32
 				pJumpFromTrampoline[0] = 0xE9;
 				*reinterpret_cast<unsigned int*>(pJumpFromTrampoline + 1) = static_cast<unsigned int>(unJumpFromTrampolineOffset & 0xFFFFFFFF) - 5;
 			} else {
@@ -82216,11 +82290,7 @@ namespace Detours {
 			memset(m_pAddress, 0x90, unCopyingSize);
 
 			unsigned char* pJumpToHook = reinterpret_cast<unsigned char*>(m_pAddress);
-#ifdef _M_X64
-			if ((static_cast<long long>(unJumpToHookOffset) >= INT_MIN) && (static_cast<long long>(unJumpToHookOffset) <= INT_MAX)) { // E9 00 00 00 00 - jmp rel32
-#elif _M_IX86
-			if ((static_cast<int>(unJumpToHookOffset) >= INT_MIN) && (static_cast<int>(unJumpToHookOffset) <= INT_MAX)) { // E9 00 00 00 00 - jmp rel32
-#endif
+			if (unJumpToHookOffset) { // E9 00 00 00 00 - jmp rel32
 				pJumpToHook[0] = 0xE9;
 				*reinterpret_cast<unsigned int*>(pJumpToHook + 1) = static_cast<unsigned int>(unJumpToHookOffset & 0xFFFFFFFF) - 5;
 			} else {
@@ -82382,11 +82452,7 @@ namespace Detours {
 				return false;
 			}
 
-#ifdef _M_X64
 			m_pWrapper = g_HookStorage.Alloc(HOOK_RAW_WRAPPER_SIZE, m_pAddress);
-#elif _M_IX86
-			m_pWrapper = g_HookStorage.Alloc(HOOK_RAW_WRAPPER_SIZE);
-#endif
 			if (!m_pWrapper) {
 				g_ThreadSuspender.ResumeThreads();
 				return false;
@@ -83389,13 +83455,9 @@ namespace Detours {
 			}
 #endif
 
-			const size_t unJumpToWrapperOffset = reinterpret_cast<size_t>(m_pWrapper) - reinterpret_cast<size_t>(m_pAddress);
+			const size_t unJumpToWrapperOffset = __is_relative(m_pWrapper, m_pAddress);
 			size_t unJumpToWrapperSize = 0;
-#ifdef _M_X64
-			if ((static_cast<long long>(unJumpToWrapperOffset) >= INT_MIN) && (static_cast<long long>(unJumpToWrapperOffset) <= INT_MAX)) { // E9 00 00 00 00 - jmp rel32
-#elif _M_IX86
-			if ((static_cast<int>(unJumpToWrapperOffset) >= INT_MIN) && (static_cast<int>(unJumpToWrapperOffset) <= INT_MAX)) { // E9 00 00 00 00 - jmp rel32
-#endif
+			if (unJumpToWrapperOffset) { // E9 00 00 00 00 - jmp rel32
 				unJumpToWrapperSize = 5; // E9 00 00 00 00 - jmp rel32
 			} else {
 #ifdef _M_X64
@@ -83432,11 +83494,7 @@ namespace Detours {
 				unCopyingSize += ins.Length;
 			}
 
-#ifdef _M_X64
 			m_pTrampoline = g_HookStorage.Alloc(HOOK_RAW_TRAMPOLINE_SIZE, m_pAddress);
-#elif _M_IX86
-			m_pTrampoline = g_HookStorage.Alloc(HOOK_RAW_TRAMPOLINE_SIZE);
-#endif
 			if (!m_pTrampoline) {
 				m_unFirstInstructionSize = 0;
 				g_HookStorage.DeAlloc(m_pWrapper);
@@ -83483,12 +83541,8 @@ namespace Detours {
 			}
 #endif
 
-			const size_t unToTrampolineJumpOffset = reinterpret_cast<size_t>(m_pTrampoline) - reinterpret_cast<size_t>(pJumpToTrampoline);
-#ifdef _M_X64
-			if ((static_cast<long long>(unToTrampolineJumpOffset) >= INT_MIN) && (static_cast<long long>(unToTrampolineJumpOffset) <= INT_MAX)) { // E9 00 00 00 00 - jmp rel32
-#elif _M_IX86
-			if ((static_cast<int>(unToTrampolineJumpOffset) >= INT_MIN) && (static_cast<int>(unToTrampolineJumpOffset) <= INT_MAX)) { // E9 00 00 00 00 - jmp rel32
-#endif
+			const size_t unToTrampolineJumpOffset = __is_relative(m_pTrampoline, pJumpToTrampoline);
+			if (unToTrampolineJumpOffset) { // E9 00 00 00 00 - jmp rel32
 				pJumpToTrampoline[0] = 0xE9;
 				*reinterpret_cast<unsigned int*>(pJumpToTrampoline + 1) = static_cast<unsigned int>(unToTrampolineJumpOffset & 0xFFFFFFFF) - 5;
 			} else {
@@ -83555,13 +83609,9 @@ namespace Detours {
 				return false;
 			}
 
-			const size_t unJumpToOriginalOffset = (reinterpret_cast<size_t>(m_pAddress) + unJumpToWrapperSize) - (reinterpret_cast<size_t>(m_pTrampoline) + unCopyingSize);
+			const size_t unJumpToOriginalOffset = __is_relative(reinterpret_cast<char*>(m_pAddress) + unJumpToWrapperSize, reinterpret_cast<char*>(m_pTrampoline) + unCopyingSize);
 			size_t unJumpToOriginalSize = 0;
-#ifdef _M_X64
-			if ((static_cast<long long>(unJumpToOriginalOffset) >= INT_MIN) && (static_cast<long long>(unJumpToOriginalOffset) <= INT_MAX)) { // E9 00 00 00 00 - jmp rel32
-#elif _M_IX86
-			if ((static_cast<int>(unJumpToOriginalOffset) >= INT_MIN) && (static_cast<int>(unJumpToOriginalOffset) <= INT_MAX)) { // E9 00 00 00 00 - jmp rel32
-#endif
+			if (unJumpToOriginalOffset) { // E9 00 00 00 00 - jmp rel32
 				unJumpToOriginalSize = 5;
 			} else {
 #ifdef _M_X64
@@ -83649,12 +83699,8 @@ namespace Detours {
 			}
 
 			unsigned char* pJumpToOriginal = reinterpret_cast<unsigned char*>(m_pTrampoline) + unCopyingSize;
-			const size_t unFromTrampolineJumpOffset = (reinterpret_cast<size_t>(m_pAddress) + unJumpToWrapperSize) - (reinterpret_cast<size_t>(m_pTrampoline) + unCopyingSize);
-#ifdef _M_X64
-			if ((static_cast<long long>(unFromTrampolineJumpOffset) >= INT_MIN) && (static_cast<long long>(unFromTrampolineJumpOffset) <= INT_MAX)) { // E9 00 00 00 00 - jmp rel32
-#elif _M_IX86
-			if ((static_cast<int>(unFromTrampolineJumpOffset) >= INT_MIN) && (static_cast<int>(unFromTrampolineJumpOffset) <= INT_MAX)) { // E9 00 00 00 00 - jmp rel32
-#endif
+			const size_t unFromTrampolineJumpOffset = __is_relative(reinterpret_cast<char*>(m_pAddress) + unJumpToWrapperSize, pJumpToOriginal);
+			if (unFromTrampolineJumpOffset) { // E9 00 00 00 00 - jmp rel32
 				pJumpToOriginal[0] = 0xE9;
 				*reinterpret_cast<unsigned int*>(pJumpToOriginal + 1) = static_cast<unsigned int>(unFromTrampolineJumpOffset & 0xFFFFFFFF) - 5;
 			} else {
@@ -83745,11 +83791,7 @@ namespace Detours {
 			memset(m_pAddress, 0x90, unCopyingSize);
 
 			unsigned char* pJumpToWrapper = reinterpret_cast<unsigned char*>(m_pAddress);
-#ifdef _M_X64
-			if ((static_cast<long long>(unJumpToWrapperOffset) >= INT_MIN) && (static_cast<long long>(unJumpToWrapperOffset) <= INT_MAX)) { // E9 00 00 00 00 - jmp rel32
-#elif _M_IX86
-			if ((static_cast<int>(unJumpToWrapperOffset) >= INT_MIN) && (static_cast<int>(unJumpToWrapperOffset) <= INT_MAX)) { // E9 00 00 00 00 - jmp rel32
-#endif
+			if (unJumpToWrapperOffset) { // E9 00 00 00 00 - jmp rel32
 				pJumpToWrapper[0] = 0xE9;
 				*reinterpret_cast<unsigned int*>(pJumpToWrapper + 1) = static_cast<unsigned int>(unJumpToWrapperOffset & 0xFFFFFFFF) - 5;
 			} else {
