@@ -639,7 +639,7 @@ bool __fastcall boo_Hook2(void* pThis, void* /* unused */) {
 	return reinterpret_cast<fnType>(NewTestingRTTIVTable.GetHookingFunctions()[1]->GetOriginal())(pThis, nullptr);
 }
 
-Detours::Hook::InlineHook InlineSleepHook;
+Detours::Hook::InlineWrapperHook InlineSleepHook;
 void WINAPI Sleep_Hook(DWORD dwMilliseconds) {
 	_tprintf_s(_T("[Sleep_Hook] Hook called!\n"));
 	using fnType = void(WINAPI*)(DWORD);
@@ -653,8 +653,9 @@ void Sleep_RawHookFiber(void* pData) {
 		return;
 	}
 
-	auto pCTX = reinterpret_cast<Detours::Hook::PRAW_CONTEXT>(reinterpret_cast<void**>(pData)[0]);
+	auto pCTX = reinterpret_cast<Detours::Hook::PRAW_CONTEXT>(*reinterpret_cast<void**>(pData));
 	if (!pCTX) {
+		*reinterpret_cast<void**>(pData) = nullptr;
 		return;
 	}
 
@@ -1141,19 +1142,20 @@ void Sleep_RawHookFiber(void* pData) {
 	pCTX->Stack.pop();
 	pCTX->Stack.push(pReturnAddress);
 #endif
-
-	reinterpret_cast<void**>(pData)[1] = reinterpret_cast<void**>(pData)[0];
 }
 
+
+Detours::Fibers::Fiber SleepRawHookFiber(Sleep_RawHookFiber);
 #ifdef _M_X64
 bool __fastcall Sleep_RawHook(Detours::Hook::PRAW_CONTEXT pCTX) {
 #elif _M_IX86
 bool __cdecl Sleep_RawHook(Detours::Hook::PRAW_CONTEXT pCTX) {
 #endif
 
-	void* pData[2] = { pCTX, nullptr };
-	Detours::Fibers::Fiber(Sleep_RawHookFiber, pData).Switch();
-	if (pData[0] != pData[1]) {
+	void* pData = pCTX;
+	SleepRawHookFiber.SetData(&pData);
+	SleepRawHookFiber.Switch();
+	if (!pData) {
 		return false;
 	}
 
@@ -1225,7 +1227,7 @@ void DemoRawHook() { SELF_EXPORT("DemoHook");
 	}
 
 	_tprintf_s(_T("RawCPUIDHook.Set = %d\n"), RawCPUIDHook.Set(pFoundCPUID));
-	_tprintf_s(_T("RawCPUIDHook.Hook = %d\n"), RawCPUIDHook.Hook(CPUID_RawHook, true));
+	_tprintf_s(_T("RawCPUIDHook.Hook = %d\n"), RawCPUIDHook.Hook(CPUID_RawHook, true, 0, true));
 
 	int cpuinfo[4];
 	__cpuidex(cpuinfo, 7, 0); // Hooking `cpuid` in this function.
@@ -1766,7 +1768,7 @@ int _tmain(int nArguments, PTCHAR* pArguments) {
 	HMODULE hKernel32 = GetModuleHandle(_T("kernel32.dll"));
 	if (hKernel32 && (hKernel32 != INVALID_HANDLE_VALUE)) {
 		_tprintf_s(_T("InlineSleepHook.Set = %d\n"), InlineSleepHook.Set(reinterpret_cast<void*>(GetProcAddress(hKernel32, "Sleep"))));
-		_tprintf_s(_T("InlineSleepHook.Hook = %d\n"), InlineSleepHook.Hook(reinterpret_cast<void*>(Sleep_Hook)));
+		_tprintf_s(_T("InlineSleepHook.Hook = %d\n"), InlineSleepHook.Hook(reinterpret_cast<void*>(Sleep_Hook), true));
 		Sleep(1000);
 		_tprintf_s(_T("InlineSleepHook.UnHook = %d\n"), InlineSleepHook.UnHook());
 	}
@@ -1777,7 +1779,7 @@ int _tmain(int nArguments, PTCHAR* pArguments) {
 
 	if (hKernel32 && (hKernel32 != INVALID_HANDLE_VALUE)) {
 		_tprintf_s(_T("RawSleepHook.Set = %d\n"), RawSleepHook.Set(reinterpret_cast<void*>(GetProcAddress(hKernel32, "Sleep"))));
-		_tprintf_s(_T("RawSleepHook.Hook = %d\n"), RawSleepHook.Hook(Sleep_RawHook));
+		_tprintf_s(_T("RawSleepHook.Hook = %d\n"), RawSleepHook.Hook(Sleep_RawHook, false, 0, true));
 		Sleep(1000);
 		_tprintf_s(_T("RawSleepHook.UnHook = %d\n"), RawSleepHook.UnHook());
 		_tprintf_s(_T("RawSleepHook.Release = %d\n"), RawSleepHook.Release());
@@ -1792,7 +1794,7 @@ int _tmain(int nArguments, PTCHAR* pArguments) {
 
 	if (bHaveSSE && hKernel32 && (hKernel32 != INVALID_HANDLE_VALUE)) {
 		_tprintf_s(_T("RawSleepHook.Set = %d\n"), RawSleepHook.Set(reinterpret_cast<void*>(GetProcAddress(hKernel32, "Sleep"))));
-		_tprintf_s(_T("RawSleepHook.Hook = %d\n"), RawSleepHook.Hook(Sleep_RawHookMod));
+		_tprintf_s(_T("RawSleepHook.Hook = %d\n"), RawSleepHook.Hook(Sleep_RawHookMod, false, 0, true));
 
 		Sleep(1000); // Will record last XMM7 value and change it
 
@@ -1817,11 +1819,11 @@ int _tmain(int nArguments, PTCHAR* pArguments) {
 
 	// RawHook #3
 
-	if (const auto& pHookingObject = Detours::RTTI::FindObject(_T("Detours.exe"), ".?AVTestingRTTI@@")) {
+	if (const auto& pHookingObject = Detours::RTTI::FindObject(GetModuleHandle(nullptr), ".?AVTestingRTTI@@")) {
 		void** pHookingVTable = pHookingObject->GetVTable();
 
 		_tprintf_s(_T("RawHook_CallConv_Convert.Set = %d\n"), RawHook_CallConv_Convert.Set(pHookingVTable[0]));
-		_tprintf_s(_T("RawHook_CallConv_Convert.Hook = %d\n"), RawHook_CallConv_Convert.Hook(CallConv_Convert_RawHook, true, 0x10));
+		_tprintf_s(_T("RawHook_CallConv_Convert.Hook = %d\n"), RawHook_CallConv_Convert.Hook(CallConv_Convert_RawHook, true, 0x10, true));
 
 		_tprintf_s(_T("g_pTestingRTTI->foo = %d\n"), g_pTestingRTTI->foo());
 

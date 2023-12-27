@@ -606,8 +606,16 @@
 #endif // !HOOK_STORAGE_CAPACITY
 
 #ifndef HOOK_INLINE_TRAMPOLINE_SIZE
-#define HOOK_INLINE_TRAMPOLINE_SIZE 45 // Max trampoline size.
+#define HOOK_INLINE_TRAMPOLINE_SIZE 0x30 // Max trampoline size.
 #endif // !HOOK_INLINE_TRAMPOLINE_SIZE
+
+#ifndef HOOK_INLINE_WRAPPER_SIZE
+#ifdef _M_X64
+#define HOOK_INLINE_WRAPPER_SIZE 0x18 // Max wrapper size.
+#elif _M_IX86
+#define HOOK_INLINE_WRAPPER_SIZE 0x18 // Max wrapper size.
+#endif
+#endif // !HOOK_INLINE_WRAPPER_SIZE
 
 #ifndef HOOK_RAW_WRAPPER_SIZE
 #ifdef _M_X64
@@ -618,7 +626,7 @@
 #endif // !HOOK_RAW_WRAPPER_SIZE
 
 #ifndef HOOK_RAW_TRAMPOLINE_SIZE
-#define HOOK_RAW_TRAMPOLINE_SIZE 45 // Max trampoline size.
+#define HOOK_RAW_TRAMPOLINE_SIZE 0x30 // Max trampoline size.
 #endif // !HOOK_RAW_TRAMPOLINE_SIZE
 
 // ----------------------------------------------------------------
@@ -4888,7 +4896,7 @@ namespace Detours {
 			void* GetAddress() const;
 			size_t GetSize() const;
 			bool IsAutoDisable() const;
-			fnMemoryHookCallBack GetCallBack();
+			fnMemoryHookCallBack GetCallBack() const;
 
 		private:
 			void* m_pAddress;
@@ -4927,7 +4935,7 @@ namespace Detours {
 
 		public:
 			unsigned char GetInterrupt() const;
-			fnInterruptHookCallBack GetCallBack();
+			fnInterruptHookCallBack GetCallBack() const;
 
 		private:
 			unsigned char m_unInterrupt;
@@ -5012,7 +5020,7 @@ namespace Detours {
 			bool Release();
 
 		public:
-			bool Hook(void* pHookAddress);
+			bool Hook(void* pHookAddress, bool bSingleInstructionOnly = false);
 			bool UnHook();
 
 		public:
@@ -5021,6 +5029,36 @@ namespace Detours {
 		private:
 			bool m_bInitialized;
 			void* m_pAddress;
+			void* m_pTrampoline;
+			size_t m_unOriginalBytes;
+			std::unique_ptr<unsigned char[]> m_pOriginalBytes;
+		};
+
+		// ----------------------------------------------------------------
+		// Inline Hook (With Wrapper)
+		// ----------------------------------------------------------------
+
+		class InlineWrapperHook {
+		public:
+			InlineWrapperHook();
+			InlineWrapperHook(void* pAddress);
+			~InlineWrapperHook();
+
+		public:
+			bool Set(void* pAddress);
+			bool Release();
+
+		public:
+			bool Hook(void* pHookAddress, bool bSingleInstructionOnly = false);
+			bool UnHook();
+
+		public:
+			void* GetTrampoline() const;
+
+		private:
+			bool m_bInitialized;
+			void* m_pAddress;
+			void* m_pWrapper;
 			void* m_pTrampoline;
 			size_t m_unOriginalBytes;
 			std::unique_ptr<unsigned char[]> m_pOriginalBytes;
@@ -5788,7 +5826,7 @@ namespace Detours {
 			bool Release();
 
 		public:
-			bool Hook(const fnRawHookCallBack pCallBack, bool bNative = false, const unsigned int unReserveStackSize = 0);
+			bool Hook(const fnRawHookCallBack pCallBack, bool bNative = false, const unsigned int unReserveStackSize = 0, bool bSingleInstructionOnly = false);
 			bool UnHook();
 
 		public:

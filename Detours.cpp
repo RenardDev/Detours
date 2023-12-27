@@ -2655,8 +2655,8 @@ namespace Detours {
 			return reinterpret_cast<const PRTTI_CLASS_HIERARCHY_DESCRIPTOR>(reinterpret_cast<size_t>(pBaseAddress) + pBaseClassDescriptor->m_unClassHierarchyDescriptor);
 		}
 
-		static inline PRTTI_CLASS_HIERARCHY_DESCRIPTOR __GetClassHierarchyDescriptor(void const* const pBaseAddress, PRTTI_COMPLETE_OBJECT_LOCATOR pCompleteObjectLocator) {
-			return reinterpret_cast<PRTTI_CLASS_HIERARCHY_DESCRIPTOR>(reinterpret_cast<size_t>(pBaseAddress) + pCompleteObjectLocator->m_unClassHierarchyDescriptor);
+		static inline const PRTTI_CLASS_HIERARCHY_DESCRIPTOR __GetClassHierarchyDescriptor(void const* const pBaseAddress, PRTTI_COMPLETE_OBJECT_LOCATOR pCompleteObjectLocator) {
+			return reinterpret_cast<const PRTTI_CLASS_HIERARCHY_DESCRIPTOR>(reinterpret_cast<size_t>(pBaseAddress) + pCompleteObjectLocator->m_unClassHierarchyDescriptor);
 		}
 #endif
 
@@ -81624,7 +81624,7 @@ namespace Detours {
 			return m_bAutoDisable;
 		}
 
-		fnMemoryHookCallBack MemoryHook::GetCallBack() {
+		fnMemoryHookCallBack MemoryHook::GetCallBack() const {
 			return m_pCallBack;
 		}
 
@@ -81751,7 +81751,7 @@ namespace Detours {
 			return m_unInterrupt;
 		}
 
-		fnInterruptHookCallBack InterruptHook::GetCallBack() {
+		fnInterruptHookCallBack InterruptHook::GetCallBack() const {
 			return m_pCallBack;
 		}
 
@@ -82061,7 +82061,7 @@ namespace Detours {
 			return true;
 		}
 
-		bool InlineHook::Hook(void* pHookAddress) {
+		bool InlineHook::Hook(void* pHookAddress, bool bSingleInstructionOnly) {
 			if (!g_ThreadSuspender.SuspendThreads()) {
 				return false;
 			}
@@ -82076,6 +82076,10 @@ namespace Detours {
 			if (unJumpToHookOffset) { // E9 00 00 00 00 - jmp rel32
 				unJumpToHookSize = 5;
 			} else {
+				if (bSingleInstructionOnly) {
+					g_ThreadSuspender.ResumeThreads();
+					return false;
+				}
 #ifdef _M_X64
 				// C7 44 24 F8 44332211 - mov [rsp-0x8], 0x11223344
 				// C7 44 24 FC 44332211 - mov [rsp-0x4], 0x11223344
@@ -82381,6 +82385,451 @@ namespace Detours {
 		}
 
 		// ----------------------------------------------------------------
+		// Inline Hook (With Wrapper)
+		// ----------------------------------------------------------------
+
+		InlineWrapperHook::InlineWrapperHook() {
+			m_bInitialized = false;
+			m_pAddress = nullptr;
+			m_pWrapper = nullptr;
+			m_pTrampoline = nullptr;
+			m_pOriginalBytes = nullptr;
+			m_unOriginalBytes = 0;
+		}
+
+		InlineWrapperHook::InlineWrapperHook(void* pAddress) {
+			m_bInitialized = true;
+			m_pAddress = pAddress;
+			m_pWrapper = nullptr;
+			m_pTrampoline = nullptr;
+			m_pOriginalBytes = nullptr;
+			m_unOriginalBytes = 0;
+		}
+
+		InlineWrapperHook::~InlineWrapperHook() {
+			UnHook();
+		}
+
+		bool InlineWrapperHook::Set(void* pAddress) {
+			if (m_bInitialized || !pAddress) {
+				return false;
+			}
+
+			m_pAddress = pAddress;
+			m_pWrapper = nullptr;
+			m_pTrampoline = nullptr;
+			m_pOriginalBytes = nullptr;
+			m_unOriginalBytes = 0;
+
+			m_bInitialized = true;
+			return true;
+		}
+
+		bool InlineWrapperHook::Release() {
+			if (!m_bInitialized) {
+				return false;
+			}
+
+			UnHook();
+
+			m_pAddress = nullptr;
+			m_pWrapper = nullptr;
+			m_pTrampoline = nullptr;
+			m_pOriginalBytes = nullptr;
+			m_unOriginalBytes = 0;
+
+			m_bInitialized = false;
+			return true;
+		}
+
+		bool InlineWrapperHook::Hook(void* pHookAddress, bool bSingleInstructionOnly) {
+			if (!g_ThreadSuspender.SuspendThreads()) {
+				return false;
+			}
+
+			if (!m_bInitialized || !m_pAddress || m_pWrapper || m_pTrampoline || !pHookAddress) {
+				g_ThreadSuspender.ResumeThreads();
+				return false;
+			}
+
+			m_pWrapper = g_HookStorage.Alloc(HOOK_INLINE_WRAPPER_SIZE, m_pAddress);
+			if (!m_pWrapper) {
+				g_ThreadSuspender.ResumeThreads();
+				return false;
+			}
+
+			if (!Protection(m_pWrapper, HOOK_INLINE_WRAPPER_SIZE, false).ChangeProtection(PAGE_READWRITE)) {
+				g_HookStorage.DeAlloc(m_pWrapper);
+				m_pWrapper = nullptr;
+				g_ThreadSuspender.ResumeThreads();
+				return false;
+			}
+
+			memset(m_pWrapper, 0xC3, HOOK_INLINE_WRAPPER_SIZE);
+
+			unsigned char* pJumpToHook = reinterpret_cast<unsigned char*>(m_pWrapper);
+#ifdef _M_X64
+			// C7 44 24 F8 44332211 - mov [rsp-0x8], 0x11223344 ; Low
+			// C7 44 24 FC 44332211 - mov [rsp-0x4], 0x11223344 ; High
+			// FF 64 24 F8 - jmp [rsp-8]
+
+			const size_t unHookAddress = reinterpret_cast<size_t>(pHookAddress);
+
+			pJumpToHook[ 0] = 0xC7;
+			pJumpToHook[ 1] = 0x44;
+			pJumpToHook[ 2] = 0x24;
+			pJumpToHook[ 3] = 0xF8;
+
+			*reinterpret_cast<unsigned int*>(pJumpToHook + 4) = unHookAddress & 0xFFFFFFFF;
+
+			pJumpToHook[ 8] = 0xC7;
+			pJumpToHook[ 9] = 0x44;
+			pJumpToHook[10] = 0x24;
+			pJumpToHook[11] = 0xFC;
+
+			*reinterpret_cast<unsigned int*>(pJumpToHook + 12) = (unHookAddress >> 32) & 0xFFFFFFFF;
+
+			pJumpToHook[16] = 0xFF;
+			pJumpToHook[17] = 0x64;
+			pJumpToHook[18] = 0x24;
+			pJumpToHook[19] = 0xF8;
+#elif _M_IX86
+			// C7 44 24 FC 44332211 - mov [esp-0x4], 0x11223344
+			// FF 64 24 FC - jmp [esp-4]
+
+			pJumpToHook[ 0] = 0xC7;
+			pJumpToHook[ 1] = 0x44;
+			pJumpToHook[ 2] = 0x24;
+			pJumpToHook[ 3] = 0xFC;
+
+			*reinterpret_cast<unsigned int*>(pJumpToHook + 4) = reinterpret_cast<unsigned int>(pHookAddress);
+
+			pJumpToHook[ 8] = 0xFF;
+			pJumpToHook[ 9] = 0x64;
+			pJumpToHook[10] = 0x24;
+			pJumpToHook[11] = 0xFC;
+#endif
+
+			const size_t unJumpToWrapperOffset = __is_relative(m_pWrapper, m_pAddress);
+			size_t unJumpToWrapperSize = 0;
+			if (unJumpToWrapperOffset) { // E9 00 00 00 00 - jmp rel32
+				unJumpToWrapperSize = 5;
+			} else {
+				if (bSingleInstructionOnly) {
+					g_ThreadSuspender.ResumeThreads();
+					return false;
+				}
+#ifdef _M_X64
+				// C7 44 24 F8 44332211 - mov [rsp-0x8], 0x11223344
+				// C7 44 24 FC 44332211 - mov [rsp-0x4], 0x11223344
+				// FF 64 24 F8 - jmp [rsp-8]
+				unJumpToWrapperSize = 20;
+#elif _M_IX86
+				// C7 44 24 FC 44332211 - mov [esp-0x4], 0x11223344
+				// FF 64 24 FC - jmp [esp-4]
+				unJumpToWrapperSize = 12;
+#endif
+			}
+
+			INSTRUCTION ins;
+			size_t unCopyingSize = 0;
+			while (unCopyingSize < unJumpToWrapperSize) {
+#ifdef _M_X64
+				if (!RD_SUCCESS(RdDecode(&ins, reinterpret_cast<unsigned char*>(m_pAddress) + unCopyingSize, RD_CODE_64, RD_DATA_64))) {
+#elif _M_IX86
+				if (!RD_SUCCESS(RdDecode(&ins, reinterpret_cast<unsigned char*>(m_pAddress) + unCopyingSize, RD_CODE_32, RD_DATA_32))) {
+#endif
+					g_ThreadSuspender.ResumeThreads();
+					return false;
+				}
+
+				unCopyingSize += ins.Length;
+			}
+
+			if (unCopyingSize >= HOOK_INLINE_TRAMPOLINE_SIZE) {
+				g_ThreadSuspender.ResumeThreads();
+				return false;
+			}
+
+			m_pTrampoline = g_HookStorage.Alloc(HOOK_INLINE_TRAMPOLINE_SIZE, m_pAddress);
+			if (!m_pTrampoline) {
+				g_ThreadSuspender.ResumeThreads();
+				return false;
+			}
+
+			if (!Protection(m_pTrampoline, HOOK_INLINE_TRAMPOLINE_SIZE, false).ChangeProtection(PAGE_READWRITE)) {
+				g_HookStorage.DeAlloc(m_pTrampoline);
+				m_pTrampoline = nullptr;
+				g_ThreadSuspender.ResumeThreads();
+				return false;
+			}
+
+			const size_t unJumpFromTampolineOffset = __is_relative(reinterpret_cast<char*>(m_pAddress) + unJumpToWrapperSize, reinterpret_cast<char*>(m_pTrampoline) + unCopyingSize);
+			size_t unJumpFromTrampolineSize = 0;
+			if (unJumpFromTampolineOffset) { // E9 00 00 00 00 - jmp rel32
+				unJumpFromTrampolineSize = 5;
+			} else {
+#ifdef _M_X64
+				// C7 44 24 F8 44332211 - mov [rsp-0x8], 0x11223344
+				// C7 44 24 FC 44332211 - mov [rsp-0x4], 0x11223344
+				// FF 64 24 F8 - jmp [rsp-8]
+				unJumpFromTrampolineSize = 20;
+#elif _M_IX86
+				// C7 44 24 FC 44332211 - mov [esp-0x4], 0x11223344
+				// FF 64 24 FC - jmp [esp-4]
+				unJumpFromTrampolineSize = 12;
+#endif
+			}
+
+			if (unCopyingSize + unJumpFromTrampolineSize > HOOK_INLINE_TRAMPOLINE_SIZE) {
+				g_HookStorage.DeAlloc(m_pTrampoline);
+				m_pTrampoline = nullptr;
+				g_ThreadSuspender.ResumeThreads();
+				return false;
+			}
+
+			memset(m_pTrampoline, 0xC3, HOOK_INLINE_TRAMPOLINE_SIZE);
+			memcpy(m_pTrampoline, m_pAddress, unCopyingSize);
+
+			for (size_t unIndex = 0; unIndex < unCopyingSize;) {
+#ifdef _M_X64
+				if (!RD_SUCCESS(RdDecode(&ins, reinterpret_cast<unsigned char*>(m_pTrampoline) + unIndex, RD_CODE_64, RD_DATA_64))) {
+#elif _M_IX86
+				if (!RD_SUCCESS(RdDecode(&ins, reinterpret_cast<unsigned char*>(m_pTrampoline) + unIndex, RD_CODE_32, RD_DATA_32))) {
+#endif
+					g_HookStorage.DeAlloc(m_pTrampoline);
+					m_pTrampoline = nullptr;
+					g_ThreadSuspender.ResumeThreads();
+					return false;
+				}
+
+				const size_t unAddress = reinterpret_cast<size_t>(m_pAddress) + unIndex + ins.Length;
+				const size_t unTrampolineAddress = reinterpret_cast<size_t>(m_pTrampoline) + unIndex + ins.Length;
+
+				if (ins.IsRipRelative && ins.HasDisp) {
+					const size_t unTargetAddress = unAddress + static_cast<size_t>(ins.Displacement);
+					const size_t unNewDisp = unTargetAddress - unTrampolineAddress;
+
+					switch (ins.DispLength) {
+						case 1: // FIXME: Impossible to do. (FIX: Replace disp8 with disp32)
+							*reinterpret_cast<unsigned char*>(reinterpret_cast<size_t>(m_pTrampoline) + unIndex + ins.DispOffset) = static_cast<unsigned char>(unNewDisp & 0xFF);
+							break;
+						case 2: // FIXME: Possible crash. (FIX: Same as with disp8)
+							*reinterpret_cast<unsigned short*>(reinterpret_cast<size_t>(m_pTrampoline) + unIndex + ins.DispOffset) = static_cast<unsigned short>(unNewDisp & 0xFFFF);
+							break;
+						case 4:
+							*reinterpret_cast<unsigned int*>(reinterpret_cast<size_t>(m_pTrampoline) + unIndex + ins.DispOffset) = static_cast<unsigned int>(unNewDisp & 0xFFFFFFFF);
+							break;
+						default:
+							g_HookStorage.DeAlloc(m_pTrampoline);
+							m_pTrampoline = nullptr;
+							g_ThreadSuspender.ResumeThreads();
+							return false;
+					}
+				} else if (ins.HasRelOffs) {
+					const size_t unTargetAddress = unAddress + static_cast<size_t>(ins.RelativeOffset);
+					const size_t unNewOffset = unTargetAddress - unTrampolineAddress;
+
+					switch (ins.RelOffsLength) {
+						case 1: // FIXME: Impossible to do. (FIX: Replace rel8 with rel32)
+							*reinterpret_cast<unsigned char*>(reinterpret_cast<size_t>(m_pTrampoline) + unIndex + ins.RelOffsOffset) = static_cast<unsigned char>(unNewOffset & 0xFF);
+							break;
+						case 2: // FIXME: Possible crash. (FIX: Same as with rel8)
+							*reinterpret_cast<unsigned short*>(reinterpret_cast<size_t>(m_pTrampoline) + unIndex + ins.RelOffsOffset) = static_cast<unsigned short>(unNewOffset & 0xFFFF);
+							break;
+						case 4:
+							*reinterpret_cast<unsigned int*>(reinterpret_cast<size_t>(m_pTrampoline) + unIndex + ins.RelOffsOffset) = static_cast<unsigned int>(unNewOffset & 0xFFFFFFFF);
+							break;
+						default:
+							g_HookStorage.DeAlloc(m_pTrampoline);
+							m_pTrampoline = nullptr;
+							g_ThreadSuspender.ResumeThreads();
+							return false;
+					}
+				}
+
+				unIndex += ins.Length;
+			}
+
+			unsigned char* pJumpFromTrampoline = reinterpret_cast<unsigned char*>(m_pTrampoline) + unCopyingSize;
+			const size_t unJumpFromTrampolineOffset = __is_relative(reinterpret_cast<char*>(m_pAddress) + unJumpToWrapperSize, pJumpFromTrampoline);
+			if (unJumpFromTrampolineOffset) { // E9 00 00 00 00 - jmp rel32
+				pJumpFromTrampoline[0] = 0xE9;
+				*reinterpret_cast<unsigned int*>(pJumpFromTrampoline + 1) = static_cast<unsigned int>(unJumpFromTrampolineOffset & 0xFFFFFFFF) - 5;
+			} else {
+#ifdef _M_X64
+				// C7 44 24 F8 44332211 - mov [rsp-0x8], 0x11223344
+				// C7 44 24 FC 44332211 - mov [rsp-0x4], 0x11223344
+				// FF 64 24 F8 - jmp [rsp-8]
+
+				const size_t unAddress = reinterpret_cast<size_t>(m_pAddress) + unJumpToWrapperSize;
+
+				pJumpFromTrampoline[ 0] = 0xC7;
+				pJumpFromTrampoline[ 1] = 0x44;
+				pJumpFromTrampoline[ 2] = 0x24;
+				pJumpFromTrampoline[ 3] = 0xF8;
+				
+				*reinterpret_cast<unsigned int*>(pJumpFromTrampoline + 4) = unAddress & 0xFFFFFFFF;
+				
+				pJumpFromTrampoline[ 8] = 0xC7;
+				pJumpFromTrampoline[ 9] = 0x44;
+				pJumpFromTrampoline[10] = 0x24;
+				pJumpFromTrampoline[11] = 0xFC;
+
+				*reinterpret_cast<unsigned int*>(pJumpFromTrampoline + 12) = (unAddress >> 32) & 0xFFFFFFFF;
+
+				pJumpFromTrampoline[16] = 0xFF;
+				pJumpFromTrampoline[17] = 0x64;
+				pJumpFromTrampoline[18] = 0x24;
+				pJumpFromTrampoline[19] = 0xF8;
+#elif _M_IX86
+				// C7 44 24 FC 44332211 - mov [esp-0x4], 0x11223344
+				// FF 64 24 FC - jmp [esp-4]
+
+				pJumpFromTrampoline[0] = 0xC7;
+				pJumpFromTrampoline[1] = 0x44;
+				pJumpFromTrampoline[2] = 0x24;
+				pJumpFromTrampoline[3] = 0xFC;
+
+				*reinterpret_cast<unsigned int*>(pJumpFromTrampoline + 4) = reinterpret_cast<unsigned int>(m_pAddress) + static_cast<unsigned int>(unJumpToWrapperSize & 0xFFFFFFFF);
+
+				pJumpFromTrampoline[ 8] = 0xFF;
+				pJumpFromTrampoline[ 9] = 0x64;
+				pJumpFromTrampoline[10] = 0x24;
+				pJumpFromTrampoline[11] = 0xFC;
+#endif
+			}
+
+			if (!Protection(m_pTrampoline, HOOK_INLINE_TRAMPOLINE_SIZE, false).ChangeProtection(PAGE_EXECUTE_READ)) {
+				g_HookStorage.DeAlloc(m_pTrampoline);
+				m_pTrampoline = nullptr;
+				g_ThreadSuspender.ResumeThreads();
+				return false;
+			}
+
+			m_unOriginalBytes = unCopyingSize;
+
+			m_pOriginalBytes = std::make_unique<unsigned char[]>(unCopyingSize);
+			if (!m_pOriginalBytes) {
+				m_unOriginalBytes = 0;
+				g_HookStorage.DeAlloc(m_pTrampoline);
+				m_pTrampoline = nullptr;
+				g_ThreadSuspender.ResumeThreads();
+				return false;
+			}
+
+			memcpy(m_pOriginalBytes.get(), m_pAddress, unCopyingSize);
+
+			Protection JumpToHookProtection(m_pAddress, unCopyingSize, false);
+			if (!JumpToHookProtection.ChangeProtection(PAGE_READWRITE)) {
+				m_pOriginalBytes = nullptr;
+				m_unOriginalBytes = 0;
+				g_HookStorage.DeAlloc(m_pTrampoline);
+				m_pTrampoline = nullptr;
+				g_ThreadSuspender.ResumeThreads();
+				return false;
+			}
+
+			memset(m_pAddress, 0x90, unCopyingSize);
+
+			unsigned char* pJumpToWrapper = reinterpret_cast<unsigned char*>(m_pAddress);
+			if (unJumpToWrapperOffset) { // E9 00 00 00 00 - jmp rel32
+				pJumpToWrapper[0] = 0xE9;
+				*reinterpret_cast<unsigned int*>(pJumpToWrapper + 1) = static_cast<unsigned int>(unJumpToWrapperOffset & 0xFFFFFFFF) - 5;
+			} else {
+#ifdef _M_X64
+				// C7 44 24 F8 44332211 - mov [rsp-0x8], 0x11223344 ; Low
+				// C7 44 24 FC 44332211 - mov [rsp-0x4], 0x11223344 ; High
+				// FF 64 24 F8 - jmp [rsp-8]
+
+				const size_t unAddress = reinterpret_cast<size_t>(m_pWrapper);
+
+				pJumpToWrapper[ 0] = 0xC7;
+				pJumpToWrapper[ 1] = 0x44;
+				pJumpToWrapper[ 2] = 0x24;
+				pJumpToWrapper[ 3] = 0xF8;
+
+				*reinterpret_cast<unsigned int*>(pJumpToWrapper + 4) = unAddress & 0xFFFFFFFF;
+
+				pJumpToWrapper[ 8] = 0xC7;
+				pJumpToWrapper[ 9] = 0x44;
+				pJumpToWrapper[10] = 0x24;
+				pJumpToWrapper[11] = 0xFC;
+
+				*reinterpret_cast<unsigned int*>(pJumpToWrapper + 12) = (unAddress >> 32) & 0xFFFFFFFF;
+
+				pJumpToWrapper[16] = 0xFF;
+				pJumpToWrapper[17] = 0x64;
+				pJumpToWrapper[18] = 0x24;
+				pJumpToWrapper[19] = 0xF8;
+#elif _M_IX86
+				// C7 44 24 FC 44332211 - mov [esp-0x4], 0x11223344
+				// FF 64 24 FC - jmp [esp-4]
+
+				pJumpToWrapper[0] = 0xC7;
+				pJumpToWrapper[1] = 0x44;
+				pJumpToWrapper[2] = 0x24;
+				pJumpToWrapper[3] = 0xFC;
+
+				*reinterpret_cast<unsigned int*>(pJumpToWrapper + 4) = reinterpret_cast<unsigned int>(m_pWrapper);
+
+				pJumpToWrapper[ 8] = 0xFF;
+				pJumpToWrapper[ 9] = 0x64;
+				pJumpToWrapper[10] = 0x24;
+				pJumpToWrapper[11] = 0xFC;
+#endif
+			}
+
+			JumpToHookProtection.RestoreProtection();
+
+			g_ThreadSuspender.ResumeThreads();
+			return true;
+		}
+
+		bool InlineWrapperHook::UnHook() {
+			if (!g_ThreadSuspender.SuspendThreads()) {
+				return false;
+			}
+
+			if (!m_bInitialized || !m_pAddress || !m_pWrapper || !m_pTrampoline) {
+				g_ThreadSuspender.ResumeThreads();
+				return false;
+			}
+
+			for (size_t unIndex = 0; unIndex < HOOK_INLINE_WRAPPER_SIZE; ++unIndex) {
+				g_ThreadSuspender.FixExecutionAddress(reinterpret_cast<unsigned char*>(m_pWrapper) + unIndex, reinterpret_cast<unsigned char*>(m_pAddress));
+			}
+
+			for (size_t unIndex = 0; unIndex < HOOK_INLINE_TRAMPOLINE_SIZE; ++unIndex) {
+				g_ThreadSuspender.FixExecutionAddress(reinterpret_cast<unsigned char*>(m_pTrampoline) + unIndex, reinterpret_cast<unsigned char*>(m_pAddress) + unIndex);
+			}
+
+			Protection HookProtection(m_pAddress, m_unOriginalBytes, false);
+			if (!HookProtection.ChangeProtection(PAGE_READWRITE)) {
+				g_ThreadSuspender.ResumeThreads();
+				return false;
+			}
+
+			memcpy(m_pAddress, m_pOriginalBytes.get(), m_unOriginalBytes);
+
+			HookProtection.RestoreProtection();
+
+			m_pOriginalBytes = nullptr;
+			m_unOriginalBytes = 0;
+			g_HookStorage.DeAlloc(m_pTrampoline);
+			m_pTrampoline = nullptr;
+			g_HookStorage.DeAlloc(m_pWrapper);
+			m_pWrapper = nullptr;
+
+			g_ThreadSuspender.ResumeThreads();
+			return true;
+		}
+
+		void* InlineWrapperHook::GetTrampoline() const {
+			return m_pTrampoline;
+		}
+
+		// ----------------------------------------------------------------
 		// Raw Hook
 		// ----------------------------------------------------------------
 
@@ -82442,7 +82891,7 @@ namespace Detours {
 			return true;
 		}
 
-		bool RawHook::Hook(const fnRawHookCallBack pCallBack, bool bNative, const unsigned int unReservedStackSize) {
+		bool RawHook::Hook(const fnRawHookCallBack pCallBack, bool bNative, const unsigned int unReservedStackSize, bool bSingleInstructionOnly) {
 			if (!g_ThreadSuspender.SuspendThreads()) {
 				return false;
 			}
@@ -83458,8 +83907,14 @@ namespace Detours {
 			const size_t unJumpToWrapperOffset = __is_relative(m_pWrapper, m_pAddress);
 			size_t unJumpToWrapperSize = 0;
 			if (unJumpToWrapperOffset) { // E9 00 00 00 00 - jmp rel32
-				unJumpToWrapperSize = 5; // E9 00 00 00 00 - jmp rel32
+				unJumpToWrapperSize = 5;
 			} else {
+				if (bSingleInstructionOnly) {
+					g_HookStorage.DeAlloc(m_pWrapper);
+					m_pWrapper = nullptr;
+					g_ThreadSuspender.ResumeThreads();
+					return false;
+				}
 #ifdef _M_X64
 				// C7 44 24 F8 44332211 - mov [rsp-0x8], 0x11223344
 				// C7 44 24 FC 44332211 - mov [rsp-0x4], 0x11223344
@@ -83881,7 +84336,6 @@ namespace Detours {
 			m_unFirstInstructionSize = 0;
 			g_HookStorage.DeAlloc(m_pWrapper);
 			m_pWrapper = nullptr;
-			g_ThreadSuspender.ResumeThreads();
 
 			g_ThreadSuspender.ResumeThreads();
 			return true;
