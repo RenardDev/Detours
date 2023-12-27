@@ -3548,9 +3548,10 @@ namespace Detours {
 		// Page
 		// ----------------------------------------------------------------
 
+		static DWORD unPageSize = 0;
+		static DWORD unAllocationGranularity = 0;
+
 		Page::Page(size_t unCapacity) {
-			static DWORD unPageSize = 0;
-			static DWORD unAllocationGranularity = 0;
 			if (!unPageSize || !unAllocationGranularity) {
 				SYSTEM_INFO sysinf;
 				GetSystemInfo(&sysinf);
@@ -3685,8 +3686,6 @@ namespace Detours {
 		// ----------------------------------------------------------------
 
 		NearPage::NearPage(size_t unCapacity, void* pDesiredAddress) {
-			static DWORD unPageSize = 0;
-			static DWORD unAllocationGranularity = 0;
 			if (!unPageSize || !unAllocationGranularity) {
 				SYSTEM_INFO sysinf;
 				GetSystemInfo(&sysinf);
@@ -3874,8 +3873,6 @@ namespace Detours {
 		// ----------------------------------------------------------------
 
 		Storage::Storage(size_t unTotalCapacity, size_t unPageCapacity) {
-			static DWORD unPageSize = 0;
-			static DWORD unAllocationGranularity = 0;
 			if (!unPageSize || !unAllocationGranularity) {
 				SYSTEM_INFO sysinf;
 				GetSystemInfo(&sysinf);
@@ -4013,8 +4010,6 @@ namespace Detours {
 		// ----------------------------------------------------------------
 
 		NearStorage::NearStorage(size_t unTotalCapacity, size_t unPageCapacity) {
-			static DWORD unPageSize = 0;
-			static DWORD unAllocationGranularity = 0;
 			if (!unPageSize || !unAllocationGranularity) {
 				SYSTEM_INFO sysinf;
 				GetSystemInfo(&sysinf);
