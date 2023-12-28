@@ -5049,7 +5049,7 @@ namespace Detours {
 			bool Release();
 
 		public:
-			bool Hook(void* pHookAddress, bool bSingleInstructionOnly = false);
+			bool Hook(void* pHookAddress, bool bSingleInstructionOnly = true);
 			bool UnHook();
 
 		public:
