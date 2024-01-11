@@ -995,7 +995,7 @@ namespace Detours {
 			};
 		};
 		ULONGLONG CsrServerReadOnlySharedMemoryBase;
-		PRTL_CRITICAL_SECTION TppWorkerpListLock;
+		RTL_SRWLOCK TppWorkerpListLock;
 		LIST_ENTRY TppWorkerpList;
 		PVOID WaitOnAddressHashTable[128];
 		PVOID TelemetryCoverageHeader;
