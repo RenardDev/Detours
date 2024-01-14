@@ -356,7 +356,7 @@ void TestFindData() {
 	_tprintf_s(_T("TEST - %s\n"), Detours::Scan::FindDataAVX2(pEndArray3, sizeof(pEndArray3), reinterpret_cast<unsigned char const*>("\xDE\xED"), 2) == pEndArray3 + 61 ? _T("OK") : _T("FAIL"));
 }
 
-int TestMode() {
+int TestScan() {
 
 	_tprintf_s(_T("FindSignature Test\n"));
 	TestFindSignature();
@@ -367,7 +367,7 @@ int TestMode() {
 	return 0;
 }
 
-int BenchmarkMode() {
+int BenchmarkScan() {
 	auto pRandomData = std::make_unique<unsigned char[]>(0x800000); // 8 MiB
 	if (!pRandomData) {
 		return -1;
@@ -511,6 +511,18 @@ void ProcessMessage(BaseMessage* pMessage) {
 	}
 }
 
+void OnThread(void* pData) {
+	UNREFERENCED_PARAMETER(pData);
+	_tprintf_s(_T("[OnThread] Started!\n"));
+	Sleep(5000);
+}
+
+void OnFiber(void* pData) {
+	UNREFERENCED_PARAMETER(pData);
+	_tprintf_s(_T("[OnFiber] Started!\n"));
+	Sleep(5000);
+}
+
 bool OnException(const EXCEPTION_RECORD& Exception, const PCONTEXT pCTX) {
 	if (Exception.ExceptionCode != EXCEPTION_ACCESS_VIOLATION) {
 		return false;
@@ -568,7 +580,7 @@ bool OnException(const EXCEPTION_RECORD& Exception, const PCONTEXT pCTX) {
 }
 
 bool Sleep_MemoryHook(const std::unique_ptr<Detours::Hook::MemoryHook>& pHook, const PCONTEXT pCTX) {
-	_CRT_UNUSED(pHook);
+	UNREFERENCED_PARAMETER(pHook);
 
 	_tprintf_s(_T("[Sleep_MemoryHook] Called!\n"));
 #ifdef _M_X64
@@ -582,7 +594,7 @@ bool Sleep_MemoryHook(const std::unique_ptr<Detours::Hook::MemoryHook>& pHook, c
 }
 
 bool InterruptHook(const std::unique_ptr<Detours::Hook::InterruptHook>& pHook, const PCONTEXT pCTX) {
-	_CRT_UNUSED(pHook);
+	UNREFERENCED_PARAMETER(pHook);
 
 	_tprintf_s(_T("[InterruptHook] Called `int 0x%02X`\n"), pHook->GetInterrupt());
 #ifdef _M_X64
@@ -1145,7 +1157,7 @@ void Sleep_RawHookFiber(void* pData) {
 }
 
 
-Detours::Fibers::Fiber SleepRawHookFiber(Sleep_RawHookFiber);
+Detours::Parallel::Fiber SleepRawHookFiber(Sleep_RawHookFiber);
 #ifdef _M_X64
 bool __fastcall Sleep_RawHook(Detours::Hook::PRAW_CONTEXT pCTX) {
 #elif _M_IX86
@@ -1286,17 +1298,241 @@ int _tmain(int nArguments, PTCHAR* pArguments) {
 		for (int i = 0; i < nArguments; ++i) {
 			PTCHAR pArgument = pArguments[i];
 
-			if (_tcscmp(pArgument, _T("/test")) == 0) {
-				return TestMode();
+			if (_tcscmp(pArgument, _T("/test-scan")) == 0) {
+				return TestScan();
 			}
 
-			if (_tcscmp(pArgument, _T("/benchmark")) == 0) {
-				return BenchmarkMode();
+			if (_tcscmp(pArgument, _T("/benchmark-scan")) == 0) {
+				return BenchmarkScan();
 			}
 
-			if (_tcscmp(pArgument, _T("/sv")) == 0) {
-				Detours::Memory::Server sv(GetLargePageMinimum());
-				PSHARED_MEMORY pMemory = reinterpret_cast<PSHARED_MEMORY>(sv.GetAddress());
+			if (_tcscmp(pArgument, _T("/event-server")) == 0) {
+				Detours::Sync::EventServer event;
+
+				TCHAR szEventName[64];
+				if (!event.GetEventName(szEventName)) {
+					return -1;
+				}
+
+				_tprintf_s(_T("EventServer: %s\n"), szEventName);
+
+				if (!event.Wait()) {
+					return -1;
+				}
+
+				_tprintf_s(_T("Signaled\n"));
+
+				return 0;
+			}
+
+			if ((nArguments > 2) && (_tcscmp(pArgument, _T("/event-client")) == 0)) {
+				PTCHAR pEventName = pArguments[i + 1];
+				if (_tcslen(pEventName) != 40) {
+					return -1;
+				}
+
+				_tprintf_s(_T("Connecting to `%s`\n"), pEventName);
+
+				Detours::Sync::EventClient event(pEventName);
+
+				if (!event.Pulse()) {
+					return -1;
+				}
+
+				_tprintf_s(_T("Signaled\n"));
+
+				return 0;
+			}
+
+			if (_tcscmp(pArgument, _T("/mutex-server")) == 0) {
+				Detours::Sync::MutexServer mutex;
+
+				TCHAR szMutexName[64];
+				if (!mutex.GetMutexName(szMutexName)) {
+					return -1;
+				}
+
+				_tprintf_s(_T("MutexServer: %s\n"), szMutexName);
+
+				if (!mutex.Lock()) {
+					return -1;
+				}
+
+				_tprintf_s(_T("Locked\n"));
+
+				Sleep(30000);
+
+				if (!mutex.UnLock()) {
+					return -1;
+				}
+
+				_tprintf_s(_T("UnLocked\n"));
+
+				return 0;
+			}
+
+			if ((nArguments > 2) && (_tcscmp(pArgument, _T("/mutex-client")) == 0)) {
+				PTCHAR pMutexName = pArguments[i + 1];
+				if (_tcslen(pMutexName) != 40) {
+					return -1;
+				}
+
+				_tprintf_s(_T("Connecting to `%s`\n"), pMutexName);
+
+				Detours::Sync::MutexClient mutex(pMutexName);
+
+				if (!mutex.Lock()) {
+					return -1;
+				}
+
+				_tprintf_s(_T("Locked\n"));
+
+				Sleep(30000);
+
+				if (!mutex.UnLock()) {
+					return -1;
+				}
+
+				_tprintf_s(_T("UnLocked\n"));
+
+				return 0;
+			}
+
+			if (_tcscmp(pArgument, _T("/semaphore-server")) == 0) {
+				Detours::Sync::SemaphoreServer semaphore(false, 2, 2);
+
+				TCHAR szSemaphoreName[64];
+				if (!semaphore.GetSemaphoreName(szSemaphoreName)) {
+					return -1;
+				}
+
+				_tprintf_s(_T("SemaphoreServer: %s\n"), szSemaphoreName);
+
+				if (!semaphore.Enter()) {
+					return -1;
+				}
+
+				_tprintf_s(_T("Entered\n"));
+
+				Sleep(30000);
+
+				if (!semaphore.Leave()) {
+					return -1;
+				}
+
+				_tprintf_s(_T("Leaved\n"));
+
+				return 0;
+			}
+
+			if ((nArguments > 2) && (_tcscmp(pArgument, _T("/semaphore-client")) == 0)) {
+				PTCHAR pSemaphoreName = pArguments[i + 1];
+				if (_tcslen(pSemaphoreName) != 44) {
+					return -1;
+				}
+
+				_tprintf_s(_T("Connecting to `%s`\n"), pSemaphoreName);
+
+				Detours::Sync::SemaphoreClient semaphore(pSemaphoreName);
+
+				if (!semaphore.Enter()) {
+					return -1;
+				}
+
+				_tprintf_s(_T("Entered\n"));
+
+				Sleep(30000);
+
+				if (!semaphore.Leave()) {
+					return -1;
+				}
+
+				_tprintf_s(_T("Leaved\n"));
+
+				return 0;
+			}
+
+			if (_tcscmp(pArgument, _T("/pipe-server")) == 0) {
+				Detours::Pipe::PipeServer pipe(0x1000);
+
+				TCHAR szPipeName[64];
+				if (!pipe.GetPipeName(szPipeName)) {
+					return -1;
+				}
+
+				_tprintf_s(_T("PipeServer: %s\n"), szPipeName);
+
+				if (!pipe.Open()) {
+					return -1;
+				}
+
+				unsigned char pData[0x1000];
+				memset(pData, 0, sizeof(pData));
+
+				pData[0] = 1;
+
+				if (!pipe.Send(pData)) {
+					return -1;
+				}
+
+				if (!pipe.Receive(pData)) {
+					return -1;
+				}
+
+				if (pData[0] == 0) {
+					_tprintf_s(_T("Received 0\n"));
+				}
+
+				if (!pipe.Close()) {
+					return -1;
+				}
+
+				return 0;
+			}
+
+			if ((nArguments > 2) && (_tcscmp(pArgument, _T("/pipe-client")) == 0)) {
+				PTCHAR pPipeName = pArguments[i + 1];
+				if (_tcslen(pPipeName) != 39) {
+					return -1;
+				}
+
+				_tprintf_s(_T("Connecting to `%s`\n"), pPipeName);
+
+				Detours::Pipe::PipeClient pipe(0x1000);
+
+				if (!pipe.Open(pPipeName)) {
+					return -1;
+				}
+
+				unsigned char pData[0x1000];
+				memset(pData, 0, sizeof(pData));
+
+				if (!pipe.Receive(pData)) {
+					return -1;
+				}
+
+				if (pData[0] != 1) {
+					return -1;
+				}
+
+				pData[0] = 0;
+
+				if (!pipe.Send(pData)) {
+					return -1;
+				}
+
+				_tprintf_s(_T("Send 0\n"));
+
+				if (!pipe.Close()) {
+					return -1;
+				}
+
+				return 0;
+			}
+
+			if (_tcscmp(pArgument, _T("/shared-server")) == 0) {
+				Detours::Memory::SharedServer shsv(GetLargePageMinimum());
+				PSHARED_MEMORY pMemory = reinterpret_cast<PSHARED_MEMORY>(shsv.GetAddress());
 				if (!pMemory) {
 					return -1;
 				}
@@ -1307,12 +1543,12 @@ int _tmain(int nArguments, PTCHAR* pArguments) {
 				_tprintf_s(_T("Memory: 0x%08X\n"), reinterpret_cast<size_t>(pMemory));
 #endif
 
-				TCHAR szSessionName[64];
-				if (!sv.GetSessionName(szSessionName)) {
+				TCHAR szSharedName[64];
+				if (!shsv.GetSharedName(szSharedName)) {
 					return -1;
 				}
 
-				_tprintf_s(_T("Server Session: %s\n"), szSessionName);
+				_tprintf_s(_T("SharedServer: %s\n"), szSharedName);
 
 				while (!pMemory->m_bStop) {
 					pMemory->m_unTick = GetTickCount64() & 0xFFFFFFFFi32;
@@ -1324,16 +1560,16 @@ int _tmain(int nArguments, PTCHAR* pArguments) {
 				return 0;
 			}
 
-			if ((nArguments > 2) && (_tcscmp(pArgument, _T("/cl")) == 0)) {
-				PTCHAR pSessionName = pArguments[i + 1];
-				if (_tcslen(pSessionName) != 41) {
+			if ((nArguments > 2) && (_tcscmp(pArgument, _T("/shared-client")) == 0)) {
+				PTCHAR pSharedName = pArguments[i + 1];
+				if (_tcslen(pSharedName) != 41) {
 					return -1;
 				}
 
-				_tprintf_s(_T("Connecting to `%s`\n"), pSessionName);
+				_tprintf_s(_T("Connecting to `%s`\n"), pSharedName);
 
-				Detours::Memory::Client cl(pSessionName);
-				PSHARED_MEMORY pMemory = reinterpret_cast<PSHARED_MEMORY>(cl.GetAddress());
+				Detours::Memory::SharedClient shcl(pSharedName);
+				PSHARED_MEMORY pMemory = reinterpret_cast<PSHARED_MEMORY>(shcl.GetAddress());
 				if (!pMemory) {
 					return -1;
 				}
@@ -1423,6 +1659,41 @@ int _tmain(int nArguments, PTCHAR* pArguments) {
 
 	_tprintf_s(_T("LastError = 0x%08X\n"), pTEB->LastErrorValue);
 	_tprintf_s(_T("LastStatus = 0x%08X\n"), pTEB->LastStatusValue);
+
+	_tprintf_s(_T("\n"));
+
+	// ----------------------------------------------------------------
+	// LDR Example
+	// ----------------------------------------------------------------
+
+	_tprintf_s(_T("LDR Example\n\n"));
+
+#ifdef _M_X64
+	_tprintf_s(_T("kernel32.dll = 0x%016llX\n"), reinterpret_cast<size_t>(GetModuleHandle(_T("kernel32.dll"))));
+#elif _M_IX86
+	_tprintf_s(_T("kernel32.dll = 0x%08X\n"), reinterpret_cast<size_t>(GetModuleHandle(_T("kernel32.dll"))));
+#endif
+
+	Detours::LDR::LINK_DATA ld;
+	if (Detours::LDR::UnLinkModule(_T("kernel32"), &ld)) {
+		_tprintf_s(_T("UnLinked\n"));
+	}
+
+#ifdef _M_X64
+	_tprintf_s(_T("kernel32.dll = 0x%016llX\n"), reinterpret_cast<size_t>(GetModuleHandle(_T("kernel32.dll"))));
+#elif _M_IX86
+	_tprintf_s(_T("kernel32.dll = 0x%08X\n"), reinterpret_cast<size_t>(GetModuleHandle(_T("kernel32.dll"))));
+#endif
+
+	if (Detours::LDR::ReLinkModule(ld)) {
+		_tprintf_s(_T("ReLinked\n"));
+	}
+
+#ifdef _M_X64
+	_tprintf_s(_T("kernel32.dll = 0x%016llX\n"), reinterpret_cast<size_t>(GetModuleHandle(_T("kernel32.dll"))));
+#elif _M_IX86
+	_tprintf_s(_T("kernel32.dll = 0x%08X\n"), reinterpret_cast<size_t>(GetModuleHandle(_T("kernel32.dll"))));
+#endif
 
 	_tprintf_s(_T("\n"));
 
@@ -1535,9 +1806,9 @@ int _tmain(int nArguments, PTCHAR* pArguments) {
 	}
 
 #ifdef _M_X64
-	_tprintf_s(_T("FindSignature(...) = 0x%016llX\n"), reinterpret_cast<size_t>(Detours::Scan::FindSignature(_T("ntdll.dll"), { '.', 't', 'e', 'x', 't', 0, 0, 0 }, "\x48\x8B\x41\x2A\x33\xD2\x4C\x8B\xC1\x48\x85\xC0\x75", 0, 0x20C2003D)));
+	_tprintf_s(_T("FindSignature(...) = 0x%016llX\n"), reinterpret_cast<size_t>(Detours::Scan::FindSignature(_T("ntdll.dll"), { '.', 't', 'e', 'x', 't', 0, 0, 0 }, "\x48\x8B\x41\x2A\x33\xD2\x4C\x8B\xC1\x48\x85\xC0\x75", '\x2A', 0, 0x20C2003D)));
 #elif _M_IX86
-	_tprintf_s(_T("FindSignature(...) = 0x%08X\n"), reinterpret_cast<size_t>(Detours::Scan::FindSignature(_T("ntdll.dll"), { '.', 't', 'e', 'x', 't', 0, 0, 0 }, "\x8B\xD1\x8B\x42", 0, 0xF3780028)));
+	_tprintf_s(_T("FindSignature(...) = 0x%08X\n"), reinterpret_cast<size_t>(Detours::Scan::FindSignature(_T("ntdll.dll"), { '.', 't', 'e', 'x', 't', 0, 0, 0 }, "\x8B\xD1\x8B\x42", '\x2A', 0, 0xF3780028)));
 #endif
 
 #ifdef _M_X64
@@ -1640,6 +1911,22 @@ int _tmain(int nArguments, PTCHAR* pArguments) {
 
 	delete pMsg1;
 	delete pMsg2;
+
+	_tprintf_s(_T("\n"));
+
+	// ----------------------------------------------------------------
+	// Parallel Example
+	// ----------------------------------------------------------------
+
+	_tprintf_s(_T("Parallel Example\n\n"));
+
+	//Detours::Parallel::Thread DetoursThread(OnThread);
+	Detours::Parallel::Fiber DetoursFiber(OnFiber);
+
+	//_tprintf_s(_T("DetoursThread.Start() = %d\n"), DetoursThread.Start());
+	//_tprintf_s(_T("DetoursThread.Join() = %d\n"), DetoursThread.Join());
+
+	_tprintf_s(_T("DetoursFiber.Switch() = %d\n"), DetoursFiber.Switch());
 
 	_tprintf_s(_T("\n"));
 
