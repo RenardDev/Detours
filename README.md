@@ -20,6 +20,9 @@ A set of tools for working with software modifications.
 # Detours::GetTEB
 * Contains information on the currently running thread.
 
+# Detours::LDR
+* Allows to unlink and link modules.
+
 # Detours::Codec
 * Allows to encode and decode text into different encodings.
 
@@ -31,6 +34,15 @@ A set of tools for working with software modifications.
 
 # Detours::RTTI
 * RTTI search and casting, and VTable search by RTTI.
+
+# Detours::Sync
+* Synchronization management such as Mutex, Semaphore and Critical Sections.
+
+# Detours::Pipe
+* Pipes.
+
+# Detours::Parallel
+* Fibers.
 
 # Detours::Memory
 * Memory management such as Shared Memory, Protection and Pages.
