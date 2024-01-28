@@ -2205,7 +2205,7 @@ namespace Detours {
 
 			unsigned char const* const pSourceData = reinterpret_cast<unsigned char const* const>(pAddress);
 
-			for (size_t unIndex = 0; unIndex < unSize; ++unIndex) {
+			for (size_t unIndex = 0; unIndex < unSize - unDataSize; ++unIndex) {
 				//if (memcmp(pSourceData + unIndex, pData, unDataSize) == 0) {
 				//	return pSourceData + unIndex;
 				//}
