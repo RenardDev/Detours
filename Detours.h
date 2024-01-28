@@ -34,6 +34,24 @@
 // General definitions
 // ----------------------------------------------------------------
 
+// MSVC - Linker
+#define LINKER_OPTION(OPTION) __pragma(comment(linker, OPTION))
+
+// MSVC - Symbols
+#define INCLUDE(SYMBOL_NAME) LINKER_OPTION("/INCLUDE:" SYMBOL_NAME)
+#define SELF_INCLUDE INCLUDE(__FUNCDNAME__)
+#define EXPORT(SYMBOL_NAME, ALIAS_NAME) LINKER_OPTION("/EXPORT:" ALIAS_NAME "=" SYMBOL_NAME)
+#define SELF_EXPORT(ALIAS_NAME) EXPORT(__FUNCDNAME__, ALIAS_NAME)
+
+// MSVC - Sections
+#define SECTION_READONLY "R"
+#define SECTION_READWRITE "RW"
+#define SECTION_EXECUTE_READ "ER"
+#define SECTION_EXECUTE_READWRITE "ERW"
+#define DECLARE_SECTION(NAME) __pragma(section(NAME))
+#define DEFINE_SECTION(NAME, ATTRIBUTES) LINKER_OPTION("/SECTION:" NAME "," ATTRIBUTES)
+#define DEFINE_IN_SECTION(NAME) __declspec(allocate(NAME))
+
 #ifndef PROCESSOR_FEATURE_MAX
 #define PROCESSOR_FEATURE_MAX 64
 #endif // !PROCESSOR_FEATURE_MAX
@@ -61,24 +79,6 @@
 #else
 #error Only x86 and x86_64 platforms are supported.
 #endif
-
-// MSVC - Linker
-#define LINKER_OPTION(OPTION) __pragma(comment(linker, OPTION))
-
-// MSVC - Symbols
-#define INCLUDE(SYMBOL_NAME) LINKER_OPTION("/INCLUDE:" SYMBOL_NAME)
-#define SELF_INCLUDE INCLUDE(__FUNCDNAME__)
-#define EXPORT(SYMBOL_NAME, ALIAS_NAME) LINKER_OPTION("/EXPORT:" ALIAS_NAME "=" SYMBOL_NAME)
-#define SELF_EXPORT(ALIAS_NAME) EXPORT(__FUNCDNAME__, ALIAS_NAME)
-
-// MSVC - Sections
-#define SECTION_READONLY "R"
-#define SECTION_READWRITE "RW"
-#define SECTION_EXECUTE_READ "ER"
-#define SECTION_EXECUTE_READWRITE "ERW"
-#define DECLARE_SECTION(NAME) __pragma(section(NAME))
-#define DEFINE_SECTION(NAME, ATTRIBUTES) LINKER_OPTION("/SECTION:" NAME "," ATTRIBUTES)
-#define DEFINE_IN_SECTION(NAME) __declspec(allocate(NAME))
 
 // rddisasm
 
