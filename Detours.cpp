@@ -1209,27 +1209,31 @@ namespace Detours {
 				return nullptr;
 			}
 
-			unsigned char const* const pData = reinterpret_cast<unsigned char const* const>(pAddress);
+			unsigned char const* const pData = static_cast<unsigned char const*>(pAddress);
 			unsigned char const* const pSignature = reinterpret_cast<unsigned char const* const>(szSignature);
 
-			for (size_t unIndex = 0; unIndex < unSize; ++unIndex) {
-				size_t unSignatureIndex = 0;
+			for (size_t unIndex = 0; unIndex <= unSize - unSignatureLength; ++unIndex) {
+				if ((pData[unIndex] != pSignature[0]) && (pSignature[0] != unIgnoredByte)) {
+					continue;
+				}
+
+				size_t unSignatureIndex = 1;
 				for (; unSignatureIndex < unSignatureLength; ++unSignatureIndex) {
 					const unsigned char unSignatureByte = pSignature[unSignatureIndex];
 					if (unSignatureByte == unIgnoredByte) {
 						continue;
-					} else if (pData[unIndex + unSignatureIndex] != unSignatureByte) {
+					}
+
+					if (pData[unIndex + unSignatureIndex] != unSignatureByte) {
 						break;
 					}
 				}
 
 				if (unSignatureIndex == unSignatureLength) {
-					unsigned char const* pFoundAddress = pData + unIndex;
+					unsigned char const* const pFoundAddress = pData + unIndex;
 
-					if (unHash) {
-						if (!CheckSignatureHash(pFoundAddress, unHash)) {
-							return nullptr;
-						}
+					if (unHash && !CheckSignatureHash(pFoundAddress, unHash)) {
+						return nullptr;
 					}
 
 					return pFoundAddress + unOffset;
@@ -1397,7 +1401,7 @@ namespace Detours {
 				return nullptr;
 			}
 
-			unsigned char const* const pData = reinterpret_cast<unsigned char const* const>(pAddress);
+			unsigned char const* const pData = static_cast<unsigned char const* const>(pAddress);
 			unsigned char const* const pSignature = reinterpret_cast<unsigned char const* const>(szSignature);
 
 			const size_t unDataBytesCycles = unSize / 16;
@@ -1415,23 +1419,21 @@ namespace Detours {
 					const unsigned char unSignatureByte = pSignature[unSignatureIndex];
 					if (unSignatureByte == unIgnoredByte) {
 						continue;
-					} else {
-						const __m128i xmm1 = _mm_loadu_si128(reinterpret_cast<const __m128i*>(pData + unCycleOffset + unSignatureIndex));
-						const __m128i xmm2 = _mm_set1_epi8(static_cast<char>(unSignatureByte));
-
-						const __m128i xmm3 = _mm_cmpeq_epi8(xmm1, xmm2);
-
-						unFound &= _mm_movemask_epi8(xmm3);
 					}
+
+					const __m128i xmm1 = _mm_loadu_si128(reinterpret_cast<const __m128i*>(pData + unCycleOffset + unSignatureIndex));
+					const __m128i xmm2 = _mm_set1_epi8(static_cast<char>(unSignatureByte));
+
+					const __m128i xmm3 = _mm_cmpeq_epi8(xmm1, xmm2);
+
+					unFound &= _mm_movemask_epi8(xmm3);
 				}
 
 				if (unFound != 0) {
-					unsigned char const* pFoundAddress = pData + unCycleOffset + __bit_scan_forward(unFound);
+					unsigned char const* const pFoundAddress = pData + unCycleOffset + __bit_scan_forward(unFound);
 
-					if (unHash) {
-						if (!CheckSignatureHash(pFoundAddress, unHash)) {
-							return nullptr;
-						}
+					if (unHash && !CheckSignatureHash(pFoundAddress, unHash)) {
+						return nullptr;
 					}
 
 					return pFoundAddress + unOffset;
@@ -1604,11 +1606,11 @@ namespace Detours {
 			}
 
 			const size_t unSignatureLength = strnlen_s(szSignature, 0x1000);
-			if (!unSignatureLength || unSize < unSignatureLength) {
+			if (!unSignatureLength || (unSize < unSignatureLength)) {
 				return nullptr;
 			}
 
-			unsigned char const* const pData = reinterpret_cast<unsigned char const* const>(pAddress);
+			unsigned char const* const pData = static_cast<unsigned char const* const>(pAddress);
 			unsigned char const* const pSignature = reinterpret_cast<unsigned char const* const>(szSignature);
 
 			const size_t unDataBytesCycles = unSize / 32;
@@ -1626,23 +1628,21 @@ namespace Detours {
 					const unsigned char unSignatureByte = pSignature[unSignatureIndex];
 					if (unSignatureByte == unIgnoredByte) {
 						continue;
-					} else {
-						const __m256i ymm0 = _mm256_loadu_si256(reinterpret_cast<const __m256i*>(pData + unCycleOffset + unSignatureIndex));
-						const __m256i ymm1 = _mm256_set1_epi8(static_cast<char>(unSignatureByte));
-
-						const __m256i ymm3 = _mm256_cmpeq_epi8(ymm0, ymm1);
-
-						unFound &= _mm256_movemask_epi8(ymm3);
 					}
+
+					const __m256i ymm0 = _mm256_loadu_si256(reinterpret_cast<const __m256i*>(pData + unCycleOffset + unSignatureIndex));
+					const __m256i ymm1 = _mm256_set1_epi8(static_cast<char>(unSignatureByte));
+
+					const __m256i ymm3 = _mm256_cmpeq_epi8(ymm0, ymm1);
+
+					unFound &= _mm256_movemask_epi8(ymm3);
 				}
 
 				if (unFound != 0) {
-					unsigned char const* pFoundAddress = pData + unCycleOffset + __bit_scan_forward(unFound);
+					unsigned char const* const pFoundAddress = pData + unCycleOffset + __bit_scan_forward(unFound);
 
-					if (unHash) {
-						if (!CheckSignatureHash(pFoundAddress, unHash)) {
-							return nullptr;
-						}
+					if (unHash && !CheckSignatureHash(pFoundAddress, unHash)) {
+						return nullptr;
 					}
 
 					return pFoundAddress + unOffset;
@@ -1815,11 +1815,11 @@ namespace Detours {
 			}
 
 			const size_t unSignatureLength = strnlen_s(szSignature, 0x1000);
-			if (!unSignatureLength || unSize < unSignatureLength) {
+			if (!unSignatureLength || (unSize < unSignatureLength)) {
 				return nullptr;
 			}
 
-			unsigned char const* const pData = reinterpret_cast<unsigned char const* const>(pAddress);
+			unsigned char const* const pData = static_cast<unsigned char const* const>(pAddress);
 			unsigned char const* const pSignature = reinterpret_cast<unsigned char const* const>(szSignature);
 
 			const size_t unDataBytesCycles = unSize / 64;
@@ -1837,21 +1837,19 @@ namespace Detours {
 					const unsigned char unSignatureByte = pSignature[unSignatureIndex];
 					if (unSignatureByte == unIgnoredByte) {
 						continue;
-					} else {
-						const __m512i zmm0 = _mm512_loadu_si512(reinterpret_cast<const __m256i*>(pData + unCycleOffset + unSignatureIndex));
-						const __m512i zmm1 = _mm512_set1_epi8(static_cast<char>(unSignatureByte));
-
-						unFound &= _mm512_cmpeq_epi8_mask(zmm0, zmm1);
 					}
+
+					const __m512i zmm0 = _mm512_loadu_si512(reinterpret_cast<const __m256i*>(pData + unCycleOffset + unSignatureIndex));
+					const __m512i zmm1 = _mm512_set1_epi8(static_cast<char>(unSignatureByte));
+
+					unFound &= _mm512_cmpeq_epi8_mask(zmm0, zmm1);
 				}
 
 				if (unFound != 0) {
-					unsigned char const* pFoundAddress = pData + unCycleOffset + __bit_scan_forward(unFound);
+					unsigned char const* const pFoundAddress = pData + unCycleOffset + __bit_scan_forward(unFound);
 
-					if (unHash) {
-						if (!CheckSignatureHash(pFoundAddress, unHash)) {
-							return nullptr;
-						}
+					if (unHash && !CheckSignatureHash(pFoundAddress, unHash)) {
+						return nullptr;
 					}
 
 					return pFoundAddress + unOffset;
