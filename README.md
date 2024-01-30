@@ -2,7 +2,7 @@
 A set of tools for working with software modifications.
 
 # Definitions
-* `LINKER_OPTION` - Passing a parameter to the compiler.
+* `LINKER_OPTION(OPTION)` - Passing a parameter to the compiler.
 * `INCLUDE(SYMBOL_NAME)` - Forces the compiler to include and link the given symbol.
 * `SELF_INCLUDE` - Same as above but easy to use inside a function to include and link the function itself.
 * `EXPORT(SYMBOL_NAME, ALIAS_NAME)` - Exports a symbol under a specific name.
