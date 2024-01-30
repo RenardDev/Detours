@@ -2,14 +2,15 @@
 A set of tools for working with software modifications.
 
 # Definitions
-* `LINKER_OPTION(OPTION)` - Passing a parameter to the compiler.
-* `INCLUDE(SYMBOL_NAME)` - Forces the compiler to include and link the given symbol.
-* `SELF_INCLUDE` - Same as above but easy to use inside a function to include and link the function itself.
-* `EXPORT(SYMBOL_NAME, ALIAS_NAME)` - Exports a symbol under a specific name.
-* `SELF_EXPORT(ALIAS_NAME)` - Same as above but easy to use inside a function to export the function itself.
-* `DECLARE_SECTION(NAME, ATTRIBUTES)` - Declares a new section.
-* `DEFINE_SECTION(NAME)` - Defines a new section.
-* `DEFINE_IN_SECTION(NAME)` - Allocates data to a section.
+* `LINKER_OPTION(OPTION)` - Macro for passing a parameter to the MSVC linker.
+* `INCLUDE(SYMBOL_NAME)` - Macro for forcing the inclusion of a symbol in the build.
+* `SELF_INCLUDE` - Macro for self-inclusion in the build, equivalent to `INCLUDE(FUNCDNAME)`.
+* `EXPORT(SYMBOL_NAME, ALIAS_NAME)` - Macro for exporting a symbol with an alias in MSVC.
+* `SELF_EXPORT(ALIAS_NAME)` - Macro for self-exporting a symbol with an alias, equivalent to `EXPORT(FUNCDNAME, ALIAS_NAME)`.
+* `DECLARE_SECTION(NAME)` - Macro for declaring a section for use with `DEFINE_IN_SECTION`.
+* `DEFINE_SECTION(NAME, ATTRIBUTES)` - Macro for defining or redefining a section with specified attributes.
+* `DEFINE_IN_SECTION(NAME)` - Macro for defining data in a section specified by its name.
+* `DEFINE_IN_CODE_SECTION(NAME)` - Macro for defining code in a section not created by `DECLARE_SECTION` but defined by `DEFINE_SECTION`.
 
 # Detours
 * KUserSharedData - A data area structure that the kernel allocates for sharing with user-mode software.
