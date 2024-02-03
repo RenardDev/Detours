@@ -84269,43 +84269,11 @@ namespace Detours {
 					}
 
 					if (!bIsExecuting) {
-						break;
-					}
-
-					g_Suspender.Resume();
-
-					for (unsigned int i = 0; i < 1'000'000'000UL; ++i) {
-						_mm_pause();
-					}
-
-					if (!g_Suspender.Suspend()) {
-						return false;
-					}
-				}
-			}
-
-			Protection HookProtection(m_pAddress, m_unOriginalBytes, false);
-			if (!HookProtection.ChangeProtection(PAGE_READWRITE)) {
-				g_Suspender.Resume();
-				return false;
-			}
-
-			memcpy(m_pAddress, m_pOriginalBytes.get(), m_unOriginalBytes);
-
-			if (!HookProtection.RestoreProtection()) {
-				__debugbreak();
-				g_Suspender.Resume();
-				return false;
-			}
-
-			if (bWaitForUnHook) {
-				while (true) {
-					bool bIsExecuting = false;
-
-					for (size_t unIndex = 0; unIndex < HOOK_INLINE_TRAMPOLINE_SIZE; ++unIndex) {
-						if (g_Suspender.IsAddressExecuting(reinterpret_cast<unsigned char*>(m_pTrampoline) + unIndex)) {
-							bIsExecuting = true;
-							break;
+						for (size_t unIndex = 0; unIndex < HOOK_INLINE_TRAMPOLINE_SIZE; ++unIndex) {
+							if (g_Suspender.IsAddressExecuting(reinterpret_cast<unsigned char*>(m_pTrampoline) + unIndex)) {
+								bIsExecuting = true;
+								break;
+							}
 						}
 					}
 
@@ -84327,6 +84295,20 @@ namespace Detours {
 				for (size_t unIndex = 0; unIndex < HOOK_INLINE_TRAMPOLINE_SIZE; ++unIndex) {
 					g_Suspender.FixExecutionAddress(reinterpret_cast<unsigned char*>(m_pTrampoline) + unIndex, reinterpret_cast<unsigned char*>(m_pAddress) + unIndex);
 				}
+			}
+
+			Protection HookProtection(m_pAddress, m_unOriginalBytes, false);
+			if (!HookProtection.ChangeProtection(PAGE_READWRITE)) {
+				g_Suspender.Resume();
+				return false;
+			}
+
+			memcpy(m_pAddress, m_pOriginalBytes.get(), m_unOriginalBytes);
+
+			if (!HookProtection.RestoreProtection()) {
+				__debugbreak();
+				g_Suspender.Resume();
+				return false;
 			}
 
 			m_pOriginalBytes = nullptr;
@@ -84834,43 +84816,11 @@ namespace Detours {
 					}
 
 					if (!bIsExecuting) {
-						break;
-					}
-
-					g_Suspender.Resume();
-
-					for (unsigned int i = 0; i < 1'000'000'000UL; ++i) {
-						_mm_pause();
-					}
-
-					if (!g_Suspender.Suspend()) {
-						return false;
-					}
-				}
-			}
-
-			Protection HookProtection(m_pAddress, m_unOriginalBytes, false);
-			if (!HookProtection.ChangeProtection(PAGE_EXECUTE_READWRITE)) {
-				g_Suspender.Resume();
-				return false;
-			}
-
-			memcpy(m_pAddress, m_pOriginalBytes.get(), m_unOriginalBytes);
-
-			if (!HookProtection.RestoreProtection()) {
-				__debugbreak();
-				g_Suspender.Resume();
-				return false;
-			}
-
-			if (bWaitForUnHook) {
-				while (true) {
-					bool bIsExecuting = false;
-
-					for (size_t unIndex = 0; unIndex < HOOK_INLINE_WRAPPER_SIZE; ++unIndex) {
-						if (g_Suspender.IsAddressExecuting(reinterpret_cast<unsigned char*>(m_pWrapper) + unIndex)) {
-							bIsExecuting = true;
-							break;
+						for (size_t unIndex = 0; unIndex < HOOK_INLINE_WRAPPER_SIZE; ++unIndex) {
+							if (g_Suspender.IsAddressExecuting(reinterpret_cast<unsigned char*>(m_pWrapper) + unIndex)) {
+								bIsExecuting = true;
+								break;
+							}
 						}
 					}
 
@@ -84905,6 +84855,20 @@ namespace Detours {
 				for (size_t unIndex = 0; unIndex < HOOK_INLINE_TRAMPOLINE_SIZE; ++unIndex) {
 					g_Suspender.FixExecutionAddress(reinterpret_cast<unsigned char*>(m_pTrampoline) + unIndex, reinterpret_cast<unsigned char*>(m_pAddress) + unIndex);
 				}
+			}
+
+			Protection HookProtection(m_pAddress, m_unOriginalBytes, false);
+			if (!HookProtection.ChangeProtection(PAGE_EXECUTE_READWRITE)) {
+				g_Suspender.Resume();
+				return false;
+			}
+
+			memcpy(m_pAddress, m_pOriginalBytes.get(), m_unOriginalBytes);
+
+			if (!HookProtection.RestoreProtection()) {
+				__debugbreak();
+				g_Suspender.Resume();
+				return false;
 			}
 
 			m_pOriginalBytes = nullptr;
@@ -86461,6 +86425,24 @@ namespace Detours {
 					}
 
 					if (!bIsExecuting) {
+						for (size_t unIndex = 0; unIndex < HOOK_RAW_WRAPPER_SIZE; ++unIndex) {
+							if (g_Suspender.IsAddressExecuting(reinterpret_cast<unsigned char*>(m_pWrapper) + unIndex)) {
+								bIsExecuting = true;
+								break;
+							}
+						}
+					}
+
+					if (!bIsExecuting) {
+						for (size_t unIndex = 0; unIndex < HOOK_RAW_TRAMPOLINE_SIZE; ++unIndex) {
+							if (g_Suspender.IsAddressExecuting(reinterpret_cast<unsigned char*>(m_pTrampoline) + unIndex)) {
+								bIsExecuting = true;
+								break;
+							}
+						}
+					}
+
+					if (!bIsExecuting) {
 						break;
 					}
 
@@ -86473,6 +86455,14 @@ namespace Detours {
 					if (!g_Suspender.Suspend()) {
 						return false;
 					}
+				}
+			} else {
+				for (size_t unIndex = 0; unIndex < HOOK_RAW_WRAPPER_SIZE; ++unIndex) {
+					g_Suspender.FixExecutionAddress(reinterpret_cast<unsigned char*>(m_pWrapper) + unIndex, reinterpret_cast<unsigned char*>(m_pAddress));
+				}
+
+				for (size_t unIndex = 0; unIndex < HOOK_RAW_TRAMPOLINE_SIZE; ++unIndex) {
+					g_Suspender.FixExecutionAddress(reinterpret_cast<unsigned char*>(m_pTrampoline) + unIndex, reinterpret_cast<unsigned char*>(m_pAddress) + unIndex);
 				}
 			}
 
