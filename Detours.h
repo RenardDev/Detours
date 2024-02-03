@@ -1384,6 +1384,7 @@ namespace Detours {
 	} TEB, *PTEB;
 
 	PTEB GetTEB();
+	PTEB GetTEB(HANDLE hThread);
 
 	// ----------------------------------------------------------------
 	// LDR
@@ -2203,6 +2204,7 @@ namespace Detours {
 		public:
 			bool Suspend();
 			void Resume();
+			bool IsAddressExecuting(void* pAddress);
 			void FixExecutionAddress(void* pAddress, void* pNewAddress);
 
 		private:
@@ -5701,8 +5703,8 @@ namespace Detours {
 			bool Release();
 
 		public:
-			bool Hook(void* pHookAddress, bool bSingleInstructionOnly = false);
-			bool UnHook();
+			bool Hook(void* pHookAddress, bool bSingleInstructionOnly = false, bool bWaitForHook = true);
+			bool UnHook(bool bWaitForUnHook = true);
 
 		public:
 			void* GetTrampoline() const;
@@ -5730,8 +5732,8 @@ namespace Detours {
 			bool Release();
 
 		public:
-			bool Hook(void* pHookAddress, bool bSingleInstructionOnly = true);
-			bool UnHook();
+			bool Hook(void* pHookAddress, bool bSingleInstructionOnly = true, bool bWaitForHook = true);
+			bool UnHook(bool bWaitForUnHook = true);
 
 		public:
 			void* GetTrampoline() const;
@@ -6511,8 +6513,8 @@ namespace Detours {
 			bool Release();
 
 		public:
-			bool Hook(const fnRawHookCallBack pCallBack, bool bNative = false, const unsigned int unReserveStackSize = 0, bool bSingleInstructionOnly = false);
-			bool UnHook();
+			bool Hook(const fnRawHookCallBack pCallBack, bool bNative = false, const unsigned int unReserveStackSize = 0, bool bSingleInstructionOnly = false, bool bWaitForHook = true);
+			bool UnHook(bool bWaitForUnHook = true);
 
 		public:
 			void* GetTrampoline() const;

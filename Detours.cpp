@@ -171,12 +171,55 @@ namespace Detours {
 	// TEB
 	// ----------------------------------------------------------------
 
+	enum THREADINFOCLASS {
+		ThreadBasicInformation,
+	};
+
+	typedef struct _THREAD_BASIC_INFORMATION {
+		NTSTATUS ExitStatus;
+		PVOID TebBaseAddress;
+		CLIENT_ID ClientId;
+		KAFFINITY AffinityMask;
+		DWORD Priority;
+		DWORD BasePriority;
+	} THREAD_BASIC_INFORMATION, *PTHREAD_BASIC_INFORMATION;
+
+	using fnNtQueryInformationThread = LONG(__stdcall*)(HANDLE ThreadHandle, THREADINFOCLASS ThreadInformationClass, PVOID ThreadInformation, ULONG ThreadInformationLength, PULONG ReturnLength);
+
 	PTEB GetTEB() {
 #ifdef _M_X64
 		return reinterpret_cast<PTEB>(__readgsqword(0x30));
 #elif _M_IX86
 		return reinterpret_cast<PTEB>(__readfsdword(0x18));
 #endif
+	}
+
+	PTEB GetTEB(HANDLE hThread) {
+		if (!hThread || (hThread == INVALID_HANDLE_VALUE)) {
+			return nullptr;
+		}
+
+		static fnNtQueryInformationThread NtQueryInformationThread = nullptr;
+		if (!NtQueryInformationThread) {
+			HMODULE hNTDLL = GetModuleHandle(_T("ntdll.dll"));
+			if (!hNTDLL) {
+				return nullptr;
+			}
+
+			NtQueryInformationThread = reinterpret_cast<fnNtQueryInformationThread>(GetProcAddress(hNTDLL, "NtQueryInformationThread"));
+			if (!NtQueryInformationThread) {
+				return nullptr;
+			}
+		}
+
+		THREAD_BASIC_INFORMATION tbi;
+		memset(&tbi, 0, sizeof(tbi));
+
+		if (NtQueryInformationThread(hThread, ThreadBasicInformation, &tbi, sizeof(tbi), nullptr) != 0) {
+			return nullptr;
+		}
+
+		return static_cast<PTEB>(tbi.TebBaseAddress);
 	}
 
 	// ----------------------------------------------------------------
@@ -4675,9 +4718,11 @@ namespace Detours {
 
 			do {
 				if ((pTEB->ClientId.UniqueProcess == te.th32OwnerProcessID) && (pTEB->ClientId.UniqueThread != te.th32ThreadID)) {
-					HANDLE hThread = OpenThread(THREAD_SUSPEND_RESUME, FALSE, te.th32ThreadID);
+					HANDLE hThread = OpenThread(THREAD_QUERY_LIMITED_INFORMATION | THREAD_SUSPEND_RESUME | THREAD_GET_CONTEXT | THREAD_SET_CONTEXT, FALSE, te.th32ThreadID);
 					if (hThread && (hThread != INVALID_HANDLE_VALUE)) {
-						SuspendThread(hThread);
+						if (SuspendThread(hThread) == static_cast<DWORD>(-1)) {
+							continue;
+						}
 
 						CONTEXT ctx;
 						memset(&ctx, 0, sizeof(CONTEXT));
@@ -4715,7 +4760,33 @@ namespace Detours {
 			m_Threads.clear();
 		}
 
+		bool Suspender::IsAddressExecuting(void* pAddress) {
+			if (!pAddress) {
+				return false;
+			}
+
+			for (auto& thread : m_Threads) {
+				auto pTEB = GetTEB(thread.m_hHandle);
+				if (!pTEB) {
+					continue;
+				}
+
+				auto pFoundAddress = FindData(pTEB->NtTib.StackLimit, reinterpret_cast<size_t>(pTEB->NtTib.StackBase) - reinterpret_cast<size_t>(pTEB->NtTib.StackLimit) - 1, reinterpret_cast<unsigned char const* const>(&pAddress), sizeof(void*));
+				if (!pFoundAddress) {
+					continue;
+				}
+
+				return true;
+			}
+
+			return false;
+		}
+
 		void Suspender::FixExecutionAddress(void* pAddress, void* pNewAddress) {
+			if (!pAddress || pNewAddress) {
+				return;
+			}
+
 			for (auto& thread : m_Threads) {
 #ifdef _M_X64
 				DWORD64 unIP = thread.m_CTX.Rip;
@@ -5616,7 +5687,7 @@ namespace Detours {
 
 				// [unAddress; unEnd] - From unAddress to unEnd (Forward)
 				for (size_t unAddress = reinterpret_cast<size_t>(pDesiredAddress); unAddress < unEnd; unAddress = __align_up(unAddress + static_cast<size_t>(unAllocationGranularity) - 1, static_cast<size_t>(unAllocationGranularity))) {
-					if (!VirtualQuery(reinterpret_cast<void*>(unAddress), &mbi, sizeof(mbi))) {
+					if (VirtualQuery(reinterpret_cast<void*>(unAddress), &mbi, sizeof(mbi)) != sizeof(mbi)) {
 						break;
 					}
 
@@ -5637,7 +5708,7 @@ namespace Detours {
 				// [unAddress; unBegin] - From unAddress to unBegin (Backward)
 				if (!m_pPageAddress) {
 					for (size_t unAddress = reinterpret_cast<size_t>(pDesiredAddress); unAddress > unBegin; unAddress = __align_down(unAddress - 1, static_cast<size_t>(unAllocationGranularity))) {
-						if (!VirtualQuery(reinterpret_cast<void*>(unAddress), &mbi, sizeof(mbi))) {
+						if (VirtualQuery(reinterpret_cast<void*>(unAddress), &mbi, sizeof(mbi)) != sizeof(mbi)) {
 							break;
 						}
 
@@ -6082,14 +6153,7 @@ namespace Detours {
 				return;
 			}
 
-			MEMORY_BASIC_INFORMATION mbi;
-			memset(&mbi, 0, sizeof(mbi));
-
-			if (!VirtualQuery(m_pAddress, &mbi, sizeof(mbi))) {
-				return;
-			}
-
-			m_unOriginalProtection = mbi.Protect;
+			GetProtection(&m_unOriginalProtection);
 		}
 
 		Protection::~Protection() {
@@ -6097,8 +6161,7 @@ namespace Detours {
 				return;
 			}
 
-			DWORD unProtection = 0;
-			VirtualProtect(const_cast<void*>(m_pAddress), m_unSize, m_unOriginalProtection, &unProtection);
+			ChangeProtection(m_unOriginalProtection);
 		}
 
 		bool Protection::GetProtection(const PDWORD pProtection) {
@@ -6109,7 +6172,7 @@ namespace Detours {
 			MEMORY_BASIC_INFORMATION mbi;
 			memset(&mbi, 0, sizeof(mbi));
 
-			if (!VirtualQuery(m_pAddress, &mbi, sizeof(mbi))) {
+			if (VirtualQuery(m_pAddress, &mbi, sizeof(mbi)) != sizeof(mbi)) {
 				return false;
 			}
 
@@ -6129,7 +6192,7 @@ namespace Detours {
 				MEMORY_BASIC_INFORMATION mbi;
 				memset(&mbi, 0, sizeof(mbi));
 
-				if (!VirtualQuery(m_pAddress, &mbi, sizeof(mbi))) {
+				if (VirtualQuery(m_pAddress, &mbi, sizeof(mbi)) != sizeof(mbi)) {
 					return false;
 				}
 
@@ -6151,8 +6214,7 @@ namespace Detours {
 				return false;
 			}
 
-			DWORD unProtection = 0;
-			if (!VirtualProtect(const_cast<void*>(m_pAddress), m_unSize, m_unOriginalProtection, &unProtection)) {
+			if (!ChangeProtection(m_unOriginalProtection)) {
 				return false;
 			}
 
@@ -83859,7 +83921,7 @@ namespace Detours {
 			return true;
 		}
 
-		bool InlineHook::Hook(void* pHookAddress, bool bSingleInstructionOnly) {
+		bool InlineHook::Hook(void* pHookAddress, bool bSingleInstructionOnly, bool bWaitForHook) {
 			if (!g_Suspender.Suspend()) {
 				return false;
 			}
@@ -84079,6 +84141,38 @@ namespace Detours {
 
 			memcpy(m_pOriginalBytes.get(), m_pAddress, unCopyingSize);
 
+			if (bWaitForHook) {
+				while (true) {
+					bool bIsExecuting = false;
+
+					for (size_t unIndex = 0; unIndex < unCopyingSize; ++unIndex) {
+						if (g_Suspender.IsAddressExecuting(reinterpret_cast<unsigned char*>(m_pAddress) + unIndex)) {
+							bIsExecuting = true;
+							break;
+						}
+					}
+
+					if (!bIsExecuting) {
+						break;
+					}
+
+					g_Suspender.Resume();
+
+					for (unsigned int i = 0; i < 1'000'000'000UL; ++i) {
+						_mm_pause();
+					}
+
+					if (!g_Suspender.Suspend()) {
+						m_pOriginalBytes = nullptr;
+						m_unOriginalBytes = 0;
+						g_HookStorage.DeAlloc(m_pTrampoline);
+						m_pTrampoline = nullptr;
+						g_Suspender.Resume();
+						return false;
+					}
+				}
+			}
+
 			Protection JumpToHookProtection(m_pAddress, unCopyingSize, false);
 			if (!JumpToHookProtection.ChangeProtection(PAGE_READWRITE)) {
 				m_pOriginalBytes = nullptr;
@@ -84139,13 +84233,21 @@ namespace Detours {
 #endif
 			}
 
-			JumpToHookProtection.RestoreProtection();
+			if (!JumpToHookProtection.RestoreProtection()) {
+				m_pOriginalBytes = nullptr;
+				m_unOriginalBytes = 0;
+				g_HookStorage.DeAlloc(m_pTrampoline);
+				m_pTrampoline = nullptr;
+				__debugbreak();
+				g_Suspender.Resume();
+				return false;
+			}
 
 			g_Suspender.Resume();
 			return true;
 		}
 
-		bool InlineHook::UnHook() {
+		bool InlineHook::UnHook(bool bWaitForUnHook) {
 			if (!g_Suspender.Suspend()) {
 				return false;
 			}
@@ -84155,8 +84257,31 @@ namespace Detours {
 				return false;
 			}
 
-			for (size_t unIndex = 0; unIndex < HOOK_INLINE_TRAMPOLINE_SIZE; ++unIndex) {
-				g_Suspender.FixExecutionAddress(reinterpret_cast<unsigned char*>(m_pTrampoline) + unIndex, reinterpret_cast<unsigned char*>(m_pAddress) + unIndex);
+			if (bWaitForUnHook) {
+				while (true) {
+					bool bIsExecuting = false;
+
+					for (size_t unIndex = 0; unIndex < m_unOriginalBytes; ++unIndex) {
+						if (g_Suspender.IsAddressExecuting(reinterpret_cast<unsigned char*>(m_pAddress) + unIndex)) {
+							bIsExecuting = true;
+							break;
+						}
+					}
+
+					if (!bIsExecuting) {
+						break;
+					}
+
+					g_Suspender.Resume();
+
+					for (unsigned int i = 0; i < 1'000'000'000UL; ++i) {
+						_mm_pause();
+					}
+
+					if (!g_Suspender.Suspend()) {
+						return false;
+					}
+				}
 			}
 
 			Protection HookProtection(m_pAddress, m_unOriginalBytes, false);
@@ -84167,7 +84292,42 @@ namespace Detours {
 
 			memcpy(m_pAddress, m_pOriginalBytes.get(), m_unOriginalBytes);
 
-			HookProtection.RestoreProtection();
+			if (!HookProtection.RestoreProtection()) {
+				__debugbreak();
+				g_Suspender.Resume();
+				return false;
+			}
+
+			if (bWaitForUnHook) {
+				while (true) {
+					bool bIsExecuting = false;
+
+					for (size_t unIndex = 0; unIndex < HOOK_INLINE_TRAMPOLINE_SIZE; ++unIndex) {
+						if (g_Suspender.IsAddressExecuting(reinterpret_cast<unsigned char*>(m_pTrampoline) + unIndex)) {
+							bIsExecuting = true;
+							break;
+						}
+					}
+
+					if (!bIsExecuting) {
+						break;
+					}
+
+					g_Suspender.Resume();
+
+					for (unsigned int i = 0; i < 1'000'000'000UL; ++i) {
+						_mm_pause();
+					}
+
+					if (!g_Suspender.Suspend()) {
+						return false;
+					}
+				}
+			} else {
+				for (size_t unIndex = 0; unIndex < HOOK_INLINE_TRAMPOLINE_SIZE; ++unIndex) {
+					g_Suspender.FixExecutionAddress(reinterpret_cast<unsigned char*>(m_pTrampoline) + unIndex, reinterpret_cast<unsigned char*>(m_pAddress) + unIndex);
+				}
+			}
 
 			m_pOriginalBytes = nullptr;
 			m_unOriginalBytes = 0;
@@ -84240,7 +84400,7 @@ namespace Detours {
 			return true;
 		}
 
-		bool InlineWrapperHook::Hook(void* pHookAddress, bool bSingleInstructionOnly) {
+		bool InlineWrapperHook::Hook(void* pHookAddress, bool bSingleInstructionOnly, bool bWaitForHook) {
 			if (!g_Suspender.Suspend()) {
 				return false;
 			}
@@ -84314,6 +84474,8 @@ namespace Detours {
 				unJumpToWrapperSize = 5;
 			} else {
 				if (bSingleInstructionOnly) {
+					g_HookStorage.DeAlloc(m_pWrapper);
+					m_pWrapper = nullptr;
 					g_Suspender.Resume();
 					return false;
 				}
@@ -84337,6 +84499,8 @@ namespace Detours {
 #elif _M_IX86
 				if (!RD_SUCCESS(RdDecode(&ins, reinterpret_cast<unsigned char*>(m_pAddress) + unCopyingSize, RD_CODE_32, RD_DATA_32))) {
 #endif
+					g_HookStorage.DeAlloc(m_pWrapper);
+					m_pWrapper = nullptr;
 					g_Suspender.Resume();
 					return false;
 				}
@@ -84345,12 +84509,16 @@ namespace Detours {
 			}
 
 			if (unCopyingSize >= HOOK_INLINE_TRAMPOLINE_SIZE) {
+				g_HookStorage.DeAlloc(m_pWrapper);
+				m_pWrapper = nullptr;
 				g_Suspender.Resume();
 				return false;
 			}
 
 			m_pTrampoline = g_HookStorage.Alloc(HOOK_INLINE_TRAMPOLINE_SIZE, m_pAddress);
 			if (!m_pTrampoline) {
+				g_HookStorage.DeAlloc(m_pWrapper);
+				m_pWrapper = nullptr;
 				g_Suspender.Resume();
 				return false;
 			}
@@ -84358,6 +84526,8 @@ namespace Detours {
 			if (!Protection(m_pTrampoline, HOOK_INLINE_TRAMPOLINE_SIZE, false).ChangeProtection(PAGE_READWRITE)) {
 				g_HookStorage.DeAlloc(m_pTrampoline);
 				m_pTrampoline = nullptr;
+				g_HookStorage.DeAlloc(m_pWrapper);
+				m_pWrapper = nullptr;
 				g_Suspender.Resume();
 				return false;
 			}
@@ -84382,6 +84552,8 @@ namespace Detours {
 			if (unCopyingSize + unJumpFromTrampolineSize > HOOK_INLINE_TRAMPOLINE_SIZE) {
 				g_HookStorage.DeAlloc(m_pTrampoline);
 				m_pTrampoline = nullptr;
+				g_HookStorage.DeAlloc(m_pWrapper);
+				m_pWrapper = nullptr;
 				g_Suspender.Resume();
 				return false;
 			}
@@ -84397,6 +84569,8 @@ namespace Detours {
 #endif
 					g_HookStorage.DeAlloc(m_pTrampoline);
 					m_pTrampoline = nullptr;
+					g_HookStorage.DeAlloc(m_pWrapper);
+					m_pWrapper = nullptr;
 					g_Suspender.Resume();
 					return false;
 				}
@@ -84421,6 +84595,8 @@ namespace Detours {
 						default:
 							g_HookStorage.DeAlloc(m_pTrampoline);
 							m_pTrampoline = nullptr;
+							g_HookStorage.DeAlloc(m_pWrapper);
+							m_pWrapper = nullptr;
 							g_Suspender.Resume();
 							return false;
 					}
@@ -84441,6 +84617,8 @@ namespace Detours {
 						default:
 							g_HookStorage.DeAlloc(m_pTrampoline);
 							m_pTrampoline = nullptr;
+							g_HookStorage.DeAlloc(m_pWrapper);
+							m_pWrapper = nullptr;
 							g_Suspender.Resume();
 							return false;
 					}
@@ -84501,6 +84679,8 @@ namespace Detours {
 			if (!Protection(m_pTrampoline, HOOK_INLINE_TRAMPOLINE_SIZE, false).ChangeProtection(PAGE_EXECUTE_READ)) {
 				g_HookStorage.DeAlloc(m_pTrampoline);
 				m_pTrampoline = nullptr;
+				g_HookStorage.DeAlloc(m_pWrapper);
+				m_pWrapper = nullptr;
 				g_Suspender.Resume();
 				return false;
 			}
@@ -84512,11 +84692,47 @@ namespace Detours {
 				m_unOriginalBytes = 0;
 				g_HookStorage.DeAlloc(m_pTrampoline);
 				m_pTrampoline = nullptr;
+				g_HookStorage.DeAlloc(m_pWrapper);
+				m_pWrapper = nullptr;
 				g_Suspender.Resume();
 				return false;
 			}
 
 			memcpy(m_pOriginalBytes.get(), m_pAddress, unCopyingSize);
+
+			if (bWaitForHook) {
+				while (true) {
+					bool bIsExecuting = false;
+
+					for (size_t unIndex = 0; unIndex < unCopyingSize; ++unIndex) {
+						if (g_Suspender.IsAddressExecuting(reinterpret_cast<unsigned char*>(m_pAddress) + unIndex)) {
+							bIsExecuting = true;
+							break;
+						}
+					}
+
+					if (!bIsExecuting) {
+						break;
+					}
+
+					g_Suspender.Resume();
+
+					for (unsigned int i = 0; i < 1'000'000'000UL; ++i) {
+						_mm_pause();
+					}
+
+					if (!g_Suspender.Suspend()) {
+						m_pOriginalBytes = nullptr;
+						m_unOriginalBytes = 0;
+						g_HookStorage.DeAlloc(m_pTrampoline);
+						m_pTrampoline = nullptr;
+						g_HookStorage.DeAlloc(m_pWrapper);
+						m_pWrapper = nullptr;
+						g_Suspender.Resume();
+						return false;
+					}
+				}
+			}
 
 			Protection JumpToHookProtection(m_pAddress, unCopyingSize, false);
 			if (!JumpToHookProtection.ChangeProtection(PAGE_READWRITE)) {
@@ -84524,6 +84740,8 @@ namespace Detours {
 				m_unOriginalBytes = 0;
 				g_HookStorage.DeAlloc(m_pTrampoline);
 				m_pTrampoline = nullptr;
+				g_HookStorage.DeAlloc(m_pWrapper);
+				m_pWrapper = nullptr;
 				g_Suspender.Resume();
 				return false;
 			}
@@ -84578,13 +84796,23 @@ namespace Detours {
 #endif
 			}
 
-			JumpToHookProtection.RestoreProtection();
+			if (!JumpToHookProtection.RestoreProtection()) {
+				m_pOriginalBytes = nullptr;
+				m_unOriginalBytes = 0;
+				g_HookStorage.DeAlloc(m_pTrampoline);
+				m_pTrampoline = nullptr;
+				g_HookStorage.DeAlloc(m_pWrapper);
+				m_pWrapper = nullptr;
+				__debugbreak();
+				g_Suspender.Resume();
+				return false;
+			}
 
 			g_Suspender.Resume();
 			return true;
 		}
 
-		bool InlineWrapperHook::UnHook() {
+		bool InlineWrapperHook::UnHook(bool bWaitForUnHook) {
 			if (!g_Suspender.Suspend()) {
 				return false;
 			}
@@ -84594,23 +84822,90 @@ namespace Detours {
 				return false;
 			}
 
-			for (size_t unIndex = 0; unIndex < HOOK_INLINE_WRAPPER_SIZE; ++unIndex) {
-				g_Suspender.FixExecutionAddress(reinterpret_cast<unsigned char*>(m_pWrapper) + unIndex, reinterpret_cast<unsigned char*>(m_pAddress));
-			}
+			if (bWaitForUnHook) {
+				while (true) {
+					bool bIsExecuting = false;
 
-			for (size_t unIndex = 0; unIndex < HOOK_INLINE_TRAMPOLINE_SIZE; ++unIndex) {
-				g_Suspender.FixExecutionAddress(reinterpret_cast<unsigned char*>(m_pTrampoline) + unIndex, reinterpret_cast<unsigned char*>(m_pAddress) + unIndex);
+					for (size_t unIndex = 0; unIndex < m_unOriginalBytes; ++unIndex) {
+						if (g_Suspender.IsAddressExecuting(reinterpret_cast<unsigned char*>(m_pAddress) + unIndex)) {
+							bIsExecuting = true;
+							break;
+						}
+					}
+
+					if (!bIsExecuting) {
+						break;
+					}
+
+					g_Suspender.Resume();
+
+					for (unsigned int i = 0; i < 1'000'000'000UL; ++i) {
+						_mm_pause();
+					}
+
+					if (!g_Suspender.Suspend()) {
+						return false;
+					}
+				}
 			}
 
 			Protection HookProtection(m_pAddress, m_unOriginalBytes, false);
-			if (!HookProtection.ChangeProtection(PAGE_READWRITE)) {
+			if (!HookProtection.ChangeProtection(PAGE_EXECUTE_READWRITE)) {
 				g_Suspender.Resume();
 				return false;
 			}
 
 			memcpy(m_pAddress, m_pOriginalBytes.get(), m_unOriginalBytes);
 
-			HookProtection.RestoreProtection();
+			if (!HookProtection.RestoreProtection()) {
+				__debugbreak();
+				g_Suspender.Resume();
+				return false;
+			}
+
+			if (bWaitForUnHook) {
+				while (true) {
+					bool bIsExecuting = false;
+
+					for (size_t unIndex = 0; unIndex < HOOK_INLINE_WRAPPER_SIZE; ++unIndex) {
+						if (g_Suspender.IsAddressExecuting(reinterpret_cast<unsigned char*>(m_pWrapper) + unIndex)) {
+							bIsExecuting = true;
+							break;
+						}
+					}
+
+					if (!bIsExecuting) {
+						for (size_t unIndex = 0; unIndex < HOOK_INLINE_TRAMPOLINE_SIZE; ++unIndex) {
+							if (g_Suspender.IsAddressExecuting(reinterpret_cast<unsigned char*>(m_pTrampoline) + unIndex)) {
+								bIsExecuting = true;
+								break;
+							}
+						}
+					}
+
+					if (!bIsExecuting) {
+						break;
+					}
+
+					g_Suspender.Resume();
+
+					for (unsigned int i = 0; i < 1'000'000'000UL; ++i) {
+						_mm_pause();
+					}
+
+					if (!g_Suspender.Suspend()) {
+						return false;
+					}
+				}
+			} else {
+				for (size_t unIndex = 0; unIndex < HOOK_INLINE_WRAPPER_SIZE; ++unIndex) {
+					g_Suspender.FixExecutionAddress(reinterpret_cast<unsigned char*>(m_pWrapper) + unIndex, reinterpret_cast<unsigned char*>(m_pAddress));
+				}
+
+				for (size_t unIndex = 0; unIndex < HOOK_INLINE_TRAMPOLINE_SIZE; ++unIndex) {
+					g_Suspender.FixExecutionAddress(reinterpret_cast<unsigned char*>(m_pTrampoline) + unIndex, reinterpret_cast<unsigned char*>(m_pAddress) + unIndex);
+				}
+			}
 
 			m_pOriginalBytes = nullptr;
 			m_unOriginalBytes = 0;
@@ -84689,7 +84984,7 @@ namespace Detours {
 			return true;
 		}
 
-		bool RawHook::Hook(const fnRawHookCallBack pCallBack, bool bNative, const unsigned int unReservedStackSize, bool bSingleInstructionOnly) {
+		bool RawHook::Hook(const fnRawHookCallBack pCallBack, bool bNative, const unsigned int unReservedStackSize, bool bSingleInstructionOnly, bool bWaitForHook) {
 			if (!g_Suspender.Suspend()) {
 				return false;
 			}
@@ -86028,6 +86323,40 @@ namespace Detours {
 
 			memcpy(m_pOriginalBytes.get(), m_pAddress, unCopyingSize);
 
+			if (bWaitForHook) {
+				while (true) {
+					bool bIsExecuting = false;
+
+					for (size_t unIndex = 0; unIndex < unCopyingSize; ++unIndex) {
+						if (g_Suspender.IsAddressExecuting(reinterpret_cast<unsigned char*>(m_pAddress) + unIndex)) {
+							bIsExecuting = true;
+							break;
+						}
+					}
+
+					if (!bIsExecuting) {
+						break;
+					}
+
+					g_Suspender.Resume();
+
+					for (unsigned int i = 0; i < 1'000'000'000UL; ++i) {
+						_mm_pause();
+					}
+
+					if (!g_Suspender.Suspend()) {
+						m_pOriginalBytes = nullptr;
+						m_unOriginalBytes = 0;
+						g_HookStorage.DeAlloc(m_pTrampoline);
+						m_pTrampoline = nullptr;
+						m_unFirstInstructionSize = 0;
+						g_HookStorage.DeAlloc(m_pWrapper);
+						m_pWrapper = nullptr;
+						return false;
+					}
+				}
+			}
+
 			Protection JumpToHookProtection(m_pAddress, unCopyingSize, false);
 			if (!JumpToHookProtection.ChangeProtection(PAGE_READWRITE)) {
 				m_pOriginalBytes = nullptr;
@@ -86093,13 +86422,24 @@ namespace Detours {
 #endif
 			}
 
-			JumpToHookProtection.RestoreProtection();
+			if (!JumpToHookProtection.RestoreProtection()) {
+				m_pOriginalBytes = nullptr;
+				m_unOriginalBytes = 0;
+				g_HookStorage.DeAlloc(m_pTrampoline);
+				m_pTrampoline = nullptr;
+				m_unFirstInstructionSize = 0;
+				g_HookStorage.DeAlloc(m_pWrapper);
+				m_pWrapper = nullptr;
+				__debugbreak();
+				g_Suspender.Resume();
+				return false;
+			}
 
 			g_Suspender.Resume();
 			return true;
 		}
 
-		bool RawHook::UnHook() {
+		bool RawHook::UnHook(bool bWaitForUnHook) {
 			if (!g_Suspender.Suspend()) {
 				return false;
 			}
@@ -86109,12 +86449,31 @@ namespace Detours {
 				return false;
 			}
 
-			for (size_t unIndex = 0; unIndex < HOOK_RAW_WRAPPER_SIZE; ++unIndex) {
-				g_Suspender.FixExecutionAddress(reinterpret_cast<unsigned char*>(m_pWrapper) + unIndex, reinterpret_cast<unsigned char*>(m_pAddress));
-			}
+			if (bWaitForUnHook) {
+				while (true) {
+					bool bIsExecuting = false;
 
-			for (size_t unIndex = 0; unIndex < HOOK_RAW_TRAMPOLINE_SIZE; ++unIndex) {
-				g_Suspender.FixExecutionAddress(reinterpret_cast<unsigned char*>(m_pTrampoline) + unIndex, reinterpret_cast<unsigned char*>(m_pAddress) + unIndex);
+					for (size_t unIndex = 0; unIndex < m_unOriginalBytes; ++unIndex) {
+						if (g_Suspender.IsAddressExecuting(reinterpret_cast<unsigned char*>(m_pAddress) + unIndex)) {
+							bIsExecuting = true;
+							break;
+						}
+					}
+
+					if (!bIsExecuting) {
+						break;
+					}
+
+					g_Suspender.Resume();
+
+					for (unsigned int i = 0; i < 1'000'000'000UL; ++i) {
+						_mm_pause();
+					}
+
+					if (!g_Suspender.Suspend()) {
+						return false;
+					}
+				}
 			}
 
 			Protection HookProtection(m_pAddress, m_unOriginalBytes, false);
@@ -86125,7 +86484,55 @@ namespace Detours {
 
 			memcpy(m_pAddress, m_pOriginalBytes.get(), m_unOriginalBytes);
 
-			HookProtection.RestoreProtection();
+			if (!HookProtection.RestoreProtection()) {
+				__debugbreak();
+				g_Suspender.Resume();
+				return false;
+			}
+
+			if (bWaitForUnHook) {
+				while (true) {
+					bool bIsExecuting = false;
+
+					for (size_t unIndex = 0; unIndex < HOOK_RAW_WRAPPER_SIZE; ++unIndex) {
+						if (g_Suspender.IsAddressExecuting(reinterpret_cast<unsigned char*>(m_pWrapper) + unIndex)) {
+							bIsExecuting = true;
+							break;
+						}
+					}
+
+					if (!bIsExecuting) {
+						for (size_t unIndex = 0; unIndex < HOOK_RAW_TRAMPOLINE_SIZE; ++unIndex) {
+							if (g_Suspender.IsAddressExecuting(reinterpret_cast<unsigned char*>(m_pTrampoline) + unIndex)) {
+								bIsExecuting = true;
+								break;
+							}
+						}
+					}
+
+					if (!bIsExecuting) {
+						break;
+					}
+
+					g_Suspender.Resume();
+
+					for (unsigned int i = 0; i < 1'000'000'000UL; ++i) {
+						_mm_pause();
+					}
+
+					if (!g_Suspender.Suspend()) {
+						return false;
+					}
+				}
+			} else {
+				for (size_t unIndex = 0; unIndex < HOOK_RAW_WRAPPER_SIZE; ++unIndex) {
+					g_Suspender.FixExecutionAddress(reinterpret_cast<unsigned char*>(m_pWrapper) + unIndex, reinterpret_cast<unsigned char*>(m_pAddress));
+				}
+
+				for (size_t unIndex = 0; unIndex < HOOK_RAW_TRAMPOLINE_SIZE; ++unIndex) {
+					g_Suspender.FixExecutionAddress(reinterpret_cast<unsigned char*>(m_pTrampoline) + unIndex, reinterpret_cast<unsigned char*>(m_pAddress) + unIndex);
+				}
+			}
 
 			m_pOriginalBytes = nullptr;
 			m_unOriginalBytes = 0;
