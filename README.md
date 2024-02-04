@@ -18,14 +18,6 @@ A set of tools for working with software modifications.
 * GetTEB - Gets *Thread Environment Block* (TEB) of the current thread or thread from a handle.
 
 # Detours::LDR
-* InitializeListHead - Initializes a doubly linked list head.
-* InsertHeadList - Inserts a new entry at the beginning of the list.
-* InsertTailList - Inserts a new entry at the end of the list.
-* RemoveEntryList - Removes a specified entry from the list.
-* RemoveHeadList - Removes the entry at the beginning of the list.
-* RemoveTailList - Removes the entry at the end of the list.
-* GetListHeadFromEntry - Retrieves the list head from a given entry.
-* GetHeadsOfLists - Retrieves the heads of three different lists (Load Order, Memory Order, and Initialization Order) used for module management.
 * FindModuleListEntry - Finds a module list entry.
 * FindModuleDataTableEntry - Finds a module data table entry.
 * LINK_DATA - A structure containing pointers to various linked lists related to module loading.
