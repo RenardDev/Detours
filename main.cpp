@@ -1690,9 +1690,9 @@ int _tmain(int nArguments, PTCHAR* pArguments) {
 	_tprintf_s(_T("kernel32.dll = 0x%08X\n"), reinterpret_cast<size_t>(GetModuleHandle(_T("kernel32.dll"))));
 #endif
 
-	if (Detours::LDR::ReLinkModule(ld)) {
-		_tprintf_s(_T("ReLinked\n"));
-	}
+	Detours::LDR::ReLinkModule(ld);
+
+	_tprintf_s(_T("ReLinked\n"));
 
 #ifdef _M_X64
 	_tprintf_s(_T("kernel32.dll = 0x%016llX\n"), reinterpret_cast<size_t>(GetModuleHandle(_T("kernel32.dll"))));

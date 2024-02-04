@@ -1393,25 +1393,6 @@ namespace Detours {
 	namespace LDR {
 
 		// ----------------------------------------------------------------
-		// List Entry APIs
-		// ----------------------------------------------------------------
-
-		void InitializeListHead(PLIST_ENTRY pListHead);
-		void InsertHeadList(PLIST_ENTRY pListHead, PLIST_ENTRY pEntry);
-		void InsertTailList(PLIST_ENTRY pListHead, PLIST_ENTRY pEntry);
-		void RemoveEntryList(PLIST_ENTRY pEntry);
-		void RemoveHeadList(PLIST_ENTRY pListHead);
-		void RemoveTailList(PLIST_ENTRY pListHead);
-
-		PLIST_ENTRY GetListHeadFromEntry(PLIST_ENTRY pEntry);
-
-		// ----------------------------------------------------------------
-		// GetHeadsOfLists
-		// ----------------------------------------------------------------
-
-		bool GetHeadsOfLists(PLIST_ENTRY* pInLoadOrderModuleList, PLIST_ENTRY* pInMemoryOrderModuleList, PLIST_ENTRY* pInInitializationOrderModuleList);
-
-		// ----------------------------------------------------------------
 		// FindModuleListEntry
 		// ----------------------------------------------------------------
 
@@ -1444,11 +1425,7 @@ namespace Detours {
 		// ----------------------------------------------------------------
 
 		typedef struct _LINK_DATA {
-			PLIST_ENTRY m_pHeadInLoadOrderLinks;
-			PLIST_ENTRY m_pHeadInMemoryOrderLinks;
-			PLIST_ENTRY m_pHeadInInitializationOrderLinks;
-			PLIST_ENTRY m_pHeadHashLinks;
-			PLIST_ENTRY m_pHeadNodeModuleLink;
+			PLDR_DATA_TABLE_ENTRY m_pDTE;
 			PLIST_ENTRY m_pSavedInLoadOrderLinks;
 			PLIST_ENTRY m_pSavedInMemoryOrderLinks;
 			PLIST_ENTRY m_pSavedInInitializationOrderLinks;
@@ -1474,7 +1451,7 @@ namespace Detours {
 		// ReLinkModule
 		// ----------------------------------------------------------------
 
-		bool ReLinkModule(LINK_DATA LinkData);
+		void ReLinkModule(LINK_DATA LinkData);
 	}
 
 	// ----------------------------------------------------------------

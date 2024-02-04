@@ -232,111 +232,16 @@ namespace Detours {
 		// List Entry APIs
 		// ----------------------------------------------------------------
 
-		void InitializeListHead(PLIST_ENTRY pListHead) {
-			if (pListHead) {
-				pListHead->Flink = pListHead->Blink = pListHead;
-			}
+		void UnLinkEntry(PLIST_ENTRY pEntry) {
+			pEntry->Flink->Blink = pEntry->Blink;
+			pEntry->Blink->Flink = pEntry->Flink;
 		}
 
-		void InsertEntry(PLIST_ENTRY pPrev, PLIST_ENTRY pNext, PLIST_ENTRY pEntry) {
-			if (pPrev && pNext && pEntry) {
-				pEntry->Flink = pNext;
-				pEntry->Blink = pPrev;
-
-				if (pPrev->Flink) {
-					pPrev->Flink->Blink = pEntry;
-				}
-
-				if (pNext->Blink) {
-					pNext->Blink->Flink = pEntry;
-				}
-
-				pPrev->Flink = pEntry;
-				pNext->Blink = pEntry;
-			}
-		}
-
-		void InsertHeadList(PLIST_ENTRY pListHead, PLIST_ENTRY pEntry) {
-			if (pListHead && pEntry) {
-				InsertEntry(pListHead, pListHead->Flink, pEntry);
-			}
-		}
-
-		void InsertTailList(PLIST_ENTRY pListHead, PLIST_ENTRY pEntry) {
-			if (pListHead && pEntry) {
-				InsertEntry(pListHead->Blink, pListHead, pEntry);
-			}
-		}
-
-		void RemoveEntryList(PLIST_ENTRY pEntry) {
-			if (pEntry) {
-				PLIST_ENTRY pPrev = pEntry->Blink;
-				PLIST_ENTRY pNext = pEntry->Flink;
-
-				if (pPrev->Flink) {
-					pPrev->Flink = pNext;
-				}
-
-				if (pNext->Blink) {
-					pNext->Blink = pPrev;
-				}
-			}
-		}
-
-		void RemoveHeadList(PLIST_ENTRY pListHead) {
-			if (pListHead && pListHead->Flink) {
-				RemoveEntryList(pListHead->Flink);
-			}
-		}
-
-		void RemoveTailList(PLIST_ENTRY pListHead) {
-			if (pListHead && pListHead->Blink) {
-				RemoveEntryList(pListHead->Blink);
-			}
-		}
-
-		PLIST_ENTRY GetListHeadFromEntry(PLIST_ENTRY pEntry) {
-			if (!pEntry) {
-				return nullptr;
-			}
-
-			PLIST_ENTRY pHead = pEntry;
-
-			while ((pHead->Blink != nullptr) && (pHead->Blink != pEntry)) {
-				pHead = pHead->Blink;
-			}
-
-			return pEntry;
-		}
-
-		// ----------------------------------------------------------------
-		// GetListHeads
-		// ----------------------------------------------------------------
-
-		bool GetHeadsOfLists(PLIST_ENTRY* pInLoadOrderModuleList, PLIST_ENTRY* pInMemoryOrderModuleList, PLIST_ENTRY* pInInitializationOrderModuleList) {
-			auto pPEB = GetPEB();
-			if (!pPEB) {
-				return false;
-			}
-
-			auto pLDR = pPEB->Ldr;
-			if (!pLDR) {
-				return false;
-			}
-
-			if (pInLoadOrderModuleList) {
-				*pInLoadOrderModuleList = &pLDR->InLoadOrderModuleList;
-			}
-
-			if (pInMemoryOrderModuleList) {
-				*pInMemoryOrderModuleList = &pLDR->InMemoryOrderModuleList;
-			}
-
-			if (pInInitializationOrderModuleList) {
-				*pInInitializationOrderModuleList = &pLDR->InInitializationOrderModuleList;
-			}
-
-			return true;
+		void ReLinkEntry(PLIST_ENTRY pList, PLIST_ENTRY pEntry) {
+			pList->Flink->Blink = pEntry;
+			pList->Blink->Flink = pEntry;
+			pEntry->Blink = pList->Blink;
+			pEntry->Flink = pList->Flink;
 		}
 
 		// ----------------------------------------------------------------
@@ -348,54 +253,26 @@ namespace Detours {
 				return nullptr;
 			}
 
-			PLIST_ENTRY pInLoadOrderModuleList = nullptr;
-			PLIST_ENTRY pInMemoryOrderModuleList = nullptr;
-			PLIST_ENTRY pInInitializationOrderModuleList = nullptr;
-
-			if (!GetHeadsOfLists(&pInLoadOrderModuleList, &pInMemoryOrderModuleList, &pInInitializationOrderModuleList)) {
+			auto pPEB = GetPEB();
+			if (!pPEB) {
 				return nullptr;
 			}
 
-			if (pInLoadOrderModuleList) {
-				PLIST_ENTRY pHead = pInLoadOrderModuleList;
-				PLIST_ENTRY pEntry = pInLoadOrderModuleList->Flink;
-				while (pEntry != pHead) {
-					auto pDTE = CONTAINING_RECORD(pEntry, Detours::LDR_DATA_TABLE_ENTRY, InLoadOrderLinks);
-
-					if (pDTE->DllBase == pBaseAddress) {
-						return pEntry;
-					}
-
-					pEntry = pEntry->Flink;
-				}
+			auto pLDR = pPEB->Ldr;
+			if (!pLDR) {
+				return nullptr;
 			}
 
-			if (pInMemoryOrderModuleList) {
-				PLIST_ENTRY pHead = pInMemoryOrderModuleList;
-				PLIST_ENTRY pEntry = pInMemoryOrderModuleList->Flink;
-				while (pEntry != pHead) {
-					auto pDTE = CONTAINING_RECORD(pEntry, Detours::LDR_DATA_TABLE_ENTRY, InMemoryOrderLinks);
+			PLIST_ENTRY pHead = &pLDR->InLoadOrderModuleList;
+			PLIST_ENTRY pEntry = pHead->Flink;
+			while (pEntry != pHead) {
+				auto pDTE = CONTAINING_RECORD(pEntry, LDR_DATA_TABLE_ENTRY, InLoadOrderLinks);
 
-					if (pDTE->DllBase == pBaseAddress) {
-						return pEntry;
-					}
-
-					pEntry = pEntry->Flink;
+				if (pDTE->DllBase == pBaseAddress) {
+					return pEntry;
 				}
-			}
 
-			if (pInInitializationOrderModuleList) {
-				PLIST_ENTRY pHead = pInInitializationOrderModuleList;
-				PLIST_ENTRY pEntry = pInInitializationOrderModuleList->Flink;
-				while (pEntry != pHead) {
-					auto pDTE = CONTAINING_RECORD(pEntry, Detours::LDR_DATA_TABLE_ENTRY, InInitializationOrderLinks);
-
-					if (pDTE->DllBase == pBaseAddress) {
-						return pEntry;
-					}
-
-					pEntry = pEntry->Flink;
-				}
+				pEntry = pEntry->Flink;
 			}
 
 			return nullptr;
@@ -459,7 +336,7 @@ namespace Detours {
 				return nullptr;
 			}
 
-			return CONTAINING_RECORD(pEntry, Detours::LDR_DATA_TABLE_ENTRY, InLoadOrderLinks);
+			return CONTAINING_RECORD(pEntry, LDR_DATA_TABLE_ENTRY, InLoadOrderLinks);
 		}
 
 		PLDR_DATA_TABLE_ENTRY FindModuleDataTableEntry(HMODULE hModule) {
@@ -517,50 +394,23 @@ namespace Detours {
 
 			memset(pLinkData, 0, sizeof(LINK_DATA));
 
-			auto pDTE = Detours::LDR::FindModuleDataTableEntry(pBaseAddress);
+			auto pDTE = FindModuleDataTableEntry(pBaseAddress);
 			if (!pDTE) {
 				return false;
 			}
 
-			PLIST_ENTRY pInLoadOrderModuleList = nullptr;
-			PLIST_ENTRY pInMemoryOrderModuleList = nullptr;
-			PLIST_ENTRY pInInitializationOrderModuleList = nullptr;
+			pLinkData->m_pDTE = pDTE;
+			pLinkData->m_pSavedInLoadOrderLinks = pDTE->InLoadOrderLinks.Blink->Flink;
+			pLinkData->m_pSavedInInitializationOrderLinks = pDTE->InInitializationOrderLinks.Blink->Flink;
+			pLinkData->m_pSavedInMemoryOrderLinks = pDTE->InMemoryOrderLinks.Blink->Flink;
+			pLinkData->m_pSavedHashLinks = pDTE->HashLinks.Blink->Flink;
+			pLinkData->m_pSavedNodeModuleLink = pDTE->NodeModuleLink.Blink->Flink;
 
-			if (!GetHeadsOfLists(&pInLoadOrderModuleList, &pInMemoryOrderModuleList, &pInInitializationOrderModuleList)) {
-				return false;
-			}
-
-			pLinkData->m_pHeadInLoadOrderLinks = pInLoadOrderModuleList;
-			pLinkData->m_pHeadInMemoryOrderLinks = pInMemoryOrderModuleList;
-			pLinkData->m_pHeadInInitializationOrderLinks = pInInitializationOrderModuleList;
-
-			pLinkData->m_pHeadHashLinks = GetListHeadFromEntry(&pDTE->HashLinks);
-			pLinkData->m_pHeadNodeModuleLink = GetListHeadFromEntry(&pDTE->NodeModuleLink);
-
-			if (pLinkData->m_pHeadInLoadOrderLinks) {
-				Detours::LDR::RemoveEntryList(&pDTE->InLoadOrderLinks);
-				pLinkData->m_pSavedInLoadOrderLinks = &pDTE->InLoadOrderLinks;
-			}
-
-			if (pLinkData->m_pHeadInMemoryOrderLinks) {
-				Detours::LDR::RemoveEntryList(&pDTE->InMemoryOrderLinks);
-				pLinkData->m_pSavedInMemoryOrderLinks = &pDTE->InMemoryOrderLinks;
-			}
-
-			if (pLinkData->m_pHeadInInitializationOrderLinks) {
-				Detours::LDR::RemoveEntryList(&pDTE->InInitializationOrderLinks);
-				pLinkData->m_pSavedInInitializationOrderLinks = &pDTE->InInitializationOrderLinks;
-			}
-
-			if (pLinkData->m_pHeadHashLinks) {
-				Detours::LDR::RemoveEntryList(&pDTE->HashLinks);
-				pLinkData->m_pSavedHashLinks = &pDTE->HashLinks;
-			}
-
-			if (pLinkData->m_pHeadNodeModuleLink) {
-				Detours::LDR::RemoveEntryList(&pDTE->NodeModuleLink);
-				pLinkData->m_pSavedNodeModuleLink = &pDTE->NodeModuleLink;
-			}
+			UnLinkEntry(&pDTE->InLoadOrderLinks);
+			UnLinkEntry(&pDTE->InInitializationOrderLinks);
+			UnLinkEntry(&pDTE->InMemoryOrderLinks);
+			UnLinkEntry(&pDTE->HashLinks);
+			UnLinkEntry(&pDTE->NodeModuleLink);
 
 			return true;
 		}
@@ -608,58 +458,12 @@ namespace Detours {
 		// ReLinkModule
 		// ----------------------------------------------------------------
 
-		bool ReLinkModule(LINK_DATA LinkData) {
-			if (LinkData.m_pSavedInLoadOrderLinks) {
-				if (!LinkData.m_pHeadInLoadOrderLinks) {
-					return false;
-				}
-			}
-
-			if (LinkData.m_pSavedInMemoryOrderLinks) {
-				if (!LinkData.m_pHeadInMemoryOrderLinks) {
-					return false;
-				}
-			}
-	
-			if (LinkData.m_pSavedInInitializationOrderLinks) {
-				if (!LinkData.m_pHeadInInitializationOrderLinks) {
-					return false;
-				}
-			}
-
-			if (LinkData.m_pSavedHashLinks) {
-				if (!LinkData.m_pHeadHashLinks) {
-					return false;
-				}
-			}
-
-			if (LinkData.m_pSavedNodeModuleLink) {
-				if (!LinkData.m_pHeadNodeModuleLink) {
-					return false;
-				}
-			}
-
-			if (LinkData.m_pSavedInLoadOrderLinks) {
-				Detours::LDR::InsertTailList(LinkData.m_pHeadInLoadOrderLinks, LinkData.m_pSavedInLoadOrderLinks);
-			}
-
-			if (LinkData.m_pSavedInMemoryOrderLinks) {
-				Detours::LDR::InsertTailList(LinkData.m_pHeadInMemoryOrderLinks, LinkData.m_pSavedInMemoryOrderLinks);
-			}
-
-			if (LinkData.m_pSavedInInitializationOrderLinks) {
-				Detours::LDR::InsertTailList(LinkData.m_pHeadInInitializationOrderLinks, LinkData.m_pSavedInInitializationOrderLinks);
-			}
-
-			if (LinkData.m_pSavedHashLinks) {
-				Detours::LDR::InsertTailList(LinkData.m_pHeadHashLinks, LinkData.m_pSavedHashLinks);
-			}
-
-			if (LinkData.m_pSavedNodeModuleLink) {
-				Detours::LDR::InsertTailList(LinkData.m_pHeadNodeModuleLink, LinkData.m_pSavedNodeModuleLink);
-			}
-
-			return true;
+		void ReLinkModule(LINK_DATA LinkData) {
+			ReLinkEntry(&LinkData.m_pDTE->InLoadOrderLinks, LinkData.m_pSavedInLoadOrderLinks);
+			ReLinkEntry(&LinkData.m_pDTE->InInitializationOrderLinks, LinkData.m_pSavedInInitializationOrderLinks);
+			ReLinkEntry(&LinkData.m_pDTE->InMemoryOrderLinks, LinkData.m_pSavedInMemoryOrderLinks);
+			ReLinkEntry(&LinkData.m_pDTE->HashLinks, LinkData.m_pSavedHashLinks);
+			ReLinkEntry(&LinkData.m_pDTE->NodeModuleLink, LinkData.m_pSavedNodeModuleLink);
 		}
 	}
 
