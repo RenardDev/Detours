@@ -2137,7 +2137,7 @@ namespace Detours {
 
 			return FindDataNative(hModule, SectionName, pData, unDataSize);
 		}
-		
+
 		void const* FindDataNativeA(char const* const szModuleName, char const* const szSectionName, unsigned char const* const pData, const size_t unDataSize) noexcept {
 			if (!szModuleName || !szSectionName || !pData || !unDataSize) {
 				return nullptr;
@@ -3151,7 +3151,6 @@ namespace Detours {
 				}
 			}
 
-
 			for (unsigned int i = 0; i < unNumberOfBaseClasses; ++i) {
 #ifdef _M_X64
 				const auto& pBCD = __GetBaseClassDescriptor(pBaseAddress, pBCA, i);
@@ -3714,7 +3713,6 @@ namespace Detours {
 
 			return FindObject(hModule, szName, bCompleteObject);
 		}
-
 
 		std::unique_ptr<Object> FindObjectW(wchar_t const* const szModuleName, char const* const szName, bool bCompleteObject) {
 			if (!szModuleName || !szName) {
@@ -66574,7 +66572,6 @@ namespace Detours {
 
 		RD_TABLE const* g_pVexTable = reinterpret_cast<RD_TABLE const*>(&g_pVexTable_root_mmmmm);
 
-
 		static const RD_TABLE_INSTRUCTION g_pEvexTable_root_02_9a_03_mem_02_00_leaf = {
 			RD_ILUT_INSTRUCTION, reinterpret_cast<const void*>(&g_pInstructions[1400])
 		};
@@ -83883,9 +83880,9 @@ namespace Detours {
 				pJumpFromTrampoline[ 1] = 0x44;
 				pJumpFromTrampoline[ 2] = 0x24;
 				pJumpFromTrampoline[ 3] = 0xF8;
-				
+
 				*reinterpret_cast<unsigned int*>(pJumpFromTrampoline + 4) = unAddress & 0xFFFFFFFF;
-				
+
 				pJumpFromTrampoline[ 8] = 0xC7;
 				pJumpFromTrampoline[ 9] = 0x44;
 				pJumpFromTrampoline[10] = 0x24;
@@ -84420,9 +84417,9 @@ namespace Detours {
 				pJumpFromTrampoline[ 1] = 0x44;
 				pJumpFromTrampoline[ 2] = 0x24;
 				pJumpFromTrampoline[ 3] = 0xF8;
-				
+
 				*reinterpret_cast<unsigned int*>(pJumpFromTrampoline + 4) = unAddress & 0xFFFFFFFF;
-				
+
 				pJumpFromTrampoline[ 8] = 0xC7;
 				pJumpFromTrampoline[ 9] = 0x44;
 				pJumpFromTrampoline[10] = 0x24;

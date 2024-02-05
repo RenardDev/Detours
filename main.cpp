@@ -117,7 +117,7 @@ void TestFindSignature() {
 	_tprintf_s(_T("TEST - %s\n"), Detours::Scan::FindSignatureNative(pAlignMiddleBeginRightArray, sizeof(pAlignMiddleBeginRightArray), "\xDE\xED\x2A\xEF") == pAlignMiddleBeginRightArray + 32 ? _T("OK") : _T("FAIL"));
 	_tprintf_s(_T("TEST - %s\n"), Detours::Scan::FindSignatureNative(pAlignMiddleEndArray, sizeof(pAlignMiddleEndArray), "\xDE\xED\x2A\xEF") == pAlignMiddleEndArray + 36 ? _T("OK") : _T("FAIL"));
 	_tprintf_s(_T("TEST - %s\n"), Detours::Scan::FindSignatureNative(pAlignEndArray, sizeof(pAlignEndArray), "\xDE\xED\x2A\xEF") == pAlignEndArray + 60 ? _T("OK") : _T("FAIL"));
-	
+
 	_tprintf_s(_T("TEST - %s\n"), Detours::Scan::FindSignatureSSE2(pAlignEmptyArray, sizeof(pAlignEmptyArray), "\xDE\xED\x2A\xEF") == nullptr ? _T("OK") : _T("FAIL"));
 	_tprintf_s(_T("TEST - %s\n"), Detours::Scan::FindSignatureSSE2(pAlignBeginArray, sizeof(pAlignBeginArray), "\xDE\xED\x2A\xEF") == pAlignBeginArray ? _T("OK") : _T("FAIL"));
 	_tprintf_s(_T("TEST - %s\n"), Detours::Scan::FindSignatureSSE2(pAlignMiddleBeginArray, sizeof(pAlignMiddleBeginArray), "\xDE\xED\x2A\xEF") == pAlignMiddleBeginArray + 24 ? _T("OK") : _T("FAIL"));
@@ -125,7 +125,7 @@ void TestFindSignature() {
 	_tprintf_s(_T("TEST - %s\n"), Detours::Scan::FindSignatureSSE2(pAlignMiddleBeginRightArray, sizeof(pAlignMiddleBeginRightArray), "\xDE\xED\x2A\xEF") == pAlignMiddleBeginRightArray + 32 ? _T("OK") : _T("FAIL"));
 	_tprintf_s(_T("TEST - %s\n"), Detours::Scan::FindSignatureSSE2(pAlignMiddleEndArray, sizeof(pAlignMiddleEndArray), "\xDE\xED\x2A\xEF") == pAlignMiddleEndArray + 36 ? _T("OK") : _T("FAIL"));
 	_tprintf_s(_T("TEST - %s\n"), Detours::Scan::FindSignatureSSE2(pAlignEndArray, sizeof(pAlignEndArray), "\xDE\xED\x2A\xEF") == pAlignEndArray + 60 ? _T("OK") : _T("FAIL"));
-	
+
 	_tprintf_s(_T("TEST - %s\n"), Detours::Scan::FindSignatureAVX2(pAlignEmptyArray, sizeof(pAlignEmptyArray), "\xDE\xED\x2A\xEF") == nullptr ? _T("OK") : _T("FAIL"));
 	_tprintf_s(_T("TEST - %s\n"), Detours::Scan::FindSignatureAVX2(pAlignBeginArray, sizeof(pAlignBeginArray), "\xDE\xED\x2A\xEF") == pAlignBeginArray ? _T("OK") : _T("FAIL"));
 	_tprintf_s(_T("TEST - %s\n"), Detours::Scan::FindSignatureAVX2(pAlignMiddleBeginArray, sizeof(pAlignMiddleBeginArray), "\xDE\xED\x2A\xEF") == pAlignMiddleBeginArray + 24 ? _T("OK") : _T("FAIL"));
@@ -149,7 +149,7 @@ void TestFindSignature() {
 	_tprintf_s(_T("TEST - %s\n"), Detours::Scan::FindSignatureNative(pMiddleBeginRightArray1, sizeof(pMiddleBeginRightArray1), "\xDE\xED\x2A\xEF") == pMiddleBeginRightArray1 + 33 ? _T("OK") : _T("FAIL"));
 	_tprintf_s(_T("TEST - %s\n"), Detours::Scan::FindSignatureNative(pMiddleEndArray1, sizeof(pMiddleEndArray1), "\xDE\xED\x2A\xEF") == pMiddleEndArray1 + 37 ? _T("OK") : _T("FAIL"));
 	_tprintf_s(_T("TEST - %s\n"), Detours::Scan::FindSignatureNative(pEndArray1, sizeof(pEndArray1), "\xDE\xED\x2A\xEF") == pEndArray1 + 61 ? _T("OK") : _T("FAIL"));
-	
+
 	_tprintf_s(_T("TEST - %s\n"), Detours::Scan::FindSignatureSSE2(pEmptyArray1, sizeof(pEmptyArray1), "\xDE\xED\x2A\xEF") == nullptr ? _T("OK") : _T("FAIL"));
 	_tprintf_s(_T("TEST - %s\n"), Detours::Scan::FindSignatureSSE2(pBeginArray1, sizeof(pBeginArray1), "\xDE\xED\x2A\xEF") == pBeginArray1 + 1 ? _T("OK") : _T("FAIL"));
 	_tprintf_s(_T("TEST - %s\n"), Detours::Scan::FindSignatureSSE2(pMiddleBeginArray1, sizeof(pMiddleBeginArray1), "\xDE\xED\x2A\xEF") == pMiddleBeginArray1 + 25 ? _T("OK") : _T("FAIL"));
@@ -157,7 +157,7 @@ void TestFindSignature() {
 	_tprintf_s(_T("TEST - %s\n"), Detours::Scan::FindSignatureSSE2(pMiddleBeginRightArray1, sizeof(pMiddleBeginRightArray1), "\xDE\xED\x2A\xEF") == pMiddleBeginRightArray1 + 33 ? _T("OK") : _T("FAIL"));
 	_tprintf_s(_T("TEST - %s\n"), Detours::Scan::FindSignatureSSE2(pMiddleEndArray1, sizeof(pMiddleEndArray1), "\xDE\xED\x2A\xEF") == pMiddleEndArray1 + 37 ? _T("OK") : _T("FAIL"));
 	_tprintf_s(_T("TEST - %s\n"), Detours::Scan::FindSignatureSSE2(pEndArray1, sizeof(pEndArray1), "\xDE\xED\x2A\xEF") == pEndArray1 + 61 ? _T("OK") : _T("FAIL"));
-	
+
 	_tprintf_s(_T("TEST - %s\n"), Detours::Scan::FindSignatureAVX2(pEmptyArray1, sizeof(pEmptyArray1), "\xDE\xED\x2A\xEF") == nullptr ? _T("OK") : _T("FAIL"));
 	_tprintf_s(_T("TEST - %s\n"), Detours::Scan::FindSignatureAVX2(pBeginArray1, sizeof(pBeginArray1), "\xDE\xED\x2A\xEF") == pBeginArray1 + 1 ? _T("OK") : _T("FAIL"));
 	_tprintf_s(_T("TEST - %s\n"), Detours::Scan::FindSignatureAVX2(pMiddleBeginArray1, sizeof(pMiddleBeginArray1), "\xDE\xED\x2A\xEF") == pMiddleBeginArray1 + 25 ? _T("OK") : _T("FAIL"));
@@ -181,7 +181,7 @@ void TestFindSignature() {
 	_tprintf_s(_T("TEST - %s\n"), Detours::Scan::FindSignatureNative(pMiddleBeginRightArray2, sizeof(pMiddleBeginRightArray2), "\xDE\xED\x2A\xEF") == pMiddleBeginRightArray2 + 32 ? _T("OK") : _T("FAIL"));
 	_tprintf_s(_T("TEST - %s\n"), Detours::Scan::FindSignatureNative(pMiddleEndArray2, sizeof(pMiddleEndArray2), "\xDE\xED\x2A\xEF") == pMiddleEndArray2 + 36 ? _T("OK") : _T("FAIL"));
 	_tprintf_s(_T("TEST - %s\n"), Detours::Scan::FindSignatureNative(pEndArray2, sizeof(pEndArray2), "\xDE\xED\x2A\xEF") == pEndArray2 + 60 ? _T("OK") : _T("FAIL"));
-	
+
 	_tprintf_s(_T("TEST - %s\n"), Detours::Scan::FindSignatureSSE2(pEmptyArray2, sizeof(pEmptyArray2), "\xDE\xED\x2A\xEF") == nullptr ? _T("OK") : _T("FAIL"));
 	_tprintf_s(_T("TEST - %s\n"), Detours::Scan::FindSignatureSSE2(pBeginArray2, sizeof(pBeginArray2), "\xDE\xED\x2A\xEF") == pBeginArray2 ? _T("OK") : _T("FAIL"));
 	_tprintf_s(_T("TEST - %s\n"), Detours::Scan::FindSignatureSSE2(pMiddleBeginArray2, sizeof(pMiddleBeginArray2), "\xDE\xED\x2A\xEF") == pMiddleBeginArray2 + 24 ? _T("OK") : _T("FAIL"));
@@ -189,7 +189,7 @@ void TestFindSignature() {
 	_tprintf_s(_T("TEST - %s\n"), Detours::Scan::FindSignatureSSE2(pMiddleBeginRightArray2, sizeof(pMiddleBeginRightArray2), "\xDE\xED\x2A\xEF") == pMiddleBeginRightArray2 + 32 ? _T("OK") : _T("FAIL"));
 	_tprintf_s(_T("TEST - %s\n"), Detours::Scan::FindSignatureSSE2(pMiddleEndArray2, sizeof(pMiddleEndArray2), "\xDE\xED\x2A\xEF") == pMiddleEndArray2 + 36 ? _T("OK") : _T("FAIL"));
 	_tprintf_s(_T("TEST - %s\n"), Detours::Scan::FindSignatureSSE2(pEndArray2, sizeof(pEndArray2), "\xDE\xED\x2A\xEF") == pEndArray2 + 60 ? _T("OK") : _T("FAIL"));
-	
+
 	_tprintf_s(_T("TEST - %s\n"), Detours::Scan::FindSignatureAVX2(pEmptyArray2, sizeof(pEmptyArray2), "\xDE\xED\x2A\xEF") == nullptr ? _T("OK") : _T("FAIL"));
 	_tprintf_s(_T("TEST - %s\n"), Detours::Scan::FindSignatureAVX2(pBeginArray2, sizeof(pBeginArray2), "\xDE\xED\x2A\xEF") == pBeginArray2 ? _T("OK") : _T("FAIL"));
 	_tprintf_s(_T("TEST - %s\n"), Detours::Scan::FindSignatureAVX2(pMiddleBeginArray2, sizeof(pMiddleBeginArray2), "\xDE\xED\x2A\xEF") == pMiddleBeginArray2 + 24 ? _T("OK") : _T("FAIL"));
@@ -213,7 +213,7 @@ void TestFindSignature() {
 	_tprintf_s(_T("TEST - %s\n"), Detours::Scan::FindSignatureNative(pMiddleBeginRightArray3, sizeof(pMiddleBeginRightArray3), "\xDE\xED\x2A\xEF") == pMiddleBeginRightArray3 + 33 ? _T("OK") : _T("FAIL"));
 	_tprintf_s(_T("TEST - %s\n"), Detours::Scan::FindSignatureNative(pMiddleEndArray3, sizeof(pMiddleEndArray3), "\xDE\xED\x2A\xEF") == pMiddleEndArray3 + 37 ? _T("OK") : _T("FAIL"));
 	_tprintf_s(_T("TEST - %s\n"), Detours::Scan::FindSignatureNative(pEndArray3, sizeof(pEndArray3), "\xDE\xED\x2A\xEF") == pEndArray3 + 61 ? _T("OK") : _T("FAIL"));
-	
+
 	_tprintf_s(_T("TEST - %s\n"), Detours::Scan::FindSignatureSSE2(pEmptyArray3, sizeof(pEmptyArray3), "\xDE\xED\x2A\xEF") == nullptr ? _T("OK") : _T("FAIL"));
 	_tprintf_s(_T("TEST - %s\n"), Detours::Scan::FindSignatureSSE2(pBeginArray3, sizeof(pBeginArray3), "\xDE\xED\x2A\xEF") == pBeginArray3 + 1 ? _T("OK") : _T("FAIL"));
 	_tprintf_s(_T("TEST - %s\n"), Detours::Scan::FindSignatureSSE2(pMiddleBeginArray3, sizeof(pMiddleBeginArray3), "\xDE\xED\x2A\xEF") == pMiddleBeginArray3 + 25 ? _T("OK") : _T("FAIL"));
@@ -221,7 +221,7 @@ void TestFindSignature() {
 	_tprintf_s(_T("TEST - %s\n"), Detours::Scan::FindSignatureSSE2(pMiddleBeginRightArray3, sizeof(pMiddleBeginRightArray3), "\xDE\xED\x2A\xEF") == pMiddleBeginRightArray3 + 33 ? _T("OK") : _T("FAIL"));
 	_tprintf_s(_T("TEST - %s\n"), Detours::Scan::FindSignatureSSE2(pMiddleEndArray3, sizeof(pMiddleEndArray3), "\xDE\xED\x2A\xEF") == pMiddleEndArray3 + 37 ? _T("OK") : _T("FAIL"));
 	_tprintf_s(_T("TEST - %s\n"), Detours::Scan::FindSignatureSSE2(pEndArray3, sizeof(pEndArray3), "\xDE\xED\x2A\xEF") == pEndArray3 + 61 ? _T("OK") : _T("FAIL"));
-	
+
 	_tprintf_s(_T("TEST - %s\n"), Detours::Scan::FindSignatureAVX2(pEmptyArray3, sizeof(pEmptyArray3), "\xDE\xED\x2A\xEF") == nullptr ? _T("OK") : _T("FAIL"));
 	_tprintf_s(_T("TEST - %s\n"), Detours::Scan::FindSignatureAVX2(pBeginArray3, sizeof(pBeginArray3), "\xDE\xED\x2A\xEF") == pBeginArray3 + 1 ? _T("OK") : _T("FAIL"));
 	_tprintf_s(_T("TEST - %s\n"), Detours::Scan::FindSignatureAVX2(pMiddleBeginArray3, sizeof(pMiddleBeginArray3), "\xDE\xED\x2A\xEF") == pMiddleBeginArray3 + 25 ? _T("OK") : _T("FAIL"));
@@ -1161,7 +1161,6 @@ void Sleep_RawHookFiber(void* pData) {
 #endif
 }
 
-
 Detours::Parallel::Fiber SleepRawHookFiber(Sleep_RawHookFiber);
 #ifdef _M_X64
 bool __fastcall Sleep_RawHook(Detours::Hook::PRAW_CONTEXT pCTX) {
@@ -1799,7 +1798,7 @@ int _tmain(int nArguments, PTCHAR* pArguments) {
 		_tprintf_s(_T("FindSection(...) = 0x%08X\n"), reinterpret_cast<size_t>(pSectionNTDLL));
 #endif
 	}
-	
+
 	pSectionNTDLL = nullptr;
 	unSectionNTDLLSize = 0;
 	if (Detours::Scan::FindSectionPOGO(_T("ntdll.dll"), ".rdata", &pSectionNTDLL, &unSectionNTDLLSize)) {

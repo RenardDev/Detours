@@ -2040,7 +2040,6 @@ namespace Detours {
 		private:
 			HANDLE m_hMutex;
 		};
-		
 
 		// ----------------------------------------------------------------
 		// Semaphore
