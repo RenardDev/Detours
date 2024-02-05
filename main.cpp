@@ -1925,11 +1925,11 @@ int _tmain(int nArguments, PTCHAR* pArguments) {
 
 	_tprintf_s(_T("Parallel Example\n\n"));
 
-	//Detours::Parallel::Thread DetoursThread(OnThread);
+	Detours::Parallel::Thread DetoursThread(OnThread);
 	Detours::Parallel::Fiber DetoursFiber(OnFiber);
 
-	//_tprintf_s(_T("DetoursThread.Start() = %d\n"), DetoursThread.Start());
-	//_tprintf_s(_T("DetoursThread.Join() = %d\n"), DetoursThread.Join());
+	_tprintf_s(_T("DetoursThread.Start() = %d\n"), DetoursThread.Start());
+	_tprintf_s(_T("DetoursThread.Join() = %d\n"), DetoursThread.Join());
 
 	_tprintf_s(_T("DetoursFiber.Switch() = %d\n"), DetoursFiber.Switch());
 

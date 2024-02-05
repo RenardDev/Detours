@@ -4857,7 +4857,6 @@ namespace Detours {
 
 	namespace Parallel {
 
-		/*
 		// ----------------------------------------------------------------
 		// Thread Data
 		// ----------------------------------------------------------------
@@ -4873,12 +4872,13 @@ namespace Detours {
 		DWORD WINAPI ThreadRoutine(PVOID lpThreadParameter) {
 			auto pTD = reinterpret_cast<PTHREAD_DATA>(lpThreadParameter);
 			if (!pTD) {
-				return EXIT_SUCCESS;
+				return EXIT_FAILURE;
 			}
 
 			auto pThread = static_cast<Thread*>(pTD->m_pParameter);
 			if (!pThread) {
-				return EXIT_SUCCESS;
+				delete pTD;
+				return EXIT_FAILURE;
 			}
 
 			auto pCallback = pThread->GetCallBack();
@@ -4886,6 +4886,7 @@ namespace Detours {
 				pCallback(pThread->GetData());
 			}
 
+			delete pTD;
 			return EXIT_SUCCESS;
 		}
 
@@ -4940,16 +4941,16 @@ namespace Detours {
 				return false;
 			}
 
-			auto pTD = std::make_unique<THREAD_DATA>();
+			auto pTD = new THREAD_DATA;
 			if (!pTD) {
 				return false;
 			}
 
-			memset(pTD.get(), 0, sizeof(THREAD_DATA));
+			memset(pTD, 0, sizeof(THREAD_DATA));
 
 			pTD->m_pParameter = this;
 
-			m_hThread = CreateThread(nullptr, NULL, ThreadRoutine, pTD.get(), NULL, nullptr);
+			m_hThread = CreateThread(nullptr, NULL, ThreadRoutine, pTD, NULL, nullptr);
 			if (!m_hThread || (m_hThread == INVALID_HANDLE_VALUE)) {
 				return false;
 			}
@@ -4963,6 +4964,20 @@ namespace Detours {
 			}
 
 			if (WaitForSingleObject(m_hThread, INFINITE) != WAIT_OBJECT_0) {
+				return false;
+			}
+
+			DWORD unExitCode = EXIT_SUCCESS;
+			if (!GetExitCodeThread(m_hThread, &unExitCode)) {
+				CloseHandle(m_hThread);
+				m_hThread = nullptr;
+				return false;
+			}
+
+			CloseHandle(m_hThread);
+			m_hThread = nullptr;
+
+			if (unExitCode != EXIT_SUCCESS) {
 				return false;
 			}
 
@@ -5000,7 +5015,6 @@ namespace Detours {
 		void* Thread::GetData() const {
 			return m_pData;
 		}
-		*/
 
 		// ----------------------------------------------------------------
 		// Fiber Data
