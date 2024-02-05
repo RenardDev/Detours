@@ -4869,15 +4869,9 @@ namespace Detours {
 		// Thread Routine
 		// ----------------------------------------------------------------
 
-		DWORD WINAPI ThreadRoutine(PVOID lpThreadParameter) {
-			auto pTD = reinterpret_cast<PTHREAD_DATA>(lpThreadParameter);
-			if (!pTD) {
-				return EXIT_FAILURE;
-			}
-
-			auto pThread = static_cast<Thread*>(pTD->m_pParameter);
+		DWORD WINAPI ThreadRoutine(PVOID lpParameter) {
+			auto pThread = static_cast<Thread*>(lpParameter);
 			if (!pThread) {
-				delete pTD;
 				return EXIT_FAILURE;
 			}
 
@@ -4886,7 +4880,6 @@ namespace Detours {
 				pCallback(pThread->GetData());
 			}
 
-			delete pTD;
 			return EXIT_SUCCESS;
 		}
 
@@ -4941,16 +4934,7 @@ namespace Detours {
 				return false;
 			}
 
-			auto pTD = new THREAD_DATA;
-			if (!pTD) {
-				return false;
-			}
-
-			memset(pTD, 0, sizeof(THREAD_DATA));
-
-			pTD->m_pParameter = this;
-
-			m_hThread = CreateThread(nullptr, NULL, ThreadRoutine, pTD, NULL, nullptr);
+			m_hThread = CreateThread(nullptr, NULL, ThreadRoutine, this, NULL, nullptr);
 			if (!m_hThread || (m_hThread == INVALID_HANDLE_VALUE)) {
 				return false;
 			}
