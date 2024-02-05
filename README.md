@@ -63,6 +63,7 @@ A set of tools for working with software modifications.
 * PipeClient - Represents a client-side connection to a named pipe server, supporting communication with a specified buffer size.
 
 # Detours::Parallel
+* Thread - Represents a lightweight thread with a callback function and associated data.
 * Fiber - Represents a lightweight fiber with a callback function and associated data.
 
 # Detours::Memory
