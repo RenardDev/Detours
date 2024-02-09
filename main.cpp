@@ -1707,6 +1707,32 @@ int _tmain(int nArguments, PTCHAR* pArguments) {
 
 	_tprintf_s(_T("Codec Example\n\n"));
 
+	char* szHelloWorld = _strdup("Hello, World!");
+	if (szHelloWorld) {
+		const size_t unSize = strnlen(szHelloWorld, 0x7FF);
+		if (unSize != 0x7FF) {
+#ifdef _UNICODE
+			if (Detours::Codec::UpperCase(szHelloWorld, unSize)) {
+				_tprintf_s(_T("UpperCase: `%hs`\n"), szHelloWorld);
+			}
+
+			if (Detours::Codec::LowerCase(szHelloWorld, unSize)) {
+				_tprintf_s(_T("LowerCase: `%hs`\n"), szHelloWorld);
+			}
+#else
+			if (Detours::Codec::UpperCase(szHelloWorld, unSize)) {
+				_tprintf_s(_T("UpperCase: `%s`\n"), szHelloWorld);
+			}
+
+			if (Detours::Codec::LowerCase(szHelloWorld, unSize)) {
+				_tprintf_s(_T("LowerCase: `%s`\n"), szHelloWorld);
+			}
+#endif
+		}
+
+		free(szHelloWorld);
+	}
+
 	int nEncodeSize = Detours::Codec::Encode(CP_UTF8, "Hello, World!");
 	if (nEncodeSize > 0) {
 		HANDLE hHeap = GetProcessHeap();

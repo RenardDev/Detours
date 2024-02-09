@@ -474,6 +474,46 @@ namespace Detours {
 	namespace Codec {
 
 		// ----------------------------------------------------------------
+		// UpperCase
+		// ----------------------------------------------------------------
+
+		bool UpperCase(char szBuffer[], const size_t unSize) {
+			if (!szBuffer || !unSize) {
+				return false;
+			}
+
+			for (size_t i = 0; i < unSize; ++i) {
+				const unsigned char unX = szBuffer[i];
+
+				if ((unX >= 'a') && (unX <= 'z')) {
+					szBuffer[i] = unX & ~0x20;
+				}
+			}
+
+			return true;
+		}
+
+		// ----------------------------------------------------------------
+		// LowerCase
+		// ----------------------------------------------------------------
+
+		bool LowerCase(char szBuffer[], const size_t unSize) {
+			if (!szBuffer || !unSize) {
+				return false;
+			}
+
+			for (size_t i = 0; i < unSize; ++i) {
+				const unsigned char unX = szBuffer[i];
+
+				if ((unX >= 'A') && (unX <= 'Z')) {
+					szBuffer[i] = unX | 0x20;
+				}
+			}
+
+			return true;
+		}
+
+		// ----------------------------------------------------------------
 		// Encode
 		// ----------------------------------------------------------------
 
@@ -921,13 +961,17 @@ namespace Detours {
 
 				PIMAGE_POGO_BLOCK pBlock = pPI->m_pBlocks;
 				while (pBlock->m_unRVA != 0) {
-					const size_t unNameLength = strnlen_s(pBlock->m_pName, 0x1000) + 1; // FIXME: Unsafe.
-					size_t unBlockSize = sizeof(DWORD) * 2 + unNameLength;
+					const size_t unNameLength = strnlen_s(pBlock->m_pName, 0x7FF);
+					if (unNameLength == 0x7FF) {
+						break;
+					}
+
+					size_t unBlockSize = sizeof(DWORD) * 2 + unNameLength + 1;
 					if (unBlockSize & 3) {
 						unBlockSize += (4 - (unBlockSize & 3));
 					}
 
-					if (strncmp(szSectionName, pBlock->m_pName, 0x1000) == 0) { // FIXME: Unsafe.
+					if (strncmp(szSectionName, pBlock->m_pName, 0x7FF) == 0) {
 						if (pAddress) {
 							*pAddress = reinterpret_cast<void*>(reinterpret_cast<char*>(hModule) + pBlock->m_unRVA);
 						}
