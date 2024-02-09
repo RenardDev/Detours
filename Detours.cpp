@@ -5464,7 +5464,7 @@ namespace Detours {
 			}
 
 			MergedFreeBlocks.insert(PrevBlock);
-			m_FreeBlocks = MergedFreeBlocks;
+			m_FreeBlocks = std::move(MergedFreeBlocks);
 		}
 
 		void* Page::GetAddress() const {
@@ -5651,7 +5651,7 @@ namespace Detours {
 			}
 
 			MergedFreeBlocks.insert(PrevBlock);
-			m_FreeBlocks = MergedFreeBlocks;
+			m_FreeBlocks = std::move(MergedFreeBlocks);
 		}
 
 		void* NearPage::GetAddress() const {
