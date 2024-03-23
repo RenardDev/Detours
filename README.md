@@ -98,6 +98,6 @@ A set of tools for working with software modifications.
 * UnHookInterrupt - Unhooks the specified interrupt.
 * VTableFunctionHook - Class for hooking virtual table (VTable) functions.
 * VTableHook - Class for hooking virtual tables (VTables).
-* InlineHook - Class for hooking functions using inline hooking technique.
-* InlineWrapperHook - Class for hooking functions using inline hooking with a wrapper function.
-* RawHook - Class for raw hooking functions with full control over registers and the stack.
+* InlineHook - Class for hooking functions using inline hooking technique. (Has support for checking Return Address to avoid crashes after unhook)
+* InlineWrapperHook - Class for hooking functions using inline hooking with a wrapper function. (Has support for checking Return Address to avoid crashes after unhook)
+* RawHook - Class for raw hooking functions with full control over registers and the stack. (Has support for checking Return Address to avoid crashes after unhook)
