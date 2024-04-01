@@ -387,6 +387,29 @@ namespace Detours {
 		// UnLinkModule
 		// ----------------------------------------------------------------
 
+		bool UnLinkModule(PLDR_DATA_TABLE_ENTRY pDTE, PLINK_DATA pLinkData) {
+			if (!pDTE || !pLinkData) {
+				return false;
+			}
+
+			memset(pLinkData, 0, sizeof(LINK_DATA));
+
+			pLinkData->m_pDTE = pDTE;
+			pLinkData->m_pSavedInLoadOrderLinks = pDTE->InLoadOrderLinks.Blink->Flink;
+			pLinkData->m_pSavedInInitializationOrderLinks = pDTE->InInitializationOrderLinks.Blink->Flink;
+			pLinkData->m_pSavedInMemoryOrderLinks = pDTE->InMemoryOrderLinks.Blink->Flink;
+			pLinkData->m_pSavedHashLinks = pDTE->HashLinks.Blink->Flink;
+			pLinkData->m_pSavedNodeModuleLink = pDTE->NodeModuleLink.Blink->Flink;
+
+			UnLinkEntry(&pDTE->InLoadOrderLinks);
+			UnLinkEntry(&pDTE->InInitializationOrderLinks);
+			UnLinkEntry(&pDTE->InMemoryOrderLinks);
+			UnLinkEntry(&pDTE->HashLinks);
+			UnLinkEntry(&pDTE->NodeModuleLink);
+
+			return true;
+		}
+
 		bool UnLinkModule(void* pBaseAddress, PLINK_DATA pLinkData) {
 			if (!pBaseAddress || !pLinkData) {
 				return false;

@@ -1437,6 +1437,7 @@ namespace Detours {
 		// UnLinkModule
 		// ----------------------------------------------------------------
 
+		bool UnLinkModule(PLDR_DATA_TABLE_ENTRY pDTE, PLINK_DATA pLinkData);
 		bool UnLinkModule(void* pBaseAddress, PLINK_DATA pLinkData);
 		bool UnLinkModule(HMODULE hModule, PLINK_DATA pLinkData);
 		bool UnLinkModuleA(const char* szModuleName, PLINK_DATA pLinkData);
