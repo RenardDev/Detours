@@ -415,27 +415,12 @@ namespace Detours {
 				return false;
 			}
 
-			memset(pLinkData, 0, sizeof(LINK_DATA));
-
 			auto pDTE = FindModuleDataTableEntry(pBaseAddress);
 			if (!pDTE) {
 				return false;
 			}
 
-			pLinkData->m_pDTE = pDTE;
-			pLinkData->m_pSavedInLoadOrderLinks = pDTE->InLoadOrderLinks.Blink->Flink;
-			pLinkData->m_pSavedInInitializationOrderLinks = pDTE->InInitializationOrderLinks.Blink->Flink;
-			pLinkData->m_pSavedInMemoryOrderLinks = pDTE->InMemoryOrderLinks.Blink->Flink;
-			pLinkData->m_pSavedHashLinks = pDTE->HashLinks.Blink->Flink;
-			pLinkData->m_pSavedNodeModuleLink = pDTE->NodeModuleLink.Blink->Flink;
-
-			UnLinkEntry(&pDTE->InLoadOrderLinks);
-			UnLinkEntry(&pDTE->InInitializationOrderLinks);
-			UnLinkEntry(&pDTE->InMemoryOrderLinks);
-			UnLinkEntry(&pDTE->HashLinks);
-			UnLinkEntry(&pDTE->NodeModuleLink);
-
-			return true;
+			return UnLinkModule(pDTE, pLinkData);
 		}
 
 		bool UnLinkModule(HMODULE hModule, PLINK_DATA pLinkData) {
