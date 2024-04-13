@@ -5531,6 +5531,8 @@ namespace Detours {
 		bool RdIsInstruxRipRelative(PINSTRUCTION pInstruction);
 		unsigned int RdGetFullAccessMap(PINSTRUCTION pInstruction, PRD_ACCESS_MAP pAccessMap);
 		unsigned int RdGetOperandRlut(PINSTRUCTION pInstruction, PRD_OPERARD_RLUT pRlut);
+
+		void* RdGetAddressFromRelOrDisp(void* pAddress);
 	}
 
 	// ----------------------------------------------------------------

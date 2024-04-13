@@ -415,12 +415,27 @@ namespace Detours {
 				return false;
 			}
 
+			memset(pLinkData, 0, sizeof(LINK_DATA));
+
 			auto pDTE = FindModuleDataTableEntry(pBaseAddress);
 			if (!pDTE) {
 				return false;
 			}
 
-			return UnLinkModule(pDTE, pLinkData);
+			pLinkData->m_pDTE = pDTE;
+			pLinkData->m_pSavedInLoadOrderLinks = pDTE->InLoadOrderLinks.Blink->Flink;
+			pLinkData->m_pSavedInInitializationOrderLinks = pDTE->InInitializationOrderLinks.Blink->Flink;
+			pLinkData->m_pSavedInMemoryOrderLinks = pDTE->InMemoryOrderLinks.Blink->Flink;
+			pLinkData->m_pSavedHashLinks = pDTE->HashLinks.Blink->Flink;
+			pLinkData->m_pSavedNodeModuleLink = pDTE->NodeModuleLink.Blink->Flink;
+
+			UnLinkEntry(&pDTE->InLoadOrderLinks);
+			UnLinkEntry(&pDTE->InInitializationOrderLinks);
+			UnLinkEntry(&pDTE->InMemoryOrderLinks);
+			UnLinkEntry(&pDTE->HashLinks);
+			UnLinkEntry(&pDTE->NodeModuleLink);
+
+			return true;
 		}
 
 		bool UnLinkModule(HMODULE hModule, PLINK_DATA pLinkData) {
@@ -83178,6 +83193,29 @@ namespace Detours {
 
 			return RD_STATUS_SUCCESS;
 		}
+
+		void* RdGetAddressFromRelOrDisp(void* pAddress) {
+			if (!pAddress) {
+				return nullptr;
+			}
+
+			INSTRUCTION ins;
+#ifdef _M_X64
+			if (!RD_SUCCESS(RdDecode(&ins, reinterpret_cast<unsigned char*>(pAddress), RD_CODE_64, RD_DATA_64))) {
+#elif _M_IX86
+			if (!RD_SUCCESS(RdDecode(&ins, reinterpret_cast<unsigned char*>(pAddress), RD_CODE_32, RD_DATA_32))) {
+#endif
+				return nullptr;
+			}
+
+			if (ins.IsRipRelative && ins.HasDisp) {
+				return reinterpret_cast<char*>(pAddress) + ins.Displacement + ins.Length;
+			} else if (ins.HasRelOffs) {
+				return reinterpret_cast<char*>(pAddress) + ins.RelativeOffset + ins.Length;
+			}
+
+			return nullptr;
+		}
 	}
 
 	// ----------------------------------------------------------------
@@ -83875,12 +83913,12 @@ namespace Detours {
 					const size_t unNewDisp = unTargetAddress - unTrampolineAddress;
 
 					switch (ins.DispLength) {
-						case 1: // FIXME: Impossible to do. (FIX: Replace disp8 with disp32)
-							*reinterpret_cast<unsigned char*>(reinterpret_cast<size_t>(m_pTrampoline) + unIndex + ins.DispOffset) = static_cast<unsigned char>(unNewDisp & 0xFF);
-							break;
-						case 2: // FIXME: Possible crash. (FIX: Same as with disp8)
-							*reinterpret_cast<unsigned short*>(reinterpret_cast<size_t>(m_pTrampoline) + unIndex + ins.DispOffset) = static_cast<unsigned short>(unNewDisp & 0xFFFF);
-							break;
+						//case 1: // FIXME: Impossible to do. (FIX: Replace disp8 with disp32)
+						//	*reinterpret_cast<unsigned char*>(reinterpret_cast<size_t>(m_pTrampoline) + unIndex + ins.DispOffset) = static_cast<unsigned char>(unNewDisp & 0xFF);
+						//	break;
+						//case 2: // FIXME: Possible crash. (FIX: Same as with disp8)
+						//	*reinterpret_cast<unsigned short*>(reinterpret_cast<size_t>(m_pTrampoline) + unIndex + ins.DispOffset) = static_cast<unsigned short>(unNewDisp & 0xFFFF);
+						//	break;
 						case 4:
 							*reinterpret_cast<unsigned int*>(reinterpret_cast<size_t>(m_pTrampoline) + unIndex + ins.DispOffset) = static_cast<unsigned int>(unNewDisp & 0xFFFFFFFF);
 							break;
@@ -83895,12 +83933,12 @@ namespace Detours {
 					const size_t unNewOffset = unTargetAddress - unTrampolineAddress;
 
 					switch (ins.RelOffsLength) {
-						case 1: // FIXME: Impossible to do. (FIX: Replace rel8 with rel32)
-							*reinterpret_cast<unsigned char*>(reinterpret_cast<size_t>(m_pTrampoline) + unIndex + ins.RelOffsOffset) = static_cast<unsigned char>(unNewOffset & 0xFF);
-							break;
-						case 2: // FIXME: Possible crash. (FIX: Same as with rel8)
-							*reinterpret_cast<unsigned short*>(reinterpret_cast<size_t>(m_pTrampoline) + unIndex + ins.RelOffsOffset) = static_cast<unsigned short>(unNewOffset & 0xFFFF);
-							break;
+						//case 1: // FIXME: Impossible to do. (FIX: Replace rel8 with rel32)
+						//	*reinterpret_cast<unsigned char*>(reinterpret_cast<size_t>(m_pTrampoline) + unIndex + ins.RelOffsOffset) = static_cast<unsigned char>(unNewOffset & 0xFF);
+						//	break;
+						//case 2: // FIXME: Possible crash. (FIX: Same as with rel8)
+						//	*reinterpret_cast<unsigned short*>(reinterpret_cast<size_t>(m_pTrampoline) + unIndex + ins.RelOffsOffset) = static_cast<unsigned short>(unNewOffset & 0xFFFF);
+						//	break;
 						case 4:
 							*reinterpret_cast<unsigned int*>(reinterpret_cast<size_t>(m_pTrampoline) + unIndex + ins.RelOffsOffset) = static_cast<unsigned int>(unNewOffset & 0xFFFFFFFF);
 							break;
@@ -84408,12 +84446,12 @@ namespace Detours {
 					const size_t unNewDisp = unTargetAddress - unTrampolineAddress;
 
 					switch (ins.DispLength) {
-						case 1: // FIXME: Impossible to do. (FIX: Replace disp8 with disp32)
-							*reinterpret_cast<unsigned char*>(reinterpret_cast<size_t>(m_pTrampoline) + unIndex + ins.DispOffset) = static_cast<unsigned char>(unNewDisp & 0xFF);
-							break;
-						case 2: // FIXME: Possible crash. (FIX: Same as with disp8)
-							*reinterpret_cast<unsigned short*>(reinterpret_cast<size_t>(m_pTrampoline) + unIndex + ins.DispOffset) = static_cast<unsigned short>(unNewDisp & 0xFFFF);
-							break;
+						//case 1: // FIXME: Impossible to do. (FIX: Replace disp8 with disp32)
+						//	*reinterpret_cast<unsigned char*>(reinterpret_cast<size_t>(m_pTrampoline) + unIndex + ins.DispOffset) = static_cast<unsigned char>(unNewDisp & 0xFF);
+						//	break;
+						//case 2: // FIXME: Possible crash. (FIX: Same as with disp8)
+						//	*reinterpret_cast<unsigned short*>(reinterpret_cast<size_t>(m_pTrampoline) + unIndex + ins.DispOffset) = static_cast<unsigned short>(unNewDisp & 0xFFFF);
+						//	break;
 						case 4:
 							*reinterpret_cast<unsigned int*>(reinterpret_cast<size_t>(m_pTrampoline) + unIndex + ins.DispOffset) = static_cast<unsigned int>(unNewDisp & 0xFFFFFFFF);
 							break;
@@ -84430,12 +84468,12 @@ namespace Detours {
 					const size_t unNewOffset = unTargetAddress - unTrampolineAddress;
 
 					switch (ins.RelOffsLength) {
-						case 1: // FIXME: Impossible to do. (FIX: Replace rel8 with rel32)
-							*reinterpret_cast<unsigned char*>(reinterpret_cast<size_t>(m_pTrampoline) + unIndex + ins.RelOffsOffset) = static_cast<unsigned char>(unNewOffset & 0xFF);
-							break;
-						case 2: // FIXME: Possible crash. (FIX: Same as with rel8)
-							*reinterpret_cast<unsigned short*>(reinterpret_cast<size_t>(m_pTrampoline) + unIndex + ins.RelOffsOffset) = static_cast<unsigned short>(unNewOffset & 0xFFFF);
-							break;
+						//case 1: // FIXME: Impossible to do. (FIX: Replace rel8 with rel32)
+						//	*reinterpret_cast<unsigned char*>(reinterpret_cast<size_t>(m_pTrampoline) + unIndex + ins.RelOffsOffset) = static_cast<unsigned char>(unNewOffset & 0xFF);
+						//	break;
+						//case 2: // FIXME: Possible crash. (FIX: Same as with rel8)
+						//	*reinterpret_cast<unsigned short*>(reinterpret_cast<size_t>(m_pTrampoline) + unIndex + ins.RelOffsOffset) = static_cast<unsigned short>(unNewOffset & 0xFFFF);
+						//	break;
 						case 4:
 							*reinterpret_cast<unsigned int*>(reinterpret_cast<size_t>(m_pTrampoline) + unIndex + ins.RelOffsOffset) = static_cast<unsigned int>(unNewOffset & 0xFFFFFFFF);
 							break;
@@ -86007,12 +86045,12 @@ namespace Detours {
 					const size_t unNewDisp = unTargetAddress - unTrampolineAddress;
 
 					switch (ins.DispLength) {
-						case 1: // FIXME: Impossible to do (FIX: Replace disp8 to disp32)
-							*reinterpret_cast<unsigned char*>(reinterpret_cast<size_t>(m_pTrampoline) + unIndex + ins.DispOffset) = static_cast<unsigned char>(unNewDisp & 0xFF);
-							break;
-						case 2: // FIXME: Possible crash (FIX: Same as disp8)
-							*reinterpret_cast<unsigned short*>(reinterpret_cast<size_t>(m_pTrampoline) + unIndex + ins.DispOffset) = static_cast<unsigned short>(unNewDisp & 0xFFFF);
-							break;
+						//case 1: // FIXME: Impossible to do (FIX: Replace disp8 to disp32)
+						//	*reinterpret_cast<unsigned char*>(reinterpret_cast<size_t>(m_pTrampoline) + unIndex + ins.DispOffset) = static_cast<unsigned char>(unNewDisp & 0xFF);
+						//	break;
+						//case 2: // FIXME: Possible crash (FIX: Same as disp8)
+						//	*reinterpret_cast<unsigned short*>(reinterpret_cast<size_t>(m_pTrampoline) + unIndex + ins.DispOffset) = static_cast<unsigned short>(unNewDisp & 0xFFFF);
+						//	break;
 						case 4:
 							*reinterpret_cast<unsigned int*>(reinterpret_cast<size_t>(m_pTrampoline) + unIndex + ins.DispOffset) = static_cast<unsigned int>(unNewDisp & 0xFFFFFFFF);
 							break;
@@ -86030,12 +86068,12 @@ namespace Detours {
 					const size_t unNewOffset = unTargetAddress - unTrampolineAddress;
 
 					switch (ins.RelOffsLength) {
-						case 1: // FIXME: Impossible to do (FIX: Replace rel8 to rel32)
-							*reinterpret_cast<unsigned char*>(reinterpret_cast<size_t>(m_pTrampoline) + unIndex + ins.RelOffsOffset) = static_cast<unsigned char>(unNewOffset & 0xFF);
-							break;
-						case 2: // FIXME: Possible error (FIX: Same as rel8)
-							*reinterpret_cast<unsigned short*>(reinterpret_cast<size_t>(m_pTrampoline) + unIndex + ins.RelOffsOffset) = static_cast<unsigned short>(unNewOffset & 0xFFFF);
-							break;
+						//case 1: // FIXME: Impossible to do (FIX: Replace rel8 to rel32)
+						//	*reinterpret_cast<unsigned char*>(reinterpret_cast<size_t>(m_pTrampoline) + unIndex + ins.RelOffsOffset) = static_cast<unsigned char>(unNewOffset & 0xFF);
+						//	break;
+						//case 2: // FIXME: Possible error (FIX: Same as rel8)
+						//	*reinterpret_cast<unsigned short*>(reinterpret_cast<size_t>(m_pTrampoline) + unIndex + ins.RelOffsOffset) = static_cast<unsigned short>(unNewOffset & 0xFFFF);
+						//	break;
 						case 4:
 							*reinterpret_cast<unsigned int*>(reinterpret_cast<size_t>(m_pTrampoline) + unIndex + ins.RelOffsOffset) = static_cast<unsigned int>(unNewOffset & 0xFFFFFFFF);
 							break;
