@@ -156,6 +156,12 @@ namespace Detours {
 	const volatile KUSER_SHARED_DATA& KUserSharedData = *reinterpret_cast<PKUSER_SHARED_DATA>(0x7FFE0000);
 
 	// ----------------------------------------------------------------
+	// KUSER_QPC_SHARED_DATA
+	// ----------------------------------------------------------------
+
+	const volatile KUSER_QPC_SHARED_DATA& KUserQpcSharedData = *reinterpret_cast<PKUSER_QPC_SHARED_DATA>(0x7FFEE000);
+
+	// ----------------------------------------------------------------
 	// PEB
 	// ----------------------------------------------------------------
 

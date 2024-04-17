@@ -781,6 +781,19 @@ namespace Detours {
 	extern const volatile KUSER_SHARED_DATA& KUserSharedData;
 
 	// ----------------------------------------------------------------
+	// KUSER_QPC_SHARED_DATA
+	// ----------------------------------------------------------------
+
+	typedef struct _KUSER_QPC_SHARED_DATA {
+		ULONG Present;
+		ULONG Reserved1;
+		ULONGLONG MultiplierValue;
+		ULONGLONG AdditionalOffset;
+	} KUSER_QPC_SHARED_DATA, *PKUSER_QPC_SHARED_DATA;
+
+	extern const volatile KUSER_QPC_SHARED_DATA& KUserQpcSharedData;
+
+	// ----------------------------------------------------------------
 	// LDR
 	// ----------------------------------------------------------------
 
