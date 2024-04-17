@@ -14,6 +14,7 @@ A set of tools for working with software modifications.
 
 # Detours
 * KUserSharedData - A data area structure that the kernel allocates for sharing with user-mode software.
+* KUserQpcSharedData - A data area structure that the kernel allocates for sharing with QueryPerformanceCounter in user-mode software.
 * GetPEB - Gets *Process Environment Block* (PEB) of the currently running process.
 * GetTEB - Gets *Thread Environment Block* (TEB) of the current thread or thread from a handle.
 
