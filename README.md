@@ -10,7 +10,7 @@ A set of tools for working with software modifications.
 * `DECLARE_SECTION(NAME)` - Macro for declaring a section for use with `DEFINE_IN_SECTION`.
 * `DEFINE_SECTION(NAME, ATTRIBUTES)` - Macro for defining or redefining a section with specified attributes.
 * `DEFINE_IN_SECTION(NAME)` - Macro for defining data in a section specified by its name.
-* `DEFINE_IN_CODE_SECTION(NAME)` - Macro for defining code in a section not created by `DECLARE_SECTION` but defined by `DEFINE_SECTION`.
+* `DEFINE_IN_CODE_SECTION(NAME)` - Macro for defining code in a section not declared by `DECLARE_SECTION` but defined by `DEFINE_SECTION`.
 
 # Detours
 * KUserSharedData - A data area structure that the kernel allocates for sharing with user-mode software.
