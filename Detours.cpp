@@ -4450,7 +4450,7 @@ namespace Detours {
 		}
 
 		CriticalSection::CriticalSection(DWORD unSpinCount) {
-			InitializeCriticalSectionAndSpinCount(&m_CriticalSection, unSpinCount);
+			UNREFERENCED_PARAMETER(InitializeCriticalSectionAndSpinCount(&m_CriticalSection, unSpinCount));
 		}
 
 		CriticalSection::~CriticalSection() {
@@ -5419,23 +5419,32 @@ namespace Detours {
 			}
 		}
 
-		void* Page::Alloc(size_t unSize) {
+		void* Page::Alloc(size_t unSize, size_t unSizeAlign, size_t unAddressAlign) {
 			if (!m_pPageAddress || !unSize) {
 				return nullptr;
 			}
 
-			for (auto it = m_FreeBlocks.begin(); it != m_FreeBlocks.end(); ++it) {
-				if (it->m_unSize >= unSize) {
-					void* pAddress = it->m_pAddress;
+			const bool bSizeAlign = (unSizeAlign > 1) && !(unSizeAlign & (unSizeAlign - 1));
+			const bool bAddressAlign = (unAddressAlign > 1) && !(unAddressAlign & (unAddressAlign - 1));
 
-					if (it->m_unSize > unSize) {
-						m_FreeBlocks.emplace(reinterpret_cast<char*>(it->m_pAddress) + unSize, it->m_unSize - unSize);
+			for (auto it = m_FreeBlocks.begin(); it != m_FreeBlocks.end(); ++it) {
+				const size_t unAddress = reinterpret_cast<size_t>(it->m_pAddress);
+				const size_t unAddressAlignSize = !bAddressAlign ? 0 : (((unAddress % unAddressAlign == 0) ? 0 : (unAddressAlign - (unAddress % unAddressAlign))));
+
+				const size_t unSizeAlignSize = !bSizeAlign ? 0 : ((unSize % unSizeAlign) == 0) ? 0 : (unSizeAlign - (unSize % unSizeAlign));
+				const size_t unAlignedSize = unSize + unSizeAlignSize;
+
+				if (it->m_unSize >= unAlignedSize + unAddressAlignSize) {
+					void* pAlignedAddress = reinterpret_cast<char*>(unAddress) + unAddressAlignSize;
+
+					if (it->m_unSize > unAlignedSize + unAddressAlignSize) {
+						m_FreeBlocks.emplace(reinterpret_cast<char*>(pAlignedAddress) + unAlignedSize, it->m_unSize - unAlignedSize - unAddressAlignSize);
 					}
 
-					m_ActiveBlocks.emplace(pAddress, unSize);
+					m_ActiveBlocks.emplace(pAlignedAddress, unSize);
 					m_FreeBlocks.erase(it);
 
-					return pAddress;
+					return pAlignedAddress;
 				}
 			}
 
@@ -5606,23 +5615,32 @@ namespace Detours {
 			}
 		}
 
-		void* NearPage::Alloc(size_t unSize) {
+		void* NearPage::Alloc(size_t unSize, size_t unSizeAlign, size_t unAddressAlign) {
 			if (!m_pPageAddress || !unSize) {
 				return nullptr;
 			}
 
-			for (auto it = m_FreeBlocks.begin(); it != m_FreeBlocks.end(); ++it) {
-				if (it->m_unSize >= unSize) {
-					void* pAddress = it->m_pAddress;
+			const bool bSizeAlign = (unSizeAlign > 1) && !(unSizeAlign & (unSizeAlign - 1));
+			const bool bAddressAlign = (unAddressAlign > 1) && !(unAddressAlign & (unAddressAlign - 1));
 
-					if (it->m_unSize > unSize) {
-						m_FreeBlocks.emplace(reinterpret_cast<char*>(it->m_pAddress) + unSize, it->m_unSize - unSize);
+			for (auto it = m_FreeBlocks.begin(); it != m_FreeBlocks.end(); ++it) {
+				const size_t unAddress = reinterpret_cast<size_t>(it->m_pAddress);
+				const size_t unAddressAlignSize = !bAddressAlign ? 0 : (((unAddress % unAddressAlign == 0) ? 0 : (unAddressAlign - (unAddress % unAddressAlign))));
+
+				const size_t unSizeAlignSize = !bSizeAlign ? 0 : ((unSize % unSizeAlign) == 0) ? 0 : (unSizeAlign - (unSize % unSizeAlign));
+				const size_t unAlignedSize = unSize + unSizeAlignSize;
+
+				if (it->m_unSize >= unAlignedSize + unAddressAlignSize) {
+					void* pAlignedAddress = reinterpret_cast<char*>(unAddress) + unAddressAlignSize;
+
+					if (it->m_unSize > unAlignedSize + unAddressAlignSize) {
+						m_FreeBlocks.emplace(reinterpret_cast<char*>(pAlignedAddress) + unAlignedSize, it->m_unSize - unAlignedSize - unAddressAlignSize);
 					}
 
-					m_ActiveBlocks.emplace(pAddress, unSize);
+					m_ActiveBlocks.emplace(pAlignedAddress, unSize);
 					m_FreeBlocks.erase(it);
 
-					return pAddress;
+					return pAlignedAddress;
 				}
 			}
 
@@ -5742,12 +5760,17 @@ namespace Detours {
 			m_unUsedSpace = 0;
 		}
 
-		void* Storage::Alloc(size_t unSize) {
-			if (unSize > m_unPageCapacity) {
+		void* Storage::Alloc(size_t unSize, size_t unSizeAlign, size_t unAddressAlign) {
+			const bool bSizeAlign = (unSizeAlign > 1) && !(unSizeAlign & (unSizeAlign - 1));
+
+			const size_t unSizeAlignSize = !bSizeAlign ? 0 : ((unSize % unSizeAlign) == 0) ? 0 : (unSizeAlign - (unSize % unSizeAlign));
+			const size_t unAlignedSize = unSize + unSizeAlignSize;
+
+			if (unAlignedSize > m_unPageCapacity) {
 				return nullptr;
 			}
 
-			if (m_unUsedSpace + unSize > m_unTotalCapacity) {
+			if (m_unUsedSpace + unAlignedSize > m_unTotalCapacity) {
 				return nullptr;
 			}
 
@@ -5755,17 +5778,18 @@ namespace Detours {
 				m_Pages.emplace_back(m_unPageCapacity);
 				if (!m_Pages.back().GetAddress()) {
 					m_Pages.pop_back();
+					return nullptr;
 				}
 			}
 
 			for (auto& Page : m_Pages) {
-				if ((Page.GetCapacity() - Page.GetSize()) >= unSize) {
-					void* pMemory = Page.Alloc(unSize);
+				if ((Page.GetCapacity() - Page.GetSize()) >= unAlignedSize) {
+					void* pMemory = Page.Alloc(unSize, unSizeAlign, unAddressAlign);
 					if (!pMemory) {
 						continue;
 					}
 
-					m_unUsedSpace += unSize;
+					m_unUsedSpace += unAlignedSize;
 					return pMemory;
 				}
 			}
@@ -5773,9 +5797,9 @@ namespace Detours {
 			if (m_unUsedSpace + m_unPageCapacity <= m_unTotalCapacity) {
 				m_Pages.emplace_back(m_unPageCapacity);
 
-				void* pMemory = m_Pages.back().Alloc(unSize);
+				void* pMemory = m_Pages.back().Alloc(unSize, unSizeAlign, unAddressAlign);
 				if (pMemory) {
-					m_unUsedSpace += unSize;
+					m_unUsedSpace += unAlignedSize;
 					return pMemory;
 				}
 
@@ -5879,12 +5903,17 @@ namespace Detours {
 			m_unUsedSpace = 0;
 		}
 
-		void* NearStorage::Alloc(size_t unSize, void* pDesiredAddress) {
-			if (unSize > m_unPageCapacity) {
+		void* NearStorage::Alloc(size_t unSize, void* pDesiredAddress, size_t unSizeAlign, size_t unAddressAlign) {
+			const bool bSizeAlign = (unSizeAlign > 1) && !(unSizeAlign & (unSizeAlign - 1));
+
+			const size_t unSizeAlignSize = !bSizeAlign ? 0 : ((unSize % unSizeAlign) == 0) ? 0 : (unSizeAlign - (unSize % unSizeAlign));
+			const size_t unAlignedSize = unSize + unSizeAlignSize;
+
+			if (unAlignedSize > m_unPageCapacity) {
 				return nullptr;
 			}
 
-			if (m_unUsedSpace + unSize > m_unTotalCapacity) {
+			if (m_unUsedSpace + unAlignedSize > m_unTotalCapacity) {
 				return nullptr;
 			}
 
@@ -5897,50 +5926,40 @@ namespace Detours {
 
 			if (pDesiredAddress) {
 				for (auto& Page : m_Pages) {
-					if ((Page.GetCapacity() - Page.GetSize()) >= unSize) {
-						if (!__is_relative(pDesiredAddress, reinterpret_cast<char*>(Page.GetAddress()) + Page.GetSize())) {
+					if ((Page.GetCapacity() - Page.GetSize()) >= unAlignedSize) {
+						if (!__is_relative(pDesiredAddress, Page.GetAddress()) || !__is_relative(pDesiredAddress, reinterpret_cast<char*>(Page.GetAddress()) + Page.GetSize())) {
 							continue;
 						}
 
-						void* pMemory = Page.Alloc(unSize);
+						void* pMemory = Page.Alloc(unSize, unSizeAlign, unAddressAlign);
 						if (!pMemory) {
 							continue;
 						}
 
-						m_unUsedSpace += unSize;
+						m_unUsedSpace += unAlignedSize;
 						return pMemory;
 					}
 				}
-
-				m_Pages.emplace_back(m_unPageCapacity, pDesiredAddress);
-
-				void* pMemory = m_Pages.back().Alloc(unSize);
-				if (pMemory) {
-					m_unUsedSpace += unSize;
-					return pMemory;
-				}
-
-				m_Pages.pop_back();
 			} else {
 				for (auto& Page : m_Pages) {
-					if ((Page.GetCapacity() - Page.GetSize()) >= unSize) {
-						void* pMemory = Page.Alloc(unSize);
+					if ((Page.GetCapacity() - Page.GetSize()) >= unAlignedSize) {
+						void* pMemory = Page.Alloc(unSize, unSizeAlign, unAddressAlign);
 						if (!pMemory) {
 							continue;
 						}
 
-						m_unUsedSpace += unSize;
+						m_unUsedSpace += unAlignedSize;
 						return pMemory;
 					}
 				}
 			}
 
 			if (m_unUsedSpace + m_unPageCapacity <= m_unTotalCapacity) {
-				m_Pages.emplace_back(m_unPageCapacity, pDesiredAddress);
+				m_Pages.emplace_back(m_unPageCapacity);
 
-				void* pMemory = m_Pages.back().Alloc(unSize);
+				void* pMemory = m_Pages.back().Alloc(unSize, unSizeAlign, unAddressAlign);
 				if (pMemory) {
-					m_unUsedSpace += unSize;
+					m_unUsedSpace += unAlignedSize;
 					return pMemory;
 				}
 

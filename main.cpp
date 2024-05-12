@@ -1464,9 +1464,266 @@ bool __cdecl CallConv_Convert_RawHook(Detours::Hook::PRAW_CONTEXT pCTX) {
 	return true;
 }
 
+//void TestPageAlloc() {
+//	Detours::Memory::NearStorage Page;
+//
+//	// Test 1: Check if allocation of page size succeeds
+//	if (Page.Alloc(Page.GetCapacity())) {
+//		_tprintf(_T("OK1!\n"));
+//	} else {
+//		_tprintf(_T("FAIL1!\n"));
+//	}
+//
+//	// Test 2: Try to allocate 1 byte, should fail
+//	if (!Page.Alloc(1)) {
+//		_tprintf(_T("OK2!\n"));
+//	} else {
+//		_tprintf(_T("FAIL2!\n"));
+//	}
+//
+//	// Test 3: Try to allocate 1 byte with 2-byte alignment, should fail
+//	if (!Page.Alloc(1, nullptr, 2)) {
+//		_tprintf(_T("OK3!\n"));
+//	} else {
+//		_tprintf(_T("FAIL3!\n"));
+//	}
+//
+//	// Test 4: Try to allocate 1 byte with 4-byte alignment, should fail
+//	if (!Page.Alloc(1, nullptr, 4)) {
+//		_tprintf(_T("OK4!\n"));
+//	} else {
+//		_tprintf(_T("FAIL4!\n"));
+//	}
+//
+//	// Test 5: Try to allocate 1 byte with 8-byte alignment, should fail
+//	if (!Page.Alloc(1, nullptr, 8)) {
+//		_tprintf(_T("OK5!\n"));
+//	} else {
+//		_tprintf(_T("FAIL5!\n"));
+//	}
+//
+//	// Test 6: Check if address alignment works
+//	Page.DeAllocAll();
+//	if ((reinterpret_cast<size_t>(Page.Alloc(1, nullptr)) & 0x7) == 0) {
+//		_tprintf(_T("OK6!\n"));
+//	} else {
+//		_tprintf(_T("FAIL6!\n"));
+//	}
+//
+//	// Test 7: Check if address alignment with 2-byte alignment works
+//	if ((reinterpret_cast<size_t>(Page.Alloc(1, nullptr, 2)) & 0x1) == 0) {
+//		_tprintf(_T("OK7!\n"));
+//	} else {
+//		_tprintf(_T("FAIL7!\n"));
+//	}
+//
+//	// Test 8: Check if address alignment with 4-byte alignment works
+//	if ((reinterpret_cast<size_t>(Page.Alloc(1, nullptr, 4)) & 0x3) == 0) {
+//		_tprintf(_T("OK8!\n"));
+//	} else {
+//		_tprintf(_T("FAIL8!\n"));
+//	}
+//
+//	// Test 9: Check if address alignment with 8-byte alignment works
+//	if ((reinterpret_cast<size_t>(Page.Alloc(1, nullptr, 8)) & 0x8) == 8) {
+//		_tprintf(_T("OK9!\n"));
+//	} else {
+//		_tprintf(_T("FAIL9!\n"));
+//	}
+//
+//	// Test 10: Try to allocate more than available space with alignment, should fail
+//	if (!Page.Alloc(Page.GetCapacity(), nullptr, 8)) {
+//		_tprintf(_T("OK10!\n"));
+//	} else {
+//		_tprintf(_T("FAIL10!\n"));
+//	}
+//
+//	// Test 11: Try to allocate with size alignment larger than page size, should fail
+//	Page.DeAllocAll();
+//	if (!Page.Alloc(Page.GetCapacity(), nullptr, Page.GetCapacity() * 2)) {
+//		_tprintf(_T("OK11!\n"));
+//	} else {
+//		_tprintf(_T("FAIL11!\n"));
+//	}
+//
+//	// Test 12: Try to allocate just under page size, should succeed
+//	Page.DeAllocAll();
+//	if (Page.Alloc(Page.GetCapacity() - 1)) {
+//		_tprintf(_T("OK12!\n"));
+//	} else {
+//		_tprintf(_T("FAIL12!\n"));
+//	}
+//
+//	// Test 13: Try to allocate 1 byte after deallocating, should succeed
+//	if (!Page.Alloc(1)) {
+//		_tprintf(_T("OK13!\n"));
+//	} else {
+//		_tprintf(_T("FAIL13!\n"));
+//	}
+//
+//	// Test 14: Try to allocate just under page size after deallocating, should succeed
+//	Page.DeAllocAll();
+//	if (Page.Alloc(Page.GetCapacity() - 1)) {
+//		_tprintf(_T("OK14!\n"));
+//	} else {
+//		_tprintf(_T("FAIL14!\n"));
+//	}
+//
+//	// Test 15: Try to allocate 1 byte with 2-byte alignment after deallocating, should fail
+//	if (!Page.Alloc(1, nullptr, 2)) {
+//		_tprintf(_T("OK15!\n"));
+//	} else {
+//		_tprintf(_T("FAIL15!\n"));
+//	}
+//
+//	// Test 16: Try to allocate just under page size with alignment after deallocating, should succeed
+//	Page.DeAllocAll();
+//	if (Page.Alloc(Page.GetCapacity() - 2)) {
+//		_tprintf(_T("OK16!\n"));
+//	} else {
+//		_tprintf(_T("FAIL16!\n"));
+//	}
+//
+//	// Test 17: Try to allocate 1 byte with 2-byte alignment after deallocating, should succeed
+//	if (Page.Alloc(1, nullptr, 2, 2)) {
+//		_tprintf(_T("OK17!\n"));
+//	} else {
+//		_tprintf(_T("FAIL17!\n"));
+//	}
+//
+//	// Test 18: Try to allocate just under page size with alignment after deallocating, should succeed
+//	Page.DeAllocAll();
+//	if (Page.Alloc(Page.GetCapacity() - 2)) {
+//		_tprintf(_T("OK18!\n"));
+//	} else {
+//		_tprintf(_T("FAIL18!\n"));
+//	}
+//
+//	// Test 19: Try to allocate 1 byte with 4-byte alignment after deallocating, should fail
+//	if (!Page.Alloc(1, nullptr, 4)) {
+//		_tprintf(_T("OK19!\n"));
+//	} else {
+//		_tprintf(_T("FAIL19!\n"));
+//	}
+//
+//	// Test 20: Try to allocate just under page size with alignment after deallocating, should succeed
+//	Page.DeAllocAll();
+//	if (Page.Alloc(Page.GetCapacity() - 2)) {
+//		_tprintf(_T("OK20!\n"));
+//	} else {
+//		_tprintf(_T("FAIL20!\n"));
+//	}
+//
+//	// Test 21: Try to allocate 2 bytes with 8-byte alignment after deallocating, should fail
+//	if (!Page.Alloc(2, nullptr, 8)) {
+//		_tprintf(_T("OK21!\n"));
+//	} else {
+//		_tprintf(_T("FAIL21!\n"));
+//	}
+//
+//	Page.DeAllocAll();
+//
+//#ifdef _M_X64
+//	_tprintf_s(_T("Memory: 0x%016llX\n"), reinterpret_cast<size_t>(Page.Alloc(4, nullptr, 4, 16)));
+//	_tprintf_s(_T("Memory: 0x%016llX\n"), reinterpret_cast<size_t>(Page.Alloc(4, nullptr, 4, 16)));
+//#elif _M_IX86
+//	_tprintf_s(_T("Memory: 0x%08X\n"), reinterpret_cast<size_t>(Page.Alloc(4, nullptr, 4, 16)));
+//	_tprintf_s(_T("Memory: 0x%08X\n"), reinterpret_cast<size_t>(Page.Alloc(4, nullptr, 4, 16)));
+//#endif
+//
+//	Page.DeAllocAll();
+//
+//	// Test 22: Try to allocate maximum possible size
+//	if (Page.Alloc(Page.GetCapacity(), nullptr, 1, 1)) {
+//		_tprintf(_T("OK22!\n"));
+//	} else {
+//		_tprintf(_T("FAIL22!\n"));
+//	}
+//
+//	// Test 23: Try to allocate more than the maximum possible size, should fail
+//	if (!Page.Alloc(Page.GetCapacity() + 1, nullptr, 1, 1)) {
+//		_tprintf(_T("OK23!\n"));
+//	} else {
+//		_tprintf(_T("FAIL23!\n"));
+//	}
+//
+//	// Test 24: Check if address alignment with size alignment works
+//	Page.DeAllocAll();
+//	if ((reinterpret_cast<size_t>(Page.Alloc(1, nullptr, 4, 4)) & 3) == 0) {
+//		_tprintf(_T("OK24!\n"));
+//	} else {
+//		_tprintf(_T("FAIL24!\n"));
+//	}
+//
+//	// Test 25: Check if size alignment with address alignment works
+//	Page.DeAllocAll();
+//	if ((reinterpret_cast<size_t>(Page.Alloc(1, nullptr, 4, 4)) & 3) == 0) {
+//		_tprintf(_T("OK25!\n"));
+//	} else {
+//		_tprintf(_T("FAIL25!\n"));
+//	}
+//
+//	// Test 26: Try to allocate 0 bytes, should fail
+//	if (!Page.Alloc(0)) {
+//		_tprintf(_T("OK26!\n"));
+//	} else {
+//		_tprintf(_T("FAIL26!\n"));
+//	}
+//
+//	// Test 27: Try to allocate with size alignment larger than address alignment, should fail
+//	Page.DeAllocAll();
+//	if (Page.Alloc(1, nullptr, 4, 8)) {
+//		_tprintf(_T("OK27!\n"));
+//	} else {
+//		_tprintf(_T("FAIL27!\n"));
+//	}
+//
+//	// Test 28: Try to allocate with address alignment larger than size alignment, should fail
+//	Page.DeAllocAll();
+//	if (Page.Alloc(1, nullptr, 8, 4)) {
+//		_tprintf(_T("OK28!\n"));
+//	} else {
+//		_tprintf(_T("FAIL28!\n"));
+//	}
+//
+//	// Test 29: Try to allocate 0 bytes with alignment, should fail
+//	Page.DeAllocAll();
+//	if (!Page.Alloc(0, nullptr, 4, 4)) {
+//		_tprintf(_T("OK29!\n"));
+//	} else {
+//		_tprintf(_T("FAIL29!\n"));
+//	}
+//
+//	// Test 30: Try to allocate with 0 address alignment, should succeed
+//	Page.DeAllocAll();
+//	if (Page.Alloc(1, nullptr, 4, 0)) {
+//		_tprintf(_T("OK30!\n"));
+//	} else {
+//		_tprintf(_T("FAIL30!\n"));
+//	}
+//
+//	// Test 31: Try to allocate with 0 size alignment, should succeed
+//	Page.DeAllocAll();
+//	if (Page.Alloc(1, nullptr, 0, 4)) {
+//		_tprintf(_T("OK31!\n"));
+//	} else {
+//		_tprintf(_T("FAIL31!\n"));
+//	}
+//
+//	// Test 32: Try to allocate 0 bytes with 0 alignment, should succeed
+//	Page.DeAllocAll();
+//	if (!Page.Alloc(0, nullptr, 0, 0)) {
+//		_tprintf(_T("OK32!\n"));
+//	} else {
+//		_tprintf(_T("FAIL32!\n"));
+//	}
+//}
+
 int _tmain(int nArguments, PTCHAR* pArguments) {
 	g_pBaseTestingRTTI = new BaseTestingRTTI();
 	g_pTestingRTTI = new TestingRTTI();
+
+	//TestPageAlloc();
 
 	// ----------------------------------------------------------------
 	// Memory Server & Client Example

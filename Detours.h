@@ -2435,7 +2435,7 @@ namespace Detours {
 			Page(size_t unCapacity = 0);
 			~Page();
 
-			void* Alloc(size_t unSize);
+			void* Alloc(size_t unSize, size_t unSizeAlign = 1, size_t unAddressAlign = sizeof(void*));
 			bool DeAlloc(void* pAddress);
 			void DeAllocAll();
 
@@ -2478,7 +2478,7 @@ namespace Detours {
 			NearPage(size_t unCapacity = 0, void* pDesiredAddress = nullptr);
 			~NearPage();
 
-			void* Alloc(size_t unSize);
+			void* Alloc(size_t unSize, size_t unSizeAlign = 1, size_t unAddressAlign = sizeof(void*));
 			bool DeAlloc(void* pAddress);
 			void DeAllocAll();
 
@@ -2522,7 +2522,7 @@ namespace Detours {
 			~Storage() = default;
 
 		public:
-			void* Alloc(size_t unSize);
+			void* Alloc(size_t unSize, size_t unSizeAlign = 1, size_t unAddressAlign = sizeof(void*));
 			bool DeAlloc(void* pAddress);
 			bool DeAllocAll();
 
@@ -2548,7 +2548,7 @@ namespace Detours {
 			~NearStorage() = default;
 
 		public:
-			void* Alloc(size_t unSize, void* pDesiredAddress = nullptr);
+			void* Alloc(size_t unSize, void* pDesiredAddress = nullptr, size_t unSizeAlign = 1, size_t unAddressAlign = sizeof(void*));
 			bool DeAlloc(void* pAddress);
 			bool DeAllocAll();
 
