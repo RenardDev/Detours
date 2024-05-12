@@ -5758,6 +5758,8 @@ namespace Detours {
 			m_unTotalCapacity = unTotalCapacity;
 			m_unPageCapacity = unPageCapacity;
 			m_unUsedSpace = 0;
+
+			m_Pages.emplace_back(unPageCapacity);
 		}
 
 		void* Storage::Alloc(size_t unSize, size_t unSizeAlign, size_t unAddressAlign) {
@@ -5780,6 +5782,11 @@ namespace Detours {
 					m_Pages.pop_back();
 					return nullptr;
 				}
+			}
+
+			if (!m_Pages.back().GetAddress()) {
+				m_Pages.pop_back();
+				return nullptr;
 			}
 
 			for (auto& Page : m_Pages) {
@@ -5901,6 +5908,8 @@ namespace Detours {
 			m_unTotalCapacity = unTotalCapacity;
 			m_unPageCapacity = unPageCapacity;
 			m_unUsedSpace = 0;
+
+			// m_Pages.emplace_back(unPageCapacity, _ReturnAddress());
 		}
 
 		void* NearStorage::Alloc(size_t unSize, void* pDesiredAddress, size_t unSizeAlign, size_t unAddressAlign) {
@@ -5922,6 +5931,11 @@ namespace Detours {
 				if (!m_Pages.back().GetAddress()) {
 					m_Pages.pop_back();
 				}
+			}
+
+			if (!m_Pages.back().GetAddress()) {
+				m_Pages.pop_back();
+				return nullptr;
 			}
 
 			if (pDesiredAddress) {
@@ -83915,7 +83929,7 @@ namespace Detours {
 				return false;
 			}
 
-			memset(m_pTrampoline, 0xC3, HOOK_INLINE_TRAMPOLINE_SIZE);
+			memset(m_pTrampoline, 0xCC, HOOK_INLINE_TRAMPOLINE_SIZE);
 			memcpy(m_pTrampoline, m_pAddress, unCopyingSize);
 
 			for (size_t unIndex = 0; unIndex < unCopyingSize;) {
@@ -84311,7 +84325,7 @@ namespace Detours {
 				return false;
 			}
 
-			memset(m_pWrapper, 0xC3, HOOK_INLINE_WRAPPER_SIZE);
+			memset(m_pWrapper, 0xCC, HOOK_INLINE_WRAPPER_SIZE);
 
 			unsigned char* pJumpToHook = reinterpret_cast<unsigned char*>(m_pWrapper);
 #ifdef _M_X64
@@ -84446,7 +84460,7 @@ namespace Detours {
 				return false;
 			}
 
-			memset(m_pTrampoline, 0xC3, HOOK_INLINE_TRAMPOLINE_SIZE);
+			memset(m_pTrampoline, 0xCC, HOOK_INLINE_TRAMPOLINE_SIZE);
 			memcpy(m_pTrampoline, m_pAddress, unCopyingSize);
 
 			for (size_t unIndex = 0; unIndex < unCopyingSize;) {
@@ -84877,7 +84891,7 @@ namespace Detours {
 				return false;
 			}
 
-			memset(m_pWrapper, 0xC3, HOOK_RAW_WRAPPER_SIZE);
+			memset(m_pWrapper, 0xCC, HOOK_RAW_WRAPPER_SIZE);
 
 			int cpuinfo[4];
 			__cpuid(cpuinfo, 1);
@@ -86044,7 +86058,7 @@ namespace Detours {
 #endif
 			}
 
-			memset(m_pTrampoline, 0xC3, HOOK_RAW_TRAMPOLINE_SIZE);
+			memset(m_pTrampoline, 0xCC, HOOK_RAW_TRAMPOLINE_SIZE);
 			memcpy(m_pTrampoline, m_pAddress, unCopyingSize);
 
 			for (size_t unIndex = 0; unIndex < unCopyingSize;) {
