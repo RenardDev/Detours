@@ -1,5 +1,5 @@
 # Detours
-A set of tools for working with software modifications.
+A set of tools for working with software modifications in two files (Detours.h, Detours.cpp).
 
 # Definitions
 * `LINKER_OPTION(OPTION)` - Macro for passing a parameter to the MSVC linker.
