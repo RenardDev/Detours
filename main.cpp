@@ -758,17 +758,132 @@ bool OnException(const EXCEPTION_RECORD& Exception, const PCONTEXT pCTX) {
 	return true;
 }
 
-bool Sleep_MemoryHook(const std::unique_ptr<Detours::Hook::MemoryHook>& pHook, const PCONTEXT pCTX) {
-	UNREFERENCED_PARAMETER(pHook);
+unsigned char g_pCustomData[256] = {
+	1, 2, 3, 3, 2, 1, 0, 0, 0, 0, 0, 0, 8, 0, 0, 0,
+	0, 0, 0, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+	0, 0, 0, 0, 5, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+	0, 0, 0, 0, 0, 6, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+	0, 0, 0, 0, 0, 0, 7, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+	0, 0, 0, 0, 0, 0, 0, 8, 0, 0, 0, 0, 0, 0, 0, 0,
+	0, 0, 0, 0, 0, 0, 0, 0, 9, 0, 0, 0, 0, 0, 0, 0,
+	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+	0, 0, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0,
+	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1
+};
 
-	_tprintf_s(_T("[Sleep_MemoryHook] Called!\n"));
+bool Data_MemoryHook(const std::unique_ptr<Detours::Hook::MemoryHook>& pHook, const PCONTEXT pCTX, const void* pAccessAddress, bool bAccessAround) {
+
+	if (bAccessAround) {
+		_tprintf_s(_T("[Data_MemoryHook] Access around hooking memory!!!\n"));
+		pHook->Disable();
+	}
+
 #ifdef _M_X64
-	pCTX->Rip = *reinterpret_cast<PDWORD64>(pCTX->Rsp); // [SP] = RETURN ADDRESS
-	pCTX->Rsp += 8; // Clearing stack (RETURN ADDRESS)
+	const DWORD64 unAccessAddress = reinterpret_cast<DWORD64>(pAccessAddress);
+	const DWORD64 unAccessOffset = unAccessAddress - reinterpret_cast<DWORD64>(pHook->GetAddress());
+
+	if (pCTX->Rax == unAccessAddress) {
+		pCTX->Rax = reinterpret_cast<DWORD64>(g_pCustomData) + unAccessOffset;
+	}
+
+	if (pCTX->Rcx == unAccessAddress) {
+		pCTX->Rcx = reinterpret_cast<DWORD64>(g_pCustomData) + unAccessOffset;
+	}
+
+	if (pCTX->Rdx == unAccessAddress) {
+		pCTX->Rdx = reinterpret_cast<DWORD64>(g_pCustomData) + unAccessOffset;
+	}
+
+	if (pCTX->Rbx == unAccessAddress) {
+		pCTX->Rbx = reinterpret_cast<DWORD64>(g_pCustomData) + unAccessOffset;
+	}
+
+	if (pCTX->Rsp == unAccessAddress) {
+		pCTX->Rsp = reinterpret_cast<DWORD64>(g_pCustomData) + unAccessOffset;
+	}
+
+	if (pCTX->Rbp == unAccessAddress) {
+		pCTX->Rbp = reinterpret_cast<DWORD64>(g_pCustomData) + unAccessOffset;
+	}
+
+	if (pCTX->Rsi == unAccessAddress) {
+		pCTX->Rsi = reinterpret_cast<DWORD64>(g_pCustomData) + unAccessOffset;
+	}
+
+	if (pCTX->Rdi == unAccessAddress) {
+		pCTX->Rdi = reinterpret_cast<DWORD64>(g_pCustomData) + unAccessOffset;
+	}
+
+	if (pCTX->R8 == unAccessAddress) {
+		pCTX->R8 = reinterpret_cast<DWORD64>(g_pCustomData) + unAccessOffset;
+	}
+
+	if (pCTX->R9 == unAccessAddress) {
+		pCTX->R9 = reinterpret_cast<DWORD64>(g_pCustomData) + unAccessOffset;
+	}
+
+	if (pCTX->R10 == unAccessAddress) {
+		pCTX->R10 = reinterpret_cast<DWORD64>(g_pCustomData) + unAccessOffset;
+	}
+
+	if (pCTX->R11 == unAccessAddress) {
+		pCTX->R11 = reinterpret_cast<DWORD64>(g_pCustomData) + unAccessOffset;
+	}
+
+	if (pCTX->R12 == unAccessAddress) {
+		pCTX->R12 = reinterpret_cast<DWORD64>(g_pCustomData) + unAccessOffset;
+	}
+
+	if (pCTX->R13 == unAccessAddress) {
+		pCTX->R13 = reinterpret_cast<DWORD64>(g_pCustomData) + unAccessOffset;
+	}
+
+	if (pCTX->R14 == unAccessAddress) {
+		pCTX->R14 = reinterpret_cast<DWORD64>(g_pCustomData) + unAccessOffset;
+	}
+
+	if (pCTX->R15 == unAccessAddress) {
+		pCTX->R15 = reinterpret_cast<DWORD64>(g_pCustomData) + unAccessOffset;
+	}
 #elif _M_IX86
-	pCTX->Eip = *reinterpret_cast<PDWORD>(pCTX->Esp); // [SP] = RETURN ADDRESS
-	pCTX->Esp += 8; // Clearing stack (RETURN ADDRESS + ARGUMENT)
+	const DWORD32 unAccessAddress = reinterpret_cast<DWORD32>(pAccessAddress);
+	const DWORD32 unAccessOffset = unAccessAddress - reinterpret_cast<DWORD32>(pHook->GetAddress());
+
+	if (pCTX->Edi == unAccessAddress) {
+		pCTX->Edi = reinterpret_cast<DWORD32>(g_pCustomData) + unAccessOffset;
+	}
+
+	if (pCTX->Esi == unAccessAddress) {
+		pCTX->Esi = reinterpret_cast<DWORD32>(g_pCustomData) + unAccessOffset;
+	}
+
+	if (pCTX->Ebx == unAccessAddress) {
+		pCTX->Ebx = reinterpret_cast<DWORD32>(g_pCustomData) + unAccessOffset;
+	}
+
+	if (pCTX->Edx == unAccessAddress) {
+		pCTX->Edx = reinterpret_cast<DWORD32>(g_pCustomData) + unAccessOffset;
+	}
+
+	if (pCTX->Ecx == unAccessAddress) {
+		pCTX->Ecx = reinterpret_cast<DWORD32>(g_pCustomData) + unAccessOffset;
+	}
+
+	if (pCTX->Eax == unAccessAddress) {
+		pCTX->Eax = reinterpret_cast<DWORD32>(g_pCustomData) + unAccessOffset;
+	}
+
+	if (pCTX->Ebp == unAccessAddress) {
+		pCTX->Ebp = reinterpret_cast<DWORD32>(g_pCustomData) + unAccessOffset;
+	}
 #endif
+
 	return true;
 }
 
@@ -2385,9 +2500,9 @@ int _tmain(int nArguments, PTCHAR* pArguments) {
 	Detours::Parallel::Fiber DetoursFiber(OnFiber);
 
 	_tprintf_s(_T("DetoursThread.Start() = %d\n"), DetoursThread.Start());
-	_tprintf_s(_T("DetoursThread.Join() = %d\n"), DetoursThread.Join());
+	//_tprintf_s(_T("DetoursThread.Join() = %d\n"), DetoursThread.Join());
 
-	_tprintf_s(_T("DetoursFiber.Switch() = %d\n"), DetoursFiber.Switch());
+	//_tprintf_s(_T("DetoursFiber.Switch() = %d\n"), DetoursFiber.Switch());
 
 	_tprintf_s(_T("\n"));
 
@@ -2442,9 +2557,42 @@ int _tmain(int nArguments, PTCHAR* pArguments) {
 
 	// MemoryHook
 
-	_tprintf_s(_T("HookMemory = %d\n"), Detours::Hook::HookMemory(reinterpret_cast<void*>(Sleep), Sleep_MemoryHook));
-	Sleep(1000);
-	_tprintf_s(_T("UnHookMemory = %d\n"), Detours::Hook::UnHookMemory(Sleep_MemoryHook));
+	Detours::Memory::Page DataPage;
+	if (unsigned char* pData = static_cast<unsigned char*>(DataPage.Alloc(256))) {
+		static const unsigned char pAccessData[256] = {
+			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
+		};
+
+		memcpy(pData, pAccessData, sizeof(pAccessData));
+
+		_tprintf_s(_T("HookMemory = %d\n"), Detours::Hook::HookMemory(reinterpret_cast<void*>(pData), 256, Data_MemoryHook));
+
+		_tprintf_s(_T("pData =\n"));
+		for (size_t i = 0; i < 256; ++i) {
+			_tprintf_s(_T("%hhu "), pData[i]);
+			if ((i % 16 == 15)) {
+				_tprintf_s(_T("\n"));
+			}
+		}
+
+		_tprintf_s(_T("UnHookMemory = %d\n"), Detours::Hook::UnHookMemory(Data_MemoryHook));
+	}
+
 	_tprintf_s(_T("\n"));
 
 	// InterruptHook

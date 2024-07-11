@@ -4470,91 +4470,6 @@ namespace Detours {
 		}
 
 		// ----------------------------------------------------------------
-		// SRWLock
-		// ----------------------------------------------------------------
-
-		SRWLock::SRWLock(bool bIsShared) {
-			m_bIsShared = bIsShared;
-			InitializeSRWLock(&m_SRWLock);
-		}
-
-		SRWLock::~SRWLock() {
-			Release();
-		}
-
-		bool SRWLock::IsShared() const {
-			return m_bIsShared;
-		}
-
-		PSRWLOCK SRWLock::GetSRWLock() {
-			return &m_SRWLock;
-		}
-
-		void SRWLock::Acquire() {
-			if (m_bIsShared) {
-				AcquireSRWLockShared(&m_SRWLock);
-			} else {
-				AcquireSRWLockExclusive(&m_SRWLock);
-			}
-		}
-
-		void SRWLock::Release() {
-			if (m_bIsShared) {
-				ReleaseSRWLockShared(&m_SRWLock);
-			} else {
-				AcquireSRWLockExclusive(&m_SRWLock);
-			}
-		}
-
-		// ----------------------------------------------------------------
-		// ConditionVariable
-		// ----------------------------------------------------------------
-
-		ConditionVariable::ConditionVariable() {
-			InitializeConditionVariable(&m_ConditionVariable);
-		}
-
-		ConditionVariable::~ConditionVariable() {
-			WakeAll();
-		}
-
-		CONDITION_VARIABLE ConditionVariable::GetConditionVariable() const {
-			return m_ConditionVariable;
-		}
-
-		bool ConditionVariable::Sleep(CriticalSection* pLock, DWORD unMilliseconds) {
-			if (!pLock) {
-				return false;
-			}
-
-			if (!SleepConditionVariableCS(&m_ConditionVariable, pLock->GetCriticalSection(), unMilliseconds)) {
-				return false;
-			}
-
-			return true;
-		}
-
-		bool ConditionVariable::Sleep(SRWLock* pLock, DWORD unMilliseconds) {
-			if (!pLock) {
-				return false;
-			}
-
-			if (!SleepConditionVariableSRW(&m_ConditionVariable, pLock->GetSRWLock(), unMilliseconds, pLock->IsShared() ? CONDITION_VARIABLE_LOCKMODE_SHARED : 0)) {
-				return false;
-			}
-
-			return true;
-		}
-
-		void ConditionVariable::Wake() {
-			WakeConditionVariable(&m_ConditionVariable);
-		}
-
-		void ConditionVariable::WakeAll() {
-			WakeAllConditionVariable(&m_ConditionVariable);
-		}
-
-		// ----------------------------------------------------------------
 		// Suspender
 		// ----------------------------------------------------------------
 
@@ -6185,13 +6100,60 @@ namespace Detours {
 				return false;
 			}
 
+			if (Exception.NumberParameters != 2) {
+				return false;
+			}
+
+			const ULONG_PTR unAccessType = Exception.ExceptionInformation[0];
+			if ((unAccessType != 0) && (unAccessType != 1) && (unAccessType != 8)) {
+				return false;
+			}
+
+			const void* pAccessAddress = reinterpret_cast<void*>(Exception.ExceptionInformation[1]);
+			if (!pAccessAddress || (pAccessAddress == reinterpret_cast<void*>(-1))) {
+				return false;
+			}
+
+			MEMORY_BASIC_INFORMATION mbi;
+
 			for (auto it = g_MemoryHooks.begin(); it != g_MemoryHooks.end(); ++it) {
 				const auto& pHook = it->second;
 				if (!pHook) {
 					continue;
 				}
 
-				if (pHook->GetAddress() != Exception.ExceptionAddress) {
+				unsigned char* pHookBegin = static_cast<unsigned char*>(pHook->GetAddress());
+				unsigned char* pHookEnd = pHookBegin + pHook->GetSize();
+
+				memset(&mbi, 0, sizeof(mbi));
+
+				if (VirtualQuery(pHookBegin, &mbi, sizeof(mbi)) != sizeof(mbi)) {
+					continue;
+				}
+
+				unsigned char* pPageBegin = static_cast<unsigned char*>(mbi.BaseAddress);
+				unsigned char* pPageEnd = pHookBegin;
+
+				bool bAccessAround = false;
+
+				if ((pPageBegin > pAccessAddress) && (pAccessAddress > pPageEnd)) {
+					bAccessAround = true;
+				}
+
+				memset(&mbi, 0, sizeof(mbi));
+
+				if (VirtualQuery(pHookEnd, &mbi, sizeof(mbi)) != sizeof(mbi)) {
+				    continue;
+				}
+
+				pPageBegin = pHookEnd;
+				pPageEnd = static_cast<unsigned char*>(mbi.BaseAddress) + mbi.RegionSize;
+				
+				if (!bAccessAround && ((pPageBegin > pAccessAddress) && (pAccessAddress > pPageEnd))) {
+					bAccessAround = true;
+				}
+
+				if ((pHookBegin > pAccessAddress) || (pAccessAddress > pHookEnd)) {
 					continue;
 				}
 
@@ -6204,7 +6166,7 @@ namespace Detours {
 					return false;
 				}
 
-				return pCallBack(pHook, pCTX);
+				return pCallBack(pHook, pCTX, pAccessAddress, bAccessAround);
 			}
 
 			return false;
@@ -6217,6 +6179,20 @@ namespace Detours {
 		static bool InterruptHookCallBack(const EXCEPTION_RECORD& Exception, const PCONTEXT pCTX) {
 			if (Exception.ExceptionCode != EXCEPTION_ACCESS_VIOLATION) {
 				return false;
+			}
+
+			if (Exception.NumberParameters != 2) {
+				return false;
+			}
+
+			const ULONG_PTR unAccessType = Exception.ExceptionInformation[0];
+			if (unAccessType != 0) {
+			    return false;
+			}
+
+			const void* pAccessAddress = reinterpret_cast<void*>(Exception.ExceptionInformation[1]);
+			if (pAccessAddress != reinterpret_cast<void*>(-1)) {
+			    return false;
 			}
 
 			unsigned char* pCode = reinterpret_cast<unsigned char*>(Exception.ExceptionAddress);
@@ -83293,18 +83269,7 @@ namespace Detours {
 				return false;
 			}
 
-			DWORD unProtection = 0;
-			if (!pProtection->GetProtection(&unProtection)) {
-				return false;
-			}
-
-			unProtection &= ~(PAGE_EXECUTE | PAGE_EXECUTE_READ | PAGE_EXECUTE_READWRITE);
-
-			if (!unProtection) {
-				unProtection |= PAGE_READONLY;
-			}
-
-			if (!pProtection->ChangeProtection(unProtection)) {
+			if (!pProtection->ChangeProtection(PAGE_NOACCESS)) {
 				return false;
 			}
 
@@ -83356,20 +83321,7 @@ namespace Detours {
 				return false;
 			}
 
-			DWORD unProtection = 0;
-			if (!pProtection->GetProtection(&unProtection)) {
-				return false;
-			}
-
-			unProtection &= ~(PAGE_EXECUTE | PAGE_EXECUTE_READ | PAGE_EXECUTE_READWRITE);
-
-			if (!unProtection) {
-				unProtection |= PAGE_READONLY;
-			}
-
-			const bool bSuccess = pProtection->ChangeProtection(unProtection);
-
-			return bSuccess;
+			return pProtection->ChangeProtection(PAGE_NOACCESS);
 		}
 
 		bool MemoryHook::Disable() {
@@ -83387,9 +83339,7 @@ namespace Detours {
 				return false;
 			}
 
-			const bool bSuccess = pProtection->RestoreProtection();
-
-			return bSuccess;
+			return pProtection->RestoreProtection();
 		}
 
 		void* MemoryHook::GetAddress() const {
@@ -83412,8 +83362,8 @@ namespace Detours {
 		// Memory Hook
 		// ----------------------------------------------------------------
 
-		bool HookMemory(void* pAddress, const fnMemoryHookCallBack pCallBack, bool bAutoDisable) {
-			if (!pAddress || !pCallBack) {
+		bool HookMemory(void* pAddress, size_t unSize, const fnMemoryHookCallBack pCallBack, bool bAutoDisable) {
+			if (!pAddress || !unSize || !pCallBack) {
 				return false;
 			}
 
@@ -83422,7 +83372,7 @@ namespace Detours {
 				return false;
 			}
 
-			auto pHook = std::make_unique<MemoryHook>(pAddress, 1, bAutoDisable);
+			auto pHook = std::make_unique<MemoryHook>(pAddress, unSize, bAutoDisable);
 			if (!pHook) {
 				return false;
 			}
@@ -84094,7 +84044,7 @@ namespace Detours {
 			}
 
 			Protection JumpToHookProtection(m_pAddress, unCopyingSize, false);
-			if (!JumpToHookProtection.ChangeProtection(PAGE_READWRITE)) {
+			if (!JumpToHookProtection.ChangeProtection(PAGE_EXECUTE_READWRITE)) {
 				m_pOriginalBytes = nullptr;
 				m_unOriginalBytes = 0;
 				g_HookStorage.DeAlloc(m_pTrampoline);
@@ -84218,7 +84168,7 @@ namespace Detours {
 			}
 
 			Protection HookProtection(m_pAddress, m_unOriginalBytes, false);
-			if (!HookProtection.ChangeProtection(PAGE_READWRITE)) {
+			if (!HookProtection.ChangeProtection(PAGE_EXECUTE_READWRITE)) {
 				g_Suspender.Resume();
 				return false;
 			}
@@ -84637,7 +84587,7 @@ namespace Detours {
 			}
 
 			Protection JumpToHookProtection(m_pAddress, unCopyingSize, false);
-			if (!JumpToHookProtection.ChangeProtection(PAGE_READWRITE)) {
+			if (!JumpToHookProtection.ChangeProtection(PAGE_EXECUTE_READWRITE)) {
 				m_pOriginalBytes = nullptr;
 				m_unOriginalBytes = 0;
 				g_HookStorage.DeAlloc(m_pTrampoline);
@@ -86242,7 +86192,7 @@ namespace Detours {
 			}
 
 			Protection JumpToHookProtection(m_pAddress, unCopyingSize, false);
-			if (!JumpToHookProtection.ChangeProtection(PAGE_READWRITE)) {
+			if (!JumpToHookProtection.ChangeProtection(PAGE_EXECUTE_READWRITE)) {
 				m_pOriginalBytes = nullptr;
 				m_unOriginalBytes = 0;
 				g_HookStorage.DeAlloc(m_pTrampoline);
@@ -86387,7 +86337,7 @@ namespace Detours {
 			}
 
 			Protection HookProtection(m_pAddress, m_unOriginalBytes, false);
-			if (!HookProtection.ChangeProtection(PAGE_READWRITE)) {
+			if (!HookProtection.ChangeProtection(PAGE_EXECUTE_READWRITE)) {
 				g_Suspender.Resume();
 				return false;
 			}

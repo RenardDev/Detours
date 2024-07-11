@@ -2151,50 +2151,6 @@ namespace Detours {
 		};
 
 		// ----------------------------------------------------------------
-		// SRWLock
-		// ----------------------------------------------------------------
-
-		class SRWLock {
-		public:
-			SRWLock(bool bIsShared = false);
-			~SRWLock();
-
-		public:
-			bool IsShared() const;
-			PSRWLOCK GetSRWLock();
-
-		public:
-			void Acquire();
-			void Release();
-
-		private:
-			bool m_bIsShared;
-			SRWLOCK m_SRWLock;
-		};
-
-		// ----------------------------------------------------------------
-		// ConditionVariable
-		// ----------------------------------------------------------------
-
-		class ConditionVariable {
-		public:
-			ConditionVariable();
-			~ConditionVariable();
-
-		public:
-			CONDITION_VARIABLE GetConditionVariable() const;
-
-		public:
-			bool Sleep(CriticalSection* pLock, DWORD unMilliseconds = INFINITE);
-			bool Sleep(SRWLock* pLock, DWORD unMilliseconds = INFINITE);
-			void Wake();
-			void WakeAll();
-
-		private:
-			CONDITION_VARIABLE m_ConditionVariable;
-		};
-
-		// ----------------------------------------------------------------
 		// Suspender
 		// ----------------------------------------------------------------
 
@@ -5558,7 +5514,7 @@ namespace Detours {
 		// Memory Hook CallBack
 		// ----------------------------------------------------------------
 
-		using fnMemoryHookCallBack = bool(*)(const std::unique_ptr<class MemoryHook>& pHook, const PCONTEXT pCTX);
+		using fnMemoryHookCallBack = bool(*)(const std::unique_ptr<class MemoryHook>& pHook, const PCONTEXT pCTX, const void* pAccessAddress, bool bAccessAround);
 
 		// ----------------------------------------------------------------
 		// Memory Hook (Don't use this to define hooks)
@@ -5594,7 +5550,7 @@ namespace Detours {
 		// Memory Hook
 		// ----------------------------------------------------------------
 
-		bool HookMemory(void* pAddress, const fnMemoryHookCallBack pCallBack, bool bAutoDisable = false);
+		bool HookMemory(void* pAddress, size_t unSize, const fnMemoryHookCallBack pCallBack, bool bAutoDisable = false);
 		bool UnHookMemory(const fnMemoryHookCallBack pCallBack);
 		bool EnableHookMemory(const fnMemoryHookCallBack pCallBack);
 		bool DisableHookMemory(const fnMemoryHookCallBack pCallBack);
