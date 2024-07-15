@@ -6134,31 +6134,25 @@ namespace Detours {
 				unsigned char* pPageBegin = static_cast<unsigned char*>(mbi.BaseAddress);
 				unsigned char* pPageEnd = pHookBegin;
 
-				bool bAccessAround = false;
-
 				if ((pPageBegin > pAccessAddress) && (pAccessAddress > pPageEnd)) {
-					bAccessAround = true;
+					continue;
 				}
 
 				memset(&mbi, 0, sizeof(mbi));
 
 				if (VirtualQuery(pHookEnd, &mbi, sizeof(mbi)) != sizeof(mbi)) {
-				    continue;
+					continue;
 				}
 
 				pPageBegin = pHookEnd;
 				pPageEnd = static_cast<unsigned char*>(mbi.BaseAddress) + mbi.RegionSize;
 				
-				if (!bAccessAround && ((pPageBegin > pAccessAddress) && (pAccessAddress > pPageEnd))) {
-					bAccessAround = true;
+				if (((pPageBegin > pAccessAddress) && (pAccessAddress > pPageEnd))) {
+					continue;
 				}
 
 				if ((pHookBegin > pAccessAddress) || (pAccessAddress > pHookEnd)) {
 					continue;
-				}
-
-				if (pHook->IsAutoDisable()) {
-					pHook->Disable();
 				}
 
 				const auto& pCallBack = pHook->GetCallBack();
@@ -6166,7 +6160,7 @@ namespace Detours {
 					return false;
 				}
 
-				return pCallBack(pHook, pCTX, pAccessAddress, bAccessAround);
+				return pCallBack(pHook, pCTX, pAccessAddress);
 			}
 
 			return false;
@@ -6187,12 +6181,12 @@ namespace Detours {
 
 			const ULONG_PTR unAccessType = Exception.ExceptionInformation[0];
 			if (unAccessType != 0) {
-			    return false;
+				return false;
 			}
 
 			const void* pAccessAddress = reinterpret_cast<void*>(Exception.ExceptionInformation[1]);
 			if (pAccessAddress != reinterpret_cast<void*>(-1)) {
-			    return false;
+				return false;
 			}
 
 			unsigned char* pCode = reinterpret_cast<unsigned char*>(Exception.ExceptionAddress);
@@ -83243,10 +83237,9 @@ namespace Detours {
 		// Memory Hook
 		// ----------------------------------------------------------------
 
-		MemoryHook::MemoryHook(void* pAddress, size_t unSize, bool bAutoDisable) {
+		MemoryHook::MemoryHook(void* pAddress, size_t unSize) {
 			m_pAddress = pAddress;
 			m_unSize = unSize;
-			m_bAutoDisable = bAutoDisable;
 			m_pCallBack = nullptr;
 		}
 
@@ -83362,7 +83355,7 @@ namespace Detours {
 		// Memory Hook
 		// ----------------------------------------------------------------
 
-		bool HookMemory(void* pAddress, size_t unSize, const fnMemoryHookCallBack pCallBack, bool bAutoDisable) {
+		bool HookMemory(void* pAddress, size_t unSize, const fnMemoryHookCallBack pCallBack) {
 			if (!pAddress || !unSize || !pCallBack) {
 				return false;
 			}
@@ -83372,7 +83365,7 @@ namespace Detours {
 				return false;
 			}
 
-			auto pHook = std::make_unique<MemoryHook>(pAddress, unSize, bAutoDisable);
+			auto pHook = std::make_unique<MemoryHook>(pAddress, unSize);
 			if (!pHook) {
 				return false;
 			}

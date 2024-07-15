@@ -693,13 +693,13 @@ void ProcessMessage(BaseMessage* pMessage) {
 void OnThread(void* pData) {
 	UNREFERENCED_PARAMETER(pData);
 	_tprintf_s(_T("[OnThread] Started!\n"));
-	Sleep(5000);
+	Sleep(3000);
 }
 
 void OnFiber(void* pData) {
 	UNREFERENCED_PARAMETER(pData);
 	_tprintf_s(_T("[OnFiber] Started!\n"));
-	Sleep(5000);
+	Sleep(3000);
 }
 
 bool OnException(const EXCEPTION_RECORD& Exception, const PCONTEXT pCTX) {
@@ -777,12 +777,7 @@ unsigned char g_pCustomData[256] = {
 	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1
 };
 
-bool Data_MemoryHook(const std::unique_ptr<Detours::Hook::MemoryHook>& pHook, const PCONTEXT pCTX, const void* pAccessAddress, bool bAccessAround) {
-
-	if (bAccessAround) {
-		_tprintf_s(_T("[Data_MemoryHook] Access around hooking memory!!!\n"));
-		pHook->Disable();
-	}
+bool Data_MemoryHook(const std::unique_ptr<Detours::Hook::MemoryHook>& pHook, const PCONTEXT pCTX, const void* pAccessAddress) {
 
 #ifdef _M_X64
 	const DWORD64 unAccessAddress = reinterpret_cast<DWORD64>(pAccessAddress);
@@ -2500,9 +2495,9 @@ int _tmain(int nArguments, PTCHAR* pArguments) {
 	Detours::Parallel::Fiber DetoursFiber(OnFiber);
 
 	_tprintf_s(_T("DetoursThread.Start() = %d\n"), DetoursThread.Start());
-	//_tprintf_s(_T("DetoursThread.Join() = %d\n"), DetoursThread.Join());
+	_tprintf_s(_T("DetoursThread.Join() = %d\n"), DetoursThread.Join());
 
-	//_tprintf_s(_T("DetoursFiber.Switch() = %d\n"), DetoursFiber.Switch());
+	_tprintf_s(_T("DetoursFiber.Switch() = %d\n"), DetoursFiber.Switch());
 
 	_tprintf_s(_T("\n"));
 
