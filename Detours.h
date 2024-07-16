@@ -5511,51 +5511,6 @@ namespace Detours {
 	namespace Hook {
 
 		// ----------------------------------------------------------------
-		// Memory Hook CallBack
-		// ----------------------------------------------------------------
-
-		using fnMemoryHookCallBack = bool(*)(const std::unique_ptr<class MemoryHook>& pHook, const PCONTEXT pCTX, const void* pAccessAddress);
-
-		// ----------------------------------------------------------------
-		// Memory Hook (Don't use this to define hooks)
-		// ----------------------------------------------------------------
-
-		class MemoryHook {
-		public:
-			MemoryHook(void* pAddress, size_t unSize = 1);
-			~MemoryHook();
-
-		public:
-			bool Hook(const fnMemoryHookCallBack pCallBack);
-			bool UnHook();
-
-		public:
-			bool Enable();
-			bool Disable();
-
-		public:
-			void* GetAddress() const;
-			size_t GetSize() const;
-			bool IsAutoDisable() const;
-			fnMemoryHookCallBack GetCallBack() const;
-
-		private:
-			void* m_pAddress;
-			size_t m_unSize;
-			bool m_bAutoDisable;
-			fnMemoryHookCallBack m_pCallBack;
-		};
-
-		// ----------------------------------------------------------------
-		// Memory Hook
-		// ----------------------------------------------------------------
-
-		bool HookMemory(void* pAddress, size_t unSize, const fnMemoryHookCallBack pCallBack);
-		bool UnHookMemory(const fnMemoryHookCallBack pCallBack);
-		bool EnableHookMemory(const fnMemoryHookCallBack pCallBack);
-		bool DisableHookMemory(const fnMemoryHookCallBack pCallBack);
-
-		// ----------------------------------------------------------------
 		// Interrupt Hook CallBack
 		// ----------------------------------------------------------------
 

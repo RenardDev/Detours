@@ -35,4 +35,9 @@
       <Filter>Исходные файлы</Filter>
     </MASM>
   </ItemGroup>
+  <ItemGroup>
+    <None Include="SuppressionFile.suppress">
+      <Filter>Исходные файлы</Filter>
+    </None>
+  </ItemGroup>
 </Project>

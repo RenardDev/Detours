@@ -145,7 +145,6 @@ namespace Detours {
 	// ----------------------------------------------------------------
 
 	static std::unordered_map<void*, std::unique_ptr<Protection>> g_Protections;
-	static std::unordered_map<void*, std::unique_ptr<MemoryHook>> g_MemoryHooks;
 	static std::unordered_map<void*, std::unique_ptr<InterruptHook>> g_InterruptHooks;
 	static NearStorage g_HookStorage(HOOK_STORAGE_CAPACITY);
 
@@ -6001,6 +6000,11 @@ namespace Detours {
 				return false;
 			}
 
+			DWORD unProtection = 0;
+			if (!VirtualProtect(const_cast<void*>(m_pAddress), m_unSize, unNewProtection, &unProtection)) {
+				return false;
+			}
+
 			if (unNewProtection & (PAGE_EXECUTE | PAGE_EXECUTE_READ | PAGE_EXECUTE_READWRITE)) {
 				MEMORY_BASIC_INFORMATION mbi;
 				memset(&mbi, 0, sizeof(mbi));
@@ -6012,11 +6016,6 @@ namespace Detours {
 				if (!FlushInstructionCache(reinterpret_cast<HANDLE>(-1), mbi.BaseAddress, mbi.RegionSize)) {
 					return false;
 				}
-			}
-
-			DWORD unProtection = 0;
-			if (!VirtualProtect(const_cast<void*>(m_pAddress), m_unSize, unNewProtection, &unProtection)) {
-				return false;
 			}
 
 			return true;
@@ -6092,81 +6091,6 @@ namespace Detours {
 		}
 
 		// ----------------------------------------------------------------
-		// MemoryHookCallBack
-		// ----------------------------------------------------------------
-
-		static bool MemoryHookCallBack(const EXCEPTION_RECORD& Exception, const PCONTEXT pCTX) {
-			if (Exception.ExceptionCode != EXCEPTION_ACCESS_VIOLATION) {
-				return false;
-			}
-
-			if (Exception.NumberParameters != 2) {
-				return false;
-			}
-
-			const ULONG_PTR unAccessType = Exception.ExceptionInformation[0];
-			if ((unAccessType != 0) && (unAccessType != 1) && (unAccessType != 8)) {
-				return false;
-			}
-
-			const void* pAccessAddress = reinterpret_cast<void*>(Exception.ExceptionInformation[1]);
-			if (!pAccessAddress || (pAccessAddress == reinterpret_cast<void*>(-1))) {
-				return false;
-			}
-
-			MEMORY_BASIC_INFORMATION mbi;
-
-			for (auto it = g_MemoryHooks.begin(); it != g_MemoryHooks.end(); ++it) {
-				const auto& pHook = it->second;
-				if (!pHook) {
-					continue;
-				}
-
-				unsigned char* pHookBegin = static_cast<unsigned char*>(pHook->GetAddress());
-				unsigned char* pHookEnd = pHookBegin + pHook->GetSize();
-
-				memset(&mbi, 0, sizeof(mbi));
-
-				if (VirtualQuery(pHookBegin, &mbi, sizeof(mbi)) != sizeof(mbi)) {
-					continue;
-				}
-
-				unsigned char* pPageBegin = static_cast<unsigned char*>(mbi.BaseAddress);
-				unsigned char* pPageEnd = pHookBegin;
-
-				if ((pPageBegin > pAccessAddress) && (pAccessAddress > pPageEnd)) {
-					continue;
-				}
-
-				memset(&mbi, 0, sizeof(mbi));
-
-				if (VirtualQuery(pHookEnd, &mbi, sizeof(mbi)) != sizeof(mbi)) {
-					continue;
-				}
-
-				pPageBegin = pHookEnd;
-				pPageEnd = static_cast<unsigned char*>(mbi.BaseAddress) + mbi.RegionSize;
-				
-				if (((pPageBegin > pAccessAddress) && (pAccessAddress > pPageEnd))) {
-					continue;
-				}
-
-				if ((pHookBegin > pAccessAddress) || (pAccessAddress > pHookEnd)) {
-					continue;
-				}
-
-				const auto& pCallBack = pHook->GetCallBack();
-				if (!pCallBack) {
-					return false;
-				}
-
-				return pCallBack(pHook, pCTX, pAccessAddress);
-			}
-
-			return false;
-		}
-
-		// ----------------------------------------------------------------
 		// InterruptHookCallBack
 		// ----------------------------------------------------------------
 
@@ -6233,7 +6157,6 @@ namespace Detours {
 			if (m_pVEH) {
 
 				// Built-in CallBacks
-				AddCallBack(MemoryHookCallBack); // Memory Hooks
 				AddCallBack(InterruptHookCallBack); // Interrupt Hooks
 			}
 		}
@@ -6243,7 +6166,6 @@ namespace Detours {
 				RemoveVectoredExceptionHandler(m_pVEH);
 
 				// Built-in CallBacks
-				RemoveCallBack(MemoryHookCallBack); // Memory Hooks
 				RemoveCallBack(InterruptHookCallBack); // Interrupt Hooks
 			}
 		}
@@ -83232,210 +83154,6 @@ namespace Detours {
 	// ----------------------------------------------------------------
 
 	namespace Hook {
-
-		// ----------------------------------------------------------------
-		// Memory Hook
-		// ----------------------------------------------------------------
-
-		MemoryHook::MemoryHook(void* pAddress, size_t unSize) {
-			m_pAddress = pAddress;
-			m_unSize = unSize;
-			m_pCallBack = nullptr;
-		}
-
-		MemoryHook::~MemoryHook() {
-			UnHook();
-		}
-
-		bool MemoryHook::Hook(const fnMemoryHookCallBack pCallBack) {
-			if (!m_pAddress || !m_unSize || m_pCallBack || !pCallBack) {
-				return false;
-			}
-
-			const auto& it = g_Protections.find(m_pAddress);
-			if (it != g_Protections.end()) {
-				return false;
-			}
-
-			auto pProtection = std::make_unique<Protection>(m_pAddress, m_unSize);
-			if (!pProtection) {
-				return false;
-			}
-
-			if (!pProtection->ChangeProtection(PAGE_NOACCESS)) {
-				return false;
-			}
-
-			g_Protections.emplace_hint(it, m_pAddress, std::move(pProtection));
-
-			m_pCallBack = pCallBack;
-
-			return true;
-		}
-
-		bool MemoryHook::UnHook() {
-			if (!m_pAddress || !m_unSize || !m_pCallBack) {
-				return false;
-			}
-
-			const auto& it = g_Protections.find(m_pAddress);
-			if (it == g_Protections.end()) {
-				return false;
-			}
-
-			const auto& pProtection = it->second;
-			if (!pProtection) {
-				return false;
-			}
-
-			if (!pProtection->RestoreProtection()) {
-				return false;
-			}
-
-			g_Protections.erase(it);
-
-			m_pCallBack = nullptr;
-
-			return true;
-		}
-
-		bool MemoryHook::Enable() {
-			if (!m_pAddress || !m_unSize || !m_pCallBack) {
-				return false;
-			}
-
-			const auto& it = g_Protections.find(m_pAddress);
-			if (it == g_Protections.end()) {
-				return false;
-			}
-
-			const auto& pProtection = it->second;
-			if (!pProtection) {
-				return false;
-			}
-
-			return pProtection->ChangeProtection(PAGE_NOACCESS);
-		}
-
-		bool MemoryHook::Disable() {
-			if (!m_pAddress || !m_unSize || !m_pCallBack) {
-				return false;
-			}
-
-			const auto& it = g_Protections.find(m_pAddress);
-			if (it == g_Protections.end()) {
-				return false;
-			}
-
-			const auto& pProtection = it->second;
-			if (!pProtection) {
-				return false;
-			}
-
-			return pProtection->RestoreProtection();
-		}
-
-		void* MemoryHook::GetAddress() const {
-			return m_pAddress;
-		}
-
-		size_t MemoryHook::GetSize() const {
-			return m_unSize;
-		}
-
-		bool MemoryHook::IsAutoDisable() const {
-			return m_bAutoDisable;
-		}
-
-		fnMemoryHookCallBack MemoryHook::GetCallBack() const {
-			return m_pCallBack;
-		}
-
-		// ----------------------------------------------------------------
-		// Memory Hook
-		// ----------------------------------------------------------------
-
-		bool HookMemory(void* pAddress, size_t unSize, const fnMemoryHookCallBack pCallBack) {
-			if (!pAddress || !unSize || !pCallBack) {
-				return false;
-			}
-
-			const auto& it = g_MemoryHooks.find(reinterpret_cast<void*>(pCallBack));
-			if (it != g_MemoryHooks.end()) {
-				return false;
-			}
-
-			auto pHook = std::make_unique<MemoryHook>(pAddress, unSize);
-			if (!pHook) {
-				return false;
-			}
-
-			if (!pHook->Hook(pCallBack)) {
-				return false;
-			}
-
-			g_MemoryHooks.emplace_hint(it, pCallBack, std::move(pHook));
-
-			return true;
-		}
-
-		bool UnHookMemory(const fnMemoryHookCallBack pCallBack) {
-			if (!pCallBack) {
-				return false;
-			}
-
-			const auto& it = g_MemoryHooks.find(reinterpret_cast<void*>(pCallBack));
-			if (it == g_MemoryHooks.end()) {
-				return false;
-			}
-
-			const auto& pHook = it->second;
-			if (!pHook) {
-				return false;
-			}
-
-			pHook->UnHook();
-
-			g_MemoryHooks.erase(it);
-
-			return true;
-		}
-
-		bool EnableHookMemory(const fnMemoryHookCallBack pCallBack) {
-			if (!pCallBack) {
-				return false;
-			}
-
-			const auto& it = g_MemoryHooks.find(reinterpret_cast<void*>(pCallBack));
-			if (it == g_MemoryHooks.end()) {
-				return false;
-			}
-
-			const auto& pHook = it->second;
-			if (!pHook) {
-				return false;
-			}
-
-			return pHook->Enable();
-		}
-
-		bool DisableHookMemory(const fnMemoryHookCallBack pCallBack) {
-			if (!pCallBack) {
-				return false;
-			}
-
-			const auto& it = g_MemoryHooks.find(reinterpret_cast<void*>(pCallBack));
-			if (it == g_MemoryHooks.end()) {
-				return false;
-			}
-
-			const auto& pHook = it->second;
-			if (!pHook) {
-				return false;
-			}
-
-			return pHook->Disable();
-		}
 
 		// ----------------------------------------------------------------
 		// Interrupt Hook

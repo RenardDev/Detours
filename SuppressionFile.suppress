@@ -1,0 +1,220 @@
+<?xml version="1.0" standalone="yes"?>
+<NewDataSet>
+  <xs:schema id="NewDataSet" xmlns="" xmlns:xs="http://www.w3.org/2001/XMLSchema" xmlns:msdata="urn:schemas-microsoft-com:xml-msdata">
+    <xs:element name="NewDataSet" msdata:IsDataSet="true" msdata:UseCurrentLocale="true">
+      <xs:complexType>
+        <xs:choice minOccurs="0" maxOccurs="unbounded">
+          <xs:element name="SuppressVersion">
+            <xs:complexType>
+              <xs:sequence>
+                <xs:element name="CurrentVersion" type="xs:int" minOccurs="0" />
+                <xs:element name="IsPrimary" type="xs:boolean" minOccurs="0" />
+              </xs:sequence>
+            </xs:complexType>
+          </xs:element>
+          <xs:element name="Detours" msdata:CaseSensitive="False">
+            <xs:complexType>
+              <xs:sequence>
+                <xs:element name="FileName" type="xs:string" default="" />
+                <xs:element name="ErrorCode" type="xs:string" default="" />
+                <xs:element name="Message" type="xs:string" default="" />
+                <xs:element name="CodePrev" type="xs:unsignedInt" default="0" />
+                <xs:element name="CodeCurrent" type="xs:unsignedInt" default="0" />
+                <xs:element name="CodeNext" type="xs:unsignedInt" default="0" />
+              </xs:sequence>
+            </xs:complexType>
+          </xs:element>
+        </xs:choice>
+      </xs:complexType>
+      <xs:unique name="Constraint1" msdata:PrimaryKey="true">
+        <xs:selector xpath=".//Detours" />
+        <xs:field xpath="FileName" />
+        <xs:field xpath="ErrorCode" />
+        <xs:field xpath="Message" />
+        <xs:field xpath="CodePrev" />
+        <xs:field xpath="CodeCurrent" />
+        <xs:field xpath="CodeNext" />
+      </xs:unique>
+    </xs:element>
+  </xs:schema>
+  <SuppressVersion>
+    <CurrentVersion>3</CurrentVersion>
+    <IsPrimary>false</IsPrimary>
+  </SuppressVersion>
+  <Detours>
+    <FileName>Detours.cpp</FileName>
+    <ErrorCode>V1037</ErrorCode>
+    <Message>Two or more case-branches perform the same actions. Check lines: _, _</Message>
+    <CodePrev>9087866</CodePrev>
+    <CodeCurrent>22499</CodeCurrent>
+    <CodeNext>9087854</CodeNext>
+  </Detours>
+  <Detours>
+    <FileName>Detours.cpp</FileName>
+    <ErrorCode>V1037</ErrorCode>
+    <Message>Two or more case-branches perform the same actions. Check lines: _, _</Message>
+    <CodePrev>284318</CodePrev>
+    <CodeCurrent>373959</CodeCurrent>
+    <CodeNext>2337</CodeNext>
+  </Detours>
+  <Detours>
+    <FileName>Detours.cpp</FileName>
+    <ErrorCode>V1037</ErrorCode>
+    <Message>Two or more case-branches perform the same actions. Check lines: _, _</Message>
+    <CodePrev>568552</CodePrev>
+    <CodeCurrent>1531219687</CodeCurrent>
+    <CodeNext>2337</CodeNext>
+  </Detours>
+  <Detours>
+    <FileName>Detours.cpp</FileName>
+    <ErrorCode>V1037</ErrorCode>
+    <Message>Two or more case-branches perform the same actions. Check lines: _, _, _</Message>
+    <CodePrev>284188</CodePrev>
+    <CodeCurrent>1531219815</CodeCurrent>
+    <CodeNext>2337</CodeNext>
+  </Detours>
+  <Detours>
+    <FileName>Detours.cpp</FileName>
+    <ErrorCode>V1037</ErrorCode>
+    <Message>Two or more case-branches perform the same actions. Check lines: _, _, _</Message>
+    <CodePrev>284176</CodePrev>
+    <CodeCurrent>1531219879</CodeCurrent>
+    <CodeNext>2337</CodeNext>
+  </Detours>
+  <Detours>
+    <FileName>Detours.cpp</FileName>
+    <ErrorCode>V1037</ErrorCode>
+    <Message>Two or more case-branches perform the same actions. Check lines: _, _, _</Message>
+    <CodePrev>284214</CodePrev>
+    <CodeCurrent>1531219879</CodeCurrent>
+    <CodeNext>2337</CodeNext>
+  </Detours>
+  <Detours>
+    <FileName>Detours.cpp</FileName>
+    <ErrorCode>V1037</ErrorCode>
+    <Message>Two or more case-branches perform the same actions. Check lines: _, _</Message>
+    <CodePrev>568458</CodePrev>
+    <CodeCurrent>1829909734</CodeCurrent>
+    <CodeNext>2337</CodeNext>
+  </Detours>
+  <Detours>
+    <FileName>Detours.cpp</FileName>
+    <ErrorCode>V1037</ErrorCode>
+    <Message>Two or more case-branches perform the same actions. Check lines: _, _, _</Message>
+    <CodePrev>568423</CodePrev>
+    <CodeCurrent>2086950260</CodeCurrent>
+    <CodeNext>2331398756</CodeNext>
+  </Detours>
+  <Detours>
+    <FileName>Detours.cpp</FileName>
+    <ErrorCode>V1037</ErrorCode>
+    <Message>Two or more case-branches perform the same actions. Check lines: _, _</Message>
+    <CodePrev>568556</CodePrev>
+    <CodeCurrent>3062438247</CodeCurrent>
+    <CodeNext>2337</CodeNext>
+  </Detours>
+  <Detours>
+    <FileName>Detours.cpp</FileName>
+    <ErrorCode>V513</ErrorCode>
+    <Message>Use _beginthreadex/_endthreadex functions instead of CreateThread/ExitThread functions.</Message>
+    <CodePrev>0</CodePrev>
+    <CodeCurrent>3147281295</CodeCurrent>
+    <CodeNext>2048798809</CodeNext>
+  </Detours>
+  <Detours>
+    <FileName>Detours.cpp</FileName>
+    <ErrorCode>V616</ErrorCode>
+    <Message>The '(RD_OPT_A)' named constant with the value of _ is used in the bitwise operation.</Message>
+    <CodePrev>227</CodePrev>
+    <CodeCurrent>3424005310</CodeCurrent>
+    <CodeNext>3168682899</CodeNext>
+  </Detours>
+  <Detours>
+    <FileName>Detours.cpp</FileName>
+    <ErrorCode>V616</ErrorCode>
+    <Message>The '(RD_OPT_A)' named constant with the value of _ is used in the bitwise operation.</Message>
+    <CodePrev>227</CodePrev>
+    <CodeCurrent>3424005310</CodeCurrent>
+    <CodeNext>3731828376</CodeNext>
+  </Detours>
+  <Detours>
+    <FileName>Detours.cpp</FileName>
+    <ErrorCode>V720</ErrorCode>
+    <Message>It is advised to utilize the 'SuspendThread' function only when developing a debugger (see documentation for details).</Message>
+    <CodePrev>0</CodePrev>
+    <CodeCurrent>3676679972</CodeCurrent>
+    <CodeNext>176909</CodeNext>
+  </Detours>
+  <Detours>
+    <FileName>Detours.cpp</FileName>
+    <ErrorCode>V720</ErrorCode>
+    <Message>It is advised to utilize the 'SuspendThread' function only when developing a debugger (see documentation for details).</Message>
+    <CodePrev>1723405808</CodePrev>
+    <CodeCurrent>3752072768</CodeCurrent>
+    <CodeNext>17733</CodeNext>
+  </Detours>
+  <Detours>
+    <FileName>Detours.h</FileName>
+    <ErrorCode>V1071</ErrorCode>
+    <Message>Consider inspecting the 'ChangeProtection' function. The return value is not always used. Total calls: _, discarded results: _.</Message>
+    <CodePrev>1118882184</CodePrev>
+    <CodeCurrent>380846899</CodeCurrent>
+    <CodeNext>576071145</CodeNext>
+  </Detours>
+  <Detours>
+    <FileName>Detours.h</FileName>
+    <ErrorCode>V802</ErrorCode>
+    <Message>On _-bit platform, structure size can be reduced from _ to _ bytes by rearranging the fields according to their sizes in decreasing order.</Message>
+    <CodePrev>0</CodePrev>
+    <CodeCurrent>1550727875</CodeCurrent>
+    <CodeNext>54873497</CodeNext>
+  </Detours>
+  <Detours>
+    <FileName>Detours.h</FileName>
+    <ErrorCode>V802</ErrorCode>
+    <Message>On _-bit platform, structure size can be reduced from _ to _ bytes by rearranging the fields according to their sizes in decreasing order.</Message>
+    <CodePrev>0</CodePrev>
+    <CodeCurrent>1907918976</CodeCurrent>
+    <CodeNext>225475</CodeNext>
+  </Detours>
+  <Detours>
+    <FileName>Detours.h</FileName>
+    <ErrorCode>V802</ErrorCode>
+    <Message>On _-bit platform, structure size can be reduced from _ to _ bytes by rearranging the fields according to their sizes in decreasing order.</Message>
+    <CodePrev>0</CodePrev>
+    <CodeCurrent>3815906779</CodeCurrent>
+    <CodeNext>14801337</CodeNext>
+  </Detours>
+  <Detours>
+    <FileName>main.cpp</FileName>
+    <ErrorCode>V1048</ErrorCode>
+    <Message>The 'unBegin' variable was assigned the same value.</Message>
+    <CodePrev>743129</CodePrev>
+    <CodeCurrent>3197191414</CodeCurrent>
+    <CodeNext>3213048611</CodeNext>
+  </Detours>
+  <Detours>
+    <FileName>main.cpp</FileName>
+    <ErrorCode>V760</ErrorCode>
+    <Message>Two identical blocks of text were found. The second block begins from line _.</Message>
+    <CodePrev>0</CodePrev>
+    <CodeCurrent>271169278</CodeCurrent>
+    <CodeNext>0</CodeNext>
+  </Detours>
+  <Detours>
+    <FileName>main.cpp</FileName>
+    <ErrorCode>V829</ErrorCode>
+    <Message>Lifetime of the heap-allocated variable 'pMsg_' is limited to the current function's scope. Consider allocating it on the stack instead.</Message>
+    <CodePrev>1017984259</CodePrev>
+    <CodeCurrent>1017853859</CodeCurrent>
+    <CodeNext>0</CodeNext>
+  </Detours>
+  <Detours>
+    <FileName>main.cpp</FileName>
+    <ErrorCode>V829</ErrorCode>
+    <Message>Lifetime of the heap-allocated variable 'pMsg_' is limited to the current function's scope. Consider allocating it on the stack instead.</Message>
+    <CodePrev>0</CodePrev>
+    <CodeCurrent>1017984259</CodeCurrent>
+    <CodeNext>1017853859</CodeNext>
+  </Detours>
+</NewDataSet>
