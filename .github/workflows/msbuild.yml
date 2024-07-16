@@ -2,62 +2,91 @@ name: MSBuild
 
 on:
   push:
-    branches: [ main ]
+    branches: [ "main" ]
   pull_request:
-    branches: [ main ]
+    branches: [ "main" ]
 
 env:
-  # Path to the solution file relative to the root of the project.
   SOLUTION_FILE_PATH: .
-
-  # Configuration type to build.
-  # You can convert this to a build matrix if you need coverage of multiple configuration types.
-  # https://docs.github.com/actions/learn-github-actions/managing-complex-workflows#using-a-build-matrix
-  BUILD_CONFIGURATION: Release
 
 permissions:
   contents: read
 
 jobs:
-  build:
+  build-debug:
     runs-on: windows-latest
 
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4.1.7
 
     - name: Add MSBuild to PATH
-      uses: microsoft/setup-msbuild@v1.0.2
+      uses: microsoft/setup-msbuild@v1.1.3
 
     - name: Restore NuGet packages
       working-directory: ${{env.GITHUB_WORKSPACE}}
       run: nuget restore ${{env.SOLUTION_FILE_PATH}}
 
-    - name: Build x32
+    - name: Building Detours (x86)
       working-directory: ${{env.GITHUB_WORKSPACE}}
-      # Add additional options to the MSBuild command line here (like platform or verbosity level).
-      # See https://docs.microsoft.com/visualstudio/msbuild/msbuild-command-line-reference
-      run: msbuild /m /p:Configuration=${{env.BUILD_CONFIGURATION}} /p:Platform=x86 ${{env.SOLUTION_FILE_PATH}}
+      run: msbuild /m /p:Configuration=Debug /p:Platform=x86 ${{env.SOLUTION_FILE_PATH}}
 
-    - name: Build x64
-      working-directory: ${{env.GITHUB_WORKSPACE}}
-      # Add additional options to the MSBuild command line here (like platform or verbosity level).
-      # See https://docs.microsoft.com/visualstudio/msbuild/msbuild-command-line-reference
-      run: msbuild /m /p:Configuration=${{env.BUILD_CONFIGURATION}} /p:Platform=x64 ${{env.SOLUTION_FILE_PATH}}
-
-    - name: Artifact x32
-      uses: actions/upload-artifact@v3
+    - name: Uploading Detours (x86)
+      uses: actions/upload-artifact@v4.3.1
       with:
-        name: artifact32
+        name: Detours
         path: |
-          ${{env.SOLUTION_FILE_PATH}}\${{env.BUILD_CONFIGURATION}}\*.exe
-          ${{env.SOLUTION_FILE_PATH}}\${{env.BUILD_CONFIGURATION}}\*.pdb
+          ${{env.SOLUTION_FILE_PATH}}\build\x86\Debug\*.dll
+          ${{env.SOLUTION_FILE_PATH}}\build\x86\Debug\*.pdb
         if-no-files-found: error
 
-    - name: Artifact x64
-      uses: actions/upload-artifact@v3
+    - name: Building Detours (x86_64)
+      working-directory: ${{env.GITHUB_WORKSPACE}}
+      run: msbuild /m /p:Configuration=Debug /p:Platform=x86_64 ${{env.SOLUTION_FILE_PATH}}
+
+    - name: Uploading Detours (x86_64)
+      uses: actions/upload-artifact@v4.3.1
       with:
-        name: artifact64
+        name: Detours64
         path: |
-          ${{env.SOLUTION_FILE_PATH}}\x64\${{env.BUILD_CONFIGURATION}}\*.exe
-          ${{env.SOLUTION_FILE_PATH}}\x64\${{env.BUILD_CONFIGURATION}}\*.pdb
+          ${{env.SOLUTION_FILE_PATH}}\build\x86_64\Debug\*.dll
+          ${{env.SOLUTION_FILE_PATH}}\build\x86_64\Debug\*.pdb
+        if-no-files-found: error
+
+  build-release:
+    runs-on: windows-latest
+
+    steps:
+    - uses: actions/checkout@v4.1.7
+
+    - name: Add MSBuild to PATH
+      uses: microsoft/setup-msbuild@v1.1.3
+
+    - name: Restore NuGet packages
+      working-directory: ${{env.GITHUB_WORKSPACE}}
+      run: nuget restore ${{env.SOLUTION_FILE_PATH}}
+
+    - name: Building Detours (x86)
+      working-directory: ${{env.GITHUB_WORKSPACE}}
+      run: msbuild /m /p:Configuration=Release /p:Platform=x86 ${{env.SOLUTION_FILE_PATH}}
+
+    - name: Uploading Detours (x86)
+      uses: actions/upload-artifact@v4.3.1
+      with:
+        name: Detours
+        path: |
+          ${{env.SOLUTION_FILE_PATH}}\build\x86\Release\*.dll
+          ${{env.SOLUTION_FILE_PATH}}\build\x86\Release\*.pdb
+        if-no-files-found: error
+
+    - name: Building Detours (x86_64)
+      working-directory: ${{env.GITHUB_WORKSPACE}}
+      run: msbuild /m /p:Configuration=Release /p:Platform=x86_64 ${{env.SOLUTION_FILE_PATH}}
+
+    - name: Uploading Detours (x86_64)
+      uses: actions/upload-artifact@v4.3.1
+      with:
+        name: Detours64
+        path: |
+          ${{env.SOLUTION_FILE_PATH}}\build\x86_64\Release\*.dll
+          ${{env.SOLUTION_FILE_PATH}}\build\x86_64\Release\*.pdb
         if-no-files-found: error
