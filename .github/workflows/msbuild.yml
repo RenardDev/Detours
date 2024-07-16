@@ -28,7 +28,7 @@ jobs:
 
     - name: Building Detours (x86)
       working-directory: ${{env.GITHUB_WORKSPACE}}
-      run: msbuild /m /p:Configuration=Debug /p:Platform=x86 ${{env.SOLUTION_FILE_PATH}}
+      run: msbuild /m /p:Configuration=Debug /p:Platform=Win32 ${{env.SOLUTION_FILE_PATH}}
 
     - name: Uploading Detours (x86)
       uses: actions/upload-artifact@v3
@@ -41,7 +41,7 @@ jobs:
 
     - name: Building Detours (x86_64)
       working-directory: ${{env.GITHUB_WORKSPACE}}
-      run: msbuild /m /p:Configuration=Debug /p:Platform=x86_64 ${{env.SOLUTION_FILE_PATH}}
+      run: msbuild /m /p:Configuration=Debug /p:Platform=x64 ${{env.SOLUTION_FILE_PATH}}
 
     - name: Uploading Detours (x86_64)
       uses: actions/upload-artifact@v3
@@ -67,7 +67,7 @@ jobs:
 
     - name: Building Detours (x86)
       working-directory: ${{env.GITHUB_WORKSPACE}}
-      run: msbuild /m /p:Configuration=Release /p:Platform=Win64 ${{env.SOLUTION_FILE_PATH}}
+      run: msbuild /m /p:Configuration=Release /p:Platform=Win32 ${{env.SOLUTION_FILE_PATH}}
 
     - name: Uploading Detours (x86)
       uses: actions/upload-artifact@v3
@@ -80,7 +80,7 @@ jobs:
 
     - name: Building Detours (x86_64)
       working-directory: ${{env.GITHUB_WORKSPACE}}
-      run: msbuild /m /p:Configuration=Release /p:Platform=Win64 ${{env.SOLUTION_FILE_PATH}}
+      run: msbuild /m /p:Configuration=Release /p:Platform=x64 ${{env.SOLUTION_FILE_PATH}}
 
     - name: Uploading Detours (x86_64)
       uses: actions/upload-artifact@v3
