@@ -31,10 +31,6 @@ jobs:
       working-directory: ${{env.GITHUB_WORKSPACE}}
       run: msbuild /m /p:Configuration=Debug /p:Platform=x86 ${{env.SOLUTION_FILE_PATH}}
 
-    - name: Testing Detours
-      working-directory: ${{env.GITHUB_WORKSPACE}}
-      run: ${{env.SOLUTION_FILE_PATH}}\build\x86\Debug\Detours.exe
-
     - name: Uploading Detours
       uses: actions/upload-artifact@v3
       with:
@@ -43,6 +39,10 @@ jobs:
           ${{env.SOLUTION_FILE_PATH}}\build\x86\Debug\*.exe
           ${{env.SOLUTION_FILE_PATH}}\build\x86\Debug\*.pdb
         if-no-files-found: error
+
+    - name: Testing Detours
+      working-directory: ${{env.GITHUB_WORKSPACE}}
+      run: ${{env.SOLUTION_FILE_PATH}}\build\x86\Debug\Detours.exe
 
   build-debug-x86_64:
     name: Build Debug (x86_64)
@@ -62,10 +62,6 @@ jobs:
       working-directory: ${{env.GITHUB_WORKSPACE}}
       run: msbuild /m /p:Configuration=Debug /p:Platform=x64 ${{env.SOLUTION_FILE_PATH}}
 
-    - name: Testing Detours
-      working-directory: ${{env.GITHUB_WORKSPACE}}
-      run: ${{env.SOLUTION_FILE_PATH}}\build\x86_64\Debug\Detours.exe
-
     - name: Uploading Detours
       uses: actions/upload-artifact@v3
       with:
@@ -74,6 +70,10 @@ jobs:
           ${{env.SOLUTION_FILE_PATH}}\build\x86_64\Debug\*.exe
           ${{env.SOLUTION_FILE_PATH}}\build\x86_64\Debug\*.pdb
         if-no-files-found: error
+
+    - name: Testing Detours
+      working-directory: ${{env.GITHUB_WORKSPACE}}
+      run: ${{env.SOLUTION_FILE_PATH}}\build\x86_64\Debug\Detours.exe
 
   build-release-x86:
     name: Build Release (x86)
@@ -93,10 +93,6 @@ jobs:
       working-directory: ${{env.GITHUB_WORKSPACE}}
       run: msbuild /m /p:Configuration=Release /p:Platform=x86 ${{env.SOLUTION_FILE_PATH}}
 
-    - name: Testing Detours
-      working-directory: ${{env.GITHUB_WORKSPACE}}
-      run: ${{env.SOLUTION_FILE_PATH}}\build\x86\Release\Detours.exe
-
     - name: Uploading Detours
       uses: actions/upload-artifact@v3
       with:
@@ -105,6 +101,10 @@ jobs:
           ${{env.SOLUTION_FILE_PATH}}\build\x86\Release\*.exe
           ${{env.SOLUTION_FILE_PATH}}\build\x86\Release\*.pdb
         if-no-files-found: error
+
+    - name: Testing Detours
+      working-directory: ${{env.GITHUB_WORKSPACE}}
+      run: ${{env.SOLUTION_FILE_PATH}}\build\x86\Release\Detours.exe
 
   build-release-x86_64:
     name: Build Release (x86_64)
@@ -124,10 +124,6 @@ jobs:
       working-directory: ${{env.GITHUB_WORKSPACE}}
       run: msbuild /m /p:Configuration=Release /p:Platform=x64 ${{env.SOLUTION_FILE_PATH}}
 
-    - name: Testing Detours
-      working-directory: ${{env.GITHUB_WORKSPACE}}
-      run: ${{env.SOLUTION_FILE_PATH}}\build\x86_64\Release\Detours.exe
-
     - name: Uploading Detours
       uses: actions/upload-artifact@v3
       with:
@@ -136,3 +132,7 @@ jobs:
           ${{env.SOLUTION_FILE_PATH}}\build\x86_64\Release\*.exe
           ${{env.SOLUTION_FILE_PATH}}\build\x86_64\Release\*.pdb
         if-no-files-found: error
+
+    - name: Testing Detours
+      working-directory: ${{env.GITHUB_WORKSPACE}}
+      run: ${{env.SOLUTION_FILE_PATH}}\build\x86_64\Release\Detours.exe
