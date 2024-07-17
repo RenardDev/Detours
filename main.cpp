@@ -620,7 +620,7 @@ TEST_SUITE("Detours::Scan") {
 #ifdef _M_X64
 		CHECK(Detours::Scan::FindData(_T("ntdll.dll"), reinterpret_cast<const unsigned char* const>("\x48\x8B\x41\x10\x33\xD2\x4C\x8B\xC1\x48\x85\xC0\x75"), 13) != nullptr);
 #elif _M_IX86
-		Detours::Scan::FindData(_T("ntdll.dll"), reinterpret_cast<const unsigned char* const>("\x8B\xD1\x8B\x42\x08"), 5)
+		CHECK(Detours::Scan::FindData(_T("ntdll.dll"), reinterpret_cast<const unsigned char* const>("\x8B\xD1\x8B\x42\x08"), 5) != nullptr);
 #endif
 
 		int cpuinfo[4];
