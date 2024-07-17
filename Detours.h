@@ -2379,32 +2379,6 @@ namespace Detours {
 		};
 
 		// ----------------------------------------------------------------
-		// PageCopy
-		// ----------------------------------------------------------------
-
-		class PageCopy {
-		public:
-			PageCopy(void* pAddress, size_t unSize);
-			~PageCopy();
-
-		public:
-			bool Refresh();
-		};
-
-		// ----------------------------------------------------------------
-		// Copy
-		// ----------------------------------------------------------------
-
-		class Copy {
-		public:
-			Copy(void* pAddress, size_t unSize);
-			~Copy();
-
-		public:
-			bool Refresh();
-		};
-
-		// ----------------------------------------------------------------
 		// Shared
 		// ----------------------------------------------------------------
 
@@ -2544,6 +2518,51 @@ namespace Detours {
 			void* m_pPageAddress;
 			std::set<Block> m_FreeBlocks;
 			std::set<Block> m_ActiveBlocks;
+		};
+
+		// ----------------------------------------------------------------
+		// PageClone
+		// ----------------------------------------------------------------
+
+		class PageClone {
+		public:
+			PageClone(void* pAddress, size_t unSize);
+			~PageClone();
+
+		public:
+			bool Pull(); // Copy from source to clone
+			bool Push(); // Copy from clone to source
+
+		public:
+			void* GetAddress() const;
+			size_t GetSize() const;
+
+		private:
+			std::unique_ptr<Page> m_pClone;
+			void* m_pAddress;
+			size_t m_unSize;
+		};
+
+		// ----------------------------------------------------------------
+		// Clone
+		// ----------------------------------------------------------------
+
+		class Clone {
+		public:
+			Clone(void* pAddress, size_t unSize);
+			~Clone();
+
+		public:
+			bool Pull(); // Copy from source to clone
+			bool Push(); // Copy from clone to source
+
+		public:
+			void* GetAddress() const;
+			size_t GetSize() const;
+
+		private:
+			std::vector<std::unique_ptr<Page>> m_vecClones;
+			std::vector<MEMORY_BASIC_INFORMATION> m_vecPages;
 		};
 
 		// ----------------------------------------------------------------
