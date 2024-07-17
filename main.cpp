@@ -1822,18 +1822,26 @@ TEST_SUITE("Detours::Hook") {
 		Detours::rddisasm::INSTRUCTION ins;
 		size_t unOffset = 0;
 		void* pFoundCPUID = nullptr;
+#ifdef _DEBUG
+		void* pStartAddress = Detours::rddisasm::RdGetAddressFromRelOrDisp(DemoFunction);
+		if (!pStartAddress) {
+			FAIL("Can't resolve JMP address from JMP table.");
+		}
+#else
+		void* pStartAddress = DemoFunction;
+#endif
 		while (unOffset < 0xFF) {
 #ifdef _M_X64
-			if (!RD_SUCCESS(Detours::rddisasm::RdDecode(&ins, reinterpret_cast<unsigned char*>(DemoFunction) + unOffset, RD_DATA_64, RD_DATA_64))) {
+			if (!RD_SUCCESS(Detours::rddisasm::RdDecode(&ins, reinterpret_cast<unsigned char*>(pStartAddress) + unOffset, RD_DATA_64, RD_DATA_64))) {
 #elif _M_IX86
-			if (!RD_SUCCESS(Detours::rddisasm::RdDecode(&ins, reinterpret_cast<unsigned char*>(DemoFunction) + unOffset, RD_DATA_32, RD_DATA_32))) {
+			if (!RD_SUCCESS(Detours::rddisasm::RdDecode(&ins, reinterpret_cast<unsigned char*>(pStartAddress) + unOffset, RD_DATA_32, RD_DATA_32))) {
 #endif
 				return;
 			}
 
 			if (ins.Instruction == Detours::rddisasm::RD_INS_CLASS::RD_INS_CPUID) {
 				_tprintf_s(_T("Found `cpuid` instruction!\n"));
-				pFoundCPUID = reinterpret_cast<void*>(reinterpret_cast<char*>(DemoFunction) + unOffset);
+				pFoundCPUID = reinterpret_cast<void*>(reinterpret_cast<char*>(pStartAddress) + unOffset);
 				break;
 			}
 
