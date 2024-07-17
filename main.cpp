@@ -118,8 +118,27 @@ int _tmain(int nArguments, PTCHAR* pArguments) {
 	}
 
 	if (unTestModes) {
-		return 0;
+		bool bIsFailed = false;
+
+		if (unTestModes & TEST_MODES::TEST_KUSER_SHARED_DATA) {
+			_tprintf_s(_T("Testing TEST_KUSER_SHARED_DATA... "));
+
+			ULONG unSystemTime = Detours::KUserSharedData.SystemTime.LowPart;
+			Sleep(1000);
+			unSystemTime = (Detours::KUserSharedData.SystemTime.LowPart - unSystemTime) / 1000000;
+
+			if ((unSystemTime != 9) && (unSystemTime != 10)) {
+				_tprintf_s(_T("[ FAIL ] (unSystemTime = %lu)\n"), unSystemTime);
+				bIsFailed = true;
+			} else {
+				_tprintf_s(_T("[  OK  ]\n"));
+			}
+		}
+
+		if (bIsFailed) {
+			return EXIT_FAILURE;
+		}
 	}
 
-	return 0;
+	return EXIT_SUCCESS;
 }
