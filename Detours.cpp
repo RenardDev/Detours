@@ -155,10 +155,10 @@ namespace Detours {
 	const volatile KUSER_SHARED_DATA& KUserSharedData = *reinterpret_cast<PKUSER_SHARED_DATA>(0x7FFE0000);
 
 	// ----------------------------------------------------------------
-	// KUSER_QPC_SHARED_DATA
+	// KHYPERVISOR_SHARED_DATA
 	// ----------------------------------------------------------------
 
-	const volatile KUSER_QPC_SHARED_DATA& KUserQpcSharedData = *reinterpret_cast<PKUSER_QPC_SHARED_DATA>(0x7FFEE000);
+	const volatile KHYPERVISOR_SHARED_DATA& KHypervisorSharedData = *reinterpret_cast<PKHYPERVISOR_SHARED_DATA>(0x7FFEE000); // FIXME: Address is incorrect on some Windows versions.
 
 	// ----------------------------------------------------------------
 	// PEB
@@ -958,7 +958,7 @@ namespace Detours {
 		} IMAGE_POGO_BLOCK, *PIMAGE_POGO_BLOCK;
 
 		typedef struct _IMAGE_POGO_INFO {
-			DWORD m_Signature; // 0x4C544347 = 'LTCG'
+			DWORD m_unSignature; // 0x4C544347 = 'LTCG'; 0x50475500 = 'PGO\x00'
 			IMAGE_POGO_BLOCK m_pBlocks[1];
 		} IMAGE_POGO_INFO, *PIMAGE_POGO_INFO;
 
@@ -983,7 +983,7 @@ namespace Detours {
 				}
 
 				const auto& pPI = reinterpret_cast<PIMAGE_POGO_INFO>(reinterpret_cast<char*>(hModule) + pDebugDirectory[i].AddressOfRawData);
-				if (pPI->m_Signature != 0x4C544347) {
+				if ((pPI->m_unSignature != 0x4C544347) && (pPI->m_unSignature != 0x50475500)) {
 					continue;
 				}
 
@@ -4444,12 +4444,12 @@ namespace Detours {
 		// CriticalSection
 		// ----------------------------------------------------------------
 
-		CriticalSection::CriticalSection() {
-			InitializeCriticalSection(&m_CriticalSection);
-		}
-
 		CriticalSection::CriticalSection(DWORD unSpinCount) {
-			UNREFERENCED_PARAMETER(InitializeCriticalSectionAndSpinCount(&m_CriticalSection, unSpinCount));
+			if (!unSpinCount) {
+				InitializeCriticalSection(&m_CriticalSection);
+			} else {
+				UNREFERENCED_PARAMETER(InitializeCriticalSectionAndSpinCount(&m_CriticalSection, unSpinCount));
+			}
 		}
 
 		CriticalSection::~CriticalSection() {

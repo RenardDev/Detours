@@ -227,6 +227,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Detours.h" />
+    <ClInclude Include="doctest.h" />
   </ItemGroup>
   <ItemGroup>
     <MASM Include="interrupts32.asm">
