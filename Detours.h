@@ -2326,6 +2326,85 @@ namespace Detours {
 	namespace Memory {
 
 		// ----------------------------------------------------------------
+		// PageProtection
+		// ----------------------------------------------------------------
+
+		class PageProtection {
+		public:
+			PageProtection(void* pAddress, size_t unSize, bool bAutoRestore = true);
+			~PageProtection();
+
+		public:
+			bool Get(const PDWORD pProtection);
+			bool Change(const DWORD unNewProtection);
+			bool Restore();
+
+		public:
+			void* GetAddress() const;
+			size_t GetSize() const;
+			DWORD GetOriginalProtection() const;
+
+		private:
+			void* m_pAddress;
+			size_t m_unSize;
+			bool m_bAutoRestore;
+			DWORD m_unOriginalProtection;
+		};
+
+		// ----------------------------------------------------------------
+		// Protection
+		// ----------------------------------------------------------------
+
+		class Protection {
+		public:
+			Protection(void* pAddress, size_t unSize, bool bAutoRestore = true);
+			~Protection();
+
+		public:
+			bool Get(const PDWORD pProtection);
+			bool Change(const DWORD unNewProtection);
+			bool Restore();
+
+		public:
+			void* GetAddress() const;
+			size_t GetSize() const;
+			DWORD GetOriginalProtection() const;
+
+		private:
+			void* m_pAddress;
+			size_t m_unSize;
+			bool m_bAutoRestore;
+			DWORD m_unOriginalProtection;
+			std::vector<MEMORY_BASIC_INFORMATION> m_vecPages;
+		};
+
+		// ----------------------------------------------------------------
+		// PageCopy
+		// ----------------------------------------------------------------
+
+		class PageCopy {
+		public:
+			PageCopy(void* pAddress, size_t unSize);
+			~PageCopy();
+
+		public:
+			bool Refresh();
+		};
+
+		// ----------------------------------------------------------------
+		// Copy
+		// ----------------------------------------------------------------
+
+		class Copy {
+		public:
+			Copy(void* pAddress, size_t unSize);
+			~Copy();
+
+		public:
+			bool Refresh();
+		};
+
+		// ----------------------------------------------------------------
 		// Shared
 		// ----------------------------------------------------------------
 
@@ -2517,32 +2596,6 @@ namespace Detours {
 			size_t m_unPageCapacity;
 			size_t m_unUsedSpace;
 			std::list<NearPage> m_Pages;
-		};
-
-		// ----------------------------------------------------------------
-		// Protection
-		// ----------------------------------------------------------------
-
-		class Protection {
-		public:
-			Protection(void const* const pAddress, const size_t unSize, const bool bAutoRestore = true);
-			~Protection();
-
-		public:
-			bool GetProtection(const PDWORD pProtection);
-			bool ChangeProtection(const DWORD unNewProtection);
-			bool RestoreProtection();
-
-		public:
-			const void* GetAddress() const;
-			size_t GetSize() const;
-			DWORD GetOriginalProtection() const;
-
-		private:
-			void const* const m_pAddress;
-			const size_t m_unSize;
-			const bool m_bAutoRestore;
-			DWORD m_unOriginalProtection;
 		};
 	}
 

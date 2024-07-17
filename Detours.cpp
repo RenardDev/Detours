@@ -5103,6 +5103,85 @@ namespace Detours {
 
 	namespace Memory {
 
+		static DWORD unPageSize = 0;
+		static DWORD unAllocationGranularity = 0;
+
+		// ----------------------------------------------------------------
+		// __get_page_info
+		// ----------------------------------------------------------------
+
+		static bool inline __get_page_info(void* pAddress, PMEMORY_BASIC_INFORMATION pMemoryBasicInfo) {
+			if (!pAddress || !pMemoryBasicInfo) {
+				return false;
+			}
+
+			memset(pMemoryBasicInfo, 0, sizeof(MEMORY_BASIC_INFORMATION));
+
+			if (VirtualQuery(pAddress, pMemoryBasicInfo, sizeof(MEMORY_BASIC_INFORMATION)) != sizeof(MEMORY_BASIC_INFORMATION)) {
+				return false;
+			}
+
+			return true;
+		};
+
+		// ----------------------------------------------------------------
+		// __get_page_address
+		// ----------------------------------------------------------------
+
+		static inline void* __get_page_address(void* pAddress) {
+			MEMORY_BASIC_INFORMATION mbi;
+
+			if (!__get_page_info(pAddress, &mbi)) {
+				return nullptr;
+			}
+
+			return mbi.BaseAddress;
+		};
+
+		// ----------------------------------------------------------------
+		// __is_page_address
+		// ----------------------------------------------------------------
+
+		static inline bool __is_page_address(void* pAddress) {
+			void* pPageAddress = __get_page_address(pAddress);
+			if (!pPageAddress) {
+				return false;
+			}
+
+			return pPageAddress == pAddress;
+		};
+
+		// ----------------------------------------------------------------
+		// __get_pages
+		// ----------------------------------------------------------------
+
+		static inline std::vector<MEMORY_BASIC_INFORMATION> __get_pages(void* pAddress, size_t unSize) {
+			if (!unPageSize || !unAllocationGranularity) {
+				SYSTEM_INFO sysinf;
+				GetSystemInfo(&sysinf);
+				unPageSize = sysinf.dwPageSize;
+				unAllocationGranularity = sysinf.dwAllocationGranularity;
+			}
+
+			std::vector<MEMORY_BASIC_INFORMATION> vecPages;
+
+			const size_t unEnd = reinterpret_cast<size_t>(pAddress) + unSize;
+			MEMORY_BASIC_INFORMATION mbi;
+			for (size_t unAddress = reinterpret_cast<size_t>(pAddress); unAddress < unEnd; unAddress = __align_up(unAddress + static_cast<size_t>(unAllocationGranularity) - 1, static_cast<size_t>(unAllocationGranularity))) {
+				if (!__get_page_info(reinterpret_cast<void*>(unAddress), &mbi)) {
+					break;
+				}
+
+				if (mbi.State == MEM_FREE) {
+					continue;
+				}
+
+				vecPages.emplace_back(mbi);
+			}
+
+			return vecPages;
+		};
+
 		// ----------------------------------------------------------------
 		// __is_relative
 		// ----------------------------------------------------------------
@@ -5116,6 +5195,107 @@ namespace Detours {
 
 			return 0;
 		};
+
+		// ----------------------------------------------------------------
+		// PageProtection
+		// ----------------------------------------------------------------
+
+		PageProtection::PageProtection(void* pAddress, size_t unSize, bool bAutoRestore) {
+			m_pAddress = nullptr;
+			m_unSize = 0;
+			m_bAutoRestore = bAutoRestore;
+			m_unOriginalProtection = 0;
+
+			if (!pAddress || !unSize) {
+				return;
+			}
+
+			if (!__is_page_address(pAddress)) {
+				return;
+			}
+
+			m_pAddress = __get_page_address(pAddress);
+			m_unSize = unSize;
+
+			Get(&m_unOriginalProtection);
+		}
+
+		PageProtection::~PageProtection() {
+			if (!m_pAddress || !m_unSize || !m_bAutoRestore) {
+				return;
+			}
+
+			Change(m_unOriginalProtection);
+		}
+
+		bool PageProtection::Get(const PDWORD pProtection) {
+			if (!m_pAddress || !m_unSize) {
+				return false;
+			}
+
+			MEMORY_BASIC_INFORMATION mbi;
+			memset(&mbi, 0, sizeof(mbi));
+
+			if (VirtualQuery(m_pAddress, &mbi, sizeof(mbi)) != sizeof(mbi)) {
+				return false;
+			}
+
+			if (pProtection) {
+				*pProtection = mbi.Protect;
+			}
+
+			return true;
+		}
+
+		bool PageProtection::Change(const DWORD unNewProtection2) {
+			if (!m_pAddress || !m_unSize) {
+				return false;
+			}
+
+			DWORD unProtection2 = 0;
+			if (!VirtualProtect(const_cast<void*>(m_pAddress), m_unSize, unNewProtection2, &unProtection2)) {
+				return false;
+			}
+
+			if (unNewProtection2 & (PAGE_EXECUTE | PAGE_EXECUTE_READ | PAGE_EXECUTE_READWRITE)) {
+				MEMORY_BASIC_INFORMATION mbi;
+				memset(&mbi, 0, sizeof(mbi));
+
+				if (VirtualQuery(m_pAddress, &mbi, sizeof(mbi)) != sizeof(mbi)) {
+					return false;
+				}
+
+				if (!FlushInstructionCache(reinterpret_cast<HANDLE>(-1), mbi.BaseAddress, mbi.RegionSize)) {
+					return false;
+				}
+			}
+
+			return true;
+		}
+
+		bool PageProtection::Restore() {
+			if (!m_pAddress || !m_unSize) {
+				return false;
+			}
+
+			if (!Change(m_unOriginalProtection)) {
+				return false;
+			}
+
+			return true;
+		}
+
+		void* PageProtection::GetAddress() const {
+			return m_pAddress;
+		}
+
+		size_t PageProtection::GetSize() const {
+			return m_unSize;
+		}
+
+		DWORD PageProtection::GetOriginalProtection() const {
+			return m_unOriginalProtection;
+		}
 
 		// ----------------------------------------------------------------
 		// Shared
@@ -5299,9 +5479,6 @@ namespace Detours {
 		// Page
 		// ----------------------------------------------------------------
 
-		static DWORD unPageSize = 0;
-		static DWORD unAllocationGranularity = 0;
-
 		Page::Page(size_t unCapacity) {
 			if (!unPageSize || !unAllocationGranularity) {
 				SYSTEM_INFO sysinf;
@@ -5479,7 +5656,7 @@ namespace Detours {
 						break;
 					}
 
-					if (mbi.State == MEM_FREE && mbi.RegionSize >= unCapacity) {
+					if ((mbi.State == MEM_FREE) && (mbi.RegionSize >= unCapacity)) {
 						void* pPageAddress = VirtualAlloc(reinterpret_cast<void*>(unAddress), unCapacity, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
 						if (pPageAddress) {
 							if (__is_relative(pDesiredAddress, pPageAddress)) {
@@ -5500,7 +5677,7 @@ namespace Detours {
 							break;
 						}
 
-						if (mbi.State == MEM_FREE && mbi.RegionSize >= unCapacity) {
+						if ((mbi.State == MEM_FREE) && (mbi.RegionSize >= unCapacity)) {
 							void* pPageAddress = VirtualAlloc(reinterpret_cast<void*>(unAddress), unCapacity, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
 							if (pPageAddress) {
 								if (__is_relative(pDesiredAddress, pPageAddress)) {
@@ -5952,97 +6129,6 @@ namespace Detours {
 			}
 
 			return true;
-		}
-
-		// ----------------------------------------------------------------
-		// Protection
-		// ----------------------------------------------------------------
-
-		Protection::Protection(void const* const pAddress, const size_t unSize, const bool bAutoRestore) : m_pAddress(pAddress), m_unSize(unSize), m_bAutoRestore(bAutoRestore) {
-			m_unOriginalProtection = 0;
-
-			if (!pAddress || !unSize) {
-				return;
-			}
-
-			GetProtection(&m_unOriginalProtection);
-		}
-
-		Protection::~Protection() {
-			if (!m_pAddress || !m_unSize || !m_bAutoRestore) {
-				return;
-			}
-
-			ChangeProtection(m_unOriginalProtection);
-		}
-
-		bool Protection::GetProtection(const PDWORD pProtection) {
-			if (!m_pAddress || !m_unSize) {
-				return false;
-			}
-
-			MEMORY_BASIC_INFORMATION mbi;
-			memset(&mbi, 0, sizeof(mbi));
-
-			if (VirtualQuery(m_pAddress, &mbi, sizeof(mbi)) != sizeof(mbi)) {
-				return false;
-			}
-
-			if (pProtection) {
-				*pProtection = mbi.Protect;
-			}
-
-			return true;
-		}
-
-		bool Protection::ChangeProtection(const DWORD unNewProtection) {
-			if (!m_pAddress || !m_unSize) {
-				return false;
-			}
-
-			DWORD unProtection = 0;
-			if (!VirtualProtect(const_cast<void*>(m_pAddress), m_unSize, unNewProtection, &unProtection)) {
-				return false;
-			}
-
-			if (unNewProtection & (PAGE_EXECUTE | PAGE_EXECUTE_READ | PAGE_EXECUTE_READWRITE)) {
-				MEMORY_BASIC_INFORMATION mbi;
-				memset(&mbi, 0, sizeof(mbi));
-
-				if (VirtualQuery(m_pAddress, &mbi, sizeof(mbi)) != sizeof(mbi)) {
-					return false;
-				}
-
-				if (!FlushInstructionCache(reinterpret_cast<HANDLE>(-1), mbi.BaseAddress, mbi.RegionSize)) {
-					return false;
-				}
-			}
-
-			return true;
-		}
-
-		bool Protection::RestoreProtection() {
-			if (!m_pAddress || !m_unSize) {
-				return false;
-			}
-
-			if (!ChangeProtection(m_unOriginalProtection)) {
-				return false;
-			}
-
-			return true;
-		}
-
-		void const* Protection::GetAddress() const {
-			return m_pAddress;
-		}
-
-		size_t Protection::GetSize() const {
-			return m_unSize;
-		}
-
-		DWORD Protection::GetOriginalProtection() const {
-			return m_unOriginalProtection;
 		}
 	}
 
@@ -83307,7 +83393,7 @@ namespace Detours {
 
 			const auto& pAddress = &m_pVTable[m_unIndex];
 
-			const auto& it = g_Protections.find(reinterpret_cast<void*>(pAddress));
+			const auto& it = g_Protections.find(reinterpret_cast<void*>(__get_page_address(pAddress)));
 			if (it != g_Protections.end()) {
 				return false;
 			}
@@ -83338,26 +83424,26 @@ namespace Detours {
 
 			const auto& pAddress = &m_pVTable[m_unIndex];
 
-			const auto& it = g_Protections.find(reinterpret_cast<void*>(pAddress));
-			if (it == g_Protections.end()) {
+			const auto& it = g_Protection2s.find(reinterpret_cast<void*>(pAddress));
+			if (it == g_Protection2s.end()) {
 				return false;
 			}
 
-			const auto& pProtection = it->second;
-			if (!pProtection) {
+			const auto& pProtection2 = it->second;
+			if (!pProtection2) {
 				return false;
 			}
 
-			if (!pProtection->ChangeProtection(PAGE_READWRITE)) {
+			if (!pProtection2->ChangeProtection2(PAGE_READWRITE)) {
 				return false;
 			}
 
 			*pAddress = m_pOriginal;
 			m_pOriginal = nullptr;
 
-			pProtection->RestoreProtection();
+			pProtection2->RestoreProtection2();
 
-			g_Protections.erase(it);
+			g_Protection2s.erase(it);
 
 			return true;
 		}
@@ -83559,7 +83645,7 @@ namespace Detours {
 				return false;
 			}
 
-			if (!Protection(m_pTrampoline, HOOK_INLINE_TRAMPOLINE_SIZE, false).ChangeProtection(PAGE_READWRITE)) {
+			if (!Protection2(m_pTrampoline, HOOK_INLINE_TRAMPOLINE_SIZE, false).ChangeProtection2(PAGE_READWRITE)) {
 				g_HookStorage.DeAlloc(m_pTrampoline);
 				m_pTrampoline = nullptr;
 				g_Suspender.Resume();
@@ -83702,7 +83788,7 @@ namespace Detours {
 #endif
 			}
 
-			if (!Protection(m_pTrampoline, HOOK_INLINE_TRAMPOLINE_SIZE, false).ChangeProtection(PAGE_EXECUTE_READ)) {
+			if (!Protection2(m_pTrampoline, HOOK_INLINE_TRAMPOLINE_SIZE, false).ChangeProtection2(PAGE_EXECUTE_READ)) {
 				g_HookStorage.DeAlloc(m_pTrampoline);
 				m_pTrampoline = nullptr;
 				g_Suspender.Resume();
@@ -83754,8 +83840,8 @@ namespace Detours {
 				}
 			}
 
-			Protection JumpToHookProtection(m_pAddress, unCopyingSize, false);
-			if (!JumpToHookProtection.ChangeProtection(PAGE_EXECUTE_READWRITE)) {
+			Protection2 JumpToHookProtection2(m_pAddress, unCopyingSize, false);
+			if (!JumpToHookProtection2.ChangeProtection2(PAGE_EXECUTE_READWRITE)) {
 				m_pOriginalBytes = nullptr;
 				m_unOriginalBytes = 0;
 				g_HookStorage.DeAlloc(m_pTrampoline);
@@ -83814,7 +83900,7 @@ namespace Detours {
 #endif
 			}
 
-			if (!JumpToHookProtection.RestoreProtection()) {
+			if (!JumpToHookProtection2.RestoreProtection2()) {
 				m_pOriginalBytes = nullptr;
 				m_unOriginalBytes = 0;
 				g_HookStorage.DeAlloc(m_pTrampoline);
@@ -83878,15 +83964,15 @@ namespace Detours {
 				}
 			}
 
-			Protection HookProtection(m_pAddress, m_unOriginalBytes, false);
-			if (!HookProtection.ChangeProtection(PAGE_EXECUTE_READWRITE)) {
+			Protection2 HookProtection2(m_pAddress, m_unOriginalBytes, false);
+			if (!HookProtection2.ChangeProtection2(PAGE_EXECUTE_READWRITE)) {
 				g_Suspender.Resume();
 				return false;
 			}
 
 			memcpy(m_pAddress, m_pOriginalBytes.get(), m_unOriginalBytes);
 
-			if (!HookProtection.RestoreProtection()) {
+			if (!HookProtection2.RestoreProtection2()) {
 				__debugbreak();
 				g_Suspender.Resume();
 				return false;
@@ -83979,7 +84065,7 @@ namespace Detours {
 				return false;
 			}
 
-			if (!Protection(m_pWrapper, HOOK_INLINE_WRAPPER_SIZE, false).ChangeProtection(PAGE_READWRITE)) {
+			if (!Protection2(m_pWrapper, HOOK_INLINE_WRAPPER_SIZE, false).ChangeProtection2(PAGE_READWRITE)) {
 				g_HookStorage.DeAlloc(m_pWrapper);
 				m_pWrapper = nullptr;
 				g_Suspender.Resume();
@@ -84086,7 +84172,7 @@ namespace Detours {
 				return false;
 			}
 
-			if (!Protection(m_pTrampoline, HOOK_INLINE_TRAMPOLINE_SIZE, false).ChangeProtection(PAGE_READWRITE)) {
+			if (!Protection2(m_pTrampoline, HOOK_INLINE_TRAMPOLINE_SIZE, false).ChangeProtection2(PAGE_READWRITE)) {
 				g_HookStorage.DeAlloc(m_pTrampoline);
 				m_pTrampoline = nullptr;
 				g_HookStorage.DeAlloc(m_pWrapper);
@@ -84239,7 +84325,7 @@ namespace Detours {
 #endif
 			}
 
-			if (!Protection(m_pTrampoline, HOOK_INLINE_TRAMPOLINE_SIZE, false).ChangeProtection(PAGE_EXECUTE_READ)) {
+			if (!Protection2(m_pTrampoline, HOOK_INLINE_TRAMPOLINE_SIZE, false).ChangeProtection2(PAGE_EXECUTE_READ)) {
 				g_HookStorage.DeAlloc(m_pTrampoline);
 				m_pTrampoline = nullptr;
 				g_HookStorage.DeAlloc(m_pWrapper);
@@ -84297,8 +84383,8 @@ namespace Detours {
 				}
 			}
 
-			Protection JumpToHookProtection(m_pAddress, unCopyingSize, false);
-			if (!JumpToHookProtection.ChangeProtection(PAGE_EXECUTE_READWRITE)) {
+			Protection2 JumpToHookProtection2(m_pAddress, unCopyingSize, false);
+			if (!JumpToHookProtection2.ChangeProtection2(PAGE_EXECUTE_READWRITE)) {
 				m_pOriginalBytes = nullptr;
 				m_unOriginalBytes = 0;
 				g_HookStorage.DeAlloc(m_pTrampoline);
@@ -84359,7 +84445,7 @@ namespace Detours {
 #endif
 			}
 
-			if (!JumpToHookProtection.RestoreProtection()) {
+			if (!JumpToHookProtection2.RestoreProtection2()) {
 				m_pOriginalBytes = nullptr;
 				m_unOriginalBytes = 0;
 				g_HookStorage.DeAlloc(m_pTrampoline);
@@ -84438,15 +84524,15 @@ namespace Detours {
 				}
 			}
 
-			Protection HookProtection(m_pAddress, m_unOriginalBytes, false);
-			if (!HookProtection.ChangeProtection(PAGE_EXECUTE_READWRITE)) {
+			Protection2 HookProtection2(m_pAddress, m_unOriginalBytes, false);
+			if (!HookProtection2.ChangeProtection2(PAGE_EXECUTE_READWRITE)) {
 				g_Suspender.Resume();
 				return false;
 			}
 
 			memcpy(m_pAddress, m_pOriginalBytes.get(), m_unOriginalBytes);
 
-			if (!HookProtection.RestoreProtection()) {
+			if (!HookProtection2.RestoreProtection2()) {
 				__debugbreak();
 				g_Suspender.Resume();
 				return false;
@@ -84545,7 +84631,7 @@ namespace Detours {
 				return false;
 			}
 
-			if (!Protection(m_pWrapper, HOOK_RAW_WRAPPER_SIZE, false).ChangeProtection(PAGE_READWRITE)) {
+			if (!Protection2(m_pWrapper, HOOK_RAW_WRAPPER_SIZE, false).ChangeProtection2(PAGE_READWRITE)) {
 				g_HookStorage.DeAlloc(m_pWrapper);
 				m_pWrapper = nullptr;
 				g_Suspender.Resume();
@@ -85596,7 +85682,7 @@ namespace Detours {
 				return false;
 			}
 
-			if (!Protection(m_pTrampoline, HOOK_RAW_TRAMPOLINE_SIZE, false).ChangeProtection(PAGE_READWRITE)) {
+			if (!Protection2(m_pTrampoline, HOOK_RAW_TRAMPOLINE_SIZE, false).ChangeProtection2(PAGE_READWRITE)) {
 				g_HookStorage.DeAlloc(m_pTrampoline);
 				m_pTrampoline = nullptr;
 				m_unFirstInstructionSize = 0;
@@ -85682,7 +85768,7 @@ namespace Detours {
 #endif
 			}
 
-			if (!Protection(m_pWrapper, HOOK_RAW_WRAPPER_SIZE, false).ChangeProtection(PAGE_EXECUTE_READ)) {
+			if (!Protection2(m_pWrapper, HOOK_RAW_WRAPPER_SIZE, false).ChangeProtection2(PAGE_EXECUTE_READ)) {
 				g_HookStorage.DeAlloc(m_pTrampoline);
 				m_pTrampoline = nullptr;
 				m_unFirstInstructionSize = 0;
@@ -85692,7 +85778,7 @@ namespace Detours {
 				return false;
 			}
 
-			if (!Protection(m_pTrampoline, HOOK_RAW_TRAMPOLINE_SIZE, false).ChangeProtection(PAGE_READWRITE)) {
+			if (!Protection2(m_pTrampoline, HOOK_RAW_TRAMPOLINE_SIZE, false).ChangeProtection2(PAGE_READWRITE)) {
 				g_HookStorage.DeAlloc(m_pTrampoline);
 				m_pTrampoline = nullptr;
 				m_unFirstInstructionSize = 0;
@@ -85842,7 +85928,7 @@ namespace Detours {
 #endif
 			}
 
-			if (!Protection(m_pTrampoline, HOOK_RAW_TRAMPOLINE_SIZE, false).ChangeProtection(PAGE_EXECUTE_READ)) {
+			if (!Protection2(m_pTrampoline, HOOK_RAW_TRAMPOLINE_SIZE, false).ChangeProtection2(PAGE_EXECUTE_READ)) {
 				g_HookStorage.DeAlloc(m_pTrampoline);
 				m_pTrampoline = nullptr;
 				m_unFirstInstructionSize = 0;
@@ -85902,8 +85988,8 @@ namespace Detours {
 				}
 			}
 
-			Protection JumpToHookProtection(m_pAddress, unCopyingSize, false);
-			if (!JumpToHookProtection.ChangeProtection(PAGE_EXECUTE_READWRITE)) {
+			Protection2 JumpToHookProtection2(m_pAddress, unCopyingSize, false);
+			if (!JumpToHookProtection2.ChangeProtection2(PAGE_EXECUTE_READWRITE)) {
 				m_pOriginalBytes = nullptr;
 				m_unOriginalBytes = 0;
 				g_HookStorage.DeAlloc(m_pTrampoline);
@@ -85967,7 +86053,7 @@ namespace Detours {
 #endif
 			}
 
-			if (!JumpToHookProtection.RestoreProtection()) {
+			if (!JumpToHookProtection2.RestoreProtection2()) {
 				m_pOriginalBytes = nullptr;
 				m_unOriginalBytes = 0;
 				g_HookStorage.DeAlloc(m_pTrampoline);
@@ -86047,15 +86133,15 @@ namespace Detours {
 				}
 			}
 
-			Protection HookProtection(m_pAddress, m_unOriginalBytes, false);
-			if (!HookProtection.ChangeProtection(PAGE_EXECUTE_READWRITE)) {
+			Protection2 HookProtection2(m_pAddress, m_unOriginalBytes, false);
+			if (!HookProtection2.ChangeProtection2(PAGE_EXECUTE_READWRITE)) {
 				g_Suspender.Resume();
 				return false;
 			}
 
 			memcpy(m_pAddress, m_pOriginalBytes.get(), m_unOriginalBytes);
 
-			if (!HookProtection.RestoreProtection()) {
+			if (!HookProtection2.RestoreProtection2()) {
 				__debugbreak();
 				g_Suspender.Resume();
 				return false;

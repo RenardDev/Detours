@@ -1420,20 +1420,24 @@ TEST_SUITE("Detours::Exception") {
 			return false;
 		}
 
-		const unsigned char* const pAddress = reinterpret_cast<const unsigned char* const>(Exception.ExceptionAddress);
-		if (!pAddress) {
+		const ULONG_PTR unAccessType = Exception.ExceptionInformation[0];
+		if (unAccessType != 0) {
 			return false;
 		}
 
-		if (pAddress[0] != 0xCD) {
+		const void* pAccessAddress = reinterpret_cast<void*>(Exception.ExceptionInformation[1]);
+		if (pAccessAddress != reinterpret_cast<void*>(-1)) {
 			return false;
 		}
 
-		if ((pAddress[1] != 0x7D) && (pAddress[1] != 0x7E)) { // int 0x7D / int 0x7E - Reversed for user.
+		unsigned char* pCode = reinterpret_cast<unsigned char*>(Exception.ExceptionAddress);
+		if (pCode[0] != 0xCD) {
 			return false;
 		}
 
-		_tprintf_s(_T("[OnException] Called `int 0x%02X`\n"), pAddress[1]);
+		const unsigned char unInterrupt = pCode[1];
+
+		_tprintf_s(_T("[OnException] Called `int 0x%02X`\n"), unInterrupt);
 #ifdef _M_X64
 		_tprintf_s(_T("  -> RAX = 0x%016llX\n"), pCTX->Rax);
 		_tprintf_s(_T("  -> RCX = 0x%016llX\n"), pCTX->Rcx);
