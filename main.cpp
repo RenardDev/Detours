@@ -1822,7 +1822,7 @@ TEST_SUITE("Detours::Hook") {
 		Detours::rddisasm::INSTRUCTION ins;
 		size_t unOffset = 0;
 		void* pFoundCPUID = nullptr;
-		while (unOffset < 0x1F) {
+		while (unOffset < 0xFF) {
 #ifdef _M_X64
 			if (!RD_SUCCESS(Detours::rddisasm::RdDecode(&ins, reinterpret_cast<unsigned char*>(DemoFunction) + unOffset, RD_DATA_64, RD_DATA_64))) {
 #elif _M_IX86

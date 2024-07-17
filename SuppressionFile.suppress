@@ -186,12 +186,332 @@
     <CodeNext>14801337</CodeNext>
   </Detours>
   <Detours>
+    <FileName>doctest.h</FileName>
+    <ErrorCode>V1003</ErrorCode>
+    <Message>The macro 'DOCTEST_CMP_LT' is a dangerous expression. The parameters 'l', 'r' must be surrounded by parentheses.</Message>
+    <CodePrev>9657174</CodePrev>
+    <CodeCurrent>9653586</CodeCurrent>
+    <CodeNext>19305536</CodeNext>
+  </Detours>
+  <Detours>
+    <FileName>doctest.h</FileName>
+    <ErrorCode>V1003</ErrorCode>
+    <Message>The macro 'DOCTEST_CMP_GT' is a dangerous expression. The parameters 'l', 'r' must be surrounded by parentheses.</Message>
+    <CodePrev>19312700</CodePrev>
+    <CodeCurrent>9657174</CodeCurrent>
+    <CodeNext>9653586</CodeNext>
+  </Detours>
+  <Detours>
+    <FileName>doctest.h</FileName>
+    <ErrorCode>V1003</ErrorCode>
+    <Message>The macro 'DOCTEST_CMP_GE' is a dangerous expression. The parameters 'l', 'r' must be surrounded by parentheses.</Message>
+    <CodePrev>9653586</CodePrev>
+    <CodeCurrent>19305536</CodeCurrent>
+    <CodeNext>19314760</CodeNext>
+  </Detours>
+  <Detours>
+    <FileName>doctest.h</FileName>
+    <ErrorCode>V1003</ErrorCode>
+    <Message>The macro 'DOCTEST_CMP_NE' is a dangerous expression. The parameters 'l', 'r' must be surrounded by parentheses.</Message>
+    <CodePrev>19313740</CodePrev>
+    <CodeCurrent>19312700</CodeCurrent>
+    <CodeNext>9657174</CodeNext>
+  </Detours>
+  <Detours>
+    <FileName>doctest.h</FileName>
+    <ErrorCode>V1003</ErrorCode>
+    <Message>The macro 'DOCTEST_CMP_EQ' is a dangerous expression. The parameters 'l', 'r' must be surrounded by parentheses.</Message>
+    <CodePrev>1748409920</CodePrev>
+    <CodeCurrent>19313740</CodeCurrent>
+    <CodeNext>19312700</CodeNext>
+  </Detours>
+  <Detours>
+    <FileName>doctest.h</FileName>
+    <ErrorCode>V1003</ErrorCode>
+    <Message>The macro 'DOCTEST_CMP_LE' is a dangerous expression. The parameters 'l', 'r' must be surrounded by parentheses.</Message>
+    <CodePrev>19305536</CodePrev>
+    <CodeCurrent>19314760</CodeCurrent>
+    <CodeNext>1748471616</CodeNext>
+  </Detours>
+  <Detours>
+    <FileName>doctest.h</FileName>
+    <ErrorCode>V1003</ErrorCode>
+    <Message>The macro 'DOCTEST_SET_ATTR' is a dangerous expression. The parameter 'x' must be surrounded by parentheses.</Message>
+    <CodePrev>0</CodePrev>
+    <CodeCurrent>890209813</CodeCurrent>
+    <CodeNext>0</CodeNext>
+  </Detours>
+  <Detours>
+    <FileName>doctest.h</FileName>
+    <ErrorCode>V1068</ErrorCode>
+    <Message>Do not define an unnamed namespace in a header file.</Message>
+    <CodePrev>0</CodePrev>
+    <CodeCurrent>39317</CodeCurrent>
+    <CodeNext>99707695</CodeNext>
+  </Detours>
+  <Detours>
+    <FileName>doctest.h</FileName>
+    <ErrorCode>V1068</ErrorCode>
+    <Message>Do not define an unnamed namespace in a header file.</Message>
+    <CodePrev>13743498</CodePrev>
+    <CodeCurrent>39317</CodeCurrent>
+    <CodeNext>99707695</CodeNext>
+  </Detours>
+  <Detours>
+    <FileName>doctest.h</FileName>
+    <ErrorCode>V1068</ErrorCode>
+    <Message>Do not define an unnamed namespace in a header file.</Message>
+    <CodePrev>0</CodePrev>
+    <CodeCurrent>39317</CodeCurrent>
+    <CodeNext>0</CodeNext>
+  </Detours>
+  <Detours>
+    <FileName>doctest.h</FileName>
+    <ErrorCode>V1096</ErrorCode>
+    <Message>The 'execute' variable with static storage duration is declared inside the inline function with external linkage. This may lead to ODR violation.</Message>
+    <CodePrev>2050698983</CodePrev>
+    <CodeCurrent>383079957</CodeCurrent>
+    <CodeNext>123</CodeNext>
+  </Detours>
+  <Detours>
+    <FileName>doctest.h</FileName>
+    <ErrorCode>V1096</ErrorCode>
+    <Message>The 'mutex' variable with static storage duration is declared inside the inline function with external linkage. This may lead to ODR violation.</Message>
+    <CodePrev>2000613816</CodePrev>
+    <CodeCurrent>2050698983</CodeCurrent>
+    <CodeNext>383079957</CodeNext>
+  </Detours>
+  <Detours>
+    <FileName>doctest.h</FileName>
+    <ErrorCode>V506</ErrorCode>
+    <Message>Pointer to local variable 'fstr' is stored outside the scope of this variable. Such a pointer will become invalid.</Message>
+    <CodePrev>807987489</CodePrev>
+    <CodeCurrent>799351</CodeCurrent>
+    <CodeNext>3053</CodeNext>
+  </Detours>
+  <Detours>
+    <FileName>doctest.h</FileName>
+    <ErrorCode>V547</ErrorCode>
+    <Message>The 'A = failed' expression is equivalent to the 'A = true' expression.</Message>
+    <CodePrev>58720225</CodePrev>
+    <CodeCurrent>1090287455</CodeCurrent>
+    <CodeNext>4110147717</CodeNext>
+  </Detours>
+  <Detours>
+    <FileName>doctest.h</FileName>
+    <ErrorCode>V547</ErrorCode>
+    <Message>The 'A = failed' expression is equivalent to the 'A = true' expression.</Message>
+    <CodePrev>58720225</CodePrev>
+    <CodeCurrent>2035750756</CodeCurrent>
+    <CodeNext>1987617292</CodeNext>
+  </Detours>
+  <Detours>
+    <FileName>doctest.h</FileName>
+    <ErrorCode>V550</ErrorCode>
+    <Message>An odd precise comparison: lhs != rhs. It's probably better to use a comparison with defined precision: fabs(A - B) &gt; Epsilon.</Message>
+    <CodePrev>427585793</CodePrev>
+    <CodeCurrent>191333569</CodeCurrent>
+    <CodeNext>0</CodeNext>
+  </Detours>
+  <Detours>
+    <FileName>doctest.h</FileName>
+    <ErrorCode>V550</ErrorCode>
+    <Message>An odd precise comparison: lhs != rhs. It's probably better to use a comparison with defined precision: fabs(A - B) &gt; Epsilon.</Message>
+    <CodePrev>1265009857</CodePrev>
+    <CodeCurrent>427585793</CodeCurrent>
+    <CodeNext>191333569</CodeNext>
+  </Detours>
+  <Detours>
+    <FileName>doctest.h</FileName>
+    <ErrorCode>V550</ErrorCode>
+    <Message>An odd precise comparison: lhs != rhs. It's probably better to use a comparison with defined precision: fabs(A - B) &gt; Epsilon.</Message>
+    <CodePrev>1484550401</CodePrev>
+    <CodeCurrent>1265009857</CodeCurrent>
+    <CodeNext>427585793</CodeNext>
+  </Detours>
+  <Detours>
+    <FileName>doctest.h</FileName>
+    <ErrorCode>V550</ErrorCode>
+    <Message>An odd precise comparison: lhs != rhs. It's probably better to use a comparison with defined precision: fabs(A - B) &gt; Epsilon.</Message>
+    <CodePrev>3949308649</CodePrev>
+    <CodeCurrent>1484550401</CodeCurrent>
+    <CodeNext>1265009857</CodeNext>
+  </Detours>
+  <Detours>
+    <FileName>doctest.h</FileName>
+    <ErrorCode>V550</ErrorCode>
+    <Message>An odd precise comparison: lhs == rhs. It's probably better to use a comparison with defined precision: fabs(A - B) &lt; Epsilon.</Message>
+    <CodePrev>2021547817</CodePrev>
+    <CodeCurrent>1801759465</CodeCurrent>
+    <CodeNext>4185808681</CodeNext>
+  </Detours>
+  <Detours>
+    <FileName>doctest.h</FileName>
+    <ErrorCode>V550</ErrorCode>
+    <Message>An odd precise comparison: lhs == rhs. It's probably better to use a comparison with defined precision: fabs(A - B) &lt; Epsilon.</Message>
+    <CodePrev>1102602950</CodePrev>
+    <CodeCurrent>2021547817</CodeCurrent>
+    <CodeNext>1801759465</CodeNext>
+  </Detours>
+  <Detours>
+    <FileName>doctest.h</FileName>
+    <ErrorCode>V550</ErrorCode>
+    <Message>An odd precise comparison: lhs == rhs. It's probably better to use a comparison with defined precision: fabs(A - B) &lt; Epsilon.</Message>
+    <CodePrev>4185808681</CodePrev>
+    <CodeCurrent>3949308649</CodeCurrent>
+    <CodeNext>1484550401</CodeNext>
+  </Detours>
+  <Detours>
+    <FileName>doctest.h</FileName>
+    <ErrorCode>V550</ErrorCode>
+    <Message>An odd precise comparison: lhs == rhs. It's probably better to use a comparison with defined precision: fabs(A - B) &lt; Epsilon.</Message>
+    <CodePrev>1801759465</CodePrev>
+    <CodeCurrent>4185808681</CodeCurrent>
+    <CodeNext>3949308649</CodeNext>
+  </Detours>
+  <Detours>
+    <FileName>doctest.h</FileName>
+    <ErrorCode>V565</ErrorCode>
+    <Message>An empty exception handler. Silent suppression of exceptions can hide the presence of bugs in source code during testing.</Message>
+    <CodePrev>88117</CodePrev>
+    <CodeCurrent>163194920</CodeCurrent>
+    <CodeNext>3841436198</CodeNext>
+  </Detours>
+  <Detours>
+    <FileName>doctest.h</FileName>
+    <ErrorCode>V730</ErrorCode>
+    <Message>Not all members of a class are initialized inside the compiler generated constructor. Consider inspecting: rand_seed, first, last, abort_after, subcase_filter_levels, success, ...</Message>
+    <CodePrev>0</CodePrev>
+    <CodeCurrent>823533691</CodeCurrent>
+    <CodeNext>123</CodeNext>
+  </Detours>
+  <Detours>
+    <FileName>doctest.h</FileName>
+    <ErrorCode>V730</ErrorCode>
+    <Message>Not all members of a class are initialized inside the constructor. Consider inspecting: hasLoggedCurrentTestStart, currentSubcaseLevel, tc.</Message>
+    <CodePrev>0</CodePrev>
+    <CodeCurrent>1296176280</CodeCurrent>
+    <CodeNext>19933</CodeNext>
+  </Detours>
+  <Detours>
+    <FileName>doctest.h</FileName>
+    <ErrorCode>V730</ErrorCode>
+    <Message>Not all members of a class are initialized inside the constructor. Consider inspecting: hasLoggedCurrentTestStart, currentSubcaseLevel, tc.</Message>
+    <CodePrev>0</CodePrev>
+    <CodeCurrent>1389946749</CodeCurrent>
+    <CodeNext>181</CodeNext>
+  </Detours>
+  <Detours>
+    <FileName>doctest.h</FileName>
+    <ErrorCode>V730</ErrorCode>
+    <Message>Not all members of a class are initialized inside the compiler generated constructor. Consider inspecting: numAssertsCurrentTest_atomic, numAssertsFailedCurrentTest_atomic, reachedLeaf, currentSubcaseDepth, shouldLogCurrentException.</Message>
+    <CodePrev>3139210159</CodePrev>
+    <CodeCurrent>2472553044</CodeCurrent>
+    <CodeNext>123</CodeNext>
+  </Detours>
+  <Detours>
+    <FileName>doctest.h</FileName>
+    <ErrorCode>V769</ErrorCode>
+    <Message>The 'forward' pointer in the 'forward + _' expression could be nullptr. In such case, resulting value will be senseless and it should not be used.</Message>
+    <CodePrev>294121</CodePrev>
+    <CodeCurrent>2832149</CodeCurrent>
+    <CodeNext>125</CodeNext>
+  </Detours>
+  <Detours>
+    <FileName>doctest.h</FileName>
+    <ErrorCode>V802</ErrorCode>
+    <Message>On _-bit platform, structure size can be reduced from _ to _ bytes by rearranging the fields according to their sizes in decreasing order.</Message>
+    <CodePrev>691332512</CodePrev>
+    <CodeCurrent>123</CodeCurrent>
+    <CodeNext>1265169577</CodeNext>
+  </Detours>
+  <Detours>
+    <FileName>doctest.h</FileName>
+    <ErrorCode>V803</ErrorCode>
+    <Message>Decreased performance. In case 'it' is iterator it's more effective to use prefix form of increment. Replace iterator++ with ++iterator.</Message>
+    <CodePrev>1072393746</CodePrev>
+    <CodeCurrent>191448801</CodeCurrent>
+    <CodeNext>1200275344</CodeNext>
+  </Detours>
+  <Detours>
+    <FileName>doctest.h</FileName>
+    <ErrorCode>V813</ErrorCode>
+    <Message>Decreased performance. The 'in' argument should probably be rendered as a constant reference.</Message>
+    <CodePrev>0</CodePrev>
+    <CodeCurrent>746588651</CodeCurrent>
+    <CodeNext>0</CodeNext>
+  </Detours>
+  <Detours>
+    <FileName>doctest.h</FileName>
+    <ErrorCode>V814</ErrorCode>
+    <Message>Decreased performance. The 'strlen' function was called multiple times inside the body of a loop.</Message>
+    <CodePrev>3032172372</CodePrev>
+    <CodeCurrent>171808529</CodeCurrent>
+    <CodeNext>2482729497</CodeNext>
+  </Detours>
+  <Detours>
+    <FileName>doctest.h</FileName>
+    <ErrorCode>V814</ErrorCode>
+    <Message>Decreased performance. The 'strlen' function was called multiple times inside the body of a loop.</Message>
+    <CodePrev>403502981</CodePrev>
+    <CodeCurrent>2345769587</CodeCurrent>
+    <CodeNext>3411878691</CodeNext>
+  </Detours>
+  <Detours>
+    <FileName>doctest.h</FileName>
+    <ErrorCode>V818</ErrorCode>
+    <Message>It is more efficient to use an initialization list 'm_type(type)' rather than an assignment operator.</Message>
+    <CodePrev>0</CodePrev>
+    <CodeCurrent>95048432</CodeCurrent>
+    <CodeNext>3398104676</CodeNext>
+  </Detours>
+  <Detours>
+    <FileName>doctest.h</FileName>
+    <ErrorCode>V820</ErrorCode>
+    <Message>The 'strRes' variable is not used after copying. Copying can be replaced with move/swap for optimization.</Message>
+    <CodePrev>990583116</CodePrev>
+    <CodeCurrent>2938745641</CodeCurrent>
+    <CodeNext>19163608</CodeNext>
+  </Detours>
+  <Detours>
+    <FileName>doctest.h</FileName>
+    <ErrorCode>V823</ErrorCode>
+    <Message>Decreased performance. Object may be created in-place in the 'stack' container. Consider replacing methods: 'push_back' -&gt; 'emplace_back'.</Message>
+    <CodePrev>45566041</CodePrev>
+    <CodeCurrent>3700555407</CodeCurrent>
+    <CodeNext>44737</CodeNext>
+  </Detours>
+  <Detours>
     <FileName>main.cpp</FileName>
     <ErrorCode>V1048</ErrorCode>
     <Message>The 'unBegin' variable was assigned the same value.</Message>
     <CodePrev>743129</CodePrev>
     <CodeCurrent>3197191414</CodeCurrent>
     <CodeNext>3213048611</CodeNext>
+  </Detours>
+  <Detours>
+    <FileName>main.cpp</FileName>
+    <ErrorCode>V1064</ErrorCode>
+    <Message>The left operand of integer division is less than the right one. The result will always be zero.</Message>
+    <CodePrev>241929</CodePrev>
+    <CodeCurrent>1557574077</CodeCurrent>
+    <CodeNext>2058888081</CodeNext>
+  </Detours>
+  <Detours>
+    <FileName>main.cpp</FileName>
+    <ErrorCode>V599</ErrorCode>
+    <Message>The virtual destructor is not present, although the 'BaseTestingRTTI' class contains virtual functions.</Message>
+    <CodePrev>71443353</CodePrev>
+    <CodeCurrent>1143534489</CodeCurrent>
+    <CodeNext>125</CodeNext>
+  </Detours>
+  <Detours>
+    <FileName>main.cpp</FileName>
+    <ErrorCode>V599</ErrorCode>
+    <Message>The virtual destructor is not present, although the 'BaseTestingRTTI' class contains virtual functions.</Message>
+    <CodePrev>0</CodePrev>
+    <CodeCurrent>1143534489</CodeCurrent>
+    <CodeNext>71443353</CodeNext>
   </Detours>
   <Detours>
     <FileName>main.cpp</FileName>
@@ -214,7 +534,23 @@
     <ErrorCode>V829</ErrorCode>
     <Message>Lifetime of the heap-allocated variable 'pMsg_' is limited to the current function's scope. Consider allocating it on the stack instead.</Message>
     <CodePrev>0</CodePrev>
+    <CodeCurrent>1017853859</CodeCurrent>
+    <CodeNext>257456385</CodeNext>
+  </Detours>
+  <Detours>
+    <FileName>main.cpp</FileName>
+    <ErrorCode>V829</ErrorCode>
+    <Message>Lifetime of the heap-allocated variable 'pMsg_' is limited to the current function's scope. Consider allocating it on the stack instead.</Message>
+    <CodePrev>0</CodePrev>
     <CodeCurrent>1017984259</CodeCurrent>
     <CodeNext>1017853859</CodeNext>
+  </Detours>
+  <Detours>
+    <FileName>main.cpp</FileName>
+    <ErrorCode>V829</ErrorCode>
+    <Message>Lifetime of the heap-allocated variable 'pMsg_' is limited to the current function's scope. Consider allocating it on the stack instead.</Message>
+    <CodePrev>1870392862</CodePrev>
+    <CodeCurrent>1017984259</CodeCurrent>
+    <CodeNext>257450241</CodeNext>
   </Detours>
 </NewDataSet>
