@@ -38,7 +38,7 @@ jobs:
     - name: Uploading Detours
       uses: actions/upload-artifact@v3
       with:
-        name: Detours
+        name: Debug_x86
         path: |
           ${{env.SOLUTION_FILE_PATH}}\build\x86\Debug\*.exe
           ${{env.SOLUTION_FILE_PATH}}\build\x86\Debug\*.pdb
@@ -69,7 +69,7 @@ jobs:
     - name: Uploading Detours
       uses: actions/upload-artifact@v3
       with:
-        name: Detours64
+        name: Debug_x86_64
         path: |
           ${{env.SOLUTION_FILE_PATH}}\build\x86_64\Debug\*.exe
           ${{env.SOLUTION_FILE_PATH}}\build\x86_64\Debug\*.pdb
@@ -100,7 +100,7 @@ jobs:
     - name: Uploading Detours
       uses: actions/upload-artifact@v3
       with:
-        name: Detours
+        name: Release_x86
         path: |
           ${{env.SOLUTION_FILE_PATH}}\build\x86\Release\*.exe
           ${{env.SOLUTION_FILE_PATH}}\build\x86\Release\*.pdb
@@ -131,7 +131,7 @@ jobs:
     - name: Uploading Detours
       uses: actions/upload-artifact@v3
       with:
-        name: Detours64
+        name: Release_x86_64
         path: |
           ${{env.SOLUTION_FILE_PATH}}\build\x86_64\Release\*.exe
           ${{env.SOLUTION_FILE_PATH}}\build\x86_64\Release\*.pdb
