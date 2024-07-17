@@ -126,7 +126,7 @@ jobs:
 
     - name: Testing Detours
       working-directory: ${{env.GITHUB_WORKSPACE}}
-      run: ${{env.SOLUTION_FILE_PATH}}\build\x86\Release\Detours.exe /test-all
+      run: ${{env.SOLUTION_FILE_PATH}}\build\x86_64\Release\Detours.exe /test-all
 
     - name: Uploading Detours
       uses: actions/upload-artifact@v3
