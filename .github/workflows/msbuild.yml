@@ -15,7 +15,7 @@ permissions:
 jobs:
   build-debug-x86:
     name: Build Debug (x86)
-    runs-on: windows-latest
+    runs-on: self-hosted
 
     steps:
     - uses: actions/checkout@v4.1.7
@@ -46,7 +46,7 @@ jobs:
 
   build-debug-x86_64:
     name: Build Debug (x86_64)
-    runs-on: windows-latest
+    runs-on: self-hosted
 
     steps:
     - uses: actions/checkout@v4.1.7
@@ -77,7 +77,7 @@ jobs:
 
   build-release-x86:
     name: Build Release (x86)
-    runs-on: windows-latest
+    runs-on: self-hosted
 
     steps:
     - uses: actions/checkout@v4.1.7
@@ -108,7 +108,7 @@ jobs:
 
   build-release-x86_64:
     name: Build Release (x86_64)
-    runs-on: windows-latest
+    runs-on: self-hosted
 
     steps:
     - uses: actions/checkout@v4.1.7
