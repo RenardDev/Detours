@@ -2326,59 +2326,6 @@ namespace Detours {
 	namespace Memory {
 
 		// ----------------------------------------------------------------
-		// PageProtection
-		// ----------------------------------------------------------------
-
-		class PageProtection {
-		public:
-			PageProtection(void* pAddress, size_t unSize, bool bAutoRestore = true);
-			~PageProtection();
-
-		public:
-			bool Get(const PDWORD pProtection);
-			bool Change(const DWORD unNewProtection);
-			bool Restore();
-
-		public:
-			void* GetAddress() const;
-			size_t GetSize() const;
-			DWORD GetOriginalProtection() const;
-
-		private:
-			void* m_pAddress;
-			size_t m_unSize;
-			bool m_bAutoRestore;
-			DWORD m_unOriginalProtection;
-		};
-
-		// ----------------------------------------------------------------
-		// Protection
-		// ----------------------------------------------------------------
-
-		class Protection {
-		public:
-			Protection(void* pAddress, size_t unSize, bool bAutoRestore = true);
-			~Protection();
-
-		public:
-			bool Get(const PDWORD pProtection);
-			bool Change(const DWORD unNewProtection);
-			bool Restore();
-
-		public:
-			void* GetAddress() const;
-			size_t GetSize() const;
-			DWORD GetOriginalProtection() const;
-
-		private:
-			void* m_pAddress;
-			size_t m_unSize;
-			bool m_bAutoRestore;
-			DWORD m_unOriginalProtection;
-			std::vector<MEMORY_BASIC_INFORMATION> m_vecPages;
-		};
-
-		// ----------------------------------------------------------------
 		// Shared
 		// ----------------------------------------------------------------
 
@@ -2440,18 +2387,33 @@ namespace Detours {
 
 		class Page {
 		public:
-			Page(size_t unCapacity = 0);
+			Page(void* pBaseAddress, bool bAutoRestore, bool bCommitPage = false);
+			Page(void* pDesiredAddress = nullptr);
 			~Page();
 
-			void* Alloc(size_t unSize, size_t unSizeAlign = 1, size_t unAddressAlign = sizeof(void*));
+		public:
+			bool GetProtection(const PDWORD pProtection);
+			bool GetOriginalProtection(const PDWORD pProtection);
+			bool ChangeProtection(const DWORD unNewProtection);
+			bool RestoreProtection();
+
+		public:
+			bool CloneFrom(Page* pSourcePage);
+			bool CloneTo(Page* pDestinationPage);
+			bool CloneFrom(void* pSourceBaseAddress, size_t unSize = 0);
+			bool CloneTo(void* pDestinationBaseAddress, size_t unSize = 0);
+
+		public:
+			void* Alloc(size_t unSize, size_t unSizeAlign = 1, size_t unAddressAlign = alignof(void*));
+			void* ZeroAlloc(size_t unSize, size_t unSizeAlign = 1, size_t unAddressAlign = alignof(void*));
 			bool DeAlloc(void* pAddress);
 			void DeAllocAll();
 
 		public:
-			void* GetAddress() const;
-			size_t GetCapacity() const;
-			size_t GetSize() const;
-			bool IsEmpty() const;
+			void* GetPageAddress() const;
+			size_t GetPageCapacity() const;
+			size_t GetDataSize() const;
+			bool IsPageEmpty() const;
 
 		private:
 			void MergeFreeBlocks();
@@ -2471,98 +2433,59 @@ namespace Detours {
 				size_t m_unSize;
 			};
 
-			size_t m_unCapacity;
+		private:
+			bool m_bIsManualPage;
+			size_t m_unPageCapacity;
 			void* m_pPageAddress;
+			bool m_bAutoRestore;
+			bool m_bCommitted;
+			DWORD m_unOriginalProtection;
 			std::set<Block> m_FreeBlocks;
 			std::set<Block> m_ActiveBlocks;
 		};
 
 		// ----------------------------------------------------------------
-		// NearPage
+		// Region
 		// ----------------------------------------------------------------
 
-		class NearPage {
+		class Region {
 		public:
-			NearPage(size_t unCapacity = 0, void* pDesiredAddress = nullptr);
-			~NearPage();
+			Region(void* pBaseAddress, bool bAutoRestore);
+			Region(void* pDesiredAddress = nullptr, size_t unCapacity = 0);
+			~Region();
 
-			void* Alloc(size_t unSize, size_t unSizeAlign = 1, size_t unAddressAlign = sizeof(void*));
+		public:
+			bool GetProtection(const PDWORD pProtection);
+			bool GetOriginalProtection(const PDWORD pProtection);
+			bool ChangeProtection(const DWORD unNewProtection);
+			bool RestoreProtection();
+
+		public:
+			bool CloneFrom(Region* pSourceRegion);
+			bool CloneTo(Region* pDestinationRegion);
+			bool CloneFrom(void* pSourceBaseAddress, size_t unSize = 0);
+			bool CloneTo(void* pDestinationBaseAddress, size_t unSize = 0);
+
+		public:
+			void* Alloc(size_t unSize, size_t unSizeAlign = 1, size_t unAddressAlign = alignof(void*), Page** pUsedPage = nullptr);
+			void* ZeroAlloc(size_t unSize, size_t unSizeAlign = 1, size_t unAddressAlign = alignof(void*), Page** pUsedPage = nullptr);
 			bool DeAlloc(void* pAddress);
 			void DeAllocAll();
 
 		public:
-			void* GetAddress() const;
-			size_t GetCapacity() const;
-			size_t GetSize() const;
-			bool IsEmpty() const;
+			void* GetRegionAddress() const;
+			size_t GetRegionCapacity() const;
+			size_t GetDataSize() const;
+			bool IsRegionEmpty() const;
 
 		private:
-			void MergeFreeBlocks();
-
-		private:
-			struct Block {
-				Block(void* pAddress, size_t unSize) {
-					m_pAddress = pAddress;
-					m_unSize = unSize;
-				}
-
-				bool operator<(const Block& block) const {
-					return m_pAddress < block.m_pAddress;
-				};
-
-				void* m_pAddress;
-				size_t m_unSize;
-			};
-
-			size_t m_unCapacity;
-			void* m_pPageAddress;
-			std::set<Block> m_FreeBlocks;
-			std::set<Block> m_ActiveBlocks;
-		};
-
-		// ----------------------------------------------------------------
-		// PageClone
-		// ----------------------------------------------------------------
-
-		class PageClone {
-		public:
-			PageClone(void* pAddress, size_t unSize);
-			~PageClone();
-
-		public:
-			bool Pull(); // Copy from source to clone
-			bool Push(); // Copy from clone to source
-
-		public:
-			void* GetAddress() const;
-			size_t GetSize() const;
-
-		private:
-			std::unique_ptr<Page> m_pClone;
-			void* m_pAddress;
-			size_t m_unSize;
-		};
-
-		// ----------------------------------------------------------------
-		// Clone
-		// ----------------------------------------------------------------
-
-		class Clone {
-		public:
-			Clone(void* pAddress, size_t unSize);
-			~Clone();
-
-		public:
-			bool Pull(); // Copy from source to clone
-			bool Push(); // Copy from clone to source
-
-		public:
-			void* GetAddress() const;
-			size_t GetSize() const;
-
-		private:
-			std::vector<std::unique_ptr<Page>> m_vecClones;
-			std::vector<MEMORY_BASIC_INFORMATION> m_vecPages;
+			bool m_bIsManualRegion;
+			size_t m_unRegionCapacity;
+			void* m_pRegionAddress;
+			bool m_bAutoRestore;
+			DWORD m_unOriginalProtection;
+			size_t m_unUsedSpace;
+			std::list<Page> m_Pages;
 		};
 
 		// ----------------------------------------------------------------
@@ -2571,51 +2494,77 @@ namespace Detours {
 
 		class Storage {
 		public:
-			Storage(size_t unTotalCapacity = 0, size_t unPageCapacity = 0);
+			Storage(size_t unTotalCapacity = 0, size_t unRegionCapacity = 0);
 			~Storage() = default;
 
 		public:
-			void* Alloc(size_t unSize, size_t unSizeAlign = 1, size_t unAddressAlign = sizeof(void*));
+			void* Alloc(size_t unSize, size_t unSizeAlign = 1, size_t unAddressAlign = alignof(void*), void* pDesiredAddress = nullptr, Page** pUsedPage = nullptr, Region** pUsedRegion = nullptr);
+			void* ZeroAlloc(size_t unSize, size_t unSizeAlign = 1, size_t unAddressAlign = alignof(void*), void* pDesiredAddress = nullptr, Page** pUsedPage = nullptr, Region** pUsedRegion = nullptr);
 			bool DeAlloc(void* pAddress);
 			bool DeAllocAll();
 
 		public:
-			size_t GetCapacity() const;
-			size_t GetSize() const;
-			bool IsEmpty() const;
+			size_t GetStorageCapacity() const;
+			size_t GetDataSize() const;
+			bool IsStorageEmpty() const;
 
 		private:
 			size_t m_unTotalCapacity;
-			size_t m_unPageCapacity;
+			size_t m_unRegionCapacity;
 			size_t m_unUsedSpace;
-			std::list<Page> m_Pages;
+			std::list<Region> m_Regions;
 		};
 
 		// ----------------------------------------------------------------
-		// NearStorage
+		// Protection
 		// ----------------------------------------------------------------
 
-		class NearStorage {
+		class Protection {
 		public:
-			NearStorage(size_t unTotalCapacity = 0, size_t unPageCapacity = 0);
-			~NearStorage() = default;
+			Protection(void* pAddress, size_t unSize, bool bAutoRestore = true);
+			~Protection();
 
 		public:
-			void* Alloc(size_t unSize, void* pDesiredAddress = nullptr, size_t unSizeAlign = 1, size_t unAddressAlign = sizeof(void*));
-			bool DeAlloc(void* pAddress);
-			bool DeAllocAll();
-
-		public:
-			size_t GetCapacity() const;
-			size_t GetSize() const;
-			bool IsEmpty() const;
+			bool Change(const DWORD unNewProtection);
+			bool Restore();
 
 		private:
-			size_t m_unTotalCapacity;
-			size_t m_unPageCapacity;
-			size_t m_unUsedSpace;
-			std::list<NearPage> m_Pages;
+			bool m_bAutoRestore;
+			bool m_bUseRegions;
+			std::deque<Page> m_Pages;
+			std::deque<Region> m_Regions;
 		};
+
+		// ----------------------------------------------------------------
+		// MemoryManager
+		// ----------------------------------------------------------------
+
+		class MemoryManager {
+		public:
+			MemoryManager() = default;
+			~MemoryManager() = default;
+
+		public:
+			Page* CreatePage();
+			Storage* CreateStorage(size_t unTotalCapacity = 0, size_t unPageCapacity = 0);
+
+		public:
+			bool DestroyPage(Page* pPage);
+			bool DestroyStorage(Storage* pStorage);
+
+		public:
+			std::unique_ptr<Page> GetPage(void* pAddress);
+			std::unique_ptr<Region> GetRegion(void* pAddress);
+
+		public:
+			std::vector<Page> CollectPages(void* pAddress, size_t unSize);
+			std::vector<Region> CollectRegions(void* pAddress, size_t unSize);
+
+		private:
+			std::deque<std::unique_ptr<Page>> m_Pages;
+			std::deque<std::unique_ptr<Storage>> m_Storages;
+		};
+
 	}
 
 	// ----------------------------------------------------------------

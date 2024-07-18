@@ -1355,33 +1355,33 @@ TEST_SUITE("Detours::Memory") {
 
 	TEST_CASE("Page") { // TODO: Add more tests
 		Detours::Memory::Page Page;
-		CHECK(Page.Alloc(Page.GetCapacity()) != nullptr);
+		CHECK(Page.Alloc(Page.GetPageCapacity()) != nullptr);
 		CHECK(Page.Alloc(1) == nullptr);
 		CHECK(Page.Alloc(1, 2) == nullptr);
 		CHECK(Page.Alloc(1, 4) == nullptr);
 		CHECK(Page.Alloc(1, 8) == nullptr);
 		Page.DeAllocAll();
-		CHECK(Page.Alloc(Page.GetCapacity(), 8) != nullptr);
+		CHECK(Page.Alloc(Page.GetPageCapacity(), 8) != nullptr);
 		Page.DeAllocAll();
-		CHECK(Page.Alloc(Page.GetCapacity(), Page.GetCapacity() * 2) == nullptr);
+		CHECK(Page.Alloc(Page.GetPageCapacity(), Page.GetPageCapacity() * 2) == nullptr);
 		Page.DeAllocAll();
-		CHECK(Page.Alloc(Page.GetCapacity() - 1) != nullptr);
-		CHECK(Page.Alloc(1, 0, 0) != nullptr);
+		CHECK(Page.Alloc(Page.GetPageCapacity() - 1) != nullptr);
+		CHECK(Page.Alloc(1, 0, 0) == nullptr);
 		Page.DeAllocAll();
-		CHECK(Page.Alloc(Page.GetCapacity() - 1) != nullptr);
+		CHECK(Page.Alloc(Page.GetPageCapacity() - 1) != nullptr);
 		CHECK(Page.Alloc(1, 2) == nullptr);
 		Page.DeAllocAll();
-		CHECK(Page.Alloc(Page.GetCapacity() - 2) != nullptr);
+		CHECK(Page.Alloc(Page.GetPageCapacity() - 2) != nullptr);
 		CHECK(Page.Alloc(1, 2, 2) != nullptr);
 		Page.DeAllocAll();
-		CHECK(Page.Alloc(Page.GetCapacity() - 2) != nullptr);
+		CHECK(Page.Alloc(Page.GetPageCapacity() - 2) != nullptr);
 		CHECK(Page.Alloc(1, 4) == nullptr);
 		Page.DeAllocAll();
-		CHECK(Page.Alloc(Page.GetCapacity() - 2) != nullptr);
+		CHECK(Page.Alloc(Page.GetPageCapacity() - 2) != nullptr);
 		CHECK(Page.Alloc(2, 8) == nullptr);
 		Page.DeAllocAll();
-		CHECK(Page.Alloc(Page.GetCapacity(), 1, 1) != nullptr);
-		CHECK(Page.Alloc(Page.GetCapacity() + 1, 1, 1) == nullptr);
+		CHECK(Page.Alloc(Page.GetPageCapacity(), 1, 1) != nullptr);
+		CHECK(Page.Alloc(Page.GetPageCapacity() + 1, 1, 1) == nullptr);
 		Page.DeAllocAll();
 		Page.DeAllocAll();
 		CHECK(Page.Alloc(0) == nullptr);
@@ -1392,21 +1392,22 @@ TEST_SUITE("Detours::Memory") {
 		Page.DeAllocAll();
 		CHECK(Page.Alloc(0, 4, 4) == nullptr);
 		Page.DeAllocAll();
-		CHECK(Page.Alloc(1, 4, 0) != nullptr);
+		CHECK(Page.Alloc(1, 4, 0) == nullptr);
 		Page.DeAllocAll();
-		CHECK(Page.Alloc(1, 0, 4) != nullptr);
+		CHECK(Page.Alloc(1, 0, 4) == nullptr);
 		Page.DeAllocAll();
-		CHECK(Page.Alloc(1, 0, 0) != nullptr);
+		CHECK(Page.Alloc(1, 0, 0) == nullptr);
 	}
 
 	TEST_CASE("Storage") {
 		Detours::Memory::Storage Storage;
 		unsigned char* pCodeMemory = reinterpret_cast<unsigned char*>(Storage.Alloc(3));
 		CHECK(pCodeMemory != nullptr);
+		CHECK(Detours::Memory::Protection(pCodeMemory, 3, false).Change(PAGE_READWRITE) == true);
 		pCodeMemory[0] = 0xB0;
 		pCodeMemory[1] = 0x01;
 		pCodeMemory[2] = 0xC3;
-		CHECK(Detours::Memory::Protection(pCodeMemory, 3, false).ChangeProtection(PAGE_EXECUTE_READ) == true);
+		CHECK(Detours::Memory::Protection(pCodeMemory, 3, false).Change(PAGE_EXECUTE_READ) == true);
 		using fnType = bool(__cdecl*)();
 		CHECK(reinterpret_cast<fnType>(pCodeMemory)() == true);
 		CHECK(Storage.DeAlloc(pCodeMemory) == true);

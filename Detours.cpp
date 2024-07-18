@@ -144,9 +144,9 @@ namespace Detours {
 	// Storage
 	// ----------------------------------------------------------------
 
-	static std::unordered_map<void*, std::unique_ptr<Protection>> g_Protections;
 	static std::unordered_map<void*, std::unique_ptr<InterruptHook>> g_InterruptHooks;
-	static NearStorage g_HookStorage(HOOK_STORAGE_CAPACITY);
+	static MemoryManager g_MemoryManager;
+	static Storage g_HookStorage;
 
 	// ----------------------------------------------------------------
 	// KUSER_SHARED_DATA
@@ -5103,83 +5103,218 @@ namespace Detours {
 
 	namespace Memory {
 
-		static DWORD unPageSize = 0;
-		static DWORD unAllocationGranularity = 0;
+		// ----------------------------------------------------------------
+		// PAGE_INFO
+		// ----------------------------------------------------------------
+
+		typedef struct _PAGE_INFO {
+			void* m_pBaseAddress;
+			size_t m_unSize;
+			DWORD m_unState;
+			DWORD m_unProtection;
+			DWORD m_unType;
+		} PAGE_INFO, *PPAGE_INFO;
+
+		// ----------------------------------------------------------------
+		// REGION_INFO
+		// ----------------------------------------------------------------
+
+		typedef struct _REGION_INFO {
+			void* m_pBaseAddress;
+			size_t m_unSize;
+			DWORD m_unState;
+			DWORD m_unProtection;
+			DWORD m_unType;
+		} REGION_INFO, *PREGION_INFO;
 
 		// ----------------------------------------------------------------
 		// __get_page_info
 		// ----------------------------------------------------------------
 
-		static bool inline __get_page_info(void* pAddress, PMEMORY_BASIC_INFORMATION pMemoryBasicInfo) {
-			if (!pAddress || !pMemoryBasicInfo) {
+		static void* pMinimumApplicationAddress = nullptr;
+		static void* pMaximumApplicationAddress = nullptr;
+		static DWORD unPageSize = 0;
+		static DWORD unAllocationGranularity = 0;
+
+		static bool inline __get_page_info(void* pAddress, PPAGE_INFO pPageInfo) {
+			if (!pAddress) {
 				return false;
 			}
 
-			memset(pMemoryBasicInfo, 0, sizeof(MEMORY_BASIC_INFORMATION));
+			if (!pMinimumApplicationAddress || !pMaximumApplicationAddress || !unPageSize || !unAllocationGranularity) {
+				SYSTEM_INFO sysinf;
+				GetSystemInfo(&sysinf);
+				pMinimumApplicationAddress = sysinf.lpMinimumApplicationAddress;
+				pMaximumApplicationAddress = sysinf.lpMaximumApplicationAddress;
+				unPageSize = sysinf.dwPageSize;
+				unAllocationGranularity = sysinf.dwAllocationGranularity;
+			}
 
-			if (VirtualQuery(pAddress, pMemoryBasicInfo, sizeof(MEMORY_BASIC_INFORMATION)) != sizeof(MEMORY_BASIC_INFORMATION)) {
+			MEMORY_BASIC_INFORMATION mbi;
+			memset(&mbi, 0, sizeof(mbi));
+			if (VirtualQuery(pAddress, &mbi, sizeof(mbi)) != sizeof(mbi)) {
 				return false;
+			}
+
+			if (pPageInfo) {
+				memset(pPageInfo, 0, sizeof(PAGE_INFO));
+
+				pPageInfo->m_pBaseAddress = mbi.BaseAddress;
+				pPageInfo->m_unSize = unPageSize;
+				pPageInfo->m_unState = mbi.State;
+				pPageInfo->m_unProtection = mbi.Protect;
+				pPageInfo->m_unType = mbi.Type;
 			}
 
 			return true;
 		};
 
 		// ----------------------------------------------------------------
-		// __get_page_address
+		// __get_region_info
 		// ----------------------------------------------------------------
 
-		static inline void* __get_page_address(void* pAddress) {
-			MEMORY_BASIC_INFORMATION mbi;
-
-			if (!__get_page_info(pAddress, &mbi)) {
-				return nullptr;
-			}
-
-			return mbi.BaseAddress;
-		};
-
-		// ----------------------------------------------------------------
-		// __is_page_address
-		// ----------------------------------------------------------------
-
-		static inline bool __is_page_address(void* pAddress) {
-			void* pPageAddress = __get_page_address(pAddress);
-			if (!pPageAddress) {
+		static bool inline __get_region_info(void* pAddress, PREGION_INFO pRegionInfo) {
+			if (!pAddress) {
 				return false;
 			}
 
-			return pPageAddress == pAddress;
-		};
-
-		// ----------------------------------------------------------------
-		// __get_pages
-		// ----------------------------------------------------------------
-
-		static inline std::vector<MEMORY_BASIC_INFORMATION> __get_pages(void* pAddress, size_t unSize) {
-			if (!unPageSize || !unAllocationGranularity) {
+			if (!pMinimumApplicationAddress || !pMaximumApplicationAddress || !unPageSize || !unAllocationGranularity) {
 				SYSTEM_INFO sysinf;
 				GetSystemInfo(&sysinf);
+				pMinimumApplicationAddress = sysinf.lpMinimumApplicationAddress;
+				pMaximumApplicationAddress = sysinf.lpMaximumApplicationAddress;
 				unPageSize = sysinf.dwPageSize;
 				unAllocationGranularity = sysinf.dwAllocationGranularity;
 			}
 
-			std::vector<MEMORY_BASIC_INFORMATION> vecPages;
-
-			const size_t unEnd = reinterpret_cast<size_t>(pAddress) + unSize;
 			MEMORY_BASIC_INFORMATION mbi;
-			for (size_t unAddress = reinterpret_cast<size_t>(pAddress); unAddress < unEnd; unAddress = __align_up(unAddress + static_cast<size_t>(unAllocationGranularity) - 1, static_cast<size_t>(unAllocationGranularity))) {
-				if (!__get_page_info(reinterpret_cast<void*>(unAddress), &mbi)) {
+			memset(&mbi, 0, sizeof(mbi));
+			if (VirtualQuery(pAddress, &mbi, sizeof(mbi)) != sizeof(mbi)) {
+				return false;
+			}
+
+			if (pRegionInfo) {
+				memset(pRegionInfo, 0, sizeof(REGION_INFO));
+
+				pRegionInfo->m_pBaseAddress = mbi.BaseAddress;
+				pRegionInfo->m_unSize = mbi.RegionSize;
+				pRegionInfo->m_unState = mbi.State;
+				pRegionInfo->m_unProtection = mbi.Protect;
+				pRegionInfo->m_unType = mbi.Type;
+			}
+
+			return true;
+		};
+
+		// ----------------------------------------------------------------
+		// __get_pages_info
+		// ----------------------------------------------------------------
+
+		static inline std::vector<PAGE_INFO> __get_pages_info(void* pAddress, size_t unSize) {
+			std::vector<PAGE_INFO> vecPages;
+			if (!pAddress || !unSize) {
+				return vecPages;
+			}
+
+			if (!pMinimumApplicationAddress || !pMaximumApplicationAddress || !unPageSize || !unAllocationGranularity) {
+				SYSTEM_INFO sysinf;
+				GetSystemInfo(&sysinf);
+				pMinimumApplicationAddress = sysinf.lpMinimumApplicationAddress;
+				pMaximumApplicationAddress = sysinf.lpMaximumApplicationAddress;
+				unPageSize = sysinf.dwPageSize;
+				unAllocationGranularity = sysinf.dwAllocationGranularity;
+			}
+
+			const size_t unBegin = max(reinterpret_cast<size_t>(pMinimumApplicationAddress), reinterpret_cast<size_t>(pAddress));
+			const size_t unEnd = min(reinterpret_cast<size_t>(pMaximumApplicationAddress), reinterpret_cast<size_t>(pAddress) + unSize);
+
+			PAGE_INFO pi;
+			memset(&pi, 0, sizeof(pi));
+			for (size_t unAddress = unBegin; unAddress < unEnd; unAddress = __align_up(min(unAddress, reinterpret_cast<size_t>(pi.m_pBaseAddress)) + pi.m_unSize, static_cast<size_t>(unPageSize))) {
+				if (!__get_page_info(reinterpret_cast<void*>(unAddress), &pi)) {
 					break;
 				}
 
-				if (mbi.State == MEM_FREE) {
-					continue;
-				}
-
-				vecPages.emplace_back(mbi);
+				vecPages.emplace_back(pi);
 			}
 
 			return vecPages;
+		};
+
+		// ----------------------------------------------------------------
+		// __get_regions_info
+		// ----------------------------------------------------------------
+
+		static inline std::vector<REGION_INFO> __get_regions_info(void* pAddress, size_t unSize) {
+			std::vector<REGION_INFO> vecRegions;
+			if (!pAddress || !unSize) {
+				return vecRegions;
+			}
+
+			if (!pMinimumApplicationAddress || !pMaximumApplicationAddress || !unPageSize || !unAllocationGranularity) {
+				SYSTEM_INFO sysinf;
+				GetSystemInfo(&sysinf);
+				pMinimumApplicationAddress = sysinf.lpMinimumApplicationAddress;
+				pMaximumApplicationAddress = sysinf.lpMaximumApplicationAddress;
+				unPageSize = sysinf.dwPageSize;
+				unAllocationGranularity = sysinf.dwAllocationGranularity;
+			}
+
+			const size_t unBegin = max(reinterpret_cast<size_t>(pMinimumApplicationAddress), reinterpret_cast<size_t>(pAddress));
+			const size_t unEnd = min(reinterpret_cast<size_t>(pMaximumApplicationAddress), reinterpret_cast<size_t>(pAddress) + unSize);
+			REGION_INFO ri;
+			memset(&ri, 0, sizeof(ri));
+			for (size_t unAddress = unBegin; unAddress < unEnd; unAddress = __align_up(min(unAddress, reinterpret_cast<size_t>(ri.m_pBaseAddress)) + ri.m_unSize, static_cast<size_t>(unAllocationGranularity))) {
+				if (!__get_region_info(reinterpret_cast<void*>(unAddress), &ri)) {
+					break;
+				}
+
+				vecRegions.emplace_back(ri);
+			}
+
+			return vecRegions;
+		};
+
+		// ----------------------------------------------------------------
+		// __get_combined_regions_info
+		// ----------------------------------------------------------------
+
+		static inline std::vector<REGION_INFO> __get_combined_regions_info(void* pAddress, size_t unSize) {
+			std::vector<REGION_INFO> vecRegions;
+			if (!pAddress || !unSize) {
+				return vecRegions;
+			}
+
+			if (!pMinimumApplicationAddress || !pMaximumApplicationAddress || !unPageSize || !unAllocationGranularity) {
+				SYSTEM_INFO sysinf;
+				GetSystemInfo(&sysinf);
+				pMinimumApplicationAddress = sysinf.lpMinimumApplicationAddress;
+				pMaximumApplicationAddress = sysinf.lpMaximumApplicationAddress;
+				unPageSize = sysinf.dwPageSize;
+				unAllocationGranularity = sysinf.dwAllocationGranularity;
+			}
+
+			const size_t unBegin = max(reinterpret_cast<size_t>(pMinimumApplicationAddress), reinterpret_cast<size_t>(pAddress));
+			const size_t unEnd = min(reinterpret_cast<size_t>(pMaximumApplicationAddress), reinterpret_cast<size_t>(pAddress) + unSize);
+			REGION_INFO ri;
+			memset(&ri, 0, sizeof(ri));
+			for (size_t unAddress = unBegin; unAddress < unEnd; unAddress = __align_up(min(unAddress, reinterpret_cast<size_t>(ri.m_pBaseAddress)) + ri.m_unSize, static_cast<size_t>(unAllocationGranularity))) {
+				if (!__get_region_info(reinterpret_cast<void*>(unAddress), &ri)) {
+					break;
+				}
+
+				if (!vecRegions.empty()) {
+					auto& LastRegion = vecRegions.back();
+					if (reinterpret_cast<size_t>(LastRegion.m_pBaseAddress) + LastRegion.m_unSize == reinterpret_cast<size_t>(ri.m_pBaseAddress)) {
+						LastRegion.m_unSize += ri.m_unSize;
+						continue;
+					}
+				}
+
+				vecRegions.emplace_back(ri);
+			}
+
+			return vecRegions;
 		};
 
 		// ----------------------------------------------------------------
@@ -5195,107 +5330,6 @@ namespace Detours {
 
 			return 0;
 		};
-
-		// ----------------------------------------------------------------
-		// PageProtection
-		// ----------------------------------------------------------------
-
-		PageProtection::PageProtection(void* pAddress, size_t unSize, bool bAutoRestore) {
-			m_pAddress = nullptr;
-			m_unSize = 0;
-			m_bAutoRestore = bAutoRestore;
-			m_unOriginalProtection = 0;
-
-			if (!pAddress || !unSize) {
-				return;
-			}
-
-			if (!__is_page_address(pAddress)) {
-				return;
-			}
-
-			m_pAddress = __get_page_address(pAddress);
-			m_unSize = unSize;
-
-			Get(&m_unOriginalProtection);
-		}
-
-		PageProtection::~PageProtection() {
-			if (!m_pAddress || !m_unSize || !m_bAutoRestore) {
-				return;
-			}
-
-			Change(m_unOriginalProtection);
-		}
-
-		bool PageProtection::Get(const PDWORD pProtection) {
-			if (!m_pAddress || !m_unSize) {
-				return false;
-			}
-
-			MEMORY_BASIC_INFORMATION mbi;
-			memset(&mbi, 0, sizeof(mbi));
-
-			if (VirtualQuery(m_pAddress, &mbi, sizeof(mbi)) != sizeof(mbi)) {
-				return false;
-			}
-
-			if (pProtection) {
-				*pProtection = mbi.Protect;
-			}
-
-			return true;
-		}
-
-		bool PageProtection::Change(const DWORD unNewProtection2) {
-			if (!m_pAddress || !m_unSize) {
-				return false;
-			}
-
-			DWORD unProtection2 = 0;
-			if (!VirtualProtect(const_cast<void*>(m_pAddress), m_unSize, unNewProtection2, &unProtection2)) {
-				return false;
-			}
-
-			if (unNewProtection2 & (PAGE_EXECUTE | PAGE_EXECUTE_READ | PAGE_EXECUTE_READWRITE)) {
-				MEMORY_BASIC_INFORMATION mbi;
-				memset(&mbi, 0, sizeof(mbi));
-
-				if (VirtualQuery(m_pAddress, &mbi, sizeof(mbi)) != sizeof(mbi)) {
-					return false;
-				}
-
-				if (!FlushInstructionCache(reinterpret_cast<HANDLE>(-1), mbi.BaseAddress, mbi.RegionSize)) {
-					return false;
-				}
-			}
-
-			return true;
-		}
-
-		bool PageProtection::Restore() {
-			if (!m_pAddress || !m_unSize) {
-				return false;
-			}
-
-			if (!Change(m_unOriginalProtection)) {
-				return false;
-			}
-
-			return true;
-		}
-
-		void* PageProtection::GetAddress() const {
-			return m_pAddress;
-		}
-
-		size_t PageProtection::GetSize() const {
-			return m_unSize;
-		}
-
-		DWORD PageProtection::GetOriginalProtection() const {
-			return m_unOriginalProtection;
-		}
 
 		// ----------------------------------------------------------------
 		// Shared
@@ -5479,39 +5513,310 @@ namespace Detours {
 		// Page
 		// ----------------------------------------------------------------
 
-		Page::Page(size_t unCapacity) {
-			if (!unPageSize || !unAllocationGranularity) {
+		Page::Page(void* pBaseAddress, bool bAutoRestore, bool bCommitPage) {
+			m_bIsManualPage = true;
+			m_unPageCapacity = 0;
+			m_pPageAddress = nullptr;
+			m_bAutoRestore = bAutoRestore;
+			m_bCommitted = bCommitPage;
+			m_unOriginalProtection = 0;
+
+			if (!pMinimumApplicationAddress || !pMaximumApplicationAddress || !unPageSize || !unAllocationGranularity) {
 				SYSTEM_INFO sysinf;
 				GetSystemInfo(&sysinf);
+				pMinimumApplicationAddress = sysinf.lpMinimumApplicationAddress;
+				pMaximumApplicationAddress = sysinf.lpMaximumApplicationAddress;
 				unPageSize = sysinf.dwPageSize;
 				unAllocationGranularity = sysinf.dwAllocationGranularity;
 			}
 
-			if (!unCapacity) {
-				unCapacity = unPageSize;
-			} else {
-				if (unCapacity < unPageSize) {
-					unCapacity = unPageSize;
-				} else {
-					unCapacity = __align_up(unCapacity, static_cast<size_t>(unAllocationGranularity));
-				}
+			if (!pBaseAddress) {
+				return;
 			}
 
-			m_unCapacity = unCapacity;
-			m_pPageAddress = VirtualAlloc(nullptr, unCapacity, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
+			m_unPageCapacity = unPageSize;
+			if (bCommitPage) {
+				m_pPageAddress = VirtualAlloc(pBaseAddress, unPageSize, MEM_COMMIT, PAGE_READWRITE);
+				if (m_pPageAddress) {
+					m_FreeBlocks.emplace(m_pPageAddress, unPageSize);
+				}
+			} else {
+				PAGE_INFO pi;
+				if (!__get_page_info(pBaseAddress, &pi)) {
+					return;
+				}
+
+				if (pi.m_pBaseAddress != pBaseAddress) {
+					return;
+				}
+
+				m_pPageAddress = pBaseAddress;
+				m_FreeBlocks.emplace(pBaseAddress, pi.m_unSize);
+			}
+
+			if (!GetProtection(&m_unOriginalProtection)) {
+				return;
+			}
+		}
+
+		Page::Page(void* pDesiredAddress) {
+			m_bIsManualPage = false;
+			m_unPageCapacity = 0;
+			m_pPageAddress = nullptr;
+			m_bAutoRestore = false;
+			m_bCommitted = false;
+			m_unOriginalProtection = 0;
+
+			if (!pMinimumApplicationAddress || !pMaximumApplicationAddress || !unPageSize || !unAllocationGranularity) {
+				SYSTEM_INFO sysinf;
+				GetSystemInfo(&sysinf);
+				pMinimumApplicationAddress = sysinf.lpMinimumApplicationAddress;
+				pMaximumApplicationAddress = sysinf.lpMaximumApplicationAddress;
+				unPageSize = sysinf.dwPageSize;
+				unAllocationGranularity = sysinf.dwAllocationGranularity;
+			}
+
+			m_unPageCapacity = unPageSize;
+			if (pDesiredAddress) {
+				auto vecBackwardPages = __get_pages_info(reinterpret_cast<char*>(pDesiredAddress) - 0x7FFFFFFF + 1, 0x7FFFFFFF);
+				std::reverse(vecBackwardPages.begin(), vecBackwardPages.end());
+				for (auto& PageInfo : vecBackwardPages) { // [unAddress; unBegin] - From unAddress to unBegin (Backward)
+					if (!__is_relative(pDesiredAddress, PageInfo.m_pBaseAddress)) {
+						continue;
+					}
+
+					if (PageInfo.m_unState == MEM_FREE) {
+						void* pPageAddress = VirtualAlloc(reinterpret_cast<void*>(PageInfo.m_pBaseAddress), PageInfo.m_unSize, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
+						if (pPageAddress) {
+							if (__is_relative(pDesiredAddress, pPageAddress)) {
+								m_pPageAddress = pPageAddress;
+								break;
+							} else {
+								VirtualFree(pPageAddress, 0, MEM_RELEASE);
+							}
+						}
+					}
+				}
+
+				auto vecForwardPages = __get_pages_info(pDesiredAddress, 0x7FFFFFFF);
+				for (auto& PageInfo : vecForwardPages) { // [unAddress; unEnd] - From unAddress to unEnd(Forward)
+					if (!__is_relative(pDesiredAddress, PageInfo.m_pBaseAddress)) {
+						continue;
+					}
+
+					if (PageInfo.m_unState == MEM_FREE) {
+						void* pPageAddress = VirtualAlloc(reinterpret_cast<void*>(PageInfo.m_pBaseAddress), PageInfo.m_unSize, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
+						if (pPageAddress) {
+							if (__is_relative(pDesiredAddress, pPageAddress)) {
+								m_pPageAddress = pPageAddress;
+								break;
+							} else {
+								VirtualFree(pPageAddress, 0, MEM_RELEASE);
+							}
+						}
+					}
+				}
+			} else {
+				m_pPageAddress = VirtualAlloc(nullptr, unPageSize, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
+			}
+
 			if (m_pPageAddress) {
-				m_FreeBlocks.emplace(m_pPageAddress, unCapacity);
+				m_FreeBlocks.emplace(m_pPageAddress, unPageSize);
 			}
 		}
 
 		Page::~Page() {
 			if (m_pPageAddress) {
-				VirtualFree(m_pPageAddress, 0, MEM_RELEASE);
+				if (m_bAutoRestore) {
+					RestoreProtection();
+				}
+
+				if (m_bIsManualPage && m_bCommitted) {
+					VirtualFree(m_pPageAddress, 0, MEM_DECOMMIT);
+				}
+
+				if (!m_bIsManualPage) {
+					VirtualFree(m_pPageAddress, 0, MEM_RELEASE);
+				}
 			}
 		}
 
+		bool Page::GetProtection(const PDWORD pProtection) {
+			if (!m_pPageAddress || !m_unPageCapacity) {
+				return false;
+			}
+
+			PAGE_INFO pi;
+			if (!__get_page_info(m_pPageAddress, &pi)) {
+				return false;
+			}
+
+			if (pProtection) {
+				*pProtection = pi.m_unProtection;
+			}
+
+			return true;
+		}
+
+		bool Page::GetOriginalProtection(const PDWORD pProtection) {
+			if (!m_pPageAddress || !m_unPageCapacity) {
+				return false;
+			}
+
+			if (pProtection) {
+				*pProtection = m_unOriginalProtection;
+			}
+
+			return true;
+		}
+
+		bool Page::ChangeProtection(const DWORD unNewProtection) {
+			if (!m_pPageAddress || !m_unPageCapacity) {
+				return false;
+			}
+
+			DWORD unProtection = 0;
+			if (!VirtualProtect(const_cast<void*>(m_pPageAddress), m_unPageCapacity, unNewProtection, &unProtection)) {
+				return false;
+			}
+
+			if (unNewProtection & (PAGE_EXECUTE | PAGE_EXECUTE_READ | PAGE_EXECUTE_READWRITE)) {
+				if (!FlushInstructionCache(reinterpret_cast<HANDLE>(-1), m_pPageAddress, m_unPageCapacity)) {
+					return false;
+				}
+			}
+
+			return true;
+		}
+
+		bool Page::RestoreProtection() {
+			if (!m_pPageAddress || !m_unPageCapacity) {
+				return false;
+			}
+
+			if (!ChangeProtection(m_unOriginalProtection)) {
+				return false;
+			}
+
+			return true;
+		}
+
+		bool Page::CloneFrom(Page* pSourcePage) {
+			if (!m_pPageAddress || !m_unPageCapacity || !pSourcePage) {
+				return false;
+			}
+
+			if (m_unPageCapacity != pSourcePage->GetPageCapacity()) {
+				return false;
+			}
+
+			DWORD unProtection = 0;
+			if (!pSourcePage->GetProtection(&unProtection)) {
+				return false;
+			}
+
+			if (!pSourcePage->ChangeProtection(PAGE_READONLY)) {
+				return false;
+			}
+
+			if (!ChangeProtection(PAGE_READWRITE)) {
+				return false;
+			}
+
+			memcpy(m_pPageAddress, pSourcePage->GetPageAddress(), pSourcePage->GetPageCapacity());
+
+			if (!ChangeProtection(unProtection)) {
+				return false;
+			}
+
+			if (!pSourcePage->RestoreProtection()) {
+				return false;
+			}
+
+			return true;
+		}
+
+		bool Page::CloneTo(Page* pDestinationPage) {
+			if (!m_pPageAddress || !m_unPageCapacity || !pDestinationPage) {
+				return false;
+			}
+
+			if (m_unPageCapacity != pDestinationPage->GetPageCapacity()) {
+				return false;
+			}
+
+			DWORD unProtection = 0;
+			if (!GetProtection(&unProtection)) {
+				return false;
+			}
+
+			if (!ChangeProtection(PAGE_READONLY)) {
+				return false;
+			}
+
+			if (!pDestinationPage->ChangeProtection(PAGE_READWRITE)) {
+				return false;
+			}
+
+			memcpy(pDestinationPage->GetPageAddress(), m_pPageAddress, m_unPageCapacity);
+
+			if (!pDestinationPage->ChangeProtection(unProtection)) {
+				return false;
+			}
+
+			if (!RestoreProtection()) {
+				return false;
+			}
+
+			return true;
+		}
+
+		bool Page::CloneFrom(void* pSourceBaseAddress, size_t unSize) {
+			if (!m_pPageAddress || !m_unPageCapacity || !pSourceBaseAddress) {
+				return false;
+			}
+
+			PAGE_INFO pi;
+			if (!__get_page_info(pSourceBaseAddress, &pi)) {
+				return false;
+			}
+
+			if (pi.m_pBaseAddress != pSourceBaseAddress) {
+				return false;
+			}
+
+			if (unSize && (pi.m_unSize != unSize)) {
+				return false;
+			}
+
+			Page SourcePage(pSourceBaseAddress, pi.m_unSize);
+			return SourcePage.CloneTo(this);
+		}
+
+		bool Page::CloneTo(void* pDestinationBaseAddress, size_t unSize) {
+			if (!m_pPageAddress || !m_unPageCapacity || !pDestinationBaseAddress) {
+				return false;
+			}
+
+			PAGE_INFO pi;
+			if (!__get_page_info(pDestinationBaseAddress, &pi)) {
+				return false;
+			}
+
+			if (pi.m_pBaseAddress != pDestinationBaseAddress) {
+				return false;
+			}
+
+			if (unSize && (pi.m_unSize != unSize)) {
+				return false;
+			}
+
+			Page DestinationPage(pDestinationBaseAddress, pi.m_unSize);
+			return DestinationPage.CloneFrom(this);
+		}
+
 		void* Page::Alloc(size_t unSize, size_t unSizeAlign, size_t unAddressAlign) {
-			if (!m_pPageAddress || !unSize) {
+			if (!m_pPageAddress || !m_unPageCapacity || !unSize || !unSizeAlign || !unAddressAlign) {
 				return nullptr;
 			}
 
@@ -5542,8 +5847,22 @@ namespace Detours {
 			return nullptr;
 		}
 
+		void* Page::ZeroAlloc(size_t unSize, size_t unSizeAlign, size_t unAddressAlign) {
+			if (!m_pPageAddress || !m_unPageCapacity || !unSize || !unSizeAlign || !unAddressAlign) {
+				return nullptr;
+			}
+
+			void* pAddress = Alloc(unSize, unSizeAlign, unAddressAlign);
+			if (!pAddress) {
+				return nullptr;
+			}
+
+			memset(pAddress, 0, unSize);
+			return pAddress;
+		}
+
 		bool Page::DeAlloc(void* pAddress) {
-			if (!m_pPageAddress || !pAddress) {
+			if (!m_pPageAddress || !m_unPageCapacity || !pAddress) {
 				return false;
 			}
 
@@ -5559,16 +5878,14 @@ namespace Detours {
 		}
 
 		void Page::DeAllocAll() {
-			if (!m_pPageAddress) {
+			if (!m_pPageAddress || !m_unPageCapacity) {
 				return;
 			}
 
 			m_FreeBlocks.clear();
 			m_ActiveBlocks.clear();
 
-			m_FreeBlocks.emplace(m_pPageAddress, m_unCapacity);
-
-			return;
+			m_FreeBlocks.emplace(m_pPageAddress, m_unPageCapacity);
 		}
 
 		void Page::MergeFreeBlocks() {
@@ -5596,36 +5913,79 @@ namespace Detours {
 			m_FreeBlocks = std::move(MergedFreeBlocks);
 		}
 
-		void* Page::GetAddress() const {
+		void* Page::GetPageAddress() const {
 			return m_pPageAddress;
 		}
 
-		size_t Page::GetCapacity() const {
-			return m_unCapacity;
+		size_t Page::GetPageCapacity() const {
+			return m_unPageCapacity;
 		}
 
-		size_t Page::GetSize() const {
-			size_t unSize = 0;
+		size_t Page::GetDataSize() const {
+			size_t unDataSize = 0;
 
 			for (const auto& block : m_ActiveBlocks) {
-				unSize += block.m_unSize;
+				unDataSize += block.m_unSize;
 			}
 
-			return unSize;
+			return unDataSize;
 		}
 
-		bool Page::IsEmpty() const {
+		bool Page::IsPageEmpty() const {
 			return m_ActiveBlocks.empty();
 		}
 
 		// ----------------------------------------------------------------
-		// NearPage
+		// Region
 		// ----------------------------------------------------------------
 
-		NearPage::NearPage(size_t unCapacity, void* pDesiredAddress) {
-			if (!unPageSize || !unAllocationGranularity) {
+		Region::Region(void* pBaseAddress, bool bAutoRestore) {
+			m_bIsManualRegion = true;
+			m_unRegionCapacity = 0;
+			m_pRegionAddress = nullptr;
+			m_bAutoRestore = bAutoRestore;
+			m_unOriginalProtection = 0;
+			m_unUsedSpace = 0;
+
+			if (!pBaseAddress) {
+				return;
+			}
+
+			REGION_INFO ri;
+			if (!__get_region_info(pBaseAddress, &ri)) {
+				return;
+			}
+
+			if (ri.m_pBaseAddress != pBaseAddress) {
+				return;
+			}
+
+			if (!GetProtection(&m_unOriginalProtection)) {
+				return;
+			}
+
+			m_unRegionCapacity = ri.m_unSize;
+			m_pRegionAddress = pBaseAddress;
+			
+			auto vecPages = __get_pages_info(pBaseAddress, ri.m_unSize);
+			for (auto& PageInfo : vecPages) {
+				m_Pages.emplace_back(PageInfo.m_pBaseAddress, false);
+			}
+		}
+
+		Region::Region(void* pDesiredAddress, size_t unCapacity) {
+			m_bIsManualRegion = false;
+			m_unRegionCapacity = 0;
+			m_pRegionAddress = nullptr;
+			m_bAutoRestore = false;
+			m_unOriginalProtection = 0;
+			m_unUsedSpace = 0;
+
+			if (!pMinimumApplicationAddress || !pMaximumApplicationAddress || !unPageSize || !unAllocationGranularity) {
 				SYSTEM_INFO sysinf;
 				GetSystemInfo(&sysinf);
+				pMinimumApplicationAddress = sysinf.lpMinimumApplicationAddress;
+				pMaximumApplicationAddress = sysinf.lpMaximumApplicationAddress;
 				unPageSize = sysinf.dwPageSize;
 				unAllocationGranularity = sysinf.dwAllocationGranularity;
 			}
@@ -5636,192 +5996,380 @@ namespace Detours {
 				if (unCapacity < unPageSize) {
 					unCapacity = unPageSize;
 				} else {
-					unCapacity = __align_up(unCapacity, static_cast<size_t>(unAllocationGranularity));
+					unCapacity = __align_up(unCapacity, static_cast<size_t>(unPageSize));
 				}
 			}
 
-			m_unCapacity = unCapacity;
-			m_pPageAddress = nullptr;
-
+			m_unRegionCapacity = unCapacity;
 			if (pDesiredAddress) {
-				const size_t unBegin = reinterpret_cast<size_t>(pDesiredAddress) - 0x7FFFFFFF + 1;
-				const size_t unEnd = reinterpret_cast<size_t>(pDesiredAddress) + 0x7FFFFFFF - unCapacity;
-
-				MEMORY_BASIC_INFORMATION mbi;
-				memset(&mbi, 0, sizeof(mbi));
-
-				// [unAddress; unEnd] - From unAddress to unEnd (Forward)
-				for (size_t unAddress = reinterpret_cast<size_t>(pDesiredAddress); unAddress < unEnd; unAddress = __align_up(unAddress + static_cast<size_t>(unAllocationGranularity) - 1, static_cast<size_t>(unAllocationGranularity))) {
-					if (VirtualQuery(reinterpret_cast<void*>(unAddress), &mbi, sizeof(mbi)) != sizeof(mbi)) {
-						break;
+				auto vecBackwardRegions = __get_regions_info(reinterpret_cast<char*>(pDesiredAddress) - 0x7FFFFFFF + 1, 0x7FFFFFFF);
+				std::reverse(vecBackwardRegions.begin(), vecBackwardRegions.end());
+				for (auto& Region : vecBackwardRegions) { // [unAddress; unBegin] - From unAddress to unBegin (Backward)
+					if (!__is_relative(pDesiredAddress, Region.m_pBaseAddress)) {
+						continue;
 					}
 
-					if ((mbi.State == MEM_FREE) && (mbi.RegionSize >= unCapacity)) {
-						void* pPageAddress = VirtualAlloc(reinterpret_cast<void*>(unAddress), unCapacity, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
-						if (pPageAddress) {
-							if (__is_relative(pDesiredAddress, pPageAddress)) {
-								m_pPageAddress = pPageAddress;
+					if (Region.m_unState == MEM_FREE) {
+						void* pRegionAddress = VirtualAlloc(reinterpret_cast<void*>(Region.m_pBaseAddress), Region.m_unSize, MEM_RESERVE, PAGE_READWRITE);
+						if (pRegionAddress) {
+							if (__is_relative(pDesiredAddress, pRegionAddress)) {
+								m_pRegionAddress = pRegionAddress;
+								break;
 							} else {
-								VirtualFree(pPageAddress, 0, MEM_RELEASE);
+								VirtualFree(pRegionAddress, 0, MEM_RELEASE);
 							}
-
-							break;
 						}
 					}
 				}
 
-				// [unAddress; unBegin] - From unAddress to unBegin (Backward)
-				if (!m_pPageAddress) {
-					for (size_t unAddress = reinterpret_cast<size_t>(pDesiredAddress); unAddress > unBegin; unAddress = __align_down(unAddress - 1, static_cast<size_t>(unAllocationGranularity))) {
-						if (VirtualQuery(reinterpret_cast<void*>(unAddress), &mbi, sizeof(mbi)) != sizeof(mbi)) {
-							break;
-						}
+				auto vecForwardRegions = __get_regions_info(pDesiredAddress, 0x7FFFFFFF);
+				for (auto& Region : vecForwardRegions) { // [unAddress; unEnd] - From unAddress to unEnd(Forward)
+					if (!__is_relative(pDesiredAddress, Region.m_pBaseAddress)) {
+						continue;
+					}
 
-						if ((mbi.State == MEM_FREE) && (mbi.RegionSize >= unCapacity)) {
-							void* pPageAddress = VirtualAlloc(reinterpret_cast<void*>(unAddress), unCapacity, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
-							if (pPageAddress) {
-								if (__is_relative(pDesiredAddress, pPageAddress)) {
-									m_pPageAddress = pPageAddress;
-								} else {
-									VirtualFree(pPageAddress, 0, MEM_RELEASE);
-								}
-
+					if (Region.m_unState == MEM_FREE) {
+						void* pRegionAddress = VirtualAlloc(reinterpret_cast<void*>(Region.m_pBaseAddress), Region.m_unSize, MEM_RESERVE, PAGE_READWRITE);
+						if (pRegionAddress) {
+							if (__is_relative(pDesiredAddress, pRegionAddress)) {
+								m_pRegionAddress = pRegionAddress;
 								break;
+							} else {
+								VirtualFree(pRegionAddress, 0, MEM_RELEASE);
 							}
 						}
 					}
 				}
 			} else {
-				m_pPageAddress = VirtualAlloc(nullptr, unCapacity, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
+				m_pRegionAddress = VirtualAlloc(nullptr, unCapacity, MEM_RESERVE, PAGE_READWRITE);
 			}
 
-			if (m_pPageAddress) {
-				m_FreeBlocks.emplace(m_pPageAddress, unCapacity);
+			if (!m_pRegionAddress) {
+				return;
+			}
+
+			REGION_INFO ri;
+			if (!__get_region_info(m_pRegionAddress, &ri)) {
+				return;
+			}
+
+			auto vecPages = __get_pages_info(m_pRegionAddress, unCapacity);
+			for (auto& PageInfo : vecPages) {
+				if (PageInfo.m_unState != MEM_RESERVE) {
+					continue;
+				}
+
+				m_Pages.emplace_back(PageInfo.m_pBaseAddress, true, true);
 			}
 		}
 
-		NearPage::~NearPage() {
-			if (m_pPageAddress) {
-				VirtualFree(m_pPageAddress, 0, MEM_RELEASE);
+		Region::~Region() {
+			if (m_pRegionAddress && m_unRegionCapacity) {
+				if (m_bAutoRestore) {
+					RestoreProtection();
+				}
+
+				if (!m_bIsManualRegion) {
+					VirtualFree(m_pRegionAddress, 0, MEM_RELEASE);
+				}
 			}
 		}
 
-		void* NearPage::Alloc(size_t unSize, size_t unSizeAlign, size_t unAddressAlign) {
-			if (!m_pPageAddress || !unSize) {
+		bool Region::GetProtection(const PDWORD pProtection) {
+			if (m_Pages.empty() || !m_pRegionAddress || !m_unRegionCapacity) {
+				return false;
+			}
+
+			REGION_INFO pi;
+			if (!__get_region_info(m_pRegionAddress, &pi)) {
+				return false;
+			}
+
+			if (pProtection) {
+				*pProtection = pi.m_unProtection;
+			}
+
+			return true;
+		}
+
+		bool Region::GetOriginalProtection(const PDWORD pProtection) {
+			if (m_Pages.empty() || !m_pRegionAddress || !m_unRegionCapacity) {
+				return false;
+			}
+
+			if (pProtection) {
+				*pProtection = m_unOriginalProtection;
+			}
+
+			return true;
+		}
+
+		bool Region::ChangeProtection(const DWORD unNewProtection) {
+			if (m_Pages.empty() || !m_pRegionAddress || !m_unRegionCapacity) {
+				return false;
+			}
+
+			DWORD unProtection = 0;
+			if (!VirtualProtect(const_cast<void*>(m_pRegionAddress), m_unRegionCapacity, unNewProtection, &unProtection)) {
+				return false;
+			}
+
+			if (unNewProtection & (PAGE_EXECUTE | PAGE_EXECUTE_READ | PAGE_EXECUTE_READWRITE)) {
+				if (!FlushInstructionCache(reinterpret_cast<HANDLE>(-1), m_pRegionAddress, m_unRegionCapacity)) {
+					return false;
+				}
+			}
+
+			return true;
+		}
+
+		bool Region::RestoreProtection() {
+			if (m_Pages.empty() || !m_pRegionAddress || !m_unRegionCapacity) {
+				return false;
+			}
+
+			if (!ChangeProtection(m_unOriginalProtection)) {
+				return false;
+			}
+
+			return true;
+		}
+
+		bool Region::CloneFrom(Region* pSourceRegion) {
+			if (m_Pages.empty() || !m_pRegionAddress || !m_unRegionCapacity || !pSourceRegion) {
+				return false;
+			}
+
+			if (m_unRegionCapacity != pSourceRegion->GetRegionCapacity()) {
+				return false;
+			}
+
+			DWORD unProtection = 0;
+			if (!pSourceRegion->GetProtection(&unProtection)) {
+				return false;
+			}
+
+			if (!pSourceRegion->ChangeProtection(PAGE_READONLY)) {
+				return false;
+			}
+
+			if (!ChangeProtection(PAGE_READWRITE)) {
+				return false;
+			}
+
+			memcpy(m_pRegionAddress, pSourceRegion->GetRegionAddress(), pSourceRegion->GetRegionCapacity());
+
+			if (!ChangeProtection(unProtection)) {
+				return false;
+			}
+
+			if (!pSourceRegion->RestoreProtection()) {
+				return false;
+			}
+
+			return true;
+		}
+
+		bool Region::CloneTo(Region* pDestinationRegion) {
+			if (m_Pages.empty() || !m_pRegionAddress || !m_unRegionCapacity || !pDestinationRegion) {
+				return false;
+			}
+
+			if (m_unRegionCapacity != pDestinationRegion->GetRegionCapacity()) {
+				return false;
+			}
+
+			DWORD unProtection = 0;
+			if (!GetProtection(&unProtection)) {
+				return false;
+			}
+
+			if (!ChangeProtection(PAGE_READONLY)) {
+				return false;
+			}
+
+			if (!pDestinationRegion->ChangeProtection(PAGE_READWRITE)) {
+				return false;
+			}
+
+			memcpy(pDestinationRegion->GetRegionAddress(), m_pRegionAddress, m_unRegionCapacity);
+
+			if (!pDestinationRegion->ChangeProtection(unProtection)) {
+				return false;
+			}
+
+			if (!RestoreProtection()) {
+				return false;
+			}
+
+			return true;
+		}
+
+		bool Region::CloneFrom(void* pSourceBaseAddress, size_t unSize) {
+			if (m_Pages.empty() || !m_pRegionAddress || !m_unRegionCapacity || !pSourceBaseAddress) {
+				return false;
+			}
+
+			REGION_INFO pi;
+			if (!__get_region_info(pSourceBaseAddress, &pi)) {
+				return false;
+			}
+
+			if (pi.m_pBaseAddress != pSourceBaseAddress) {
+				return false;
+			}
+
+			if (unSize && (pi.m_unSize != unSize)) {
+				return false;
+			}
+
+			Region SourceRegion(pSourceBaseAddress, pi.m_unSize);
+			return SourceRegion.CloneTo(this);
+		}
+
+		bool Region::CloneTo(void* pDestinationBaseAddress, size_t unSize) {
+			if (m_Pages.empty() || !m_pRegionAddress || !m_unRegionCapacity || !pDestinationBaseAddress) {
+				return false;
+			}
+
+			REGION_INFO pi;
+			if (!__get_region_info(pDestinationBaseAddress, &pi)) {
+				return false;
+			}
+
+			if (pi.m_pBaseAddress != pDestinationBaseAddress) {
+				return false;
+			}
+
+			if (unSize && (pi.m_unSize != unSize)) {
+				return false;
+			}
+
+			Region DestinationRegion(pDestinationBaseAddress, pi.m_unSize);
+			return DestinationRegion.CloneFrom(this);
+		}
+
+		void* Region::Alloc(size_t unSize, size_t unSizeAlign, size_t unAddressAlign, Page** pUsedPage) {
+			if (m_Pages.empty() || !m_pRegionAddress || !m_unRegionCapacity || !unSize || !unSizeAlign || !unAddressAlign) {
 				return nullptr;
 			}
 
 			const bool bSizeAlign = (unSizeAlign > 1) && !(unSizeAlign & (unSizeAlign - 1));
-			const bool bAddressAlign = (unAddressAlign > 1) && !(unAddressAlign & (unAddressAlign - 1));
 
-			for (auto it = m_FreeBlocks.begin(); it != m_FreeBlocks.end(); ++it) {
-				const size_t unAddress = reinterpret_cast<size_t>(it->m_pAddress);
-				const size_t unAddressAlignSize = !bAddressAlign ? 0 : (((unAddress % unAddressAlign == 0) ? 0 : (unAddressAlign - (unAddress % unAddressAlign))));
+			const size_t unSizeAlignSize = !bSizeAlign ? 0 : ((unSize % unSizeAlign) == 0) ? 0 : (unSizeAlign - (unSize % unSizeAlign));
+			const size_t unAlignedSize = unSize + unSizeAlignSize;
 
-				const size_t unSizeAlignSize = !bSizeAlign ? 0 : ((unSize % unSizeAlign) == 0) ? 0 : (unSizeAlign - (unSize % unSizeAlign));
-				const size_t unAlignedSize = unSize + unSizeAlignSize;
+			if (unAlignedSize > m_unRegionCapacity) {
+				return nullptr;
+			}
 
-				if (it->m_unSize >= unAlignedSize + unAddressAlignSize) {
-					void* pAlignedAddress = reinterpret_cast<char*>(unAddress) + unAddressAlignSize;
+			if (m_unUsedSpace + unAlignedSize > m_unRegionCapacity) {
+				return nullptr;
+			}
 
-					if (it->m_unSize > unAlignedSize + unAddressAlignSize) {
-						m_FreeBlocks.emplace(reinterpret_cast<char*>(pAlignedAddress) + unAlignedSize, it->m_unSize - unAlignedSize - unAddressAlignSize);
+			for (auto& Page : m_Pages) {
+				if ((Page.GetPageCapacity() - Page.GetDataSize()) >= unAlignedSize) {
+					void* pMemory = Page.Alloc(unSize, unSizeAlign, unAddressAlign);
+					if (!pMemory) {
+						continue;
 					}
 
-					m_ActiveBlocks.emplace(pAlignedAddress, unSize);
-					m_FreeBlocks.erase(it);
+					if (pUsedPage) {
+						*pUsedPage = &Page;
+					}
 
-					return pAlignedAddress;
+					m_unUsedSpace += unAlignedSize;
+					return pMemory;
 				}
 			}
 
 			return nullptr;
 		}
 
-		bool NearPage::DeAlloc(void* pAddress) {
-			if (!m_pPageAddress || !pAddress) {
+		void* Region::ZeroAlloc(size_t unSize, size_t unSizeAlign, size_t unAddressAlign, Page** pUsedPage) {
+			if (m_Pages.empty() || !m_pRegionAddress || !m_unRegionCapacity || !unSize || !unSizeAlign || !unAddressAlign) {
+				return nullptr;
+			}
+
+			void* pAddress = Alloc(unSize, unSizeAlign, unAddressAlign, pUsedPage);
+			if (!pAddress) {
+				return nullptr;
+			}
+
+			memset(pAddress, 0, unSize);
+			return pAddress;
+		}
+
+		bool Region::DeAlloc(void* pAddress) {
+			if (m_Pages.empty() || !m_pRegionAddress || !m_unRegionCapacity || !pAddress) {
 				return false;
 			}
 
-			auto it = m_ActiveBlocks.find(Block(pAddress, 0));
-			if (it != m_ActiveBlocks.end()) {
-				m_FreeBlocks.emplace(*it);
-				m_ActiveBlocks.erase(it);
-				MergeFreeBlocks();
-				return true;
+			for (auto it = m_Pages.begin(); it != m_Pages.end(); ++it) {
+				const size_t unDataSize = it->GetDataSize();
+				if (it->DeAlloc(pAddress)) {
+					m_unUsedSpace -= unDataSize;
+					return true;
+				}
 			}
 
 			return false;
 		}
 
-		void NearPage::DeAllocAll() {
-			if (!m_pPageAddress) {
+		void Region::DeAllocAll() {
+			if (m_Pages.empty() || !m_pRegionAddress || !m_unRegionCapacity) {
 				return;
 			}
 
-			m_FreeBlocks.clear();
-			m_ActiveBlocks.clear();
+			for (auto& Page : m_Pages) {
+				Page.DeAllocAll();
+			}
 
-			m_FreeBlocks.emplace(m_pPageAddress, m_unCapacity);
-
-			return;
+			m_unUsedSpace = 0;
 		}
 
-		void NearPage::MergeFreeBlocks() {
-			if (m_FreeBlocks.size() <= 1) {
-				return;
+		void* Region::GetRegionAddress() const {
+			return m_pRegionAddress;
+		}
+
+		size_t Region::GetRegionCapacity() const {
+			return m_unRegionCapacity;
+		}
+
+		size_t Region::GetDataSize() const {
+			size_t unDataSize = 0;
+
+			for (auto& Page : m_Pages) {
+				unDataSize += Page.GetDataSize();
 			}
 
-			std::set<Block> MergedFreeBlocks;
-			auto it = m_FreeBlocks.begin();
-			auto PrevBlock = *it;
-			++it;
+			return unDataSize;
+		}
 
-			while (it != m_FreeBlocks.end()) {
-				if ((reinterpret_cast<char*>(PrevBlock.m_pAddress) + PrevBlock.m_unSize) == it->m_pAddress) {
-					PrevBlock.m_unSize += it->m_unSize;
-				} else {
-					MergedFreeBlocks.insert(PrevBlock);
-					PrevBlock = *it;
+		bool Region::IsRegionEmpty() const {
+			if (m_Pages.empty()) {
+				return true;
+			}
+
+			for (auto& Page : m_Pages) {
+				if (Page.IsPageEmpty()) {
+					return false;
 				}
-
-				++it;
 			}
 
-			MergedFreeBlocks.insert(PrevBlock);
-			m_FreeBlocks = std::move(MergedFreeBlocks);
-		}
-
-		void* NearPage::GetAddress() const {
-			return m_pPageAddress;
-		}
-
-		size_t NearPage::GetCapacity() const {
-			return m_unCapacity;
-		}
-
-		size_t NearPage::GetSize() const {
-			size_t unSize = 0;
-
-			for (const auto& block : m_ActiveBlocks) {
-				unSize += block.m_unSize;
-			}
-
-			return unSize;
-		}
-
-		bool NearPage::IsEmpty() const {
-			return m_ActiveBlocks.empty();
+			return true;
 		}
 
 		// ----------------------------------------------------------------
 		// Storage
 		// ----------------------------------------------------------------
 
-		Storage::Storage(size_t unTotalCapacity, size_t unPageCapacity) {
-			if (!unPageSize || !unAllocationGranularity) {
+		Storage::Storage(size_t unTotalCapacity, size_t unRegionCapacity) {
+			if (!pMinimumApplicationAddress || !pMaximumApplicationAddress || !unPageSize || !unAllocationGranularity) {
 				SYSTEM_INFO sysinf;
 				GetSystemInfo(&sysinf);
+				pMinimumApplicationAddress = sysinf.lpMinimumApplicationAddress;
+				pMaximumApplicationAddress = sysinf.lpMaximumApplicationAddress;
 				unPageSize = sysinf.dwPageSize;
 				unAllocationGranularity = sysinf.dwAllocationGranularity;
 			}
@@ -5832,34 +6380,36 @@ namespace Detours {
 				if (unTotalCapacity < unPageSize) {
 					unTotalCapacity = unPageSize;
 				} else {
-					unTotalCapacity = __align_up(unTotalCapacity, static_cast<size_t>(unAllocationGranularity));
+					unTotalCapacity = __align_up(unTotalCapacity, static_cast<size_t>(unPageSize));
 				}
 			}
 
-			if (!unPageCapacity) {
-				unPageCapacity = unPageSize;
+			if (!unRegionCapacity) {
+				unRegionCapacity = unPageSize;
 			} else {
-				if (unPageCapacity < unPageSize) {
-					unPageCapacity = unPageSize;
+				if (unRegionCapacity < unPageSize) {
+					unRegionCapacity = unPageSize;
 				} else {
-					unPageCapacity = __align_up(unPageCapacity, static_cast<size_t>(unAllocationGranularity));
+					unRegionCapacity = __align_up(unRegionCapacity, static_cast<size_t>(unPageSize));
 				}
 			}
 
 			m_unTotalCapacity = unTotalCapacity;
-			m_unPageCapacity = unPageCapacity;
+			m_unRegionCapacity = unRegionCapacity;
 			m_unUsedSpace = 0;
-
-			m_Pages.emplace_back(unPageCapacity);
 		}
 
-		void* Storage::Alloc(size_t unSize, size_t unSizeAlign, size_t unAddressAlign) {
+		void* Storage::Alloc(size_t unSize, size_t unSizeAlign, size_t unAddressAlign, void* pDesiredAddress, Page** pUsedPage, Region** pUsedRegion) {
+			if (!unSize || !unSizeAlign || !unAddressAlign) {
+				return nullptr;
+			}
+
 			const bool bSizeAlign = (unSizeAlign > 1) && !(unSizeAlign & (unSizeAlign - 1));
 
 			const size_t unSizeAlignSize = !bSizeAlign ? 0 : ((unSize % unSizeAlign) == 0) ? 0 : (unSizeAlign - (unSize % unSizeAlign));
 			const size_t unAlignedSize = unSize + unSizeAlignSize;
 
-			if (unAlignedSize > m_unPageCapacity) {
+			if (unAlignedSize > m_unRegionCapacity) {
 				return nullptr;
 			}
 
@@ -5867,57 +6417,102 @@ namespace Detours {
 				return nullptr;
 			}
 
-			if (m_Pages.empty()) {
-				m_Pages.emplace_back(m_unPageCapacity);
-				if (!m_Pages.back().GetAddress()) {
-					m_Pages.pop_back();
+			if (m_Regions.empty()) {
+				m_Regions.emplace_back(pDesiredAddress, m_unRegionCapacity);
+				if (!m_Regions.back().GetRegionAddress()) {
+					m_Regions.pop_back();
 					return nullptr;
 				}
 			}
 
-			if (!m_Pages.back().GetAddress()) {
-				m_Pages.pop_back();
+			if (!m_Regions.back().GetRegionAddress()) {
+				m_Regions.pop_back();
 				return nullptr;
 			}
 
-			for (auto& Page : m_Pages) {
-				if ((Page.GetCapacity() - Page.GetSize()) >= unAlignedSize) {
-					void* pMemory = Page.Alloc(unSize, unSizeAlign, unAddressAlign);
-					if (!pMemory) {
-						continue;
+			if (pDesiredAddress) {
+				for (auto& Region : m_Regions) {
+					if ((Region.GetRegionCapacity() - Region.GetDataSize()) >= unAlignedSize) {
+						if (!__is_relative(pDesiredAddress, Region.GetRegionAddress()) || !__is_relative(pDesiredAddress, reinterpret_cast<char*>(Region.GetRegionAddress()) + Region.GetDataSize())) {
+							continue;
+						}
+
+						void* pMemory = Region.Alloc(unSize, unSizeAlign, unAddressAlign, pUsedPage);
+						if (!pMemory) {
+							continue;
+						}
+
+						if (pUsedRegion) {
+							*pUsedRegion = &Region;
+						}
+
+						m_unUsedSpace += unAlignedSize;
+						return pMemory;
+					}
+				}
+			} else {
+				for (auto& Region : m_Regions) {
+					if ((Region.GetRegionCapacity() - Region.GetDataSize()) >= unAlignedSize) {
+						void* pMemory = Region.Alloc(unSize, unSizeAlign, unAddressAlign, pUsedPage);
+						if (!pMemory) {
+							continue;
+						}
+
+						if (pUsedRegion) {
+							*pUsedRegion = &Region;
+						}
+
+						m_unUsedSpace += unAlignedSize;
+						return pMemory;
+					}
+				}
+			}
+
+			if (m_unUsedSpace + m_unRegionCapacity <= m_unTotalCapacity) {
+				m_Regions.emplace_back(pDesiredAddress, m_unRegionCapacity);
+
+				void* pMemory = m_Regions.back().Alloc(unSize, unSizeAlign, unAddressAlign);
+				if (pMemory) {
+					if (pUsedRegion) {
+						*pUsedRegion = &m_Regions.back();
 					}
 
 					m_unUsedSpace += unAlignedSize;
 					return pMemory;
 				}
-			}
 
-			if (m_unUsedSpace + m_unPageCapacity <= m_unTotalCapacity) {
-				m_Pages.emplace_back(m_unPageCapacity);
-
-				void* pMemory = m_Pages.back().Alloc(unSize, unSizeAlign, unAddressAlign);
-				if (pMemory) {
-					m_unUsedSpace += unAlignedSize;
-					return pMemory;
-				}
-
-				m_Pages.pop_back();
+				m_Regions.pop_back();
 			}
 
 			return nullptr;
 		}
 
+		void* Storage::ZeroAlloc(size_t unSize, size_t unSizeAlign, size_t unAddressAlign, void* pDesiredAddress, Page** pUsedPage, Region** pUsedRegion) {
+			if (!unSize || !unSizeAlign || !unAddressAlign) {
+				return nullptr;
+			}
+
+			void* pAddress = Alloc(unSize, unSizeAlign, unAddressAlign, pDesiredAddress, pUsedPage, pUsedRegion);
+			if (!pAddress) {
+				return nullptr;
+			}
+
+			memset(pAddress, 0, unSize);
+			return pAddress;
+		}
+
 		bool Storage::DeAlloc(void* pAddress) {
-			if (m_Pages.empty()) {
+			if (m_Regions.empty()) {
 				return false;
 			}
 
-			for (auto it = m_Pages.begin(); it != m_Pages.end(); ++it) {
+			for (auto it = m_Regions.begin(); it != m_Regions.end(); ++it) {
+				const size_t unDataSize = it->GetDataSize();
 				if (it->DeAlloc(pAddress)) {
-					m_unUsedSpace -= it->GetSize();
+					m_unUsedSpace -= unDataSize;
 
-					if (it->IsEmpty()) {
-						m_Pages.erase(it);
+					if (it->IsRegionEmpty()) {
+						m_Regions.erase(it);
 					}
 
 					return true;
@@ -5928,35 +6523,34 @@ namespace Detours {
 		}
 
 		bool Storage::DeAllocAll() {
-			if (m_Pages.empty()) {
+			if (m_Regions.empty()) {
 				return false;
 			}
 
-			for (auto& Page : m_Pages) {
-				Page.DeAllocAll();
+			for (auto& Region : m_Regions) {
+				Region.DeAllocAll();
 			}
 
-			m_Pages.clear();
+			m_Regions.clear();
 			m_unUsedSpace = 0;
-
 			return true;
 		}
 
-		size_t Storage::GetCapacity() const {
+		size_t Storage::GetStorageCapacity() const {
 			return m_unTotalCapacity;
 		}
 
-		size_t Storage::GetSize() const {
+		size_t Storage::GetDataSize() const {
 			return m_unUsedSpace;
 		}
 
-		bool Storage::IsEmpty() const {
-			if (m_Pages.empty()) {
+		bool Storage::IsStorageEmpty() const {
+			if (m_Regions.empty()) {
 				return true;
 			}
 
-			for (auto it = m_Pages.begin(); it != m_Pages.end(); ++it) {
-				if (!it->IsEmpty()) {
+			for (auto& Region : m_Regions) {
+				if (!Region.IsRegionEmpty()) {
 					return false;
 				}
 			}
@@ -5965,128 +6559,147 @@ namespace Detours {
 		}
 
 		// ----------------------------------------------------------------
-		// NearStorage
+		// Protection
 		// ----------------------------------------------------------------
 
-		NearStorage::NearStorage(size_t unTotalCapacity, size_t unPageCapacity) {
-			if (!unPageSize || !unAllocationGranularity) {
-				SYSTEM_INFO sysinf;
-				GetSystemInfo(&sysinf);
-				unPageSize = sysinf.dwPageSize;
-				unAllocationGranularity = sysinf.dwAllocationGranularity;
+		Protection::Protection(void* pAddress, size_t unSize, bool bAutoRestore) {
+			m_bAutoRestore = bAutoRestore;
+			m_bUseRegions = false;
+
+			if (!pAddress || !unSize) {
+				return;
 			}
 
-			if (!unTotalCapacity) {
-				unTotalCapacity = unPageSize;
-			} else {
-				if (unTotalCapacity < unPageSize) {
-					unTotalCapacity = unPageSize;
-				} else {
-					unTotalCapacity = __align_up(unTotalCapacity, static_cast<size_t>(unAllocationGranularity));
+			auto vecRegions = __get_regions_info(pAddress, unSize);
+			if (!vecRegions.empty() && (vecRegions.size() > 1)) {
+				m_bUseRegions = true;
+				for (auto& Region : vecRegions) {
+					m_Regions.emplace_back(Region.m_pBaseAddress, true);
+				}
+
+				return;
+			}
+
+			const size_t unLargePageMinimumSize = GetLargePageMinimum();
+			for (auto& Region : vecRegions) {
+				if (Region.m_unSize >= unLargePageMinimumSize) {
+					m_bUseRegions = true;
+					break;
 				}
 			}
 
-			if (!unPageCapacity) {
-				unPageCapacity = unPageSize;
-			} else {
-				if (unPageCapacity < unPageSize) {
-					unPageCapacity = unPageSize;
-				} else {
-					unPageCapacity = __align_up(unPageCapacity, static_cast<size_t>(unAllocationGranularity));
+			if (m_bUseRegions) {
+				for (auto& Region : vecRegions) {
+					m_Regions.emplace_back(Region.m_pBaseAddress, true);
 				}
+
+				return;
 			}
 
-			m_unTotalCapacity = unTotalCapacity;
-			m_unPageCapacity = unPageCapacity;
-			m_unUsedSpace = 0;
+			auto vecPages = __get_pages_info(pAddress, unSize);
+			if (vecPages.empty()) {
+				return;
+			}
 
-			// m_Pages.emplace_back(unPageCapacity, _ReturnAddress());
+			for (auto& PageInfo : vecPages) {
+				m_Pages.emplace_back(PageInfo.m_pBaseAddress, false);
+			}
 		}
 
-		void* NearStorage::Alloc(size_t unSize, void* pDesiredAddress, size_t unSizeAlign, size_t unAddressAlign) {
-			const bool bSizeAlign = (unSizeAlign > 1) && !(unSizeAlign & (unSizeAlign - 1));
+		Protection::~Protection() {
+			if (m_bAutoRestore) {
+				Restore();
+			}
+		}
 
-			const size_t unSizeAlignSize = !bSizeAlign ? 0 : ((unSize % unSizeAlign) == 0) ? 0 : (unSizeAlign - (unSize % unSizeAlign));
-			const size_t unAlignedSize = unSize + unSizeAlignSize;
-
-			if (unAlignedSize > m_unPageCapacity) {
-				return nullptr;
+		bool Protection::Change(const DWORD unNewProtection) {
+			if (!m_bUseRegions && m_Pages.empty()) {
+				return false;
 			}
 
-			if (m_unUsedSpace + unAlignedSize > m_unTotalCapacity) {
-				return nullptr;
+			if (m_bUseRegions && m_Regions.empty()) {
+				return false;
 			}
 
-			if (m_Pages.empty()) {
-				m_Pages.emplace_back(m_unPageCapacity, pDesiredAddress);
-				if (!m_Pages.back().GetAddress()) {
-					m_Pages.pop_back();
-				}
-			}
-
-			if (!m_Pages.back().GetAddress()) {
-				m_Pages.pop_back();
-				return nullptr;
-			}
-
-			if (pDesiredAddress) {
+			if (!m_bUseRegions) {
 				for (auto& Page : m_Pages) {
-					if ((Page.GetCapacity() - Page.GetSize()) >= unAlignedSize) {
-						if (!__is_relative(pDesiredAddress, Page.GetAddress()) || !__is_relative(pDesiredAddress, reinterpret_cast<char*>(Page.GetAddress()) + Page.GetSize())) {
-							continue;
-						}
-
-						void* pMemory = Page.Alloc(unSize, unSizeAlign, unAddressAlign);
-						if (!pMemory) {
-							continue;
-						}
-
-						m_unUsedSpace += unAlignedSize;
-						return pMemory;
+					if (!Page.ChangeProtection(unNewProtection)) {
+						Restore();
+						return false;
 					}
 				}
 			} else {
-				for (auto& Page : m_Pages) {
-					if ((Page.GetCapacity() - Page.GetSize()) >= unAlignedSize) {
-						void* pMemory = Page.Alloc(unSize, unSizeAlign, unAddressAlign);
-						if (!pMemory) {
-							continue;
-						}
-
-						m_unUsedSpace += unAlignedSize;
-						return pMemory;
+				for (auto& Region : m_Regions) {
+					if (!Region.ChangeProtection(unNewProtection)) {
+						Restore();
+						return false;
 					}
 				}
 			}
 
-			if (m_unUsedSpace + m_unPageCapacity <= m_unTotalCapacity) {
-				m_Pages.emplace_back(m_unPageCapacity);
-
-				void* pMemory = m_Pages.back().Alloc(unSize, unSizeAlign, unAddressAlign);
-				if (pMemory) {
-					m_unUsedSpace += unAlignedSize;
-					return pMemory;
-				}
-
-				m_Pages.pop_back();
-			}
-
-			return nullptr;
+			return true;
 		}
 
-		bool NearStorage::DeAlloc(void* pAddress) {
-			if (m_Pages.empty()) {
+		bool Protection::Restore() {
+			if (!m_bUseRegions && m_Pages.empty()) {
+				return false;
+			}
+
+			if (m_bUseRegions && m_Regions.empty()) {
+				return false;
+			}
+
+			if (!m_bUseRegions) {
+				for (auto& Page : m_Pages) {
+					if (!Page.RestoreProtection()) {
+						return false;
+					}
+				}
+			} else {
+				for (auto& Region : m_Regions) {
+					if (!Region.RestoreProtection()) {
+						return false;
+					}
+				}
+			}
+
+			return true;
+		}
+
+		// ----------------------------------------------------------------
+		// MemoryManager
+		// ----------------------------------------------------------------
+
+		Page* MemoryManager::CreatePage() {
+			auto pPage = std::make_unique<Page>();
+			if (!pPage) {
+				return nullptr;
+			}
+
+			Page* pPageAddress = pPage.get();
+			m_Pages.emplace_back(std::move(pPage));
+			return pPageAddress;
+		}
+
+		Storage* MemoryManager::CreateStorage(size_t unTotalCapacity, size_t unPageCapacity) {
+			auto pStorage = std::make_unique<Storage>(unTotalCapacity, unPageCapacity);
+			if (!pStorage) {
+				return nullptr;
+			}
+
+			Storage* pStorageAddress = pStorage.get();
+			m_Storages.emplace_back(std::move(pStorage));
+			return pStorageAddress;
+		}
+
+		bool MemoryManager::DestroyPage(Page* pPage) {
+			if (!pPage) {
 				return false;
 			}
 
 			for (auto it = m_Pages.begin(); it != m_Pages.end(); ++it) {
-				if (it->DeAlloc(pAddress)) {
-					m_unUsedSpace -= it->GetSize();
-
-					if (it->IsEmpty()) {
-						m_Pages.erase(it);
-					}
-
+				if (it->get() == pPage) {
+					m_Pages.erase(it);
 					return true;
 				}
 			}
@@ -6094,41 +6707,87 @@ namespace Detours {
 			return false;
 		}
 
-		bool NearStorage::DeAllocAll() {
-			if (m_Pages.empty()) {
+		bool MemoryManager::DestroyStorage(Storage* pStorage) {
+			if (!pStorage) {
 				return false;
 			}
 
-			for (auto& Page : m_Pages) {
-				Page.DeAllocAll();
-			}
-
-			m_Pages.clear();
-			m_unUsedSpace = 0;
-
-			return true;
-		}
-
-		size_t NearStorage::GetCapacity() const {
-			return m_unTotalCapacity;
-		}
-
-		size_t NearStorage::GetSize() const {
-			return m_unUsedSpace;
-		}
-
-		bool NearStorage::IsEmpty() const {
-			if (m_Pages.empty()) {
-				return true;
-			}
-
-			for (auto it = m_Pages.begin(); it != m_Pages.end(); ++it) {
-				if (!it->IsEmpty()) {
-					return false;
+			for (auto it = m_Storages.begin(); it != m_Storages.end(); ++it) {
+				if (it->get() == pStorage) {
+					m_Storages.erase(it);
+					return true;
 				}
 			}
 
-			return true;
+			return false;
+		}
+
+		std::unique_ptr<Page> MemoryManager::GetPage(void* pAddress) {
+			if (!pAddress) {
+				return nullptr;
+			}
+
+			PAGE_INFO pi;
+			if (!__get_page_info(pAddress, &pi)) {
+				return nullptr;
+			}
+
+			return std::make_unique<Page>(pi.m_pBaseAddress, false);
+		}
+
+		std::unique_ptr<Region> MemoryManager::GetRegion(void* pAddress) {
+			if (!pAddress) {
+				return nullptr;
+			}
+
+			REGION_INFO ri;
+			if (!__get_region_info(pAddress, &ri)) {
+				return nullptr;
+			}
+
+			return std::make_unique<Region>(ri.m_pBaseAddress, false);
+		}
+
+		std::vector<Page> MemoryManager::CollectPages(void* pAddress, size_t unSize) {
+			std::vector<Page> vecPages;
+
+			if (!pAddress || !unSize) {
+				return vecPages;
+			}
+
+			auto vecPagesInfo = __get_pages_info(pAddress, unSize);
+			if (vecPagesInfo.empty()) {
+				return vecPages;
+			}
+
+			vecPages.reserve(vecPagesInfo.size());
+
+			for (auto& PageInfo : vecPagesInfo) {
+				vecPages.emplace_back(PageInfo.m_pBaseAddress, true);
+			}
+
+			return vecPages;
+		}
+
+		std::vector<Region> MemoryManager::CollectRegions(void* pAddress, size_t unSize) {
+			std::vector<Region> vecRegions;
+
+			if (!pAddress || !unSize) {
+				return vecRegions;
+			}
+
+			auto vecRegionsInfo = __get_regions_info(pAddress, unSize);
+			if (vecRegionsInfo.empty()) {
+				return vecRegions;
+			}
+
+			vecRegions.reserve(vecRegionsInfo.size());
+
+			for (auto& RegionInfo : vecRegionsInfo) {
+				vecRegions.emplace_back(RegionInfo.m_pBaseAddress, true);
+			}
+
+			return vecRegions;
 		}
 	}
 
@@ -81112,8 +81771,7 @@ namespace Detours {
 				if ((pInstruction->DefCode != RD_CODE_64) && (pIns->m_unAttributes & RD_FLAG_O64)) {
 					unStatus = RD_STATUS_INVALID_ENCODING_IN_MODE;
 				}
-			}
-			else {
+			} else {
 				unStatus = RD_STATUS_INVALID_ENCODING;
 			}
 
@@ -83393,26 +84051,17 @@ namespace Detours {
 
 			const auto& pAddress = &m_pVTable[m_unIndex];
 
-			const auto& it = g_Protections.find(reinterpret_cast<void*>(__get_page_address(pAddress)));
-			if (it != g_Protections.end()) {
-				return false;
-			}
-
-			auto pProtection = std::make_unique<Protection>(pAddress, sizeof(void*));
-			if (!pProtection) {
-				return false;
-			}
-
-			if (!pProtection->ChangeProtection(PAGE_READWRITE)) {
+			Protection Patch(pAddress, sizeof(void*));
+			if (!Patch.Change(PAGE_READWRITE)) {
 				return false;
 			}
 
 			m_pOriginal = *pAddress;
 			*pAddress = pHookAddress;
 
-			pProtection->RestoreProtection();
-
-			g_Protections.emplace_hint(it, reinterpret_cast<void*>(pAddress), std::move(pProtection));
+			if (!Patch.Restore()) {
+				return false;
+			}
 
 			return true;
 		}
@@ -83424,26 +84073,17 @@ namespace Detours {
 
 			const auto& pAddress = &m_pVTable[m_unIndex];
 
-			const auto& it = g_Protection2s.find(reinterpret_cast<void*>(pAddress));
-			if (it == g_Protection2s.end()) {
-				return false;
-			}
-
-			const auto& pProtection2 = it->second;
-			if (!pProtection2) {
-				return false;
-			}
-
-			if (!pProtection2->ChangeProtection2(PAGE_READWRITE)) {
+			Protection Patch(pAddress, sizeof(void*));
+			if (!Patch.Change(PAGE_READWRITE)) {
 				return false;
 			}
 
 			*pAddress = m_pOriginal;
 			m_pOriginal = nullptr;
 
-			pProtection2->RestoreProtection2();
-
-			g_Protection2s.erase(it);
+			if (!Patch.Restore()) {
+				return false;
+			}
 
 			return true;
 		}
@@ -83639,13 +84279,13 @@ namespace Detours {
 				return false;
 			}
 
-			m_pTrampoline = g_HookStorage.Alloc(HOOK_INLINE_TRAMPOLINE_SIZE, m_pAddress);
+			m_pTrampoline = g_HookStorage.Alloc(HOOK_INLINE_TRAMPOLINE_SIZE, 1, alignof(void*), m_pAddress);
 			if (!m_pTrampoline) {
 				g_Suspender.Resume();
 				return false;
 			}
 
-			if (!Protection2(m_pTrampoline, HOOK_INLINE_TRAMPOLINE_SIZE, false).ChangeProtection2(PAGE_READWRITE)) {
+			if (!Protection(m_pTrampoline, HOOK_INLINE_TRAMPOLINE_SIZE, false).Change(PAGE_READWRITE)) {
 				g_HookStorage.DeAlloc(m_pTrampoline);
 				m_pTrampoline = nullptr;
 				g_Suspender.Resume();
@@ -83788,7 +84428,7 @@ namespace Detours {
 #endif
 			}
 
-			if (!Protection2(m_pTrampoline, HOOK_INLINE_TRAMPOLINE_SIZE, false).ChangeProtection2(PAGE_EXECUTE_READ)) {
+			if (!Protection(m_pTrampoline, HOOK_INLINE_TRAMPOLINE_SIZE, false).Change(PAGE_EXECUTE_READ)) {
 				g_HookStorage.DeAlloc(m_pTrampoline);
 				m_pTrampoline = nullptr;
 				g_Suspender.Resume();
@@ -83840,8 +84480,8 @@ namespace Detours {
 				}
 			}
 
-			Protection2 JumpToHookProtection2(m_pAddress, unCopyingSize, false);
-			if (!JumpToHookProtection2.ChangeProtection2(PAGE_EXECUTE_READWRITE)) {
+			Protection JumpToHookProtection(m_pAddress, unCopyingSize, false);
+			if (!JumpToHookProtection.Change(PAGE_EXECUTE_READWRITE)) {
 				m_pOriginalBytes = nullptr;
 				m_unOriginalBytes = 0;
 				g_HookStorage.DeAlloc(m_pTrampoline);
@@ -83900,7 +84540,7 @@ namespace Detours {
 #endif
 			}
 
-			if (!JumpToHookProtection2.RestoreProtection2()) {
+			if (!JumpToHookProtection.Restore()) {
 				m_pOriginalBytes = nullptr;
 				m_unOriginalBytes = 0;
 				g_HookStorage.DeAlloc(m_pTrampoline);
@@ -83964,15 +84604,15 @@ namespace Detours {
 				}
 			}
 
-			Protection2 HookProtection2(m_pAddress, m_unOriginalBytes, false);
-			if (!HookProtection2.ChangeProtection2(PAGE_EXECUTE_READWRITE)) {
+			Protection HookProtection(m_pAddress, m_unOriginalBytes, false);
+			if (!HookProtection.Change(PAGE_EXECUTE_READWRITE)) {
 				g_Suspender.Resume();
 				return false;
 			}
 
 			memcpy(m_pAddress, m_pOriginalBytes.get(), m_unOriginalBytes);
 
-			if (!HookProtection2.RestoreProtection2()) {
+			if (!HookProtection.Restore()) {
 				__debugbreak();
 				g_Suspender.Resume();
 				return false;
@@ -84059,13 +84699,13 @@ namespace Detours {
 				return false;
 			}
 
-			m_pWrapper = g_HookStorage.Alloc(HOOK_INLINE_WRAPPER_SIZE, m_pAddress);
+			m_pWrapper = g_HookStorage.Alloc(HOOK_INLINE_WRAPPER_SIZE, 1, alignof(void*), m_pAddress);
 			if (!m_pWrapper) {
 				g_Suspender.Resume();
 				return false;
 			}
 
-			if (!Protection2(m_pWrapper, HOOK_INLINE_WRAPPER_SIZE, false).ChangeProtection2(PAGE_READWRITE)) {
+			if (!Protection(m_pWrapper, HOOK_INLINE_WRAPPER_SIZE, false).Change(PAGE_READWRITE)) {
 				g_HookStorage.DeAlloc(m_pWrapper);
 				m_pWrapper = nullptr;
 				g_Suspender.Resume();
@@ -84164,7 +84804,7 @@ namespace Detours {
 				return false;
 			}
 
-			m_pTrampoline = g_HookStorage.Alloc(HOOK_INLINE_TRAMPOLINE_SIZE, m_pAddress);
+			m_pTrampoline = g_HookStorage.Alloc(HOOK_INLINE_TRAMPOLINE_SIZE, 1, alignof(void*), m_pAddress);
 			if (!m_pTrampoline) {
 				g_HookStorage.DeAlloc(m_pWrapper);
 				m_pWrapper = nullptr;
@@ -84172,7 +84812,7 @@ namespace Detours {
 				return false;
 			}
 
-			if (!Protection2(m_pTrampoline, HOOK_INLINE_TRAMPOLINE_SIZE, false).ChangeProtection2(PAGE_READWRITE)) {
+			if (!Protection(m_pTrampoline, HOOK_INLINE_TRAMPOLINE_SIZE, false).Change(PAGE_READWRITE)) {
 				g_HookStorage.DeAlloc(m_pTrampoline);
 				m_pTrampoline = nullptr;
 				g_HookStorage.DeAlloc(m_pWrapper);
@@ -84325,7 +84965,7 @@ namespace Detours {
 #endif
 			}
 
-			if (!Protection2(m_pTrampoline, HOOK_INLINE_TRAMPOLINE_SIZE, false).ChangeProtection2(PAGE_EXECUTE_READ)) {
+			if (!Protection(m_pTrampoline, HOOK_INLINE_TRAMPOLINE_SIZE, false).Change(PAGE_EXECUTE_READ)) {
 				g_HookStorage.DeAlloc(m_pTrampoline);
 				m_pTrampoline = nullptr;
 				g_HookStorage.DeAlloc(m_pWrapper);
@@ -84383,8 +85023,8 @@ namespace Detours {
 				}
 			}
 
-			Protection2 JumpToHookProtection2(m_pAddress, unCopyingSize, false);
-			if (!JumpToHookProtection2.ChangeProtection2(PAGE_EXECUTE_READWRITE)) {
+			Protection JumpToHookProtection(m_pAddress, unCopyingSize, false);
+			if (!JumpToHookProtection.Change(PAGE_EXECUTE_READWRITE)) {
 				m_pOriginalBytes = nullptr;
 				m_unOriginalBytes = 0;
 				g_HookStorage.DeAlloc(m_pTrampoline);
@@ -84445,7 +85085,7 @@ namespace Detours {
 #endif
 			}
 
-			if (!JumpToHookProtection2.RestoreProtection2()) {
+			if (!JumpToHookProtection.Restore()) {
 				m_pOriginalBytes = nullptr;
 				m_unOriginalBytes = 0;
 				g_HookStorage.DeAlloc(m_pTrampoline);
@@ -84524,15 +85164,15 @@ namespace Detours {
 				}
 			}
 
-			Protection2 HookProtection2(m_pAddress, m_unOriginalBytes, false);
-			if (!HookProtection2.ChangeProtection2(PAGE_EXECUTE_READWRITE)) {
+			Protection HookProtection(m_pAddress, m_unOriginalBytes, false);
+			if (!HookProtection.Change(PAGE_EXECUTE_READWRITE)) {
 				g_Suspender.Resume();
 				return false;
 			}
 
 			memcpy(m_pAddress, m_pOriginalBytes.get(), m_unOriginalBytes);
 
-			if (!HookProtection2.RestoreProtection2()) {
+			if (!HookProtection.Restore()) {
 				__debugbreak();
 				g_Suspender.Resume();
 				return false;
@@ -84625,13 +85265,13 @@ namespace Detours {
 				return false;
 			}
 
-			m_pWrapper = g_HookStorage.Alloc(HOOK_RAW_WRAPPER_SIZE, m_pAddress);
+			m_pWrapper = g_HookStorage.Alloc(HOOK_RAW_WRAPPER_SIZE, 1, alignof(void*), m_pAddress);
 			if (!m_pWrapper) {
 				g_Suspender.Resume();
 				return false;
 			}
 
-			if (!Protection2(m_pWrapper, HOOK_RAW_WRAPPER_SIZE, false).ChangeProtection2(PAGE_READWRITE)) {
+			if (!Protection(m_pWrapper, HOOK_RAW_WRAPPER_SIZE, false).Change(PAGE_READWRITE)) {
 				g_HookStorage.DeAlloc(m_pWrapper);
 				m_pWrapper = nullptr;
 				g_Suspender.Resume();
@@ -85673,7 +86313,7 @@ namespace Detours {
 				unCopyingSize += ins.Length;
 			}
 
-			m_pTrampoline = g_HookStorage.Alloc(HOOK_RAW_TRAMPOLINE_SIZE, m_pAddress);
+			m_pTrampoline = g_HookStorage.Alloc(HOOK_RAW_TRAMPOLINE_SIZE, 1, alignof(void*), m_pAddress);
 			if (!m_pTrampoline) {
 				m_unFirstInstructionSize = 0;
 				g_HookStorage.DeAlloc(m_pWrapper);
@@ -85682,7 +86322,7 @@ namespace Detours {
 				return false;
 			}
 
-			if (!Protection2(m_pTrampoline, HOOK_RAW_TRAMPOLINE_SIZE, false).ChangeProtection2(PAGE_READWRITE)) {
+			if (!Protection(m_pTrampoline, HOOK_RAW_TRAMPOLINE_SIZE, false).Change(PAGE_READWRITE)) {
 				g_HookStorage.DeAlloc(m_pTrampoline);
 				m_pTrampoline = nullptr;
 				m_unFirstInstructionSize = 0;
@@ -85768,7 +86408,7 @@ namespace Detours {
 #endif
 			}
 
-			if (!Protection2(m_pWrapper, HOOK_RAW_WRAPPER_SIZE, false).ChangeProtection2(PAGE_EXECUTE_READ)) {
+			if (!Protection(m_pWrapper, HOOK_RAW_WRAPPER_SIZE, false).Change(PAGE_EXECUTE_READ)) {
 				g_HookStorage.DeAlloc(m_pTrampoline);
 				m_pTrampoline = nullptr;
 				m_unFirstInstructionSize = 0;
@@ -85778,7 +86418,7 @@ namespace Detours {
 				return false;
 			}
 
-			if (!Protection2(m_pTrampoline, HOOK_RAW_TRAMPOLINE_SIZE, false).ChangeProtection2(PAGE_READWRITE)) {
+			if (!Protection(m_pTrampoline, HOOK_RAW_TRAMPOLINE_SIZE, false).Change(PAGE_READWRITE)) {
 				g_HookStorage.DeAlloc(m_pTrampoline);
 				m_pTrampoline = nullptr;
 				m_unFirstInstructionSize = 0;
@@ -85928,7 +86568,7 @@ namespace Detours {
 #endif
 			}
 
-			if (!Protection2(m_pTrampoline, HOOK_RAW_TRAMPOLINE_SIZE, false).ChangeProtection2(PAGE_EXECUTE_READ)) {
+			if (!Protection(m_pTrampoline, HOOK_RAW_TRAMPOLINE_SIZE, false).Change(PAGE_EXECUTE_READ)) {
 				g_HookStorage.DeAlloc(m_pTrampoline);
 				m_pTrampoline = nullptr;
 				m_unFirstInstructionSize = 0;
@@ -85988,8 +86628,8 @@ namespace Detours {
 				}
 			}
 
-			Protection2 JumpToHookProtection2(m_pAddress, unCopyingSize, false);
-			if (!JumpToHookProtection2.ChangeProtection2(PAGE_EXECUTE_READWRITE)) {
+			Protection JumpToHookProtection(m_pAddress, unCopyingSize, false);
+			if (!JumpToHookProtection.Change(PAGE_EXECUTE_READWRITE)) {
 				m_pOriginalBytes = nullptr;
 				m_unOriginalBytes = 0;
 				g_HookStorage.DeAlloc(m_pTrampoline);
@@ -86053,7 +86693,7 @@ namespace Detours {
 #endif
 			}
 
-			if (!JumpToHookProtection2.RestoreProtection2()) {
+			if (!JumpToHookProtection.Restore()) {
 				m_pOriginalBytes = nullptr;
 				m_unOriginalBytes = 0;
 				g_HookStorage.DeAlloc(m_pTrampoline);
@@ -86133,15 +86773,15 @@ namespace Detours {
 				}
 			}
 
-			Protection2 HookProtection2(m_pAddress, m_unOriginalBytes, false);
-			if (!HookProtection2.ChangeProtection2(PAGE_EXECUTE_READWRITE)) {
+			Protection HookProtection(m_pAddress, m_unOriginalBytes, false);
+			if (!HookProtection.Change(PAGE_EXECUTE_READWRITE)) {
 				g_Suspender.Resume();
 				return false;
 			}
 
 			memcpy(m_pAddress, m_pOriginalBytes.get(), m_unOriginalBytes);
 
-			if (!HookProtection2.RestoreProtection2()) {
+			if (!HookProtection.Restore()) {
 				__debugbreak();
 				g_Suspender.Resume();
 				return false;
