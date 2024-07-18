@@ -5960,16 +5960,16 @@ namespace Detours {
 				return;
 			}
 
-			if (!GetProtection(&m_unOriginalProtection)) {
-				return;
-			}
-
 			m_unRegionCapacity = ri.m_unSize;
 			m_pRegionAddress = pBaseAddress;
 			
 			auto vecPages = __get_pages_info(pBaseAddress, ri.m_unSize);
 			for (auto& PageInfo : vecPages) {
 				m_Pages.emplace_back(PageInfo.m_pBaseAddress, false);
+			}
+
+			if (!GetProtection(&m_unOriginalProtection)) {
+				return;
 			}
 		}
 
@@ -6574,7 +6574,7 @@ namespace Detours {
 			if (!vecRegions.empty() && (vecRegions.size() > 1)) {
 				m_bUseRegions = true;
 				for (auto& Region : vecRegions) {
-					m_Regions.emplace_back(Region.m_pBaseAddress, true);
+					m_Regions.emplace_back(Region.m_pBaseAddress, false);
 				}
 
 				return;
@@ -6590,7 +6590,7 @@ namespace Detours {
 
 			if (m_bUseRegions) {
 				for (auto& Region : vecRegions) {
-					m_Regions.emplace_back(Region.m_pBaseAddress, true);
+					m_Regions.emplace_back(Region.m_pBaseAddress, false);
 				}
 
 				return;
