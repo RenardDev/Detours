@@ -154,6 +154,14 @@
     <CodeNext>17733</CodeNext>
   </Detours>
   <Detours>
+    <FileName>Detours.cpp</FileName>
+    <ErrorCode>V801</ErrorCode>
+    <Message>Decreased performance. It is better to redefine the second function argument as a reference. Consider replacing 'const .. pmd' with 'const .. &amp;pmd'.</Message>
+    <CodePrev>0</CodePrev>
+    <CodeCurrent>564295918</CodeCurrent>
+    <CodeNext>49736095</CodeNext>
+  </Detours>
+  <Detours>
     <FileName>Detours.h</FileName>
     <ErrorCode>V1071</ErrorCode>
     <Message>Consider inspecting the 'ChangeProtection' function. The return value is not always used. Total calls: _, discarded results: _.</Message>
@@ -488,6 +496,14 @@
     <CodePrev>5886</CodePrev>
     <CodeCurrent>807119500</CodeCurrent>
     <CodeNext>100</CodeNext>
+  </Detours>
+  <Detours>
+    <FileName>main.cpp</FileName>
+    <ErrorCode>V1004</ErrorCode>
+    <Message>The pointer was used unsafely after it was verified against nullptr. Check lines: _, _.</Message>
+    <CodePrev>13296</CodePrev>
+    <CodeCurrent>807250508</CodeCurrent>
+    <CodeNext>5886</CodeNext>
   </Detours>
   <Detours>
     <FileName>main.cpp</FileName>
