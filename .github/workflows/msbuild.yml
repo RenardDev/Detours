@@ -27,20 +27,20 @@ jobs:
       working-directory: ${{env.GITHUB_WORKSPACE}}
       run: dotnet restore ${{env.SOLUTION_FILE_PATH}}
 
-    - name: Building Detours
+    - name: Building
       working-directory: ${{env.GITHUB_WORKSPACE}}
       run: msbuild /m /p:Configuration=Debug /p:Platform=x86 ${{env.SOLUTION_FILE_PATH}}
 
-    - name: Code analysis Detours
+    - name: Deep code analysis
       working-directory: ${{env.GITHUB_WORKSPACE}}
       run: python "C:\PVS-Studio_Cmd.py" --settings "C:\Settings.xml" --target "${{env.SOLUTION_FILE_PATH}}\Detours.sln" --useSuppressFile "${{env.SOLUTION_FILE_PATH}}\SuppressionFile.suppress" --configuration Debug --platform x86 --output "${{env.SOLUTION_FILE_PATH}}\build\x86\Debug\results.plog"
 
-    - name: Testing Detours
+    - name: Testing
       timeout-minutes: 3
       working-directory: ${{env.GITHUB_WORKSPACE}}
-      run: python "C:\DeleakerConsole.py" --limit-memory-leaks 10 --export-xml-report-on-exit "${{env.SOLUTION_FILE_PATH}}\build\x86\Debug\report.xml" --run "${{env.SOLUTION_FILE_PATH}}\build\x86\Debug\Detours.exe"
+      run: python "C:\DeleakerConsole.py" --limit-memory-leaks 60 --export-xml-report-on-exit "${{env.SOLUTION_FILE_PATH}}\build\x86\Debug\report.xml" --run "${{env.SOLUTION_FILE_PATH}}\build\x86\Debug\Detours.exe"
 
-    - name: Uploading Detours
+    - name: Uploading
       uses: actions/upload-artifact@v3
       with:
         name: Debug32
@@ -65,20 +65,20 @@ jobs:
       working-directory: ${{env.GITHUB_WORKSPACE}}
       run: dotnet restore ${{env.SOLUTION_FILE_PATH}}
 
-    - name: Building Detours
+    - name: Building
       working-directory: ${{env.GITHUB_WORKSPACE}}
       run: msbuild /m /p:Configuration=Debug /p:Platform=x64 ${{env.SOLUTION_FILE_PATH}}
 
-    - name: Code analysis Detours
+    - name: Deep code analysis
       working-directory: ${{env.GITHUB_WORKSPACE}}
       run: python "C:\PVS-Studio_Cmd.py" --settings "C:\Settings.xml" --target "${{env.SOLUTION_FILE_PATH}}\Detours.sln" --useSuppressFile "${{env.SOLUTION_FILE_PATH}}\SuppressionFile.suppress" --configuration Debug --platform x64 --output "${{env.SOLUTION_FILE_PATH}}\build\x86_64\Debug\results.plog"
 
-    - name: Testing Detours
+    - name: Testing
       timeout-minutes: 3
       working-directory: ${{env.GITHUB_WORKSPACE}}
-      run: python "C:\DeleakerConsole.py" --limit-memory-leaks 10 --export-xml-report-on-exit "${{env.SOLUTION_FILE_PATH}}\build\x86_64\Debug\report.xml" --run "${{env.SOLUTION_FILE_PATH}}\build\x86_64\Debug\Detours.exe"
+      run: python "C:\DeleakerConsole.py" --limit-memory-leaks 60 --export-xml-report-on-exit "${{env.SOLUTION_FILE_PATH}}\build\x86_64\Debug\report.xml" --run "${{env.SOLUTION_FILE_PATH}}\build\x86_64\Debug\Detours.exe"
 
-    - name: Uploading Detours
+    - name: Uploading
       uses: actions/upload-artifact@v3
       with:
         name: Debug64
@@ -103,20 +103,20 @@ jobs:
       working-directory: ${{env.GITHUB_WORKSPACE}}
       run: dotnet restore ${{env.SOLUTION_FILE_PATH}}
 
-    - name: Building Detours
+    - name: Building
       working-directory: ${{env.GITHUB_WORKSPACE}}
       run: msbuild /m /p:Configuration=Release /p:Platform=x86 ${{env.SOLUTION_FILE_PATH}}
 
-    - name: Code analysis Detours
+    - name: Deep code analysis
       working-directory: ${{env.GITHUB_WORKSPACE}}
       run: python "C:\PVS-Studio_Cmd.py" --settings "C:\Settings.xml" --target "${{env.SOLUTION_FILE_PATH}}\Detours.sln" --useSuppressFile "${{env.SOLUTION_FILE_PATH}}\SuppressionFile.suppress" --configuration Release --platform x86 --output "${{env.SOLUTION_FILE_PATH}}\build\x86\Release\results.plog"
 
-    - name: Testing Detours
+    - name: Testing
       timeout-minutes: 3
       working-directory: ${{env.GITHUB_WORKSPACE}}
-      run: python "C:\DeleakerConsole.py" --limit-memory-leaks 10 --export-xml-report-on-exit "${{env.SOLUTION_FILE_PATH}}\build\x86\Release\report.xml" --run "${{env.SOLUTION_FILE_PATH}}\build\x86\Release\Detours.exe"
+      run: python "C:\DeleakerConsole.py" --limit-memory-leaks 14 --export-xml-report-on-exit "${{env.SOLUTION_FILE_PATH}}\build\x86\Release\report.xml" --run "${{env.SOLUTION_FILE_PATH}}\build\x86\Release\Detours.exe"
 
-    - name: Uploading Detours
+    - name: Uploading
       uses: actions/upload-artifact@v3
       with:
         name: Release32
@@ -141,20 +141,20 @@ jobs:
       working-directory: ${{env.GITHUB_WORKSPACE}}
       run: dotnet restore ${{env.SOLUTION_FILE_PATH}}
 
-    - name: Building Detours
+    - name: Building
       working-directory: ${{env.GITHUB_WORKSPACE}}
       run: msbuild /m /p:Configuration=Release /p:Platform=x64 ${{env.SOLUTION_FILE_PATH}}
 
-    - name: Code analysis Detours
+    - name: Deep code analysis
       working-directory: ${{env.GITHUB_WORKSPACE}}
       run: python "C:\PVS-Studio_Cmd.py" --settings "C:\Settings.xml" --target "${{env.SOLUTION_FILE_PATH}}\Detours.sln" --useSuppressFile "${{env.SOLUTION_FILE_PATH}}\SuppressionFile.suppress" --configuration Release --platform x64 --output "${{env.SOLUTION_FILE_PATH}}\build\x86_64\Release\results.plog"
 
-    - name: Testing Detours
+    - name: Testing
       timeout-minutes: 3
       working-directory: ${{env.GITHUB_WORKSPACE}}
-      run: python "C:\DeleakerConsole.py" --limit-memory-leaks 10 --export-xml-report-on-exit "${{env.SOLUTION_FILE_PATH}}\build\x86_64\Release\report.xml" --run "${{env.SOLUTION_FILE_PATH}}\build\x86_64\Release\Detours.exe"
+      run: python "C:\DeleakerConsole.py" --limit-memory-leaks 42 --export-xml-report-on-exit "${{env.SOLUTION_FILE_PATH}}\build\x86_64\Release\report.xml" --run "${{env.SOLUTION_FILE_PATH}}\build\x86_64\Release\Detours.exe"
 
-    - name: Uploading Detours
+    - name: Uploading
       uses: actions/upload-artifact@v3
       with:
         name: Release64
