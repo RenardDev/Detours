@@ -43,7 +43,7 @@ jobs:
     - name: Testing Detours
       timeout-minutes: 3
       working-directory: ${{env.GITHUB_WORKSPACE}}
-      run: ${{env.SOLUTION_FILE_PATH}}\build\x86\Debug\Detours.exe -s
+      run: ${{env.SOLUTION_FILE_PATH}}\build\x86\Debug\Detours.exe
 
   build-debug-x86_64:
     name: Build Debug (x86_64)
@@ -75,7 +75,7 @@ jobs:
     - name: Testing Detours
       timeout-minutes: 3
       working-directory: ${{env.GITHUB_WORKSPACE}}
-      run: ${{env.SOLUTION_FILE_PATH}}\build\x86_64\Debug\Detours.exe -s
+      run: ${{env.SOLUTION_FILE_PATH}}\build\x86_64\Debug\Detours.exe
 
   build-release-x86:
     name: Build Release (x86)
@@ -107,7 +107,7 @@ jobs:
     - name: Testing Detours
       timeout-minutes: 3
       working-directory: ${{env.GITHUB_WORKSPACE}}
-      run: ${{env.SOLUTION_FILE_PATH}}\build\x86\Release\Detours.exe -s
+      run: ${{env.SOLUTION_FILE_PATH}}\build\x86\Release\Detours.exe
 
   build-release-x86_64:
     name: Build Release (x86_64)
@@ -139,4 +139,4 @@ jobs:
     - name: Testing Detours
       timeout-minutes: 3
       working-directory: ${{env.GITHUB_WORKSPACE}}
-      run: ${{env.SOLUTION_FILE_PATH}}\build\x86_64\Release\Detours.exe -s
+      run: ${{env.SOLUTION_FILE_PATH}}\build\x86_64\Release\Detours.exe
