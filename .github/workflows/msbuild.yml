@@ -27,27 +27,29 @@ jobs:
       working-directory: ${{env.GITHUB_WORKSPACE}}
       run: dotnet restore ${{env.SOLUTION_FILE_PATH}}
 
-    - name: Code analysis Detours
-      working-directory: ${{env.GITHUB_WORKSPACE}}
-      run: PVS-Studio_Cmd.exe --target "${{env.SOLUTION_FILE_PATH}}\Detours.sln" --platform x86 --output "${{env.SOLUTION_FILE_PATH}}\build\x86\Debug\results.plog" --configuration Debug
-
     - name: Building Detours
       working-directory: ${{env.GITHUB_WORKSPACE}}
       run: msbuild /m /p:Configuration=Debug /p:Platform=x86 ${{env.SOLUTION_FILE_PATH}}
 
-    - name: Uploading Detours
-      uses: actions/upload-artifact@v3
-      with:
-        name: Debug_x86
-        path: |
-          ${{env.SOLUTION_FILE_PATH}}\build\x86\Debug\*.exe
-          ${{env.SOLUTION_FILE_PATH}}\build\x86\Debug\*.pdb
-        if-no-files-found: error
+    - name: Code analysis Detours
+      working-directory: ${{env.GITHUB_WORKSPACE}}
+      run: PVS-Studio_Cmd.exe --target "${{env.SOLUTION_FILE_PATH}}\Detours.sln" --platform x86 --output "${{env.SOLUTION_FILE_PATH}}\build\x86\Debug\results.plog" --configuration Debug
 
     - name: Testing Detours
       timeout-minutes: 3
       working-directory: ${{env.GITHUB_WORKSPACE}}
       run: DeleakerConsole.exe --export-xml-report-on-exit "${{env.SOLUTION_FILE_PATH}}\build\x86\Debug\report.xml" --run "${{env.SOLUTION_FILE_PATH}}\build\x86\Debug\Detours.exe"
+
+    - name: Uploading Detours
+      uses: actions/upload-artifact@v3
+      with:
+        name: Debug32
+        path: |
+          ${{env.SOLUTION_FILE_PATH}}\build\x86\Debug\*.exe
+          ${{env.SOLUTION_FILE_PATH}}\build\x86\Debug\*.pdb
+          ${{env.SOLUTION_FILE_PATH}}\build\x86\Debug\*.plog
+          ${{env.SOLUTION_FILE_PATH}}\build\x86\Debug\*.xml
+        if-no-files-found: error
 
   build-debug-x86_64:
     name: Build Debug (x86_64)
@@ -63,13 +65,13 @@ jobs:
       working-directory: ${{env.GITHUB_WORKSPACE}}
       run: dotnet restore ${{env.SOLUTION_FILE_PATH}}
 
-    - name: Code analysis Detours
-      working-directory: ${{env.GITHUB_WORKSPACE}}
-      run: PVS-Studio_Cmd.exe --target "${{env.SOLUTION_FILE_PATH}}\Detours.sln" --platform x64 --output "${{env.SOLUTION_FILE_PATH}}\build\x86_64\Debug\results.plog" --configuration Debug
-
     - name: Building Detours
       working-directory: ${{env.GITHUB_WORKSPACE}}
       run: msbuild /m /p:Configuration=Debug /p:Platform=x64 ${{env.SOLUTION_FILE_PATH}}
+
+    - name: Code analysis Detours
+      working-directory: ${{env.GITHUB_WORKSPACE}}
+      run: PVS-Studio_Cmd.exe --target "${{env.SOLUTION_FILE_PATH}}\Detours.sln" --platform x64 --output "${{env.SOLUTION_FILE_PATH}}\build\x86_64\Debug\results.plog" --configuration Debug
 
     - name: Testing Detours
       timeout-minutes: 3
@@ -79,12 +81,12 @@ jobs:
     - name: Uploading Detours
       uses: actions/upload-artifact@v3
       with:
-        name: Debug_x86_64
+        name: Debug64
         path: |
           ${{env.SOLUTION_FILE_PATH}}\build\x86_64\Debug\*.exe
           ${{env.SOLUTION_FILE_PATH}}\build\x86_64\Debug\*.pdb
-          ${{env.SOLUTION_FILE_PATH}}\build\x86_64\Debug\*.xml
           ${{env.SOLUTION_FILE_PATH}}\build\x86_64\Debug\*.plog
+          ${{env.SOLUTION_FILE_PATH}}\build\x86_64\Debug\*.xml
         if-no-files-found: error
 
   build-release-x86:
@@ -101,13 +103,13 @@ jobs:
       working-directory: ${{env.GITHUB_WORKSPACE}}
       run: dotnet restore ${{env.SOLUTION_FILE_PATH}}
 
-    - name: Code analysis Detours
-      working-directory: ${{env.GITHUB_WORKSPACE}}
-      run: PVS-Studio_Cmd.exe --target "${{env.SOLUTION_FILE_PATH}}\Detours.sln" --platform x86 --output "${{env.SOLUTION_FILE_PATH}}\build\x86\Release\results.plog" --configuration Release
-
     - name: Building Detours
       working-directory: ${{env.GITHUB_WORKSPACE}}
       run: msbuild /m /p:Configuration=Release /p:Platform=x86 ${{env.SOLUTION_FILE_PATH}}
+
+    - name: Code analysis Detours
+      working-directory: ${{env.GITHUB_WORKSPACE}}
+      run: PVS-Studio_Cmd.exe --target "${{env.SOLUTION_FILE_PATH}}\Detours.sln" --platform x86 --output "${{env.SOLUTION_FILE_PATH}}\build\x86\Release\results.plog" --configuration Release
 
     - name: Testing Detours
       timeout-minutes: 3
@@ -117,12 +119,12 @@ jobs:
     - name: Uploading Detours
       uses: actions/upload-artifact@v3
       with:
-        name: Release_x86
+        name: Release32
         path: |
           ${{env.SOLUTION_FILE_PATH}}\build\x86\Release\*.exe
           ${{env.SOLUTION_FILE_PATH}}\build\x86\Release\*.pdb
-          ${{env.SOLUTION_FILE_PATH}}\build\x86\Release\*.xml
           ${{env.SOLUTION_FILE_PATH}}\build\x86\Release\*.plog
+          ${{env.SOLUTION_FILE_PATH}}\build\x86\Release\*.xml
         if-no-files-found: error
 
   build-release-x86_64:
@@ -139,13 +141,13 @@ jobs:
       working-directory: ${{env.GITHUB_WORKSPACE}}
       run: dotnet restore ${{env.SOLUTION_FILE_PATH}}
 
-    - name: Code analysis Detours
-      working-directory: ${{env.GITHUB_WORKSPACE}}
-      run: PVS-Studio_Cmd.exe --target "${{env.SOLUTION_FILE_PATH}}\Detours.sln" --platform x64 --output "${{env.SOLUTION_FILE_PATH}}\build\x86_64\Release\results.plog" --configuration Release
-
     - name: Building Detours
       working-directory: ${{env.GITHUB_WORKSPACE}}
       run: msbuild /m /p:Configuration=Release /p:Platform=x64 ${{env.SOLUTION_FILE_PATH}}
+
+    - name: Code analysis Detours
+      working-directory: ${{env.GITHUB_WORKSPACE}}
+      run: PVS-Studio_Cmd.exe --target "${{env.SOLUTION_FILE_PATH}}\Detours.sln" --platform x64 --output "${{env.SOLUTION_FILE_PATH}}\build\x86_64\Release\results.plog" --configuration Release
 
     - name: Testing Detours
       timeout-minutes: 3
@@ -155,10 +157,10 @@ jobs:
     - name: Uploading Detours
       uses: actions/upload-artifact@v3
       with:
-        name: Release_x86_64
+        name: Release64
         path: |
           ${{env.SOLUTION_FILE_PATH}}\build\x86_64\Release\*.exe
           ${{env.SOLUTION_FILE_PATH}}\build\x86_64\Release\*.pdb
-          ${{env.SOLUTION_FILE_PATH}}\build\x86_64\Release\*.xml
           ${{env.SOLUTION_FILE_PATH}}\build\x86_64\Release\*.plog
+          ${{env.SOLUTION_FILE_PATH}}\build\x86_64\Release\*.xml
         if-no-files-found: error
