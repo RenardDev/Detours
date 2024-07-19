@@ -129,9 +129,9 @@ DWORD GetUBR() {
 TEST_SUITE("Detours::KUserSharedData") {
 	TEST_CASE("SystemTime") {
 		const ULONG unLowPartTime = Detours::KUserSharedData.SystemTime.LowPart;
-		Sleep(1000);
-		const ULONG unElapsedTime = (Detours::KUserSharedData.SystemTime.LowPart - unLowPartTime + 500000) / 1000000;
-		CHECK(unElapsedTime == 10);
+		Sleep(5250);
+		const ULONG unElapsedTime = (Detours::KUserSharedData.SystemTime.LowPart - unLowPartTime) / 1000000;
+		CHECK(unElapsedTime == 5);
 	}
 
 	TEST_CASE("Cookie") {
