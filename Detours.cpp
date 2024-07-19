@@ -983,7 +983,7 @@ namespace Detours {
 				}
 
 				const auto& pPI = reinterpret_cast<PIMAGE_POGO_INFO>(reinterpret_cast<char*>(hModule) + pDebugDirectory[i].AddressOfRawData);
-				if ((pPI->m_unSignature != 0x4C544347) && (pPI->m_unSignature != 0x50475500)) {
+				if (pPI->m_unSignature != 0x4C544347) {
 					continue;
 				}
 
@@ -995,9 +995,15 @@ namespace Detours {
 					}
 
 					size_t unBlockSize = sizeof(DWORD) * 2 + unNameLength + 1;
+#ifdef _M_X64
+					if (unBlockSize & 7) {
+						unBlockSize += (8 - (unBlockSize & 7));
+					}
+#elif _M_IX86
 					if (unBlockSize & 3) {
 						unBlockSize += (4 - (unBlockSize & 3));
 					}
+#endif
 
 					if (strncmp(szSectionName, pBlock->m_pName, 0x7FF) == 0) {
 						if (pAddress) {
