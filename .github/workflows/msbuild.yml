@@ -41,9 +41,9 @@ jobs:
         if-no-files-found: error
 
     - name: Testing Detours
-      timeout-minutes: 10
+      timeout-minutes: 3
       working-directory: ${{env.GITHUB_WORKSPACE}}
-      run: ${{env.SOLUTION_FILE_PATH}}\build\x86\Debug\Detours.exe
+      run: ${{env.SOLUTION_FILE_PATH}}\build\x86\Debug\Detours.exe -s
 
   build-debug-x86_64:
     name: Build Debug (x86_64)
@@ -73,9 +73,9 @@ jobs:
         if-no-files-found: error
 
     - name: Testing Detours
-      timeout-minutes: 10
+      timeout-minutes: 3
       working-directory: ${{env.GITHUB_WORKSPACE}}
-      run: ${{env.SOLUTION_FILE_PATH}}\build\x86_64\Debug\Detours.exe
+      run: ${{env.SOLUTION_FILE_PATH}}\build\x86_64\Debug\Detours.exe -s
 
   build-release-x86:
     name: Build Release (x86)
@@ -105,9 +105,9 @@ jobs:
         if-no-files-found: error
 
     - name: Testing Detours
-      timeout-minutes: 10
+      timeout-minutes: 3
       working-directory: ${{env.GITHUB_WORKSPACE}}
-      run: ${{env.SOLUTION_FILE_PATH}}\build\x86\Release\Detours.exe
+      run: ${{env.SOLUTION_FILE_PATH}}\build\x86\Release\Detours.exe -s
 
   build-release-x86_64:
     name: Build Release (x86_64)
@@ -137,6 +137,6 @@ jobs:
         if-no-files-found: error
 
     - name: Testing Detours
-      timeout-minutes: 10
+      timeout-minutes: 3
       working-directory: ${{env.GITHUB_WORKSPACE}}
-      run: ${{env.SOLUTION_FILE_PATH}}\build\x86_64\Release\Detours.exe
+      run: ${{env.SOLUTION_FILE_PATH}}\build\x86_64\Release\Detours.exe -s
