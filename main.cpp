@@ -130,7 +130,7 @@ TEST_SUITE("Detours::KUserSharedData") {
 	TEST_CASE("SystemTime") {
 		const ULONG unLowPartTime = Detours::KUserSharedData.SystemTime.LowPart;
 		Sleep(5250);
-		const ULONG unElapsedTime = (Detours::KUserSharedData.SystemTime.LowPart - unLowPartTime) / 1000000;
+		const ULONG unElapsedTime = (Detours::KUserSharedData.SystemTime.LowPart - unLowPartTime) / 10000000;
 		CHECK(unElapsedTime == 5);
 	}
 
