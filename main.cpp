@@ -315,7 +315,7 @@ TEST_SUITE("Detours::Scan") {
 	}
 
 	TEST_CASE("FindSignature") {
-		CHECK(Detours::Scan::FindSignature(GetModuleHandle(nullptr), { '.', 't', 'e', 'x', 't', 0, 0, 0 }, "\xDE\xED\xBE\xEF", '\x2A', 0) != nullptr);
+		CHECK(Detours::Scan::FindSignature(GetModuleHandle(nullptr), { '.', 'r', 'd', 'a', 't', 'a', 0, 0 }, "\xDE\xED\xBE\xEF", '\x2A', 0) != nullptr);
 
 		int cpuinfo[4];
 		__cpuid(cpuinfo, 1);
