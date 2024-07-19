@@ -299,7 +299,7 @@ TEST_SUITE("Detours::Scan") {
 	TEST_CASE("FindSectionPOGO") {
 		void* pSection = nullptr;
 		size_t unSectionSize = 0;
-		CHECK(Detours::Scan::FindSectionPOGO(GetModuleHandle(nullptr), ".text", &pSection, &unSectionSize) == true);
+		CHECK(Detours::Scan::FindSectionPOGO(GetModuleHandle(nullptr), ".rdata", &pSection, &unSectionSize) == true);
 		CHECK(pSection != nullptr);
 		CHECK(unSectionSize != 0);
 	}
@@ -311,7 +311,7 @@ TEST_SUITE("Detours::Scan") {
 		CHECK(hModule != nullptr);
 		ULONG unBegin = Detours::KUserSharedData.SystemTime.LowPart;
 		for (size_t i = 0; i < 10'000; ++i) {
-			if (!Detours::Scan::FindSectionPOGO(hModule, ".text", &pSection, &unSectionSize)) {
+			if (!Detours::Scan::FindSectionPOGO(hModule, ".rdata", &pSection, &unSectionSize)) {
 				FAIL("Fail in benckmark!");
 			}
 		}
