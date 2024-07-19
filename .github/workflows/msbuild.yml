@@ -33,7 +33,7 @@ jobs:
 
     - name: Code analysis Detours
       working-directory: ${{env.GITHUB_WORKSPACE}}
-      run: PVS-Studio_Cmd.exe --target "${{env.SOLUTION_FILE_PATH}}\Detours.sln" --platform x86 --output "${{env.SOLUTION_FILE_PATH}}\build\x86\Debug\results.plog" --configuration Debug
+      run: PVS-Studio_Cmd.exe --target "${{env.SOLUTION_FILE_PATH}}\Detours.sln" --useSuppressFile "${{env.SOLUTION_FILE_PATH}}\SuppressionFile.suppress" --configuration Debug --platform x86 --output "${{env.SOLUTION_FILE_PATH}}\build\x86\Debug\results.plog"
 
     - name: Testing Detours
       timeout-minutes: 3
@@ -71,7 +71,7 @@ jobs:
 
     - name: Code analysis Detours
       working-directory: ${{env.GITHUB_WORKSPACE}}
-      run: PVS-Studio_Cmd.exe --target "${{env.SOLUTION_FILE_PATH}}\Detours.sln" --platform x64 --output "${{env.SOLUTION_FILE_PATH}}\build\x86_64\Debug\results.plog" --configuration Debug
+      run: PVS-Studio_Cmd.exe --target "${{env.SOLUTION_FILE_PATH}}\Detours.sln" --useSuppressFile "${{env.SOLUTION_FILE_PATH}}\SuppressionFile.suppress" --configuration Debug --platform x64 --output "${{env.SOLUTION_FILE_PATH}}\build\x86_64\Debug\results.plog"
 
     - name: Testing Detours
       timeout-minutes: 3
@@ -109,7 +109,7 @@ jobs:
 
     - name: Code analysis Detours
       working-directory: ${{env.GITHUB_WORKSPACE}}
-      run: PVS-Studio_Cmd.exe --target "${{env.SOLUTION_FILE_PATH}}\Detours.sln" --platform x86 --output "${{env.SOLUTION_FILE_PATH}}\build\x86\Release\results.plog" --configuration Release
+      run: PVS-Studio_Cmd.exe --target "${{env.SOLUTION_FILE_PATH}}\Detours.sln" --useSuppressFile "${{env.SOLUTION_FILE_PATH}}\SuppressionFile.suppress" --configuration Release --platform x86 --output "${{env.SOLUTION_FILE_PATH}}\build\x86\Release\results.plog"
 
     - name: Testing Detours
       timeout-minutes: 3
@@ -147,7 +147,7 @@ jobs:
 
     - name: Code analysis Detours
       working-directory: ${{env.GITHUB_WORKSPACE}}
-      run: PVS-Studio_Cmd.exe --target "${{env.SOLUTION_FILE_PATH}}\Detours.sln" --platform x64 --output "${{env.SOLUTION_FILE_PATH}}\build\x86_64\Release\results.plog" --configuration Release
+      run: PVS-Studio_Cmd.exe --target "${{env.SOLUTION_FILE_PATH}}\Detours.sln" --useSuppressFile "${{env.SOLUTION_FILE_PATH}}\SuppressionFile.suppress" --configuration Release --platform x64 --output "${{env.SOLUTION_FILE_PATH}}\build\x86_64\Release\results.plog"
 
     - name: Testing Detours
       timeout-minutes: 3
