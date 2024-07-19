@@ -31,7 +31,7 @@ jobs:
       working-directory: ${{env.GITHUB_WORKSPACE}}
       run: msbuild /m /p:Configuration=Debug /p:Platform=x86 ${{env.SOLUTION_FILE_PATH}}
 
-    - name: Deep analysis
+    - name: Analysis
       working-directory: ${{env.GITHUB_WORKSPACE}}
       run: python "C:\PVS-Studio_Cmd.py" --settings "C:\Settings.xml" --target "${{env.SOLUTION_FILE_PATH}}\Detours.sln" --useSuppressFile "${{env.SOLUTION_FILE_PATH}}\SuppressionFile.suppress" --configuration Debug --platform x86 --output "${{env.SOLUTION_FILE_PATH}}\build\x86\Debug\results.plog"
 
@@ -74,7 +74,7 @@ jobs:
       working-directory: ${{env.GITHUB_WORKSPACE}}
       run: msbuild /m /p:Configuration=Debug /p:Platform=x64 ${{env.SOLUTION_FILE_PATH}}
 
-    - name: Deep analysis
+    - name: Analysis
       working-directory: ${{env.GITHUB_WORKSPACE}}
       run: python "C:\PVS-Studio_Cmd.py" --settings "C:\Settings.xml" --target "${{env.SOLUTION_FILE_PATH}}\Detours.sln" --useSuppressFile "${{env.SOLUTION_FILE_PATH}}\SuppressionFile.suppress" --configuration Debug --platform x64 --output "${{env.SOLUTION_FILE_PATH}}\build\x86_64\Debug\results.plog"
 
@@ -117,7 +117,7 @@ jobs:
       working-directory: ${{env.GITHUB_WORKSPACE}}
       run: msbuild /m /p:Configuration=Release /p:Platform=x86 ${{env.SOLUTION_FILE_PATH}}
 
-    - name: Deep analysis
+    - name: Analysis
       working-directory: ${{env.GITHUB_WORKSPACE}}
       run: python "C:\PVS-Studio_Cmd.py" --settings "C:\Settings.xml" --target "${{env.SOLUTION_FILE_PATH}}\Detours.sln" --useSuppressFile "${{env.SOLUTION_FILE_PATH}}\SuppressionFile.suppress" --configuration Release --platform x86 --output "${{env.SOLUTION_FILE_PATH}}\build\x86\Release\results.plog"
 
@@ -160,7 +160,7 @@ jobs:
       working-directory: ${{env.GITHUB_WORKSPACE}}
       run: msbuild /m /p:Configuration=Release /p:Platform=x64 ${{env.SOLUTION_FILE_PATH}}
 
-    - name: Deep analysis
+    - name: Analysis
       working-directory: ${{env.GITHUB_WORKSPACE}}
       run: python "C:\PVS-Studio_Cmd.py" --settings "C:\Settings.xml" --target "${{env.SOLUTION_FILE_PATH}}\Detours.sln" --useSuppressFile "${{env.SOLUTION_FILE_PATH}}\SuppressionFile.suppress" --configuration Release --platform x64 --output "${{env.SOLUTION_FILE_PATH}}\build\x86_64\Release\results.plog"
 
