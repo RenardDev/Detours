@@ -277,7 +277,7 @@ TEST_SUITE("Detours::Scan") {
 	TEST_CASE("FindSection") {
 		void* pSection = nullptr;
 		size_t unSectionSize = 0;
-		CHECK(Detours::Scan::FindSection(_T("kernelbase.dll"), { '.', 't', 'e', 'x', 't', 0, 0, 0 }, &pSection, &unSectionSize) == true);
+		CHECK(Detours::Scan::FindSection(GetModuleHandle(nullptr), {'.', 't', 'e', 'x', 't', 0, 0, 0}, &pSection, &unSectionSize) == true);
 		CHECK(pSection != nullptr);
 		CHECK(unSectionSize != 0);
 	}
@@ -285,9 +285,11 @@ TEST_SUITE("Detours::Scan") {
 	TEST_CASE("FindSection [benchmark]" * doctest::skip() * doctest::timeout(1)) {
 		void* pSection = nullptr;
 		size_t unSectionSize = 0;
+		HMODULE hModule = GetModuleHandle(nullptr);
+		CHECK(hModule != nullptr);
 		ULONG unBegin = Detours::KUserSharedData.SystemTime.LowPart;
 		for (size_t i = 0; i < 10'000; ++i) {
-			if (!Detours::Scan::FindSection(_T("kernelbase.dll"), { '.', 't', 'e', 'x', 't', 0, 0, 0 }, &pSection, &unSectionSize)) {
+			if (!Detours::Scan::FindSection(hModule, { '.', 't', 'e', 'x', 't', 0, 0, 0 }, &pSection, &unSectionSize)) {
 				FAIL("Fail in benckmark!");
 			}
 		}
@@ -297,7 +299,7 @@ TEST_SUITE("Detours::Scan") {
 	TEST_CASE("FindSectionPOGO") {
 		void* pSection = nullptr;
 		size_t unSectionSize = 0;
-		CHECK(Detours::Scan::FindSectionPOGO(_T("kernelbase.dll"), ".text", &pSection, &unSectionSize) == true);
+		CHECK(Detours::Scan::FindSectionPOGO(GetModuleHandle(nullptr), ".text", &pSection, &unSectionSize) == true);
 		CHECK(pSection != nullptr);
 		CHECK(unSectionSize != 0);
 	}
@@ -305,9 +307,11 @@ TEST_SUITE("Detours::Scan") {
 	TEST_CASE("FindSectionPOGO [benchmark]" * doctest::skip() * doctest::timeout(1)) {
 		void* pSection = nullptr;
 		size_t unSectionSize = 0;
+		HMODULE hModule = GetModuleHandle(nullptr);
+		CHECK(hModule != nullptr);
 		ULONG unBegin = Detours::KUserSharedData.SystemTime.LowPart;
 		for (size_t i = 0; i < 10'000; ++i) {
-			if (!Detours::Scan::FindSectionPOGO(_T("kernelbase.dll"), ".text", &pSection, &unSectionSize)) {
+			if (!Detours::Scan::FindSectionPOGO(hModule, ".text", &pSection, &unSectionSize)) {
 				FAIL("Fail in benckmark!");
 			}
 		}
@@ -618,7 +622,7 @@ TEST_SUITE("Detours::Scan") {
 	}
 
 	TEST_CASE("FindData") {
-		CHECK(Detours::Scan::FindData(GetModuleHandle(nullptr), reinterpret_cast<const unsigned char* const>("\xDE\xED\xBE\xEF"), 4) != nullptr);
+		CHECK(Detours::Scan::FindData(GetModuleHandle(nullptr), { '.', 'r', 'd', 'a', 't', 'a', 0, 0 }, reinterpret_cast<const unsigned char* const>("\xDE\xED\xBE\xEF"), 4) != nullptr);
 
 		int cpuinfo[4];
 		__cpuid(cpuinfo, 1);
