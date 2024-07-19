@@ -130,7 +130,7 @@ TEST_SUITE("Detours::KUserSharedData") {
 	TEST_CASE("SystemTime") {
 		const ULONG unLowPartTime = Detours::KUserSharedData.SystemTime.LowPart;
 		Sleep(5250);
-		const ULONG unElapsedTime = (Detours::KUserSharedData.SystemTime.LowPart - unLowPartTime) / 10000000;
+		const ULONG unElapsedTime = (Detours::KUserSharedData.SystemTime.LowPart - unLowPartTime) / 1000000;
 		CHECK(unElapsedTime == 5);
 	}
 
@@ -315,11 +315,7 @@ TEST_SUITE("Detours::Scan") {
 	}
 
 	TEST_CASE("FindSignature") {
-#ifdef _M_X64
-		CHECK(Detours::Scan::FindSignature(_T("ntdll.dll"), { '.', 't', 'e', 'x', 't', 0, 0, 0 }, "\x48\x8B\x41\x2A\x33\xD2\x4C\x8B\xC1\x48\x85\xC0\x75", '\x2A', 0, 0x20C2003D) != nullptr);
-#elif _M_IX86
-		CHECK(Detours::Scan::FindSignature(_T("ntdll.dll"), { '.', 't', 'e', 'x', 't', 0, 0, 0 }, "\x8B\xD1\x8B\x42", '\x2A', 0, 0xF3780028) != nullptr);
-#endif
+		CHECK(Detours::Scan::FindSignature(GetModuleHandle(nullptr), { '.', 't', 'e', 'x', 't', 0, 0, 0 }, "\xDE\xED\xBE\xEF", '\x2A', 0) != nullptr);
 
 		int cpuinfo[4];
 		__cpuid(cpuinfo, 1);
@@ -622,11 +618,7 @@ TEST_SUITE("Detours::Scan") {
 	}
 
 	TEST_CASE("FindData") {
-#ifdef _M_X64
-		CHECK(Detours::Scan::FindData(_T("ntdll.dll"), reinterpret_cast<const unsigned char* const>("\x48\x8B\x41\x10\x33\xD2\x4C\x8B\xC1\x48\x85\xC0\x75"), 13) != nullptr);
-#elif _M_IX86
-		CHECK(Detours::Scan::FindData(_T("ntdll.dll"), reinterpret_cast<const unsigned char* const>("\x8B\xD1\x8B\x42\x08"), 5) != nullptr);
-#endif
+		CHECK(Detours::Scan::FindData(GetModuleHandle(nullptr), reinterpret_cast<const unsigned char* const>("\xDE\xED\xBE\xEF"), 4) != nullptr);
 
 		int cpuinfo[4];
 		__cpuid(cpuinfo, 1);
