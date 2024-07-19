@@ -483,6 +483,14 @@
   </Detours>
   <Detours>
     <FileName>main.cpp</FileName>
+    <ErrorCode>V1004</ErrorCode>
+    <Message>The pointer was used unsafely after it was verified against nullptr. Check lines: _, _.</Message>
+    <CodePrev>5886</CodePrev>
+    <CodeCurrent>807119500</CodeCurrent>
+    <CodeNext>100</CodeNext>
+  </Detours>
+  <Detours>
+    <FileName>main.cpp</FileName>
     <ErrorCode>V1048</ErrorCode>
     <Message>The 'unBegin' variable was assigned the same value.</Message>
     <CodePrev>743129</CodePrev>

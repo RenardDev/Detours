@@ -3272,7 +3272,7 @@ namespace Detours {
 			return (pLeft == pRight) || !strncmp(pLeft->m_szName, pRight->m_szName, 0x1000);
 		}
 
-		static ptrdiff_t PMDtoOffset(void const* const pAddress, const RTTI_PMD pmd) {
+		static ptrdiff_t PMDtoOffset(void const* const pAddress, const RTTI_PMD& pmd) {
 			ptrdiff_t unRetOff = 0;
 
 			if (pmd.m_nPDisp >= 0) {
