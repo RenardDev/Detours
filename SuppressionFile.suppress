@@ -162,6 +162,14 @@
     <CodeNext>49736095</CodeNext>
   </Detours>
   <Detours>
+    <FileName>Detours.cpp</FileName>
+    <ErrorCode>V835</ErrorCode>
+    <Message>Passing cheap-to-copy argument by reference may lead to decreased performance. To avoid this, pass the second argument by value.</Message>
+    <CodePrev>0</CodePrev>
+    <CodeCurrent>1128594287</CodeCurrent>
+    <CodeNext>49736095</CodeNext>
+  </Detours>
+  <Detours>
     <FileName>Detours.h</FileName>
     <ErrorCode>V1071</ErrorCode>
     <Message>Consider inspecting the 'ChangeProtection' function. The return value is not always used. Total calls: _, discarded results: _.</Message>
