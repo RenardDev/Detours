@@ -38,7 +38,7 @@ jobs:
     - name: Testing Detours
       timeout-minutes: 3
       working-directory: ${{env.GITHUB_WORKSPACE}}
-      run: python "C:\DeleakerConsole.py" --export-xml-report-on-exit "${{env.SOLUTION_FILE_PATH}}\build\x86\Debug\report.xml" --run "${{env.SOLUTION_FILE_PATH}}\build\x86\Debug\Detours.exe"
+      run: python "C:\DeleakerConsole.py" --limit-memory-leaks 10 --export-xml-report-on-exit "${{env.SOLUTION_FILE_PATH}}\build\x86\Debug\report.xml" --run "${{env.SOLUTION_FILE_PATH}}\build\x86\Debug\Detours.exe"
 
     - name: Uploading Detours
       uses: actions/upload-artifact@v3
@@ -76,7 +76,7 @@ jobs:
     - name: Testing Detours
       timeout-minutes: 3
       working-directory: ${{env.GITHUB_WORKSPACE}}
-      run: python "C:\DeleakerConsole.py" --export-xml-report-on-exit "${{env.SOLUTION_FILE_PATH}}\build\x86_64\Debug\report.xml" --run "${{env.SOLUTION_FILE_PATH}}\build\x86_64\Debug\Detours.exe"
+      run: python "C:\DeleakerConsole.py" --limit-memory-leaks 10 --export-xml-report-on-exit "${{env.SOLUTION_FILE_PATH}}\build\x86_64\Debug\report.xml" --run "${{env.SOLUTION_FILE_PATH}}\build\x86_64\Debug\Detours.exe"
 
     - name: Uploading Detours
       uses: actions/upload-artifact@v3
@@ -114,7 +114,7 @@ jobs:
     - name: Testing Detours
       timeout-minutes: 3
       working-directory: ${{env.GITHUB_WORKSPACE}}
-      run: python "C:\DeleakerConsole.py" --export-xml-report-on-exit "${{env.SOLUTION_FILE_PATH}}\build\x86\Release\report.xml" --run "${{env.SOLUTION_FILE_PATH}}\build\x86\Release\Detours.exe"
+      run: python "C:\DeleakerConsole.py" --limit-memory-leaks 10 --export-xml-report-on-exit "${{env.SOLUTION_FILE_PATH}}\build\x86\Release\report.xml" --run "${{env.SOLUTION_FILE_PATH}}\build\x86\Release\Detours.exe"
 
     - name: Uploading Detours
       uses: actions/upload-artifact@v3
@@ -152,7 +152,7 @@ jobs:
     - name: Testing Detours
       timeout-minutes: 3
       working-directory: ${{env.GITHUB_WORKSPACE}}
-      run: python "C:\DeleakerConsole.py" --export-xml-report-on-exit "${{env.SOLUTION_FILE_PATH}}\build\x86_64\Release\report.xml" --run "${{env.SOLUTION_FILE_PATH}}\build\x86_64\Release\Detours.exe"
+      run: python "C:\DeleakerConsole.py" --limit-memory-leaks 10 --export-xml-report-on-exit "${{env.SOLUTION_FILE_PATH}}\build\x86_64\Release\report.xml" --run "${{env.SOLUTION_FILE_PATH}}\build\x86_64\Release\Detours.exe"
 
     - name: Uploading Detours
       uses: actions/upload-artifact@v3
