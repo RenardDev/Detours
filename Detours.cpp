@@ -5632,7 +5632,10 @@ namespace Detours {
 				}
 
 				if (m_bIsManualPage && m_bCommitted) {
+#pragma warning(push)
+#pragma warning(disable : 6250)
 					VirtualFree(m_pPageAddress, 0, MEM_DECOMMIT);
+#pragma warning(pop)
 				}
 
 				if (!m_bIsManualPage) {
@@ -84285,7 +84288,8 @@ namespace Detours {
 				return false;
 			}
 
-			if (!Protection(m_pTrampoline, HOOK_INLINE_TRAMPOLINE_SIZE, false).Change(PAGE_READWRITE)) {
+			Protection TrampolineProtection(m_pTrampoline, HOOK_INLINE_TRAMPOLINE_SIZE, false);
+			if (!TrampolineProtection.Change(PAGE_READWRITE)) {
 				g_HookStorage.DeAlloc(m_pTrampoline);
 				m_pTrampoline = nullptr;
 				g_Suspender.Resume();
@@ -84428,7 +84432,7 @@ namespace Detours {
 #endif
 			}
 
-			if (!Protection(m_pTrampoline, HOOK_INLINE_TRAMPOLINE_SIZE, false).Change(PAGE_EXECUTE_READ)) {
+			if (!TrampolineProtection.Change(PAGE_EXECUTE_READ)) {
 				g_HookStorage.DeAlloc(m_pTrampoline);
 				m_pTrampoline = nullptr;
 				g_Suspender.Resume();
@@ -84705,7 +84709,8 @@ namespace Detours {
 				return false;
 			}
 
-			if (!Protection(m_pWrapper, HOOK_INLINE_WRAPPER_SIZE, false).Change(PAGE_READWRITE)) {
+			Protection WrapperProtection(m_pWrapper, HOOK_INLINE_WRAPPER_SIZE, false);
+			if (!WrapperProtection.Change(PAGE_READWRITE)) {
 				g_HookStorage.DeAlloc(m_pWrapper);
 				m_pWrapper = nullptr;
 				g_Suspender.Resume();
@@ -84812,7 +84817,8 @@ namespace Detours {
 				return false;
 			}
 
-			if (!Protection(m_pTrampoline, HOOK_INLINE_TRAMPOLINE_SIZE, false).Change(PAGE_READWRITE)) {
+			Protection TrampolineProtection(m_pTrampoline, HOOK_INLINE_TRAMPOLINE_SIZE, false);
+			if (!TrampolineProtection.Change(PAGE_READWRITE)) {
 				g_HookStorage.DeAlloc(m_pTrampoline);
 				m_pTrampoline = nullptr;
 				g_HookStorage.DeAlloc(m_pWrapper);
@@ -84965,7 +84971,7 @@ namespace Detours {
 #endif
 			}
 
-			if (!Protection(m_pTrampoline, HOOK_INLINE_TRAMPOLINE_SIZE, false).Change(PAGE_EXECUTE_READ)) {
+			if (!TrampolineProtection.Change(PAGE_EXECUTE_READ)) {
 				g_HookStorage.DeAlloc(m_pTrampoline);
 				m_pTrampoline = nullptr;
 				g_HookStorage.DeAlloc(m_pWrapper);
@@ -85271,7 +85277,8 @@ namespace Detours {
 				return false;
 			}
 
-			if (!Protection(m_pWrapper, HOOK_RAW_WRAPPER_SIZE, false).Change(PAGE_READWRITE)) {
+			Protection WrapperProtection(m_pWrapper, HOOK_RAW_WRAPPER_SIZE, false);
+			if (!WrapperProtection.Change(PAGE_READWRITE)) {
 				g_HookStorage.DeAlloc(m_pWrapper);
 				m_pWrapper = nullptr;
 				g_Suspender.Resume();
@@ -86322,7 +86329,8 @@ namespace Detours {
 				return false;
 			}
 
-			if (!Protection(m_pTrampoline, HOOK_RAW_TRAMPOLINE_SIZE, false).Change(PAGE_READWRITE)) {
+			Protection TrampolineProtection(m_pTrampoline, HOOK_RAW_TRAMPOLINE_SIZE, false);
+			if (!TrampolineProtection.Change(PAGE_READWRITE)) {
 				g_HookStorage.DeAlloc(m_pTrampoline);
 				m_pTrampoline = nullptr;
 				m_unFirstInstructionSize = 0;
@@ -86408,7 +86416,7 @@ namespace Detours {
 #endif
 			}
 
-			if (!Protection(m_pWrapper, HOOK_RAW_WRAPPER_SIZE, false).Change(PAGE_EXECUTE_READ)) {
+			if (!WrapperProtection.Change(PAGE_EXECUTE_READ)) {
 				g_HookStorage.DeAlloc(m_pTrampoline);
 				m_pTrampoline = nullptr;
 				m_unFirstInstructionSize = 0;
@@ -86418,7 +86426,7 @@ namespace Detours {
 				return false;
 			}
 
-			if (!Protection(m_pTrampoline, HOOK_RAW_TRAMPOLINE_SIZE, false).Change(PAGE_READWRITE)) {
+			if (!TrampolineProtection.Change(PAGE_READWRITE)) {
 				g_HookStorage.DeAlloc(m_pTrampoline);
 				m_pTrampoline = nullptr;
 				m_unFirstInstructionSize = 0;
@@ -86568,7 +86576,7 @@ namespace Detours {
 #endif
 			}
 
-			if (!Protection(m_pTrampoline, HOOK_RAW_TRAMPOLINE_SIZE, false).Change(PAGE_EXECUTE_READ)) {
+			if (!TrampolineProtection.Change(PAGE_EXECUTE_READ)) {
 				g_HookStorage.DeAlloc(m_pTrampoline);
 				m_pTrampoline = nullptr;
 				m_unFirstInstructionSize = 0;

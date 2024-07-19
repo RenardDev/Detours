@@ -223,6 +223,9 @@ TEST_SUITE("Detours::Codec") {
 		free(szHelloWorld);
 	}
 
+#pragma warning(push)
+#pragma warning(disable: 6001)
+
 	TEST_CASE("Encode") {
 		int nEncodeSize = Detours::Codec::Encode(CP_UTF8, "Hello, World!");
 		CHECK(nEncodeSize > 0);
@@ -250,6 +253,8 @@ TEST_SUITE("Detours::Codec") {
 		CHECK(strcmp(pBuffer, "Hello, World!") == 0);
 		CHECK(HeapFree(hHeap, NULL, pBuffer) == TRUE);
 	}
+
+#pragma warning(pop)
 }
 
 TEST_SUITE("Detours::Hexadecimal") {
@@ -1403,11 +1408,12 @@ TEST_SUITE("Detours::Memory") {
 		Detours::Memory::Storage Storage;
 		unsigned char* pCodeMemory = reinterpret_cast<unsigned char*>(Storage.Alloc(3));
 		CHECK(pCodeMemory != nullptr);
-		CHECK(Detours::Memory::Protection(pCodeMemory, 3, false).Change(PAGE_READWRITE) == true);
+		Detours::Memory::Protection CodeMemoryProtection(pCodeMemory, 3, false);
+		CHECK(CodeMemoryProtection.Change(PAGE_READWRITE) == true);
 		pCodeMemory[0] = 0xB0;
 		pCodeMemory[1] = 0x01;
 		pCodeMemory[2] = 0xC3;
-		CHECK(Detours::Memory::Protection(pCodeMemory, 3, false).Change(PAGE_EXECUTE_READ) == true);
+		CHECK(CodeMemoryProtection.Change(PAGE_EXECUTE_READ) == true);
 		using fnType = bool(__cdecl*)();
 		CHECK(reinterpret_cast<fnType>(pCodeMemory)() == true);
 		CHECK(Storage.DeAlloc(pCodeMemory) == true);
