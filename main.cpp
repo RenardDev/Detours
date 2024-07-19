@@ -277,7 +277,7 @@ TEST_SUITE("Detours::Scan") {
 	TEST_CASE("FindSection") {
 		void* pSection = nullptr;
 		size_t unSectionSize = 0;
-		CHECK(Detours::Scan::FindSection(_T("ntdll.dll"), { '.', 't', 'e', 'x', 't', 0, 0, 0 }, &pSection, &unSectionSize) == true);
+		CHECK(Detours::Scan::FindSection(_T("kernelbase.dll"), { '.', 't', 'e', 'x', 't', 0, 0, 0 }, &pSection, &unSectionSize) == true);
 		CHECK(pSection != nullptr);
 		CHECK(unSectionSize != 0);
 	}
@@ -287,7 +287,7 @@ TEST_SUITE("Detours::Scan") {
 		size_t unSectionSize = 0;
 		ULONG unBegin = Detours::KUserSharedData.SystemTime.LowPart;
 		for (size_t i = 0; i < 10'000; ++i) {
-			if (!Detours::Scan::FindSection(_T("ntdll.dll"), { '.', 't', 'e', 'x', 't', 0, 0, 0 }, &pSection, &unSectionSize)) {
+			if (!Detours::Scan::FindSection(_T("kernelbase.dll"), { '.', 't', 'e', 'x', 't', 0, 0, 0 }, &pSection, &unSectionSize)) {
 				FAIL("Fail in benckmark!");
 			}
 		}
@@ -297,7 +297,7 @@ TEST_SUITE("Detours::Scan") {
 	TEST_CASE("FindSectionPOGO") {
 		void* pSection = nullptr;
 		size_t unSectionSize = 0;
-		CHECK(Detours::Scan::FindSectionPOGO(_T("ntdll.dll"), ".rdata", &pSection, &unSectionSize) == true);
+		CHECK(Detours::Scan::FindSectionPOGO(_T("kernelbase.dll"), ".text", &pSection, &unSectionSize) == true);
 		CHECK(pSection != nullptr);
 		CHECK(unSectionSize != 0);
 	}
@@ -307,7 +307,7 @@ TEST_SUITE("Detours::Scan") {
 		size_t unSectionSize = 0;
 		ULONG unBegin = Detours::KUserSharedData.SystemTime.LowPart;
 		for (size_t i = 0; i < 10'000; ++i) {
-			if (!Detours::Scan::FindSectionPOGO(_T("ntdll.dll"), ".rdata", &pSection, &unSectionSize)) {
+			if (!Detours::Scan::FindSectionPOGO(_T("kernelbase.dll"), ".text", &pSection, &unSectionSize)) {
 				FAIL("Fail in benckmark!");
 			}
 		}
