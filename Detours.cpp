@@ -3,8 +3,13 @@
 // Default
 #include <tchar.h>
 
-// STL
-#include <unordered_map>
+#ifndef MAX
+#define MAX(a, b) (((a) > (b)) ? (a) : (b))
+#endif
+
+#ifndef MIN
+#define MIN(a, b) (((a) < (b)) ? (a) : (b))
+#endif
 
 // RTTI
 
@@ -141,10 +146,42 @@ namespace Detours {
 	using namespace Hook;
 
 	// ----------------------------------------------------------------
+	// MEMORY_HOOK_RECORD
+	// ----------------------------------------------------------------
+
+	typedef struct _MEMORY_HOOK_RECORD {
+		_MEMORY_HOOK_RECORD() {
+			m_pCallBack = nullptr;
+			m_pAddress = nullptr;
+			m_unSize = 0;
+		}
+
+		fnMemoryHookCallBack m_pCallBack;
+		void* m_pAddress;
+		size_t m_unSize;
+		std::deque<std::pair<std::unique_ptr<Page>, std::unique_ptr<Page>>> m_Pages;
+	} MEMORY_HOOK_RECORD, *PMEMORY_HOOK_RECORD;
+	
+	// ----------------------------------------------------------------
+	// INTERRUPT_HOOK_RECORD
+	// ----------------------------------------------------------------
+
+	typedef struct _INTERRUPT_HOOK_RECORD {
+		_INTERRUPT_HOOK_RECORD() {
+			m_pCallBack = nullptr;
+			m_unInterrupt = 0;
+		}
+
+		fnInterruptHookCallBack m_pCallBack;
+		unsigned char m_unInterrupt;
+	} INTERRUPT_HOOK_RECORD, *PINTERRUPT_HOOK_RECORD;
+
+	// ----------------------------------------------------------------
 	// Storage
 	// ----------------------------------------------------------------
 
-	static std::unordered_map<void*, std::unique_ptr<InterruptHook>> g_InterruptHooks;
+	static std::deque<std::unique_ptr<MEMORY_HOOK_RECORD>> g_MemoryHookRecords;
+	static std::deque<std::unique_ptr<INTERRUPT_HOOK_RECORD>> g_InterruptHookRecords;
 	static MemoryManager g_MemoryManager;
 	static Storage g_HookStorage;
 
@@ -5225,12 +5262,12 @@ namespace Detours {
 				unAllocationGranularity = sysinf.dwAllocationGranularity;
 			}
 
-			const size_t unBegin = max(reinterpret_cast<size_t>(pMinimumApplicationAddress), reinterpret_cast<size_t>(pAddress));
-			const size_t unEnd = min(reinterpret_cast<size_t>(pMaximumApplicationAddress), reinterpret_cast<size_t>(pAddress) + unSize);
+			const size_t unBegin = MAX(reinterpret_cast<size_t>(pMinimumApplicationAddress), reinterpret_cast<size_t>(pAddress));
+			const size_t unEnd = MIN(reinterpret_cast<size_t>(pMaximumApplicationAddress), reinterpret_cast<size_t>(pAddress) + unSize);
 
 			PAGE_INFO pi;
 			memset(&pi, 0, sizeof(pi));
-			for (size_t unAddress = unBegin; unAddress < unEnd; unAddress = __align_up(min(unAddress, reinterpret_cast<size_t>(pi.m_pBaseAddress)) + pi.m_unSize, static_cast<size_t>(unPageSize))) {
+			for (size_t unAddress = unBegin; unAddress < unEnd; unAddress = __align_up(MIN(unAddress, reinterpret_cast<size_t>(pi.m_pBaseAddress)) + pi.m_unSize, static_cast<size_t>(unPageSize))) {
 				if (!__get_page_info(reinterpret_cast<void*>(unAddress), &pi)) {
 					break;
 				}
@@ -5245,7 +5282,7 @@ namespace Detours {
 		// __get_regions_info
 		// ----------------------------------------------------------------
 
-		static inline std::vector<REGION_INFO> __get_regions_info(void* pAddress, size_t unSize) {
+		static inline std::vector<REGION_INFO> __get_regions_info(void* pAddress, size_t unSize, bool bCombine = false) {
 			std::vector<REGION_INFO> vecRegions;
 			if (!pAddress || !unSize) {
 				return vecRegions;
@@ -5260,54 +5297,22 @@ namespace Detours {
 				unAllocationGranularity = sysinf.dwAllocationGranularity;
 			}
 
-			const size_t unBegin = max(reinterpret_cast<size_t>(pMinimumApplicationAddress), reinterpret_cast<size_t>(pAddress));
-			const size_t unEnd = min(reinterpret_cast<size_t>(pMaximumApplicationAddress), reinterpret_cast<size_t>(pAddress) + unSize);
+			const size_t unBegin = MAX(reinterpret_cast<size_t>(pMinimumApplicationAddress), reinterpret_cast<size_t>(pAddress));
+			const size_t unEnd = MIN(reinterpret_cast<size_t>(pMaximumApplicationAddress), reinterpret_cast<size_t>(pAddress) + unSize);
 			REGION_INFO ri;
 			memset(&ri, 0, sizeof(ri));
-			for (size_t unAddress = unBegin; unAddress < unEnd; unAddress = __align_up(min(unAddress, reinterpret_cast<size_t>(ri.m_pBaseAddress)) + ri.m_unSize, static_cast<size_t>(unAllocationGranularity))) {
+			for (size_t unAddress = unBegin; unAddress < unEnd; unAddress = __align_up(MIN(unAddress, reinterpret_cast<size_t>(ri.m_pBaseAddress)) + ri.m_unSize, static_cast<size_t>(unAllocationGranularity))) {
 				if (!__get_region_info(reinterpret_cast<void*>(unAddress), &ri)) {
 					break;
 				}
 
-				vecRegions.emplace_back(ri);
-			}
-
-			return vecRegions;
-		};
-
-		// ----------------------------------------------------------------
-		// __get_combined_regions_info
-		// ----------------------------------------------------------------
-
-		static inline std::vector<REGION_INFO> __get_combined_regions_info(void* pAddress, size_t unSize) {
-			std::vector<REGION_INFO> vecRegions;
-			if (!pAddress || !unSize) {
-				return vecRegions;
-			}
-
-			if (!pMinimumApplicationAddress || !pMaximumApplicationAddress || !unPageSize || !unAllocationGranularity) {
-				SYSTEM_INFO sysinf;
-				GetSystemInfo(&sysinf);
-				pMinimumApplicationAddress = sysinf.lpMinimumApplicationAddress;
-				pMaximumApplicationAddress = sysinf.lpMaximumApplicationAddress;
-				unPageSize = sysinf.dwPageSize;
-				unAllocationGranularity = sysinf.dwAllocationGranularity;
-			}
-
-			const size_t unBegin = max(reinterpret_cast<size_t>(pMinimumApplicationAddress), reinterpret_cast<size_t>(pAddress));
-			const size_t unEnd = min(reinterpret_cast<size_t>(pMaximumApplicationAddress), reinterpret_cast<size_t>(pAddress) + unSize);
-			REGION_INFO ri;
-			memset(&ri, 0, sizeof(ri));
-			for (size_t unAddress = unBegin; unAddress < unEnd; unAddress = __align_up(min(unAddress, reinterpret_cast<size_t>(ri.m_pBaseAddress)) + ri.m_unSize, static_cast<size_t>(unAllocationGranularity))) {
-				if (!__get_region_info(reinterpret_cast<void*>(unAddress), &ri)) {
-					break;
-				}
-
-				if (!vecRegions.empty()) {
-					auto& LastRegion = vecRegions.back();
-					if (reinterpret_cast<size_t>(LastRegion.m_pBaseAddress) + LastRegion.m_unSize == reinterpret_cast<size_t>(ri.m_pBaseAddress)) {
-						LastRegion.m_unSize += ri.m_unSize;
-						continue;
+				if (bCombine) {
+					if (!vecRegions.empty()) {
+						auto& LastRegion = vecRegions.back();
+						if (reinterpret_cast<size_t>(LastRegion.m_pBaseAddress) + LastRegion.m_unSize == reinterpret_cast<size_t>(ri.m_pBaseAddress)) {
+							LastRegion.m_unSize += ri.m_unSize;
+							continue;
+						}
 					}
 				}
 
@@ -5329,6 +5334,18 @@ namespace Detours {
 			}
 
 			return 0;
+		};
+
+		// ----------------------------------------------------------------
+		// __is_in_range
+		// ----------------------------------------------------------------
+
+		static bool inline __is_in_range(void const* const pBeginAddress, const size_t unSize, void const* const pAddress) {
+			if ((pAddress >= pBeginAddress) && ((static_cast<char const* const>(pBeginAddress) + unSize) > pAddress)) {
+				return true;
+			}
+
+			return false;
 		};
 
 		// ----------------------------------------------------------------
@@ -5554,8 +5571,8 @@ namespace Detours {
 				m_FreeBlocks.emplace(pBaseAddress, pi.m_unSize);
 			}
 
-			if (!GetProtection(&m_unOriginalProtection)) {
-				return;
+			if (m_pPageAddress) {
+				GetProtection(&m_unOriginalProtection);
 			}
 		}
 
@@ -5622,6 +5639,7 @@ namespace Detours {
 
 			if (m_pPageAddress) {
 				m_FreeBlocks.emplace(m_pPageAddress, unPageSize);
+				GetProtection(&m_unOriginalProtection);
 			}
 		}
 
@@ -6839,6 +6857,485 @@ namespace Detours {
 		}
 
 		// ----------------------------------------------------------------
+		// MemoryHookCallBack
+		// ----------------------------------------------------------------
+
+		static void FixMemoryHookAddress(const PCONTEXT pCTX, const void* pExceptionAddress, const void* pAccessAddress, void* pNewAddress) {
+			if (!pCTX || !pExceptionAddress || !pAccessAddress) {
+				return;
+			}
+
+//			if (pExceptionAddress) {
+//				INSTRUCTION ins;
+//#ifdef _M_X64
+//				if (!RD_SUCCESS(RdDecode(&ins, reinterpret_cast<unsigned char*>(const_cast<void*>(pExceptionAddress)), RD_CODE_64, RD_DATA_64))) {
+//#elif _M_IX86
+//				if (!RD_SUCCESS(RdDecode(&ins, reinterpret_cast<unsigned char*>(const_cast<void*>(pExceptionAddress)), RD_CODE_32, RD_DATA_32))) {
+//#endif
+//					return;
+//				}
+//
+//				if (ins.OperandsCount > 1) {
+//					auto& Operand = ins.Operands[0];
+//					if (Operand.Type == RD_OP_REG) {
+//						switch (Operand.Info.Register.Reg) {
+//							case RDR_RAX:
+//#ifdef _M_X64
+//								if (pCTX->Rax == reinterpret_cast<DWORD64>(pAccessAddress)) {
+//									pCTX->Rax = reinterpret_cast<DWORD64>(pNewAddress);
+//								}
+//#elif _M_IX86
+//								if (pCTX->Eax == reinterpret_cast<DWORD>(pAccessAddress)) {
+//									pCTX->Eax = reinterpret_cast<DWORD>(pNewAddress);
+//								}
+//#endif
+//								break;
+//							case RDR_RCX:
+//#ifdef _M_X64
+//								if (pCTX->Rcx == reinterpret_cast<DWORD64>(pAccessAddress)) {
+//									pCTX->Rcx = reinterpret_cast<DWORD64>(pNewAddress);
+//								}
+//#elif _M_IX86
+//								if (pCTX->Ecx == reinterpret_cast<DWORD>(pAccessAddress)) {
+//									pCTX->Ecx = reinterpret_cast<DWORD>(pNewAddress);
+//								}
+//#endif
+//								break;
+//							case RDR_RDX:
+//#ifdef _M_X64
+//								if (pCTX->Rdx == reinterpret_cast<DWORD64>(pAccessAddress)) {
+//									pCTX->Rdx = reinterpret_cast<DWORD64>(pNewAddress);
+//								}
+//#elif _M_IX86
+//								if (pCTX->Edx == reinterpret_cast<DWORD>(pAccessAddress)) {
+//									pCTX->Edx = reinterpret_cast<DWORD>(pNewAddress);
+//								}
+//#endif
+//								break;
+//							case RDR_RBX:
+//#ifdef _M_X64
+//								if (pCTX->Rbx == reinterpret_cast<DWORD64>(pAccessAddress)) {
+//									pCTX->Rbx = reinterpret_cast<DWORD64>(pNewAddress);
+//								}
+//#elif _M_IX86
+//								if (pCTX->Ebx == reinterpret_cast<DWORD>(pAccessAddress)) {
+//									pCTX->Ebx = reinterpret_cast<DWORD>(pNewAddress);
+//								}
+//#endif
+//								break;
+//							case RDR_RSP:
+//#ifdef _M_X64
+//								if (pCTX->Rsp == reinterpret_cast<DWORD64>(pAccessAddress)) {
+//									pCTX->Rsp = reinterpret_cast<DWORD64>(pNewAddress);
+//								}
+//#elif _M_IX86
+//								if (pCTX->Esp == reinterpret_cast<DWORD>(pAccessAddress)) {
+//									pCTX->Esp = reinterpret_cast<DWORD>(pNewAddress);
+//								}
+//#endif
+//								break;
+//							case RDR_RBP:
+//#ifdef _M_X64
+//								if (pCTX->Rbp == reinterpret_cast<DWORD64>(pAccessAddress)) {
+//									pCTX->Rbp = reinterpret_cast<DWORD64>(pNewAddress);
+//								}
+//#elif _M_IX86
+//								if (pCTX->Ebp == reinterpret_cast<DWORD>(pAccessAddress)) {
+//									pCTX->Ebp = reinterpret_cast<DWORD>(pNewAddress);
+//								}
+//#endif
+//								break;
+//							case RDR_RSI:
+//#ifdef _M_X64
+//								if (pCTX->Rsi == reinterpret_cast<DWORD64>(pAccessAddress)) {
+//									pCTX->Rsi = reinterpret_cast<DWORD64>(pNewAddress);
+//								}
+//#elif _M_IX86
+//								if (pCTX->Esi == reinterpret_cast<DWORD>(pAccessAddress)) {
+//									pCTX->Esi = reinterpret_cast<DWORD>(pNewAddress);
+//								}
+//#endif
+//								break;
+//							case RDR_RDI:
+//#ifdef _M_X64
+//								if (pCTX->Rdi == reinterpret_cast<DWORD64>(pAccessAddress)) {
+//									pCTX->Rdi = reinterpret_cast<DWORD64>(pNewAddress);
+//								}
+//#elif _M_IX86
+//								if (pCTX->Edi == reinterpret_cast<DWORD>(pAccessAddress)) {
+//									pCTX->Edi = reinterpret_cast<DWORD>(pNewAddress);
+//								}
+//#endif
+//								break;
+//#ifdef _M_X64
+//							case RDR_R8:
+//								if (pCTX->R8 == reinterpret_cast<DWORD64>(pAccessAddress)) {
+//									pCTX->R8 = reinterpret_cast<DWORD64>(pNewAddress);
+//								}
+//								break;
+//							case RDR_R9:
+//								if (pCTX->R9 == reinterpret_cast<DWORD64>(pAccessAddress)) {
+//									pCTX->R9 = reinterpret_cast<DWORD64>(pNewAddress);
+//								}
+//								break;
+//							case RDR_R10:
+//								if (pCTX->R10 == reinterpret_cast<DWORD64>(pAccessAddress)) {
+//									pCTX->R10 = reinterpret_cast<DWORD64>(pNewAddress);
+//								}
+//								break;
+//							case RDR_R11:
+//								if (pCTX->R11 == reinterpret_cast<DWORD64>(pAccessAddress)) {
+//									pCTX->R11 = reinterpret_cast<DWORD64>(pNewAddress);
+//								}
+//								break;
+//							case RDR_R12:
+//								if (pCTX->R12 == reinterpret_cast<DWORD64>(pAccessAddress)) {
+//									pCTX->R12 = reinterpret_cast<DWORD64>(pNewAddress);
+//								}
+//								break;
+//							case RDR_R13:
+//								if (pCTX->R13 == reinterpret_cast<DWORD64>(pAccessAddress)) {
+//									pCTX->R13 = reinterpret_cast<DWORD64>(pNewAddress);
+//								}
+//								break;
+//							case RDR_R14:
+//								if (pCTX->R14 == reinterpret_cast<DWORD64>(pAccessAddress)) {
+//									pCTX->R14 = reinterpret_cast<DWORD64>(pNewAddress);
+//								}
+//								break;
+//							case RDR_R15:
+//								if (pCTX->R15 == reinterpret_cast<DWORD64>(pAccessAddress)) {
+//									pCTX->R15 = reinterpret_cast<DWORD64>(pNewAddress);
+//								}
+//								break;
+//#endif
+//							default:
+//								break;
+//						}
+//					} else if (Operand.Type == RD_OP_MEM) {
+//						if (Operand.Info.Memory.HasBase) {
+//							switch (Operand.Info.Memory.Base) {
+//								case RDR_RAX:
+//#ifdef _M_X64
+//									if (pCTX->Rax == reinterpret_cast<DWORD64>(pAccessAddress)) {
+//										pCTX->Rax = reinterpret_cast<DWORD64>(pNewAddress);
+//									}
+//#elif _M_IX86
+//									if (pCTX->Eax == reinterpret_cast<DWORD>(pAccessAddress)) {
+//										pCTX->Eax = reinterpret_cast<DWORD>(pNewAddress);
+//									}
+//#endif
+//									break;
+//								case RDR_RCX:
+//#ifdef _M_X64
+//									if (pCTX->Rcx == reinterpret_cast<DWORD64>(pAccessAddress)) {
+//										pCTX->Rcx = reinterpret_cast<DWORD64>(pNewAddress);
+//									}
+//#elif _M_IX86
+//									if (pCTX->Ecx == reinterpret_cast<DWORD>(pAccessAddress)) {
+//										pCTX->Ecx = reinterpret_cast<DWORD>(pNewAddress);
+//									}
+//#endif
+//									break;
+//								case RDR_RDX:
+//#ifdef _M_X64
+//									if (pCTX->Rdx == reinterpret_cast<DWORD64>(pAccessAddress)) {
+//										pCTX->Rdx = reinterpret_cast<DWORD64>(pNewAddress);
+//									}
+//#elif _M_IX86
+//									if (pCTX->Edx == reinterpret_cast<DWORD>(pAccessAddress)) {
+//										pCTX->Edx = reinterpret_cast<DWORD>(pNewAddress);
+//									}
+//#endif
+//									break;
+//								case RDR_RBX:
+//#ifdef _M_X64
+//									if (pCTX->Rbx == reinterpret_cast<DWORD64>(pAccessAddress)) {
+//										pCTX->Rbx = reinterpret_cast<DWORD64>(pNewAddress);
+//									}
+//#elif _M_IX86
+//									if (pCTX->Ebx == reinterpret_cast<DWORD>(pAccessAddress)) {
+//										pCTX->Ebx = reinterpret_cast<DWORD>(pNewAddress);
+//									}
+//#endif
+//									break;
+//								case RDR_RSP:
+//#ifdef _M_X64
+//									if (pCTX->Rsp == reinterpret_cast<DWORD64>(pAccessAddress)) {
+//										pCTX->Rsp = reinterpret_cast<DWORD64>(pNewAddress);
+//									}
+//#elif _M_IX86
+//									if (pCTX->Esp == reinterpret_cast<DWORD>(pAccessAddress)) {
+//										pCTX->Esp = reinterpret_cast<DWORD>(pNewAddress);
+//									}
+//#endif
+//									break;
+//								case RDR_RBP:
+//#ifdef _M_X64
+//									if (pCTX->Rbp == reinterpret_cast<DWORD64>(pAccessAddress)) {
+//										pCTX->Rbp = reinterpret_cast<DWORD64>(pNewAddress);
+//									}
+//#elif _M_IX86
+//									if (pCTX->Ebp == reinterpret_cast<DWORD>(pAccessAddress)) {
+//										pCTX->Ebp = reinterpret_cast<DWORD>(pNewAddress);
+//									}
+//#endif
+//									break;
+//								case RDR_RSI:
+//#ifdef _M_X64
+//									if (pCTX->Rsi == reinterpret_cast<DWORD64>(pAccessAddress)) {
+//										pCTX->Rsi = reinterpret_cast<DWORD64>(pNewAddress);
+//									}
+//#elif _M_IX86
+//									if (pCTX->Esi == reinterpret_cast<DWORD>(pAccessAddress)) {
+//										pCTX->Esi = reinterpret_cast<DWORD>(pNewAddress);
+//									}
+//#endif
+//									break;
+//								case RDR_RDI:
+//#ifdef _M_X64
+//									if (pCTX->Rdi == reinterpret_cast<DWORD64>(pAccessAddress)) {
+//										pCTX->Rdi = reinterpret_cast<DWORD64>(pNewAddress);
+//									}
+//#elif _M_IX86
+//									if (pCTX->Edi == reinterpret_cast<DWORD>(pAccessAddress)) {
+//										pCTX->Edi = reinterpret_cast<DWORD>(pNewAddress);
+//									}
+//#endif
+//									break;
+//#ifdef _M_X64
+//								case RDR_R8:
+//									if (pCTX->R8 == reinterpret_cast<DWORD64>(pAccessAddress)) {
+//										pCTX->R8 = reinterpret_cast<DWORD64>(pNewAddress);
+//									}
+//									break;
+//								case RDR_R9:
+//									if (pCTX->R9 == reinterpret_cast<DWORD64>(pAccessAddress)) {
+//										pCTX->R9 = reinterpret_cast<DWORD64>(pNewAddress);
+//									}
+//									break;
+//								case RDR_R10:
+//									if (pCTX->R10 == reinterpret_cast<DWORD64>(pAccessAddress)) {
+//										pCTX->R10 = reinterpret_cast<DWORD64>(pNewAddress);
+//									}
+//									break;
+//								case RDR_R11:
+//									if (pCTX->R11 == reinterpret_cast<DWORD64>(pAccessAddress)) {
+//										pCTX->R11 = reinterpret_cast<DWORD64>(pNewAddress);
+//									}
+//									break;
+//								case RDR_R12:
+//									if (pCTX->R12 == reinterpret_cast<DWORD64>(pAccessAddress)) {
+//										pCTX->R12 = reinterpret_cast<DWORD64>(pNewAddress);
+//									}
+//									break;
+//								case RDR_R13:
+//									if (pCTX->R13 == reinterpret_cast<DWORD64>(pAccessAddress)) {
+//										pCTX->R13 = reinterpret_cast<DWORD64>(pNewAddress);
+//									}
+//									break;
+//								case RDR_R14:
+//									if (pCTX->R14 == reinterpret_cast<DWORD64>(pAccessAddress)) {
+//										pCTX->R14 = reinterpret_cast<DWORD64>(pNewAddress);
+//									}
+//									break;
+//								case RDR_R15:
+//									if (pCTX->R15 == reinterpret_cast<DWORD64>(pAccessAddress)) {
+//										pCTX->R15 = reinterpret_cast<DWORD64>(pNewAddress);
+//									}
+//									break;
+//#endif
+//								default:
+//									break;
+//							}
+//						}
+//					} else if (Operand.Type == RD_OP_IMM) {
+//						__debugbreak(); // TODO: Implement.
+//					} else if (Operand.Type == RD_OP_OFFS) {
+//						__debugbreak(); // TODO: Implement.
+//					} else if (Operand.Type == RD_OP_ADDR) {
+//						__debugbreak(); // TODO: Implement.
+//					} else if (Operand.Type == RD_OP_CONST) {
+//						__debugbreak(); // TODO: Implement.
+//					}
+//				}
+//			}
+
+#ifdef _M_X64
+			if (pCTX->Rax == reinterpret_cast<DWORD64>(pAccessAddress)) {
+				pCTX->Rax = reinterpret_cast<DWORD64>(pNewAddress);
+			}
+#elif _M_IX86
+			if (pCTX->Eax == reinterpret_cast<DWORD>(pAccessAddress)) {
+				pCTX->Eax = reinterpret_cast<DWORD>(pNewAddress);
+			}
+#endif
+#ifdef _M_X64
+			if (pCTX->Rcx == reinterpret_cast<DWORD64>(pAccessAddress)) {
+				pCTX->Rcx = reinterpret_cast<DWORD64>(pNewAddress);
+			}
+#elif _M_IX86
+			if (pCTX->Ecx == reinterpret_cast<DWORD>(pAccessAddress)) {
+				pCTX->Ecx = reinterpret_cast<DWORD>(pNewAddress);
+			}
+#endif
+#ifdef _M_X64
+			if (pCTX->Rdx == reinterpret_cast<DWORD64>(pAccessAddress)) {
+				pCTX->Rdx = reinterpret_cast<DWORD64>(pNewAddress);
+			}
+#elif _M_IX86
+			if (pCTX->Edx == reinterpret_cast<DWORD>(pAccessAddress)) {
+				pCTX->Edx = reinterpret_cast<DWORD>(pNewAddress);
+			}
+#endif
+#ifdef _M_X64
+			if (pCTX->Rbx == reinterpret_cast<DWORD64>(pAccessAddress)) {
+				pCTX->Rbx = reinterpret_cast<DWORD64>(pNewAddress);
+			}
+#elif _M_IX86
+			if (pCTX->Ebx == reinterpret_cast<DWORD>(pAccessAddress)) {
+				pCTX->Ebx = reinterpret_cast<DWORD>(pNewAddress);
+			}
+#endif
+#ifdef _M_X64
+			if (pCTX->Rsp == reinterpret_cast<DWORD64>(pAccessAddress)) {
+				pCTX->Rsp = reinterpret_cast<DWORD64>(pNewAddress);
+			}
+#elif _M_IX86
+			if (pCTX->Esp == reinterpret_cast<DWORD>(pAccessAddress)) {
+				pCTX->Esp = reinterpret_cast<DWORD>(pNewAddress);
+			}
+#endif
+#ifdef _M_X64
+			if (pCTX->Rbp == reinterpret_cast<DWORD64>(pAccessAddress)) {
+				pCTX->Rbp = reinterpret_cast<DWORD64>(pNewAddress);
+			}
+#elif _M_IX86
+			if (pCTX->Ebp == reinterpret_cast<DWORD>(pAccessAddress)) {
+				pCTX->Ebp = reinterpret_cast<DWORD>(pNewAddress);
+			}
+#endif
+#ifdef _M_X64
+			if (pCTX->Rsi == reinterpret_cast<DWORD64>(pAccessAddress)) {
+				pCTX->Rsi = reinterpret_cast<DWORD64>(pNewAddress);
+			}
+#elif _M_IX86
+			if (pCTX->Esi == reinterpret_cast<DWORD>(pAccessAddress)) {
+				pCTX->Esi = reinterpret_cast<DWORD>(pNewAddress);
+			}
+#endif
+#ifdef _M_X64
+			if (pCTX->Rdi == reinterpret_cast<DWORD64>(pAccessAddress)) {
+				pCTX->Rdi = reinterpret_cast<DWORD64>(pNewAddress);
+			}
+#elif _M_IX86
+			if (pCTX->Edi == reinterpret_cast<DWORD>(pAccessAddress)) {
+				pCTX->Edi = reinterpret_cast<DWORD>(pNewAddress);
+			}
+#endif
+#ifdef _M_X64
+			if (pCTX->R8 == reinterpret_cast<DWORD64>(pAccessAddress)) {
+				pCTX->R8 = reinterpret_cast<DWORD64>(pNewAddress);
+			}
+			if (pCTX->R9 == reinterpret_cast<DWORD64>(pAccessAddress)) {
+				pCTX->R9 = reinterpret_cast<DWORD64>(pNewAddress);
+			}
+			if (pCTX->R10 == reinterpret_cast<DWORD64>(pAccessAddress)) {
+				pCTX->R10 = reinterpret_cast<DWORD64>(pNewAddress);
+			}
+			if (pCTX->R11 == reinterpret_cast<DWORD64>(pAccessAddress)) {
+				pCTX->R11 = reinterpret_cast<DWORD64>(pNewAddress);
+			}
+			if (pCTX->R12 == reinterpret_cast<DWORD64>(pAccessAddress)) {
+				pCTX->R12 = reinterpret_cast<DWORD64>(pNewAddress);
+			}
+			if (pCTX->R13 == reinterpret_cast<DWORD64>(pAccessAddress)) {
+				pCTX->R13 = reinterpret_cast<DWORD64>(pNewAddress);
+			}
+			if (pCTX->R14 == reinterpret_cast<DWORD64>(pAccessAddress)) {
+				pCTX->R14 = reinterpret_cast<DWORD64>(pNewAddress);
+			}
+			if (pCTX->R15 == reinterpret_cast<DWORD64>(pAccessAddress)) {
+				pCTX->R15 = reinterpret_cast<DWORD64>(pNewAddress);
+			}
+#endif
+		}
+
+		static bool MemoryHookCallBack(const EXCEPTION_RECORD& Exception, const PCONTEXT pCTX) {
+			if (Exception.ExceptionCode != EXCEPTION_ACCESS_VIOLATION) {
+				return false;
+			}
+
+			if (Exception.NumberParameters != 2) {
+				return false;
+			}
+
+			const ULONG_PTR unAccessType = Exception.ExceptionInformation[0];
+			if ((unAccessType != 0) && (unAccessType != 1) && (unAccessType != 8)) { // READ, WRITE, EXECUTE (DEP)
+				return false;
+			}
+
+			const void* pExceptionAddress = (unAccessType != 8) ? reinterpret_cast<void*>(Exception.ExceptionAddress) : nullptr;
+			const void* pAccessAddress = reinterpret_cast<void*>(Exception.ExceptionInformation[1]);
+			if (!pAccessAddress || (pAccessAddress == reinterpret_cast<void*>(-1))) {
+				return false;
+			}
+
+			for (auto it = g_MemoryHookRecords.begin(); it != g_MemoryHookRecords.end(); ++it) {
+				const auto& pRecord = *it;
+				if (!pRecord) {
+					continue;
+				}
+
+				if (__is_in_range(pRecord->m_pAddress, pRecord->m_unSize, pAccessAddress)) {
+					for (auto& PagePair : pRecord->m_Pages) {
+						void* pNewAddress = nullptr;
+						const auto& Page = PagePair.first;
+						if (__is_in_range(Page->GetPageAddress(), Page->GetPageCapacity(), pAccessAddress)) {
+							const size_t unOffset = reinterpret_cast<size_t>(pAccessAddress) - reinterpret_cast<size_t>(Page->GetPageAddress());
+							pNewAddress = reinterpret_cast<char*>(PagePair.second->GetPageAddress()) + unOffset;
+							if (!PagePair.first->RestoreProtection()) {
+								return false;
+							}
+
+							const bool bResult = pRecord->m_pCallBack(pCTX, pAccessAddress, &pNewAddress);
+							if (bResult) {
+								FixMemoryHookAddress(pCTX, pExceptionAddress, pAccessAddress, pNewAddress);
+							}
+
+							if (!PagePair.first->ChangeProtection(PAGE_NOACCESS)) {
+								return false;
+							}
+
+							return bResult;
+						}
+					}
+
+					return false;
+				}
+
+				void* pNewAddress = nullptr;
+				bool bAccessAround = false;
+				for (auto& PagePair : pRecord->m_Pages) {
+					const auto& Page = PagePair.first;
+					if (__is_in_range(Page->GetPageAddress(), Page->GetPageCapacity(), pAccessAddress)) {
+						const size_t unOffset = reinterpret_cast<size_t>(pAccessAddress) - reinterpret_cast<size_t>(Page->GetPageAddress());
+						pNewAddress = reinterpret_cast<char*>(PagePair.second->GetPageAddress()) + unOffset;
+						bAccessAround = true;
+						break;
+					}
+				}
+
+				if (bAccessAround) {
+					FixMemoryHookAddress(pCTX, pExceptionAddress, pAccessAddress, pNewAddress);
+					return true;
+				}
+			}
+
+			return false;
+		}
+
+		// ----------------------------------------------------------------
 		// InterruptHookCallBack
 		// ----------------------------------------------------------------
 
@@ -6868,22 +7365,22 @@ namespace Detours {
 
 			const unsigned char unInterrupt = pCode[1];
 
-			for (auto it = g_InterruptHooks.begin(); it != g_InterruptHooks.end(); ++it) {
-				const auto& pHook = it->second;
-				if (!pHook) {
+			for (auto it = g_InterruptHookRecords.begin(); it != g_InterruptHookRecords.end(); ++it) {
+				const auto& pRecord = *it;
+				if (!pRecord) {
 					continue;
 				}
 
-				if (pHook->GetInterrupt() != unInterrupt) {
+				if (pRecord->m_unInterrupt != unInterrupt) {
 					continue;
 				}
 
-				const auto& pCallBack = pHook->GetCallBack();
+				const auto& pCallBack = pRecord->m_pCallBack;
 				if (!pCallBack) {
 					return false;
 				}
 
-				if (pCallBack(pHook, pCTX)) {
+				if (pCallBack(pCTX, unInterrupt)) {
 #ifdef _M_X64
 					pCTX->Rip += 2;
 #elif _M_IX86
@@ -6905,6 +7402,7 @@ namespace Detours {
 			if (m_pVEH) {
 
 				// Built-in CallBacks
+				AddCallBack(MemoryHookCallBack); // Memory Hooks
 				AddCallBack(InterruptHookCallBack); // Interrupt Hooks
 			}
 		}
@@ -6915,6 +7413,7 @@ namespace Detours {
 
 				// Built-in CallBacks
 				RemoveCallBack(InterruptHookCallBack); // Interrupt Hooks
+				RemoveCallBack(MemoryHookCallBack); // Memory Hooks
 			}
 		}
 
@@ -83903,44 +84402,83 @@ namespace Detours {
 	namespace Hook {
 
 		// ----------------------------------------------------------------
-		// Interrupt Hook
+		// Memory Hook
 		// ----------------------------------------------------------------
 
-		InterruptHook::InterruptHook(unsigned char unInterrupt) {
-			m_unInterrupt = unInterrupt;
-			m_pCallBack = nullptr;
-		}
-
-		InterruptHook::~InterruptHook() {
-			UnHook();
-		}
-
-		bool InterruptHook::Hook(const fnInterruptHookCallBack pCallBack) {
-			if (m_pCallBack || !pCallBack) {
+		bool HookMemory(const fnMemoryHookCallBack pCallBack, void* pAddress, size_t unSize) {
+			if (!pCallBack || !pAddress || !unSize) {
 				return false;
 			}
 
-			m_pCallBack = pCallBack;
+			for (auto& Record : g_MemoryHookRecords) {
+				if (Record->m_pCallBack == pCallBack) {
+					return false;
+				}
+			}
 
-			return true;
-		}
-
-		bool InterruptHook::UnHook() {
-			if (!m_pCallBack) {
+			auto vecPages = __get_pages_info(pAddress, unSize);
+			if (vecPages.empty()) {
 				return false;
 			}
 
-			m_pCallBack = nullptr;
+			auto pRecord = std::make_unique<MEMORY_HOOK_RECORD>();
+			if (!pRecord) {
+				return false;
+			}
 
+			pRecord->m_pCallBack = pCallBack;
+			pRecord->m_pAddress = pAddress;
+			pRecord->m_unSize = unSize;
+
+			for (auto& PageInfo : vecPages) {
+				auto pOriginalPage = std::make_unique<Page>(PageInfo.m_pBaseAddress, false);
+				if (!pOriginalPage) {
+					return false;
+				}
+
+				auto pPage = std::make_unique<Page>();
+				if (!pPage) {
+					return false;
+				}
+
+				if (!pPage->CloneFrom(pOriginalPage.get())) {
+					return false;
+				}
+
+				if (!pOriginalPage->ChangeProtection(PAGE_NOACCESS)) {
+					return false;
+				}
+
+				pRecord->m_Pages.emplace_back(std::make_pair(std::move(pOriginalPage), std::move(pPage)));
+			}
+
+			g_MemoryHookRecords.emplace_back(std::move(pRecord));
 			return true;
 		}
 
-		unsigned char InterruptHook::GetInterrupt() const {
-			return m_unInterrupt;
-		}
+		bool UnHookMemory(const fnMemoryHookCallBack pCallBack) {
+			if (!pCallBack) {
+				return false;
+			}
 
-		fnInterruptHookCallBack InterruptHook::GetCallBack() const {
-			return m_pCallBack;
+			for (auto it = g_MemoryHookRecords.begin(); it != g_MemoryHookRecords.end(); ++it) {
+				if ((*it)->m_pCallBack == pCallBack) {
+					for (auto& PagePair : (*it)->m_Pages) {
+						if (!PagePair.second->CloneTo(PagePair.first.get())) {
+							return false;
+						}
+
+						if (!PagePair.first->RestoreProtection()) {
+							return false;
+						}
+					}
+
+					g_MemoryHookRecords.erase(it);
+					return true;
+				}
+			}
+
+			return false;
 		}
 
 		// ----------------------------------------------------------------
@@ -83952,22 +84490,21 @@ namespace Detours {
 				return false;
 			}
 
-			const auto& it = g_InterruptHooks.find(reinterpret_cast<void*>(pCallBack));
-			if (it != g_InterruptHooks.end()) {
+			for (auto& Record : g_InterruptHookRecords) {
+				if (Record->m_pCallBack == pCallBack) {
+					return false;
+				}
+			}
+
+			auto pRecord = std::make_unique<INTERRUPT_HOOK_RECORD>();
+			if (!pRecord) {
 				return false;
 			}
 
-			auto pHook = std::make_unique<InterruptHook>(unInterrupt);
-			if (!pHook) {
-				return false;
-			}
+			pRecord->m_pCallBack = pCallBack;
+			pRecord->m_unInterrupt = unInterrupt;
 
-			if (!pHook->Hook(pCallBack)) {
-				return false;
-			}
-
-			g_InterruptHooks.emplace_hint(it, pCallBack, std::move(pHook));
-
+			g_InterruptHookRecords.emplace_back(std::move(pRecord));
 			return true;
 		}
 
@@ -83976,21 +84513,14 @@ namespace Detours {
 				return false;
 			}
 
-			const auto& it = g_InterruptHooks.find(reinterpret_cast<void*>(pCallBack));
-			if (it == g_InterruptHooks.end()) {
-				return false;
+			for (auto it = g_InterruptHookRecords.begin(); it != g_InterruptHookRecords.end(); ++it) {
+				if ((*it)->m_pCallBack == pCallBack) {
+					g_InterruptHookRecords.erase(it);
+					return true;
+				}
 			}
 
-			const auto& pHook = it->second;
-			if (!pHook) {
-				return false;
-			}
-
-			pHook->UnHook();
-
-			g_InterruptHooks.erase(it);
-
-			return true;
+			return false;
 		}
 
 		// ----------------------------------------------------------------

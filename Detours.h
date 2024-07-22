@@ -7,6 +7,7 @@
 #pragma warning(disable : 4201)
 
 // Default
+#define NOMINMAX
 #include <Windows.h>
 #include <TlHelp32.h>
 
@@ -5531,32 +5532,23 @@ namespace Detours {
 	namespace Hook {
 
 		// ----------------------------------------------------------------
+		// Memory Hook CallBack
+		// ----------------------------------------------------------------
+
+		using fnMemoryHookCallBack = bool(*)(const PCONTEXT pCTX, const void* pAccessAddress, void** pNewAddress);
+
+		// ----------------------------------------------------------------
+		// Memory Hook
+		// ----------------------------------------------------------------
+
+		bool HookMemory(const fnMemoryHookCallBack pCallBack, void* pAddress, size_t unSize);
+		bool UnHookMemory(const fnMemoryHookCallBack pCallBack);
+
+		// ----------------------------------------------------------------
 		// Interrupt Hook CallBack
 		// ----------------------------------------------------------------
 
-		using fnInterruptHookCallBack = bool(*)(const std::unique_ptr<class InterruptHook>& pHook, const PCONTEXT pCTX);
-
-		// ----------------------------------------------------------------
-		// Interrupt Hook (Don't use this to define hooks)
-		// ----------------------------------------------------------------
-
-		class InterruptHook {
-		public:
-			InterruptHook(unsigned char unInterrupt = 0x7E);
-			~InterruptHook();
-
-		public:
-			bool Hook(const fnInterruptHookCallBack pCallBack);
-			bool UnHook();
-
-		public:
-			unsigned char GetInterrupt() const;
-			fnInterruptHookCallBack GetCallBack() const;
-
-		private:
-			unsigned char m_unInterrupt;
-			fnInterruptHookCallBack m_pCallBack;
-		};
+		using fnInterruptHookCallBack = bool(*)(const PCONTEXT pCTX, const unsigned char unInterrupt);
 
 		// ----------------------------------------------------------------
 		// Interrupt Hook

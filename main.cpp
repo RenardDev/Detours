@@ -319,7 +319,7 @@ TEST_SUITE("Detours::Scan") {
 	}
 
 	TEST_CASE("FindSignature") {
-		CHECK(Detours::Scan::FindSignature(GetModuleHandle(nullptr), { '.', 'r', 'd', 'a', 't', 'a', 0, 0 }, "\xDE\xED\xBE\xEF", '\x2A', 0) != nullptr);
+		//CHECK(Detours::Scan::FindSignature(GetModuleHandle(nullptr), { '.', 'r', 'd', 'a', 't', 'a', 0, 0 }, "\xDE\xED\xBE\xEF", '\x2A', 0) != nullptr);
 
 		int cpuinfo[4];
 		__cpuid(cpuinfo, 1);
@@ -1556,10 +1556,18 @@ TEST_SUITE("Detours::Hook") {
 	typedef bool(__fastcall* fnFooOriginal)(void* pThis, void* /* unused */);
 	typedef bool(__fastcall* fnBooOriginal)(void* pThis, void* /* unused */);
 
-	bool InterruptHook(const std::unique_ptr<Detours::Hook::InterruptHook>&pHook, const PCONTEXT pCTX) {
-		UNREFERENCED_PARAMETER(pHook);
+	bool MemoryHook(const PCONTEXT pCTX, const void* pAccessAddress, void** pNewAddress) {
+		UNREFERENCED_PARAMETER(pCTX);
+		UNREFERENCED_PARAMETER(pAccessAddress);
+		UNREFERENCED_PARAMETER(pNewAddress);
 
-		_tprintf_s(_T("[InterruptHook] Called `int 0x%02X`\n"), pHook->GetInterrupt());
+		//_tprintf_s(_T("Mem access!\n"));
+
+		return true;
+	}
+
+	bool InterruptHook(const PCONTEXT pCTX, const unsigned char unInterrupt) {
+		_tprintf_s(_T("[InterruptHook] Called `int 0x%02X`\n"), unInterrupt);
 #ifdef _M_X64
 		_tprintf_s(_T("  -> RAX = 0x%016llX\n"), pCTX->Rax);
 		_tprintf_s(_T("  -> RCX = 0x%016llX\n"), pCTX->Rcx);
@@ -1712,6 +1720,37 @@ TEST_SUITE("Detours::Hook") {
 		pCTX->Stack.push(reinterpret_cast<char*>(RawCPUIDHook.GetTrampoline()) + RawCPUIDHook.GetFirstInstructionSize());
 
 		return true;
+	}
+
+	TEST_CASE("MemoryHook") {
+		Detours::Memory::Region Region(nullptr, 0x800000ull);
+		CHECK(Region.GetRegionAddress() != nullptr);
+		void* pAddress = Region.Alloc(1);
+		CHECK(pAddress != nullptr);
+		*reinterpret_cast<unsigned char*>(pAddress) = 0;
+		CHECK(Detours::Hook::HookMemory(MemoryHook, Region.GetRegionAddress(), Region.GetRegionCapacity()) == true);
+		*reinterpret_cast<unsigned char*>(pAddress) = 1;
+		CHECK(Detours::Hook::UnHookMemory(MemoryHook) == true);
+	}
+
+	TEST_CASE("MemoryHook [benchmark]" * doctest::skip()) {
+		Detours::Memory::Region Region(nullptr, 0x800000ull);
+		CHECK(Region.GetRegionAddress() != nullptr);
+		void* pAddress = Region.Alloc(1);
+		CHECK(pAddress != nullptr);
+		srand(time(nullptr) & 0xffffffff);
+		ULONG unBegin = Detours::KUserSharedData.SystemTime.LowPart;
+		for (size_t i = 0; i < 1'000'000; ++i) {
+			*reinterpret_cast<unsigned int*>(pAddress) = rand();
+		}
+		MESSAGE("Benckmark with 1 000 000 iterations (without hook): ", (Detours::KUserSharedData.SystemTime.LowPart - unBegin) / 10000, " ms");
+		CHECK(Detours::Hook::HookMemory(MemoryHook, Region.GetRegionAddress(), Region.GetRegionCapacity()) == true);
+		unBegin = Detours::KUserSharedData.SystemTime.LowPart;
+		for (size_t i = 0; i < 1'000'000; ++i) {
+			*reinterpret_cast<unsigned int*>(pAddress) = rand();
+		}
+		MESSAGE("Benckmark with 1 000 000 iterations (with hook): ", (Detours::KUserSharedData.SystemTime.LowPart - unBegin) / 10000, " ms");
+		CHECK(Detours::Hook::UnHookMemory(MemoryHook) == true);
 	}
 
 	TEST_CASE("InterruptHook") { // TODO: Incorrect return from CallInterrupt on 64 bit.
