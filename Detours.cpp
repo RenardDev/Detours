@@ -154,11 +154,13 @@ namespace Detours {
 			m_pCallBack = nullptr;
 			m_pAddress = nullptr;
 			m_unSize = 0;
+			m_bSupportTrampoline = false;
 		}
 
 		fnMemoryHookCallBack m_pCallBack;
 		void* m_pAddress;
 		size_t m_unSize;
+		bool m_bSupportTrampoline;
 		std::deque<std::pair<std::unique_ptr<Page>, std::unique_ptr<Page>>> m_Pages;
 	} MEMORY_HOOK_RECORD, *PMEMORY_HOOK_RECORD;
 	
@@ -7289,13 +7291,15 @@ namespace Detours {
 
 				if (__is_in_range(pRecord->m_pAddress, pRecord->m_unSize, pAccessAddress)) {
 					for (auto& PagePair : pRecord->m_Pages) {
-						void* pNewAddress = nullptr;
 						const auto& Page = PagePair.first;
 						if (__is_in_range(Page->GetPageAddress(), Page->GetPageCapacity(), pAccessAddress)) {
 							const size_t unOffset = reinterpret_cast<size_t>(pAccessAddress) - reinterpret_cast<size_t>(Page->GetPageAddress());
-							pNewAddress = reinterpret_cast<char*>(PagePair.second->GetPageAddress()) + unOffset;
-							if (!PagePair.first->RestoreProtection()) {
-								return false;
+							void* pNewAddress = reinterpret_cast<char*>(PagePair.second->GetPageAddress()) + unOffset;
+
+							if (pRecord->m_bSupportTrampoline) {
+								if (!PagePair.first->RestoreProtection()) {
+									return false;
+								}
 							}
 
 							const bool bResult = pRecord->m_pCallBack(pCTX, pAccessAddress, &pNewAddress);
@@ -7303,8 +7307,10 @@ namespace Detours {
 								FixMemoryHookAddress(pCTX, pExceptionAddress, pAccessAddress, pNewAddress);
 							}
 
-							if (!PagePair.first->ChangeProtection(PAGE_NOACCESS)) {
-								return false;
+							if (pRecord->m_bSupportTrampoline) {
+								if (!PagePair.first->ChangeProtection(PAGE_NOACCESS)) {
+									return false;
+								}
 							}
 
 							return bResult;
@@ -84405,7 +84411,7 @@ namespace Detours {
 		// Memory Hook
 		// ----------------------------------------------------------------
 
-		bool HookMemory(const fnMemoryHookCallBack pCallBack, void* pAddress, size_t unSize) {
+		bool HookMemory(const fnMemoryHookCallBack pCallBack, void* pAddress, size_t unSize, bool bSupportTrampoline) {
 			if (!pCallBack || !pAddress || !unSize) {
 				return false;
 			}
@@ -84429,6 +84435,7 @@ namespace Detours {
 			pRecord->m_pCallBack = pCallBack;
 			pRecord->m_pAddress = pAddress;
 			pRecord->m_unSize = unSize;
+			pRecord->m_bSupportTrampoline = bSupportTrampoline;
 
 			for (auto& PageInfo : vecPages) {
 				auto pOriginalPage = std::make_unique<Page>(PageInfo.m_pBaseAddress, false);

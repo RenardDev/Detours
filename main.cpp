@@ -1733,21 +1733,21 @@ TEST_SUITE("Detours::Hook") {
 		CHECK(Detours::Hook::UnHookMemory(MemoryHook) == true);
 	}
 
-	TEST_CASE("MemoryHook [benchmark]" * doctest::skip()) {
-		Detours::Memory::Region Region(nullptr, static_cast<size_t>(0x800000));
+	TEST_CASE("MemoryHook [benchmark]" * doctest::skip(false)) {
+		Detours::Memory::Region Region(nullptr, static_cast<size_t>(0x1000));
 		CHECK(Region.GetRegionAddress() != nullptr);
 		void* pAddress = Region.Alloc(1);
 		CHECK(pAddress != nullptr);
 		srand(time(nullptr) & 0xffffffff);
 		ULONG unBegin = Detours::KUserSharedData.SystemTime.LowPart;
-		for (size_t i = 0; i < 1'000'000; ++i) {
-			*reinterpret_cast<unsigned int*>(pAddress) = rand();
+		for (size_t j = 0; j < 0x1000; ++j) {
+			reinterpret_cast<unsigned char*>(pAddress)[j] = rand() & 0xff;
 		}
 		MESSAGE("Benckmark with 1 000 000 iterations (without hook): ", (Detours::KUserSharedData.SystemTime.LowPart - unBegin) / 10000, " ms");
 		CHECK(Detours::Hook::HookMemory(MemoryHook, Region.GetRegionAddress(), Region.GetRegionCapacity()) == true);
 		unBegin = Detours::KUserSharedData.SystemTime.LowPart;
-		for (size_t i = 0; i < 1'000'000; ++i) {
-			*reinterpret_cast<unsigned int*>(pAddress) = rand();
+		for (size_t j = 0; j < 0x1000; ++j) {
+			reinterpret_cast<unsigned char*>(pAddress)[j] = rand() & 0xff;
 		}
 		MESSAGE("Benckmark with 1 000 000 iterations (with hook): ", (Detours::KUserSharedData.SystemTime.LowPart - unBegin) / 10000, " ms");
 		CHECK(Detours::Hook::UnHookMemory(MemoryHook) == true);
