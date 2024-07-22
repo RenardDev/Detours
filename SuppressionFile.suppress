@@ -523,6 +523,14 @@
   </Detours>
   <Detours>
     <FileName>main.cpp</FileName>
+    <ErrorCode>V1048</ErrorCode>
+    <Message>The 'unBegin' variable was assigned the same value.</Message>
+    <CodePrev>2747366233</CodePrev>
+    <CodeCurrent>3197191414</CodeCurrent>
+    <CodeNext>1215532822</CodeNext>
+  </Detours>
+  <Detours>
+    <FileName>main.cpp</FileName>
     <ErrorCode>V1064</ErrorCode>
     <Message>The left operand of integer division is less than the right one. The result will always be zero.</Message>
     <CodePrev>241929</CodePrev>
