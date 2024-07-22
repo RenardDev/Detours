@@ -1723,7 +1723,7 @@ TEST_SUITE("Detours::Hook") {
 	}
 
 	TEST_CASE("MemoryHook") {
-		Detours::Memory::Region Region(nullptr, 0x800000ull);
+		Detours::Memory::Region Region(nullptr, static_cast<size_t>(0x800000));
 		CHECK(Region.GetRegionAddress() != nullptr);
 		void* pAddress = Region.Alloc(1);
 		CHECK(pAddress != nullptr);
