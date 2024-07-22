@@ -1354,7 +1354,7 @@ TEST_SUITE("Detours::Memory") {
 		CHECK(*pData == 0xBEEFDEED);
 	}
 
-	TEST_CASE("Page") { // TODO: Add more tests
+	TEST_CASE("Page") {
 		Detours::Memory::Page Page;
 		CHECK(Page.Alloc(Page.GetPageCapacity()) != nullptr);
 		CHECK(Page.Alloc(1) == nullptr);
@@ -1398,6 +1398,52 @@ TEST_SUITE("Detours::Memory") {
 		CHECK(Page.Alloc(1, 0, 4) == nullptr);
 		Page.DeAllocAll();
 		CHECK(Page.Alloc(1, 0, 0) == nullptr);
+	}
+
+	TEST_CASE("Region") {
+		Detours::Memory::Region Region;
+		CHECK(Region.Alloc(Region.GetRegionCapacity()) != nullptr);
+		CHECK(Region.Alloc(1) == nullptr);
+		CHECK(Region.Alloc(1, 2) == nullptr);
+		CHECK(Region.Alloc(1, 4) == nullptr);
+		CHECK(Region.Alloc(1, 8) == nullptr);
+		Region.DeAllocAll();
+		CHECK(Region.Alloc(Region.GetRegionCapacity(), 8) != nullptr);
+		Region.DeAllocAll();
+		CHECK(Region.Alloc(Region.GetRegionCapacity(), Region.GetRegionCapacity() * 2) == nullptr);
+		Region.DeAllocAll();
+		CHECK(Region.Alloc(Region.GetRegionCapacity() - 1) != nullptr);
+		CHECK(Region.Alloc(1, 0, 0) == nullptr);
+		Region.DeAllocAll();
+		CHECK(Region.Alloc(Region.GetRegionCapacity() - 1) != nullptr);
+		CHECK(Region.Alloc(1, 2) == nullptr);
+		Region.DeAllocAll();
+		CHECK(Region.Alloc(Region.GetRegionCapacity() - 2) != nullptr);
+		CHECK(Region.Alloc(1, 2, 2) != nullptr);
+		Region.DeAllocAll();
+		CHECK(Region.Alloc(Region.GetRegionCapacity() - 2) != nullptr);
+		CHECK(Region.Alloc(1, 4) == nullptr);
+		Region.DeAllocAll();
+		CHECK(Region.Alloc(Region.GetRegionCapacity() - 2) != nullptr);
+		CHECK(Region.Alloc(2, 8) == nullptr);
+		Region.DeAllocAll();
+		CHECK(Region.Alloc(Region.GetRegionCapacity(), 1, 1) != nullptr);
+		CHECK(Region.Alloc(Region.GetRegionCapacity() + 1, 1, 1) == nullptr);
+		Region.DeAllocAll();
+		Region.DeAllocAll();
+		CHECK(Region.Alloc(0) == nullptr);
+		Region.DeAllocAll();
+		CHECK(Region.Alloc(1, 4, 8) != nullptr);
+		Region.DeAllocAll();
+		CHECK(Region.Alloc(1, 8, 4) != nullptr);
+		Region.DeAllocAll();
+		CHECK(Region.Alloc(0, 4, 4) == nullptr);
+		Region.DeAllocAll();
+		CHECK(Region.Alloc(1, 4, 0) == nullptr);
+		Region.DeAllocAll();
+		CHECK(Region.Alloc(1, 0, 4) == nullptr);
+		Region.DeAllocAll();
+		CHECK(Region.Alloc(1, 0, 0) == nullptr);
 	}
 
 	TEST_CASE("Storage") {
