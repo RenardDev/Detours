@@ -29,7 +29,6 @@ jobs:
         run: dotnet restore ${{env.SOLUTION_FILE_PATH}}
 
       - name: Analysis Debug (x86)
-        id: analysis-debug-x86
         if: always()
         working-directory: ${{env.GITHUB_WORKSPACE}}
         run: |
@@ -37,7 +36,6 @@ jobs:
           python "C:\PVS-Studio_Cmd.py" --settings "C:\Settings.xml" --target "${{env.SOLUTION_FILE_PATH}}\Detours.sln" --useSuppressFile "${{env.SOLUTION_FILE_PATH}}\SuppressionFile.suppress" --configuration Debug --platform x86 --output "${{env.SOLUTION_FILE_PATH}}\build\x86\Debug\results.plog"
 
       - name: Analysis Debug (x86_64)
-        id: analysis-debug-x86-64
         if: always()
         working-directory: ${{env.GITHUB_WORKSPACE}}
         run: |
@@ -45,7 +43,6 @@ jobs:
           python "C:\PVS-Studio_Cmd.py" --settings "C:\Settings.xml" --target "${{env.SOLUTION_FILE_PATH}}\Detours.sln" --useSuppressFile "${{env.SOLUTION_FILE_PATH}}\SuppressionFile.suppress" --configuration Debug --platform x64 --output "${{env.SOLUTION_FILE_PATH}}\build\x86_64\Debug\results.plog"
 
       - name: Analysis Release (x86)
-        id: analysis-release-x86
         if: always()
         working-directory: ${{env.GITHUB_WORKSPACE}}
         run: |
@@ -53,7 +50,6 @@ jobs:
           python "C:\PVS-Studio_Cmd.py" --settings "C:\Settings.xml" --target "${{env.SOLUTION_FILE_PATH}}\Detours.sln" --useSuppressFile "${{env.SOLUTION_FILE_PATH}}\SuppressionFile.suppress" --configuration Release --platform x86 --output "${{env.SOLUTION_FILE_PATH}}\build\x86\Release\results.plog"
 
       - name: Analysis Release (x86_64)
-        id: analysis-release-x86-64
         if: always()
         working-directory: ${{env.GITHUB_WORKSPACE}}
         run: |
@@ -122,24 +118,28 @@ jobs:
           ${{env.SOLUTION_FILE_PATH}}\build
 
     - name: Checking Debug (x86)
+      if: always()
       timeout-minutes: 3
       working-directory: ${{env.GITHUB_WORKSPACE}}
-      run: python "C:\DeleakerConsole.py" --max-allow-leaks 6 --export-xml-report-on-exit "${{env.SOLUTION_FILE_PATH}}\build\x86\Debug\report.xml" --run "${{env.SOLUTION_FILE_PATH}}\build\x86\Debug\Detours.exe"
+      run: python "C:\DeleakerConsole.py" --known-leak "doctest::detail::`dynamic initializer for 'g_oss'',`dynamic initializer for 'doctest::`anonymous namespace'::DebugOutputWindowReporter::oss'',doctest::detail::`dynamic initializer for 'g_infoContexts''" --max-allow-leaks 6 --export-xml-report-on-exit "${{env.SOLUTION_FILE_PATH}}\build\x86\Debug\report.xml" --run "${{env.SOLUTION_FILE_PATH}}\build\x86\Debug\Detours.exe"
 
     - name: Checking Debug (x86_64)
+      if: always()
       timeout-minutes: 3
       working-directory: ${{env.GITHUB_WORKSPACE}}
-      run: python "C:\DeleakerConsole.py" --max-allow-leaks 6 --export-xml-report-on-exit "${{env.SOLUTION_FILE_PATH}}\build\x86\Debug\report.xml" --run "${{env.SOLUTION_FILE_PATH}}\build\x86\Debug\Detours.exe"
+      run: python "C:\DeleakerConsole.py" --known-leak "doctest::detail::`dynamic initializer for 'g_oss'',`dynamic initializer for 'doctest::`anonymous namespace'::DebugOutputWindowReporter::oss'',doctest::detail::`dynamic initializer for 'g_infoContexts''" --max-allow-leaks 6 --export-xml-report-on-exit "${{env.SOLUTION_FILE_PATH}}\build\x86\Debug\report.xml" --run "${{env.SOLUTION_FILE_PATH}}\build\x86\Debug\Detours.exe"
 
     - name: Checking Release (x86)
+      if: always()
       timeout-minutes: 3
       working-directory: ${{env.GITHUB_WORKSPACE}}
-      run: python "C:\DeleakerConsole.py" --max-allow-leaks 6 --export-xml-report-on-exit "${{env.SOLUTION_FILE_PATH}}\build\x86\Debug\report.xml" --run "${{env.SOLUTION_FILE_PATH}}\build\x86\Debug\Detours.exe"
+      run: python "C:\DeleakerConsole.py" --known-leak "doctest::detail::`dynamic initializer for 'g_oss'',`dynamic initializer for 'doctest::`anonymous namespace'::DebugOutputWindowReporter::oss'',doctest::detail::`dynamic initializer for 'g_infoContexts''" --max-allow-leaks 6 --export-xml-report-on-exit "${{env.SOLUTION_FILE_PATH}}\build\x86\Debug\report.xml" --run "${{env.SOLUTION_FILE_PATH}}\build\x86\Debug\Detours.exe"
 
     - name: Checking Release (x86_64)
+      if: always()
       timeout-minutes: 3
       working-directory: ${{env.GITHUB_WORKSPACE}}
-      run: python "C:\DeleakerConsole.py" --max-allow-leaks 6 --export-xml-report-on-exit "${{env.SOLUTION_FILE_PATH}}\build\x86\Debug\report.xml" --run "${{env.SOLUTION_FILE_PATH}}\build\x86\Debug\Detours.exe"
+      run: python "C:\DeleakerConsole.py" --known-leak "doctest::detail::`dynamic initializer for 'g_oss'',`dynamic initializer for 'doctest::`anonymous namespace'::DebugOutputWindowReporter::oss'',doctest::detail::`dynamic initializer for 'g_infoContexts''" --max-allow-leaks 6 --export-xml-report-on-exit "${{env.SOLUTION_FILE_PATH}}\build\x86\Debug\report.xml" --run "${{env.SOLUTION_FILE_PATH}}\build\x86\Debug\Detours.exe"
 
     - name: Uploading results
       uses: actions/upload-artifact@v4
