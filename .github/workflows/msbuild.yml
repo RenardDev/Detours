@@ -61,7 +61,7 @@ jobs:
           python "C:\PVS-Studio_Cmd.py" --settings "C:\Settings.xml" --target "${{env.SOLUTION_FILE_PATH}}\Detours.sln" --useSuppressFile "${{env.SOLUTION_FILE_PATH}}\SuppressionFile.suppress" --configuration Release --platform x64 --output "${{env.SOLUTION_FILE_PATH}}\build\x86_64\Release\results.plog"    
 
       - name: Uploading results
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: Analysis
           path: |
@@ -100,7 +100,7 @@ jobs:
       run: msbuild /m /p:Configuration=Release /p:Platform=x64 ${{env.SOLUTION_FILE_PATH}}
 
     - name: Uploading builds
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: Builds
         path: |
@@ -142,7 +142,7 @@ jobs:
       run: python "C:\DeleakerConsole.py" --max-allow-leaks 60 --export-xml-report-on-exit "${{env.SOLUTION_FILE_PATH}}\build\x86\Debug\report.xml" --run "${{env.SOLUTION_FILE_PATH}}\build\x86\Debug\Detours.exe"
 
     - name: Uploading results
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: Testing
         path: |
