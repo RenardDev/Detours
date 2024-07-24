@@ -11,7 +11,7 @@ env:
 
 permissions:
   contents: read
-  actions: read
+  actions: write
 
 jobs:
   analysis-debug-x86:
@@ -29,7 +29,6 @@ jobs:
         run: dotnet restore ${{env.SOLUTION_FILE_PATH}}
 
       - name: Analysis Debug (x86)
-        if: always()
         working-directory: ${{env.GITHUB_WORKSPACE}}
         run: |
           mkdir "${{env.SOLUTION_FILE_PATH}}\build\x86\Debug"
@@ -58,7 +57,6 @@ jobs:
         run: dotnet restore ${{env.SOLUTION_FILE_PATH}}
 
       - name: Analysis Debug (x86_64)
-        if: always()
         working-directory: ${{env.GITHUB_WORKSPACE}}
         run: |
           mkdir "${{env.SOLUTION_FILE_PATH}}\build\x86_64\Debug"
@@ -87,7 +85,6 @@ jobs:
         run: dotnet restore ${{env.SOLUTION_FILE_PATH}}
 
       - name: Analysis Release (x86)
-        if: always()
         working-directory: ${{env.GITHUB_WORKSPACE}}
         run: |
           mkdir "${{env.SOLUTION_FILE_PATH}}\build\x86\Release"
@@ -116,7 +113,6 @@ jobs:
         run: dotnet restore ${{env.SOLUTION_FILE_PATH}}
 
       - name: Analysis Release (x86_64)
-        if: always()
         working-directory: ${{env.GITHUB_WORKSPACE}}
         run: |
           mkdir "${{env.SOLUTION_FILE_PATH}}\build\x86_64\Release"
@@ -242,10 +238,10 @@ jobs:
           ${{env.SOLUTION_FILE_PATH}}\build\**\*.pdb
         if-no-files-found: error
 
-  testing:
-    name: Testing
+  testing-debug:
+    name: Testing Debug
     runs-on: self-hosted
-    needs: [ building-debug-x86, building-debug-x86-64, building-release-x86, building-release-x86-64 ]
+    needs: [ building-debug-x86, building-debug-x86-64 ]
 
     steps:
     - name: Downloading builds
@@ -265,19 +261,7 @@ jobs:
       if: always()
       timeout-minutes: 3
       working-directory: ${{env.GITHUB_WORKSPACE}}
-      run: python "C:\DeleakerConsole.py" --known-leak "doctest::detail::`dynamic initializer for 'g_oss'',`dynamic initializer for 'doctest::`anonymous namespace'::DebugOutputWindowReporter::oss'',doctest::detail::`dynamic initializer for 'g_infoContexts''" --max-allow-leaks 6 --export-xml-report-on-exit "${{env.SOLUTION_FILE_PATH}}\build\x86\Debug\report.xml" --run "${{env.SOLUTION_FILE_PATH}}\build\x86\Debug\Detours.exe"
-
-    - name: Checking Release (x86)
-      if: always()
-      timeout-minutes: 3
-      working-directory: ${{env.GITHUB_WORKSPACE}}
-      run: python "C:\DeleakerConsole.py" --known-leak "doctest::detail::`dynamic initializer for 'g_oss'',`dynamic initializer for 'doctest::`anonymous namespace'::DebugOutputWindowReporter::oss'',doctest::detail::`dynamic initializer for 'g_infoContexts''" --max-allow-leaks 6 --export-xml-report-on-exit "${{env.SOLUTION_FILE_PATH}}\build\x86\Debug\report.xml" --run "${{env.SOLUTION_FILE_PATH}}\build\x86\Debug\Detours.exe"
-
-    - name: Checking Release (x86_64)
-      if: always()
-      timeout-minutes: 3
-      working-directory: ${{env.GITHUB_WORKSPACE}}
-      run: python "C:\DeleakerConsole.py" --known-leak "doctest::detail::`dynamic initializer for 'g_oss'',`dynamic initializer for 'doctest::`anonymous namespace'::DebugOutputWindowReporter::oss'',doctest::detail::`dynamic initializer for 'g_infoContexts''" --max-allow-leaks 6 --export-xml-report-on-exit "${{env.SOLUTION_FILE_PATH}}\build\x86\Debug\report.xml" --run "${{env.SOLUTION_FILE_PATH}}\build\x86\Debug\Detours.exe"
+      run: python "C:\DeleakerConsole.py" --known-leak "doctest::detail::`dynamic initializer for 'g_oss'',`dynamic initializer for 'doctest::`anonymous namespace'::DebugOutputWindowReporter::oss'',doctest::detail::`dynamic initializer for 'g_infoContexts''" --max-allow-leaks 6 --export-xml-report-on-exit "${{env.SOLUTION_FILE_PATH}}\build\x86_64\Debug\report.xml" --run "${{env.SOLUTION_FILE_PATH}}\build\x86_64\Debug\Detours.exe"
 
     - name: Uploading results
       uses: actions/upload-artifact@v4
@@ -285,4 +269,58 @@ jobs:
         name: Testing
         path: |
           ${{env.SOLUTION_FILE_PATH}}\build\**\*.xml
+        if-no-files-found: error
+
+  testing-release:
+    name: Testing Release
+    runs-on: self-hosted
+    needs: [ building-release-x86, building-release-x86-64 ]
+
+    steps:
+    - name: Downloading builds
+      uses: actions/download-artifact@v4
+      with:
+        name: Builds
+        path: |
+          ${{env.SOLUTION_FILE_PATH}}\build
+
+    - name: Checking Release (x86)
+      if: always()
+      timeout-minutes: 3
+      working-directory: ${{env.GITHUB_WORKSPACE}}
+      run: python "C:\DeleakerConsole.py" --known-leak "doctest::detail::`dynamic initializer for 'g_oss'',`dynamic initializer for 'doctest::`anonymous namespace'::DebugOutputWindowReporter::oss'',doctest::detail::`dynamic initializer for 'g_infoContexts''" --max-allow-leaks 6 --export-xml-report-on-exit "${{env.SOLUTION_FILE_PATH}}\build\x86\Release\report.xml" --run "${{env.SOLUTION_FILE_PATH}}\build\x86\Release\Detours.exe"
+
+    - name: Checking Release (x86_64)
+      if: always()
+      timeout-minutes: 3
+      working-directory: ${{env.GITHUB_WORKSPACE}}
+      run: python "C:\DeleakerConsole.py" --known-leak "doctest::detail::`dynamic initializer for 'g_oss'',`dynamic initializer for 'doctest::`anonymous namespace'::DebugOutputWindowReporter::oss'',doctest::detail::`dynamic initializer for 'g_infoContexts''" --max-allow-leaks 6 --export-xml-report-on-exit "${{env.SOLUTION_FILE_PATH}}\build\x86_64\Release\report.xml" --run "${{env.SOLUTION_FILE_PATH}}\build\x86_64\Release\Detours.exe"
+
+    - name: Uploading results
+      uses: actions/upload-artifact@v4
+      with:
+        name: Testing
+        path: |
+          ${{env.SOLUTION_FILE_PATH}}\build\**\*.xml
+        if-no-files-found: error
+
+  signing:
+    name: Signing Release
+    runs-on: self-hosted
+    needs: testing-release
+
+    steps:
+    - name: Downloading builds
+      uses: actions/download-artifact@v4
+      with:
+        name: Builds
+        path: |
+          ${{env.SOLUTION_FILE_PATH}}\build
+
+    - name: Uploading Release
+      uses: actions/upload-artifact@v4
+      with:
+        name: Release
+        path: |
+          ${{env.SOLUTION_FILE_PATH}}\build\**\*.exe
         if-no-files-found: error
