@@ -5532,10 +5532,20 @@ namespace Detours {
 	namespace Hook {
 
 		// ----------------------------------------------------------------
+		// Memory Hook Operation
+		// ----------------------------------------------------------------
+
+		typedef enum _MEMORY_HOOK_OPERATION : unsigned char {
+			MEMORY_READ    = 0,
+			MEMORY_WRITE   = 1,
+			MEMORY_EXECUTE = 2
+		} MEMORY_HOOK_OPERATION, *PMEMORY_HOOK_OPERATION;
+
+		// ----------------------------------------------------------------
 		// Memory Hook CallBack
 		// ----------------------------------------------------------------
 
-		using fnMemoryHookCallBack = bool(*)(const PCONTEXT pCTX, const void* pAccessAddress, void** pNewAddress);
+		using fnMemoryHookCallBack = bool(*)(const PCONTEXT pCTX, MEMORY_HOOK_OPERATION unOperation, const void* pAddress, void** pNewAddress);
 
 		// ----------------------------------------------------------------
 		// Memory Hook
