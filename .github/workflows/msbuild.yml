@@ -124,22 +124,22 @@ jobs:
     - name: Checking Debug (x86)
       timeout-minutes: 3
       working-directory: ${{env.GITHUB_WORKSPACE}}
-      run: python "C:\DeleakerConsole.py" --exclude-name "doctest::detail::`dynamic initializer for 'g_oss'',`dynamic initializer for 'doctest::`anonymous namespace'::DebugOutputWindowReporter::oss'',doctest::detail::`dynamic initializer for 'g_infoContexts''" --max-allow-leaks 6 --export-xml-report-on-exit "${{env.SOLUTION_FILE_PATH}}\build\x86\Debug\report.xml" --run "${{env.SOLUTION_FILE_PATH}}\build\x86\Debug\Detours.exe"
+      run: python "C:\DeleakerConsole.py" --max-allow-leaks 6 --export-xml-report-on-exit "${{env.SOLUTION_FILE_PATH}}\build\x86\Debug\report.xml" --run "${{env.SOLUTION_FILE_PATH}}\build\x86\Debug\Detours.exe"
 
     - name: Checking Debug (x86_64)
       timeout-minutes: 3
       working-directory: ${{env.GITHUB_WORKSPACE}}
-      run: python "C:\DeleakerConsole.py" --exclude-name "doctest::detail::`dynamic initializer for 'g_oss'',`dynamic initializer for 'doctest::`anonymous namespace'::DebugOutputWindowReporter::oss'',doctest::detail::`dynamic initializer for 'g_infoContexts''" --max-allow-leaks 6 --export-xml-report-on-exit "${{env.SOLUTION_FILE_PATH}}\build\x86\Debug\report.xml" --run "${{env.SOLUTION_FILE_PATH}}\build\x86\Debug\Detours.exe"
+      run: python "C:\DeleakerConsole.py" --max-allow-leaks 6 --export-xml-report-on-exit "${{env.SOLUTION_FILE_PATH}}\build\x86\Debug\report.xml" --run "${{env.SOLUTION_FILE_PATH}}\build\x86\Debug\Detours.exe"
 
     - name: Checking Release (x86)
       timeout-minutes: 3
       working-directory: ${{env.GITHUB_WORKSPACE}}
-      run: python "C:\DeleakerConsole.py" --exclude-name "doctest::detail::`dynamic initializer for 'g_oss'',`dynamic initializer for 'doctest::`anonymous namespace'::DebugOutputWindowReporter::oss'',doctest::detail::`dynamic initializer for 'g_infoContexts''" --max-allow-leaks 6 --export-xml-report-on-exit "${{env.SOLUTION_FILE_PATH}}\build\x86\Debug\report.xml" --run "${{env.SOLUTION_FILE_PATH}}\build\x86\Debug\Detours.exe"
+      run: python "C:\DeleakerConsole.py" --max-allow-leaks 6 --export-xml-report-on-exit "${{env.SOLUTION_FILE_PATH}}\build\x86\Debug\report.xml" --run "${{env.SOLUTION_FILE_PATH}}\build\x86\Debug\Detours.exe"
 
     - name: Checking Release (x86_64)
       timeout-minutes: 3
       working-directory: ${{env.GITHUB_WORKSPACE}}
-      run: python "C:\DeleakerConsole.py" --exclude-name "doctest::detail::`dynamic initializer for 'g_oss'',`dynamic initializer for 'doctest::`anonymous namespace'::DebugOutputWindowReporter::oss'',doctest::detail::`dynamic initializer for 'g_infoContexts''" --max-allow-leaks 6 --export-xml-report-on-exit "${{env.SOLUTION_FILE_PATH}}\build\x86\Debug\report.xml" --run "${{env.SOLUTION_FILE_PATH}}\build\x86\Debug\Detours.exe"
+      run: python "C:\DeleakerConsole.py" --max-allow-leaks 6 --export-xml-report-on-exit "${{env.SOLUTION_FILE_PATH}}\build\x86\Debug\report.xml" --run "${{env.SOLUTION_FILE_PATH}}\build\x86\Debug\Detours.exe"
 
     - name: Uploading results
       uses: actions/upload-artifact@v4
