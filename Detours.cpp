@@ -7312,7 +7312,7 @@ namespace Detours {
 							*reinterpret_cast<unsigned short*>(&pCTX->Ebp) = static_cast<unsigned short>(unValue);
 							break;
 						default:
-							pCTX->Rbp = unValue;
+							pCTX->Ebp = unValue;
 							break;
 					}
 #endif
@@ -7542,8 +7542,13 @@ namespace Detours {
 								SetRegisterValue(pCTX, ReadOperand.Info.Register.Reg, ReadOperand.Info.Register.Size, unValue);
 							}
 						} else if (ReadOperand.Type == RD_OP_MEM) {
+#ifdef _M_X64
 							unsigned long long unBase = 0;
 							unsigned long long unIndex = 0;
+#elif _M_IX86
+							unsigned int unBase = 0;
+							unsigned int unIndex = 0;
+#endif
 							unsigned long long unDisp = 0;
 
 							if (ReadOperand.Info.Memory.HasBase) {
@@ -7602,8 +7607,13 @@ namespace Detours {
 								SetRegisterValue(pCTX, WriteOperand.Info.Register.Reg, WriteOperand.Info.Register.Size, unValue);
 							}
 						} else if (WriteOperand.Type == RD_OP_MEM) {
+#ifdef _M_X64
 							unsigned long long unBase = 0;
 							unsigned long long unIndex = 0;
+#elif _M_IX86
+							unsigned int unBase = 0;
+							unsigned int unIndex = 0;
+#endif
 							unsigned long long unDisp = 0;
 
 							if (WriteOperand.Info.Memory.HasBase) {
@@ -7717,7 +7727,7 @@ namespace Detours {
 				pCTX->Rdi = reinterpret_cast<DWORD64>(pNewAddress);
 			}
 #elif _M_IX86
-			if (pCTX->Edi == reinterpret_cast<DWORD>(pAccessAddress)) {
+			if (pCTX->Edi == reinterpret_cast<DWORD>(pAddress)) {
 				pCTX->Edi = reinterpret_cast<DWORD>(pNewAddress);
 			}
 #endif
