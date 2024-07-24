@@ -7517,138 +7517,136 @@ namespace Detours {
 				return;
 			}
 
-			if (pExceptionAddress) {
-				INSTRUCTION ins;
+			INSTRUCTION ins;
 #ifdef _M_X64
-				if (!RD_SUCCESS(RdDecode(&ins, reinterpret_cast<unsigned char*>(const_cast<void*>(pExceptionAddress)), RD_CODE_64, RD_DATA_64))) {
+			if (!RD_SUCCESS(RdDecode(&ins, reinterpret_cast<unsigned char*>(const_cast<void*>(pExceptionAddress)), RD_CODE_64, RD_DATA_64))) {
 #elif _M_IX86
-				if (!RD_SUCCESS(RdDecode(&ins, reinterpret_cast<unsigned char*>(const_cast<void*>(pExceptionAddress)), RD_CODE_32, RD_DATA_32))) {
+			if (!RD_SUCCESS(RdDecode(&ins, reinterpret_cast<unsigned char*>(const_cast<void*>(pExceptionAddress)), RD_CODE_32, RD_DATA_32))) {
 #endif
+				return;
+			}
+
+			switch (unOperation) {
+				case MEMORY_HOOK_OPERATION::MEMORY_READ: {
+					if (ins.OperandsCount) {
+						auto& ReadOperand = ins.Operands[ins.OperandsCount - 1];
+						if (!ReadOperand.Access.Read) {
+							return;
+						}
+
+						if (ReadOperand.Type == RD_OP_NOT_PRESENT) {
+							return;
+						} else if (ReadOperand.Type == RD_OP_REG) {
+							ULONG_PTR unValue = GetRegisterValue(pCTX, ReadOperand.Info.Register.Reg, ReadOperand.Info.Register.Size);
+							if (reinterpret_cast<ULONG_PTR>(pAddress) == unValue) {
+								SetRegisterValue(pCTX, ReadOperand.Info.Register.Reg, ReadOperand.Info.Register.Size, unValue);
+							}
+						} else if (ReadOperand.Type == RD_OP_MEM) {
+							unsigned long long unBase = 0;
+							unsigned long long unIndex = 0;
+							unsigned long long unDisp = 0;
+
+							if (ReadOperand.Info.Memory.HasBase) {
+								unBase = GetRegisterValue(pCTX, ReadOperand.Info.Memory.Base, ReadOperand.Info.Memory.BaseSize);
+							}
+
+							if (ReadOperand.Info.Memory.HasIndex) {
+								unIndex = GetRegisterValue(pCTX, ReadOperand.Info.Memory.Index, ReadOperand.Info.Memory.IndexSize) * ReadOperand.Info.Memory.Scale;
+							}
+
+							if (ReadOperand.Info.Memory.HasDisp) {
+								unDisp = ReadOperand.Info.Memory.Disp;
+							}
+
+							if (reinterpret_cast<ULONG_PTR>(pAddress) == unBase + unIndex + unDisp) {
+								if (unBase) {
+									const size_t unOffset = reinterpret_cast<size_t>(pAddress) - unBase;
+									SetRegisterValue(pCTX, ReadOperand.Info.Memory.Base, ReadOperand.Info.Memory.BaseSize, reinterpret_cast<size_t>(pNewAddress) - unOffset);
+									return;
+								}
+
+								return;
+							}
+						} else if (ReadOperand.Type == RD_OP_IMM) {
+							__debugbreak(); // TODO: Implement.
+						} else if (ReadOperand.Type == RD_OP_OFFS) {
+							__debugbreak(); // TODO: Implement.
+						} else if (ReadOperand.Type == RD_OP_ADDR) {
+							__debugbreak(); // TODO: Implement.
+						} else if (ReadOperand.Type == RD_OP_CONST) {
+							__debugbreak(); // TODO: Implement.
+						}
+					}
+
 					return;
 				}
 
-				switch (unOperation) {
-					case MEMORY_HOOK_OPERATION::MEMORY_READ: {
-						if (ins.OperandsCount) {
-							auto& ReadOperand = ins.Operands[ins.OperandsCount - 1];
-							if (!ReadOperand.Access.Read) {
-								return;
+				case MEMORY_HOOK_OPERATION::MEMORY_WRITE: {
+					if (ins.OperandsCount) {
+						auto& WriteOperand = ins.Operands[ins.OperandsCount - 1];
+						if (!WriteOperand.Access.Write) {
+							if (ins.OperandsCount > 1) {
+								WriteOperand = ins.Operands[ins.OperandsCount - 2];
 							}
 
-							if (ReadOperand.Type == RD_OP_NOT_PRESENT) {
-								return;
-							} else if (ReadOperand.Type == RD_OP_REG) {
-								ULONG_PTR unValue = GetRegisterValue(pCTX, ReadOperand.Info.Register.Reg, ReadOperand.Info.Register.Size);
-								if (reinterpret_cast<ULONG_PTR>(pAddress) == unValue) {
-									SetRegisterValue(pCTX, ReadOperand.Info.Register.Reg, ReadOperand.Info.Register.Size, unValue);
-								}
-							} else if (ReadOperand.Type == RD_OP_MEM) {
-								unsigned long long unBase = 0;
-								unsigned long long unIndex = 0;
-								unsigned long long unDisp = 0;
-
-								if (ReadOperand.Info.Memory.HasBase) {
-									unBase = GetRegisterValue(pCTX, ReadOperand.Info.Memory.Base, ReadOperand.Info.Memory.BaseSize);
-								}
-
-								if (ReadOperand.Info.Memory.HasIndex) {
-									unIndex = GetRegisterValue(pCTX, ReadOperand.Info.Memory.Index, ReadOperand.Info.Memory.IndexSize) * ReadOperand.Info.Memory.Scale;
-								}
-
-								if (ReadOperand.Info.Memory.HasDisp) {
-									unDisp = ReadOperand.Info.Memory.Disp;
-								}
-
-								if (reinterpret_cast<ULONG_PTR>(pAddress) == unBase + unIndex + unDisp) {
-									if (unBase) {
-										const size_t unOffset = reinterpret_cast<size_t>(pAddress) - unBase;
-										SetRegisterValue(pCTX, ReadOperand.Info.Memory.Base, ReadOperand.Info.Memory.BaseSize, reinterpret_cast<size_t>(pNewAddress) - unOffset);
-										return;
-									}
-
-									return;
-								}
-							} else if (ReadOperand.Type == RD_OP_IMM) {
-								__debugbreak(); // TODO: Implement.
-							} else if (ReadOperand.Type == RD_OP_OFFS) {
-								__debugbreak(); // TODO: Implement.
-							} else if (ReadOperand.Type == RD_OP_ADDR) {
-								__debugbreak(); // TODO: Implement.
-							} else if (ReadOperand.Type == RD_OP_CONST) {
-								__debugbreak(); // TODO: Implement.
-							}
-						}
-
-						return;
-					}
-
-					case MEMORY_HOOK_OPERATION::MEMORY_WRITE: {
-						if (ins.OperandsCount) {
-							auto& WriteOperand = ins.Operands[ins.OperandsCount - 1];
 							if (!WriteOperand.Access.Write) {
-								if (ins.OperandsCount > 1) {
-									WriteOperand = ins.Operands[ins.OperandsCount - 2];
-								}
-
-								if (!WriteOperand.Access.Write) {
-									return;
-								}
-							}
-
-							if (WriteOperand.Type == RD_OP_NOT_PRESENT) {
 								return;
-							} else if (WriteOperand.Type == RD_OP_REG) {
-								ULONG_PTR unValue = GetRegisterValue(pCTX, WriteOperand.Info.Register.Reg, WriteOperand.Info.Register.Size);
-								if (reinterpret_cast<ULONG_PTR>(pAddress) == unValue) {
-									SetRegisterValue(pCTX, WriteOperand.Info.Register.Reg, WriteOperand.Info.Register.Size, unValue);
-								}
-							} else if (WriteOperand.Type == RD_OP_MEM) {
-								unsigned long long unBase = 0;
-								unsigned long long unIndex = 0;
-								unsigned long long unDisp = 0;
-
-								if (WriteOperand.Info.Memory.HasBase) {
-									unBase = GetRegisterValue(pCTX, WriteOperand.Info.Memory.Base, WriteOperand.Info.Memory.BaseSize);
-								}
-
-								if (WriteOperand.Info.Memory.HasIndex) {
-									unIndex = GetRegisterValue(pCTX, WriteOperand.Info.Memory.Index, WriteOperand.Info.Memory.IndexSize) * WriteOperand.Info.Memory.Scale;
-								}
-
-								if (WriteOperand.Info.Memory.HasDisp) {
-									unDisp = WriteOperand.Info.Memory.Disp;
-								}
-
-								if (reinterpret_cast<ULONG_PTR>(pAddress) == unBase + unIndex + unDisp) {
-									if (unBase) {
-										const size_t unOffset = reinterpret_cast<size_t>(pAddress) - unBase;
-										SetRegisterValue(pCTX, WriteOperand.Info.Memory.Base, WriteOperand.Info.Memory.BaseSize, reinterpret_cast<size_t>(pNewAddress) - unOffset);
-										return;
-									}
-
-									return;
-								}
-							} else if (WriteOperand.Type == RD_OP_IMM) {
-								__debugbreak(); // TODO: Implement.
-							} else if (WriteOperand.Type == RD_OP_OFFS) {
-								__debugbreak(); // TODO: Implement.
-							} else if (WriteOperand.Type == RD_OP_ADDR) {
-								__debugbreak(); // TODO: Implement.
-							} else if (WriteOperand.Type == RD_OP_CONST) {
-								__debugbreak(); // TODO: Implement.
 							}
 						}
 
-						return;
+						if (WriteOperand.Type == RD_OP_NOT_PRESENT) {
+							return;
+						} else if (WriteOperand.Type == RD_OP_REG) {
+							ULONG_PTR unValue = GetRegisterValue(pCTX, WriteOperand.Info.Register.Reg, WriteOperand.Info.Register.Size);
+							if (reinterpret_cast<ULONG_PTR>(pAddress) == unValue) {
+								SetRegisterValue(pCTX, WriteOperand.Info.Register.Reg, WriteOperand.Info.Register.Size, unValue);
+							}
+						} else if (WriteOperand.Type == RD_OP_MEM) {
+							unsigned long long unBase = 0;
+							unsigned long long unIndex = 0;
+							unsigned long long unDisp = 0;
+
+							if (WriteOperand.Info.Memory.HasBase) {
+								unBase = GetRegisterValue(pCTX, WriteOperand.Info.Memory.Base, WriteOperand.Info.Memory.BaseSize);
+							}
+
+							if (WriteOperand.Info.Memory.HasIndex) {
+								unIndex = GetRegisterValue(pCTX, WriteOperand.Info.Memory.Index, WriteOperand.Info.Memory.IndexSize) * WriteOperand.Info.Memory.Scale;
+							}
+
+							if (WriteOperand.Info.Memory.HasDisp) {
+								unDisp = WriteOperand.Info.Memory.Disp;
+							}
+
+							if (reinterpret_cast<ULONG_PTR>(pAddress) == unBase + unIndex + unDisp) {
+								if (unBase) {
+									const size_t unOffset = reinterpret_cast<size_t>(pAddress) - unBase;
+									SetRegisterValue(pCTX, WriteOperand.Info.Memory.Base, WriteOperand.Info.Memory.BaseSize, reinterpret_cast<size_t>(pNewAddress) - unOffset);
+									return;
+								}
+
+								return;
+							}
+						} else if (WriteOperand.Type == RD_OP_IMM) {
+							__debugbreak(); // TODO: Implement.
+						} else if (WriteOperand.Type == RD_OP_OFFS) {
+							__debugbreak(); // TODO: Implement.
+						} else if (WriteOperand.Type == RD_OP_ADDR) {
+							__debugbreak(); // TODO: Implement.
+						} else if (WriteOperand.Type == RD_OP_CONST) {
+							__debugbreak(); // TODO: Implement.
+						}
 					}
 
-					case MEMORY_HOOK_OPERATION::MEMORY_EXECUTE: {
-						break;
-					}
-
-					default:
-						break;
+					return;
 				}
+
+				case MEMORY_HOOK_OPERATION::MEMORY_EXECUTE: {
+					break;
+				}
+
+				default:
+					break;
 			}
 
 #ifdef _M_X64
@@ -7766,7 +7764,7 @@ namespace Detours {
 			}
 
 			MEMORY_HOOK_OPERATION unOperation = MEMORY_HOOK_OPERATION::MEMORY_READ;
-			if ((unAccessType != 0) && (unAccessType == 1)) {
+			if (unAccessType == 1) {
 				unOperation = MEMORY_HOOK_OPERATION::MEMORY_WRITE;
 			} else if (unAccessType == 8) {
 				unOperation = MEMORY_HOOK_OPERATION::MEMORY_EXECUTE;
