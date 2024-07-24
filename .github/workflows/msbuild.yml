@@ -66,27 +66,27 @@ jobs:
     needs: analysis
 
     steps:
-    - uses: actions/checkout@v4.1.7
+      - uses: actions/checkout@v4.1.7
 
-    - name: Add MSBuild to PATH
-      uses: microsoft/setup-msbuild@v1.1.3
+      - name: Add MSBuild to PATH
+        uses: microsoft/setup-msbuild@v1.1.3
 
-    - name: Restore NuGet packages
-      working-directory: ${{env.GITHUB_WORKSPACE}}
-      run: dotnet restore ${{env.SOLUTION_FILE_PATH}}
+      - name: Restore NuGet packages
+        working-directory: ${{env.GITHUB_WORKSPACE}}
+        run: dotnet restore ${{env.SOLUTION_FILE_PATH}}
 
-    - name: Building Debug (x86)
-      working-directory: ${{env.GITHUB_WORKSPACE}}
-      run: msbuild /m /p:Configuration=Debug /p:Platform=x86 ${{env.SOLUTION_FILE_PATH}}
+      - name: Building Debug (x86)
+        working-directory: ${{env.GITHUB_WORKSPACE}}
+        run: msbuild /m /p:Configuration=Debug /p:Platform=x86 ${{env.SOLUTION_FILE_PATH}}
 
-    - name: Uploading build
-      uses: actions/upload-artifact@v4
-      with:
-        name: Builds
-        path: |
-          ${{env.SOLUTION_FILE_PATH}}\build\**\*.exe
-          ${{env.SOLUTION_FILE_PATH}}\build\**\*.pdb
-        if-no-files-found: error
+      - name: Uploading build
+        uses: actions/upload-artifact@v4
+        with:
+          name: BuildDebug32
+          path: |
+            ${{env.SOLUTION_FILE_PATH}}\build\**\*.exe
+            ${{env.SOLUTION_FILE_PATH}}\build\**\*.pdb
+          if-no-files-found: error
 
   building-debug-x86-64:
     name: Building Debug (x86_64)
@@ -94,27 +94,27 @@ jobs:
     needs: analysis
 
     steps:
-    - uses: actions/checkout@v4.1.7
+      - uses: actions/checkout@v4.1.7
 
-    - name: Add MSBuild to PATH
-      uses: microsoft/setup-msbuild@v1.1.3
+      - name: Add MSBuild to PATH
+        uses: microsoft/setup-msbuild@v1.1.3
 
-    - name: Restore NuGet packages
-      working-directory: ${{env.GITHUB_WORKSPACE}}
-      run: dotnet restore ${{env.SOLUTION_FILE_PATH}}
+      - name: Restore NuGet packages
+        working-directory: ${{env.GITHUB_WORKSPACE}}
+        run: dotnet restore ${{env.SOLUTION_FILE_PATH}}
 
-    - name: Building Debug (x86_64)
-      working-directory: ${{env.GITHUB_WORKSPACE}}
-      run: msbuild /m /p:Configuration=Debug /p:Platform=x64 ${{env.SOLUTION_FILE_PATH}}
+      - name: Building Debug (x86_64)
+        working-directory: ${{env.GITHUB_WORKSPACE}}
+        run: msbuild /m /p:Configuration=Debug /p:Platform=x64 ${{env.SOLUTION_FILE_PATH}}
 
-    - name: Uploading build
-      uses: actions/upload-artifact@v4
-      with:
-        name: Builds
-        path: |
-          ${{env.SOLUTION_FILE_PATH}}\build\**\*.exe
-          ${{env.SOLUTION_FILE_PATH}}\build\**\*.pdb
-        if-no-files-found: error
+      - name: Uploading build
+        uses: actions/upload-artifact@v4
+        with:
+          name: BuildDebug64
+          path: |
+            ${{env.SOLUTION_FILE_PATH}}\build\**\*.exe
+            ${{env.SOLUTION_FILE_PATH}}\build\**\*.pdb
+          if-no-files-found: error
 
   building-release-x86:
     name: Building Release (x86)
@@ -122,27 +122,27 @@ jobs:
     needs: analysis
 
     steps:
-    - uses: actions/checkout@v4.1.7
+      - uses: actions/checkout@v4.1.7
 
-    - name: Add MSBuild to PATH
-      uses: microsoft/setup-msbuild@v1.1.3
+      - name: Add MSBuild to PATH
+        uses: microsoft/setup-msbuild@v1.1.3
 
-    - name: Restore NuGet packages
-      working-directory: ${{env.GITHUB_WORKSPACE}}
-      run: dotnet restore ${{env.SOLUTION_FILE_PATH}}
+      - name: Restore NuGet packages
+        working-directory: ${{env.GITHUB_WORKSPACE}}
+        run: dotnet restore ${{env.SOLUTION_FILE_PATH}}
 
-    - name: Building Release (x86)
-      working-directory: ${{env.GITHUB_WORKSPACE}}
-      run: msbuild /m /p:Configuration=Release /p:Platform=x86 ${{env.SOLUTION_FILE_PATH}}
+      - name: Building Release (x86)
+        working-directory: ${{env.GITHUB_WORKSPACE}}
+        run: msbuild /m /p:Configuration=Release /p:Platform=x86 ${{env.SOLUTION_FILE_PATH}}
 
-    - name: Uploading build
-      uses: actions/upload-artifact@v4
-      with:
-        name: Builds
-        path: |
-          ${{env.SOLUTION_FILE_PATH}}\build\**\*.exe
-          ${{env.SOLUTION_FILE_PATH}}\build\**\*.pdb
-        if-no-files-found: error
+      - name: Uploading build
+        uses: actions/upload-artifact@v4
+        with:
+          name: BuildRelease32
+          path: |
+            ${{env.SOLUTION_FILE_PATH}}\build\**\*.exe
+            ${{env.SOLUTION_FILE_PATH}}\build\**\*.pdb
+          if-no-files-found: error
 
   building-release-x86-64:
     name: Building Release (x86_64)
@@ -150,78 +150,125 @@ jobs:
     needs: analysis
 
     steps:
-    - uses: actions/checkout@v4.1.7
+      - uses: actions/checkout@v4.1.7
 
-    - name: Add MSBuild to PATH
-      uses: microsoft/setup-msbuild@v1.1.3
+      - name: Add MSBuild to PATH
+        uses: microsoft/setup-msbuild@v1.1.3
 
-    - name: Restore NuGet packages
-      working-directory: ${{env.GITHUB_WORKSPACE}}
-      run: dotnet restore ${{env.SOLUTION_FILE_PATH}}
+      - name: Restore NuGet packages
+        working-directory: ${{env.GITHUB_WORKSPACE}}
+        run: dotnet restore ${{env.SOLUTION_FILE_PATH}}
 
-    - name: Building Release (x86_64)
-      working-directory: ${{env.GITHUB_WORKSPACE}}
-      run: msbuild /m /p:Configuration=Release /p:Platform=x64 ${{env.SOLUTION_FILE_PATH}}
+      - name: Building Release (x86_64)
+        working-directory: ${{env.GITHUB_WORKSPACE}}
+        run: msbuild /m /p:Configuration=Release /p:Platform=x64 ${{env.SOLUTION_FILE_PATH}}
 
-    - name: Uploading build
-      uses: actions/upload-artifact@v4
-      with:
-        name: Builds
-        path: |
-          ${{env.SOLUTION_FILE_PATH}}\build\**\*.exe
-          ${{env.SOLUTION_FILE_PATH}}\build\**\*.pdb
-        if-no-files-found: error
+      - name: Uploading build
+        uses: actions/upload-artifact@v4
+        with:
+          name: BuildRelease64
+          path: |
+            ${{env.SOLUTION_FILE_PATH}}\build\**\*.exe
+            ${{env.SOLUTION_FILE_PATH}}\build\**\*.pdb
+          if-no-files-found: error
 
-  testing:
+  testing-debug:
     name: Testing Debug
     runs-on: self-hosted
-    needs: [ building-debug-x86, building-debug-x86-64, building-release-x86, building-release-x86-64 ]
+    needs: [ building-debug-x86, building-debug-x86-64 ]
 
     steps:
-    - name: Downloading builds
-      uses: actions/download-artifact@v4
-      with:
-        name: Builds
-        path: |
-          ${{env.SOLUTION_FILE_PATH}}\build
+      - name: Downloading Debug (x86)
+        uses: actions/download-artifact@v4
+        with:
+          name: BuildDebug32
+          path: |
+            ${{env.SOLUTION_FILE_PATH}}\build
 
-    - name: Checking Debug (x86)
-      if: always()
-      timeout-minutes: 3
-      working-directory: ${{env.GITHUB_WORKSPACE}}
-      run: python "C:\DeleakerConsole.py" --known-leak "doctest::detail::`dynamic initializer for 'g_oss'',`dynamic initializer for 'doctest::`anonymous namespace'::DebugOutputWindowReporter::oss'',doctest::detail::`dynamic initializer for 'g_infoContexts''" --max-allow-leaks 6 --export-xml-report-on-exit "${{env.SOLUTION_FILE_PATH}}\build\x86\Debug\report.xml" --run "${{env.SOLUTION_FILE_PATH}}\build\x86\Debug\Detours.exe"
+      - name: Downloading Debug (x86_64)
+        uses: actions/download-artifact@v4
+        with:
+          name: BuildDebug64
+          path: |
+            ${{env.SOLUTION_FILE_PATH}}\build
 
-    - name: Checking Debug (x86_64)
-      if: always()
-      timeout-minutes: 3
-      working-directory: ${{env.GITHUB_WORKSPACE}}
-      run: python "C:\DeleakerConsole.py" --known-leak "doctest::detail::`dynamic initializer for 'g_oss'',`dynamic initializer for 'doctest::`anonymous namespace'::DebugOutputWindowReporter::oss'',doctest::detail::`dynamic initializer for 'g_infoContexts''" --max-allow-leaks 6 --export-xml-report-on-exit "${{env.SOLUTION_FILE_PATH}}\build\x86_64\Debug\report.xml" --run "${{env.SOLUTION_FILE_PATH}}\build\x86_64\Debug\Detours.exe"
+      - name: Checking Debug (x86)
+        if: always()
+        timeout-minutes: 3
+        working-directory: ${{env.GITHUB_WORKSPACE}}
+        run: python "C:\DeleakerConsole.py" --known-leak "doctest::detail::`dynamic initializer for 'g_oss'',`dynamic initializer for 'doctest::`anonymous namespace'::DebugOutputWindowReporter::oss'',doctest::detail::`dynamic initializer for 'g_infoContexts''" --max-allow-leaks 6 --export-xml-report-on-exit "${{env.SOLUTION_FILE_PATH}}\build\x86\Debug\report.xml" --run "${{env.SOLUTION_FILE_PATH}}\build\x86\Debug\Detours.exe"
 
-    - name: Uploading results
-      uses: actions/upload-artifact@v4
-      with:
-        name: Testing
-        path: |
-          ${{env.SOLUTION_FILE_PATH}}\build\**\*.xml
-        if-no-files-found: error
+      - name: Checking Debug (x86_64)
+        if: always()
+        timeout-minutes: 3
+        working-directory: ${{env.GITHUB_WORKSPACE}}
+        run: python "C:\DeleakerConsole.py" --known-leak "doctest::detail::`dynamic initializer for 'g_oss'',`dynamic initializer for 'doctest::`anonymous namespace'::DebugOutputWindowReporter::oss'',doctest::detail::`dynamic initializer for 'g_infoContexts''" --max-allow-leaks 6 --export-xml-report-on-exit "${{env.SOLUTION_FILE_PATH}}\build\x86_64\Debug\report.xml" --run "${{env.SOLUTION_FILE_PATH}}\build\x86_64\Debug\Detours.exe"
+
+      - name: Uploading results
+        uses: actions/upload-artifact@v4
+        with:
+          name: DebugTesting32
+          path: |
+            ${{env.SOLUTION_FILE_PATH}}\build\**\*.xml
+          if-no-files-found: error
+
+  testing-release:
+    name: Testing Release
+    runs-on: self-hosted
+    needs: [ testing-debug, building-release-x86, building-release-x86-64 ]
+
+    steps:
+      - name: Downloading Release (x86)
+        uses: actions/download-artifact@v4
+        with:
+          name: BuildRelease32
+          path: |
+            ${{env.SOLUTION_FILE_PATH}}\build
+  
+      - name: Downloading Release (x86_64)
+        uses: actions/download-artifact@v4
+        with:
+          name: BuildRelease64
+          path: |
+            ${{env.SOLUTION_FILE_PATH}}\build
+
+      - name: Checking Release (x86)
+        if: always()
+        timeout-minutes: 3
+        working-directory: ${{env.GITHUB_WORKSPACE}}
+        run: python "C:\DeleakerConsole.py" --known-leak "doctest::detail::`dynamic initializer for 'g_oss'',`dynamic initializer for 'doctest::`anonymous namespace'::DebugOutputWindowReporter::oss'',doctest::detail::`dynamic initializer for 'g_infoContexts''" --max-allow-leaks 6 --export-xml-report-on-exit "${{env.SOLUTION_FILE_PATH}}\build\x86\Release\report.xml" --run "${{env.SOLUTION_FILE_PATH}}\build\x86\Release\Detours.exe"
+
+      - name: Checking Release (x86_64)
+        if: always()
+        timeout-minutes: 3
+        working-directory: ${{env.GITHUB_WORKSPACE}}
+        run: python "C:\DeleakerConsole.py" --known-leak "doctest::detail::`dynamic initializer for 'g_oss'',`dynamic initializer for 'doctest::`anonymous namespace'::DebugOutputWindowReporter::oss'',doctest::detail::`dynamic initializer for 'g_infoContexts''" --max-allow-leaks 6 --export-xml-report-on-exit "${{env.SOLUTION_FILE_PATH}}\build\x86_64\Release\report.xml" --run "${{env.SOLUTION_FILE_PATH}}\build\x86_64\Release\Detours.exe"
+
+      - name: Uploading results
+        uses: actions/upload-artifact@v4
+        with:
+          name: ReleaseTesting32
+          path: |
+            ${{env.SOLUTION_FILE_PATH}}\build\**\*.xml
+          if-no-files-found: error
 
   signing:
     name: Signing Release
     runs-on: self-hosted
-    needs: testing
+    needs: testing-release
 
     steps:
-    - name: Downloading builds
-      uses: actions/download-artifact@v4
-      with:
-        name: Builds
-        path: |
-          ${{env.SOLUTION_FILE_PATH}}\build
+      - name: Downloading builds
+        uses: actions/download-artifact@v4
+        with:
+          name: BuildRelease32
+          path: |
+            ${{env.SOLUTION_FILE_PATH}}\build
 
-    - name: Uploading Release
-      uses: actions/upload-artifact@v4
-      with:
-        name: Release
-        path: |
-          ${{env.SOLUTION_FILE_PATH}}\build\**\*.exe
-        if-no-files-found: error
+      - name: Uploading Release
+        uses: actions/upload-artifact@v4
+        with:
+          name: Production
+          path: |
+            ${{env.SOLUTION_FILE_PATH}}\build\**\Release\*.exe
+          if-no-files-found: error
