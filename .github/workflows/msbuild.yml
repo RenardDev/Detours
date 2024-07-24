@@ -14,8 +14,8 @@ permissions:
   actions: read
 
 jobs:
-  analysis:
-    name: Analysis
+  analysis-debug-x86:
+    name: Analysis Debug (x86)
     runs-on: self-hosted
 
     steps:
@@ -35,26 +35,34 @@ jobs:
           mkdir "${{env.SOLUTION_FILE_PATH}}\build\x86\Debug"
           python "C:\PVS-Studio_Cmd.py" --settings "C:\Settings.xml" --target "${{env.SOLUTION_FILE_PATH}}\Detours.sln" --useSuppressFile "${{env.SOLUTION_FILE_PATH}}\SuppressionFile.suppress" --configuration Debug --platform x86 --output "${{env.SOLUTION_FILE_PATH}}\build\x86\Debug\results.plog"
 
+      - name: Uploading results
+        uses: actions/upload-artifact@v4
+        with:
+          name: Analysis
+          path: |
+            ${{env.SOLUTION_FILE_PATH}}\build\**\*.plog
+          if-no-files-found: error
+
+  analysis-debug-x86-64:
+    name: Analysis Debug (x86_64)
+    runs-on: self-hosted
+
+    steps:
+      - uses: actions/checkout@v4.1.7
+  
+      - name: Add MSBuild to PATH
+        uses: microsoft/setup-msbuild@v1.1.3
+  
+      - name: Restore NuGet packages
+        working-directory: ${{env.GITHUB_WORKSPACE}}
+        run: dotnet restore ${{env.SOLUTION_FILE_PATH}}
+
       - name: Analysis Debug (x86_64)
         if: always()
         working-directory: ${{env.GITHUB_WORKSPACE}}
         run: |
           mkdir "${{env.SOLUTION_FILE_PATH}}\build\x86_64\Debug"
           python "C:\PVS-Studio_Cmd.py" --settings "C:\Settings.xml" --target "${{env.SOLUTION_FILE_PATH}}\Detours.sln" --useSuppressFile "${{env.SOLUTION_FILE_PATH}}\SuppressionFile.suppress" --configuration Debug --platform x64 --output "${{env.SOLUTION_FILE_PATH}}\build\x86_64\Debug\results.plog"
-
-      - name: Analysis Release (x86)
-        if: always()
-        working-directory: ${{env.GITHUB_WORKSPACE}}
-        run: |
-          mkdir "${{env.SOLUTION_FILE_PATH}}\build\x86\Release"
-          python "C:\PVS-Studio_Cmd.py" --settings "C:\Settings.xml" --target "${{env.SOLUTION_FILE_PATH}}\Detours.sln" --useSuppressFile "${{env.SOLUTION_FILE_PATH}}\SuppressionFile.suppress" --configuration Release --platform x86 --output "${{env.SOLUTION_FILE_PATH}}\build\x86\Release\results.plog"
-
-      - name: Analysis Release (x86_64)
-        if: always()
-        working-directory: ${{env.GITHUB_WORKSPACE}}
-        run: |
-          mkdir "${{env.SOLUTION_FILE_PATH}}\build\x86_64\Release"
-          python "C:\PVS-Studio_Cmd.py" --settings "C:\Settings.xml" --target "${{env.SOLUTION_FILE_PATH}}\Detours.sln" --useSuppressFile "${{env.SOLUTION_FILE_PATH}}\SuppressionFile.suppress" --configuration Release --platform x64 --output "${{env.SOLUTION_FILE_PATH}}\build\x86_64\Release\results.plog"    
 
       - name: Uploading results
         uses: actions/upload-artifact@v4
@@ -64,10 +72,68 @@ jobs:
             ${{env.SOLUTION_FILE_PATH}}\build\**\*.plog
           if-no-files-found: error
 
-  building:
-    name: Building
+  analysis-release-x86:
+    name: Analysis Release (x86)
+    runs-on: self-hosted
+
+    steps:
+      - uses: actions/checkout@v4.1.7
+  
+      - name: Add MSBuild to PATH
+        uses: microsoft/setup-msbuild@v1.1.3
+  
+      - name: Restore NuGet packages
+        working-directory: ${{env.GITHUB_WORKSPACE}}
+        run: dotnet restore ${{env.SOLUTION_FILE_PATH}}
+
+      - name: Analysis Release (x86)
+        if: always()
+        working-directory: ${{env.GITHUB_WORKSPACE}}
+        run: |
+          mkdir "${{env.SOLUTION_FILE_PATH}}\build\x86\Release"
+          python "C:\PVS-Studio_Cmd.py" --settings "C:\Settings.xml" --target "${{env.SOLUTION_FILE_PATH}}\Detours.sln" --useSuppressFile "${{env.SOLUTION_FILE_PATH}}\SuppressionFile.suppress" --configuration Release --platform x86 --output "${{env.SOLUTION_FILE_PATH}}\build\x86\Debug\results.plog"
+
+      - name: Uploading results
+        uses: actions/upload-artifact@v4
+        with:
+          name: Analysis
+          path: |
+            ${{env.SOLUTION_FILE_PATH}}\build\**\*.plog
+          if-no-files-found: error
+
+  analysis-release-x86-64:
+    name: Analysis Release (x86_64)
+    runs-on: self-hosted
+
+    steps:
+      - uses: actions/checkout@v4.1.7
+  
+      - name: Add MSBuild to PATH
+        uses: microsoft/setup-msbuild@v1.1.3
+  
+      - name: Restore NuGet packages
+        working-directory: ${{env.GITHUB_WORKSPACE}}
+        run: dotnet restore ${{env.SOLUTION_FILE_PATH}}
+
+      - name: Analysis Release (x86_64)
+        if: always()
+        working-directory: ${{env.GITHUB_WORKSPACE}}
+        run: |
+          mkdir "${{env.SOLUTION_FILE_PATH}}\build\x86_64\Release"
+          python "C:\PVS-Studio_Cmd.py" --settings "C:\Settings.xml" --target "${{env.SOLUTION_FILE_PATH}}\Detours.sln" --useSuppressFile "${{env.SOLUTION_FILE_PATH}}\SuppressionFile.suppress" --configuration Release --platform x64 --output "${{env.SOLUTION_FILE_PATH}}\build\x86_64\Debug\results.plog"
+
+      - name: Uploading results
+        uses: actions/upload-artifact@v4
+        with:
+          name: Analysis
+          path: |
+            ${{env.SOLUTION_FILE_PATH}}\build\**\*.plog
+          if-no-files-found: error
+
+  building-debug-x86:
+    name: Building Debug (x86)
     runs-on: windows-latest
-    needs: analysis
+    needs: analysis-debug-x86
 
     steps:
     - uses: actions/checkout@v4.1.7
@@ -83,19 +149,91 @@ jobs:
       working-directory: ${{env.GITHUB_WORKSPACE}}
       run: msbuild /m /p:Configuration=Debug /p:Platform=x86 ${{env.SOLUTION_FILE_PATH}}
 
+    - name: Uploading build
+      uses: actions/upload-artifact@v4
+      with:
+        name: Builds
+        path: |
+          ${{env.SOLUTION_FILE_PATH}}\build\**\*.exe
+          ${{env.SOLUTION_FILE_PATH}}\build\**\*.pdb
+        if-no-files-found: error
+
+  building-debug-x86-64:
+    name: Building Debug (x86_64)
+    runs-on: windows-latest
+    needs: analysis-debug-x86-64
+
+    steps:
+    - uses: actions/checkout@v4.1.7
+
+    - name: Add MSBuild to PATH
+      uses: microsoft/setup-msbuild@v1.1.3
+
+    - name: Restore NuGet packages
+      working-directory: ${{env.GITHUB_WORKSPACE}}
+      run: dotnet restore ${{env.SOLUTION_FILE_PATH}}
+
     - name: Building Debug (x86_64)
       working-directory: ${{env.GITHUB_WORKSPACE}}
       run: msbuild /m /p:Configuration=Debug /p:Platform=x64 ${{env.SOLUTION_FILE_PATH}}
+
+    - name: Uploading build
+      uses: actions/upload-artifact@v4
+      with:
+        name: Builds
+        path: |
+          ${{env.SOLUTION_FILE_PATH}}\build\**\*.exe
+          ${{env.SOLUTION_FILE_PATH}}\build\**\*.pdb
+        if-no-files-found: error
+
+  building-release-x86:
+    name: Building Release (x86)
+    runs-on: windows-latest
+    needs: analysis-release-x86
+
+    steps:
+    - uses: actions/checkout@v4.1.7
+
+    - name: Add MSBuild to PATH
+      uses: microsoft/setup-msbuild@v1.1.3
+
+    - name: Restore NuGet packages
+      working-directory: ${{env.GITHUB_WORKSPACE}}
+      run: dotnet restore ${{env.SOLUTION_FILE_PATH}}
 
     - name: Building Release (x86)
       working-directory: ${{env.GITHUB_WORKSPACE}}
       run: msbuild /m /p:Configuration=Release /p:Platform=x86 ${{env.SOLUTION_FILE_PATH}}
 
+    - name: Uploading build
+      uses: actions/upload-artifact@v4
+      with:
+        name: Builds
+        path: |
+          ${{env.SOLUTION_FILE_PATH}}\build\**\*.exe
+          ${{env.SOLUTION_FILE_PATH}}\build\**\*.pdb
+        if-no-files-found: error
+
+  building-release-x86-64:
+    name: Building Release (x86_64)
+    runs-on: windows-latest
+    needs: analysis-release-x86-64
+
+    steps:
+    - uses: actions/checkout@v4.1.7
+
+    - name: Add MSBuild to PATH
+      uses: microsoft/setup-msbuild@v1.1.3
+
+    - name: Restore NuGet packages
+      working-directory: ${{env.GITHUB_WORKSPACE}}
+      run: dotnet restore ${{env.SOLUTION_FILE_PATH}}
+
     - name: Building Release (x86_64)
       working-directory: ${{env.GITHUB_WORKSPACE}}
       run: msbuild /m /p:Configuration=Release /p:Platform=x64 ${{env.SOLUTION_FILE_PATH}}
 
-    - name: Uploading builds
+    - name: Uploading build
       uses: actions/upload-artifact@v4
       with:
         name: Builds
@@ -107,7 +245,7 @@ jobs:
   testing:
     name: Testing
     runs-on: self-hosted
-    needs: building
+    needs: [ building-debug-x86, building-debug-x86-64, building-release-x86, building-release-x86-64 ]
 
     steps:
     - name: Downloading builds
