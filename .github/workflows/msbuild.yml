@@ -172,10 +172,10 @@ jobs:
             ${{env.SOLUTION_FILE_PATH}}\build\**\*.pdb
           if-no-files-found: error
 
-  testing-debug:
-    name: Testing Debug
-    runs-on: self-hosted
-    needs: [ building-debug-x86, building-debug-x86-64 ]
+  testing-debug-x86:
+    name: Testing Debug (x86)
+    runs-on: windows-latest
+    needs: building-debug-x86
 
     steps:
       - name: Downloading Debug (x86)
@@ -185,6 +185,16 @@ jobs:
           path: |
             ${{env.SOLUTION_FILE_PATH}}\build
 
+      - name: Testing Debug (x86)
+        working-directory: ${{env.GITHUB_WORKSPACE}}
+        run: ${{env.SOLUTION_FILE_PATH}}\build\x86\Debug\Detours.exe
+
+  testing-debug-x86-64:
+    name: Testing Debug (x86_64)
+    runs-on: windows-latest
+    needs: building-debug-x86-64
+
+    steps:
       - name: Downloading Debug (x86_64)
         uses: actions/download-artifact@v4
         with:
@@ -192,30 +202,14 @@ jobs:
           path: |
             ${{env.SOLUTION_FILE_PATH}}\build
 
-      - name: Testing Debug (x86)
-        if: always()
-        timeout-minutes: 3
-        working-directory: ${{env.GITHUB_WORKSPACE}}
-        run: python "C:\DeleakerConsole.py" --export-xml-report-on-exit "${{env.SOLUTION_FILE_PATH}}\build\x86\Debug\report.xml" --run "${{env.SOLUTION_FILE_PATH}}\build\x86\Debug\Detours.exe"
-
       - name: Testing Debug (x86_64)
-        if: always()
-        timeout-minutes: 3
         working-directory: ${{env.GITHUB_WORKSPACE}}
-        run: python "C:\DeleakerConsole.py" --export-xml-report-on-exit "${{env.SOLUTION_FILE_PATH}}\build\x86_64\Debug\report.xml" --run "${{env.SOLUTION_FILE_PATH}}\build\x86_64\Debug\Detours.exe"
+        run: ${{env.SOLUTION_FILE_PATH}}\build\x86_64\Debug\Detours.exe
 
-      - name: Uploading results
-        uses: actions/upload-artifact@v4
-        with:
-          name: DebugTesting
-          path: |
-            ${{env.SOLUTION_FILE_PATH}}\build\**\*.xml
-          if-no-files-found: error
-
-  testing-release:
-    name: Testing Release
-    runs-on: self-hosted
-    needs: [ testing-debug, building-release-x86, building-release-x86-64 ]
+  testing-release-x86:
+    name: Testing Release (x86)
+    runs-on: windows-latest
+    needs: building-release-x86
 
     steps:
       - name: Downloading Release (x86)
@@ -224,7 +218,17 @@ jobs:
           name: BuildRelease32
           path: |
             ${{env.SOLUTION_FILE_PATH}}\build
-  
+
+      - name: Testing Release (x86)
+        working-directory: ${{env.GITHUB_WORKSPACE}}
+        run: ${{env.SOLUTION_FILE_PATH}}\build\x86\Debug\Detours.exe
+
+  testing-release-x86-64:
+    name: Testing Release (x86_64)
+    runs-on: windows-latest
+    needs: building-release-x86-64
+
+    steps:
       - name: Downloading Release (x86_64)
         uses: actions/download-artifact@v4
         with:
@@ -232,30 +236,14 @@ jobs:
           path: |
             ${{env.SOLUTION_FILE_PATH}}\build
 
-      - name: Testing Release (x86)
-        if: always()
-        timeout-minutes: 3
-        working-directory: ${{env.GITHUB_WORKSPACE}}
-        run: ${{env.SOLUTION_FILE_PATH}}\build\x86\Release\Detours.exe
-
       - name: Testing Release (x86_64)
-        if: always()
-        timeout-minutes: 3
         working-directory: ${{env.GITHUB_WORKSPACE}}
-        run: ${{env.SOLUTION_FILE_PATH}}\build\x86_64\Release\Detours.exe
+        run: ${{env.SOLUTION_FILE_PATH}}\build\x86_64\Debug\Detours.exe
 
-      - name: Uploading results
-        uses: actions/upload-artifact@v4
-        with:
-          name: ReleaseTesting
-          path: |
-            ${{env.SOLUTION_FILE_PATH}}\build\**\*.xml
-          if-no-files-found: error
-
-  checking-debug:
-    name: Checking Debug
+  checking:
+    name: Checking
     runs-on: self-hosted
-    needs: testing-debug
+    needs: [ testing-debug-x86, testing-debug-x86-64, testing-release-x86, testing-release-x86-64 ]
 
     steps:
       - name: Downloading Debug (x86)
@@ -269,6 +257,20 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: BuildDebug64
+          path: |
+            ${{env.SOLUTION_FILE_PATH}}\build
+
+      - name: Downloading Release (x86)
+        uses: actions/download-artifact@v4
+        with:
+          name: BuildRelease32
+          path: |
+            ${{env.SOLUTION_FILE_PATH}}\build
+
+      - name: Downloading Release (x86_64)
+        uses: actions/download-artifact@v4
+        with:
+          name: BuildRelease64
           path: |
             ${{env.SOLUTION_FILE_PATH}}\build
 
@@ -283,34 +285,6 @@ jobs:
         timeout-minutes: 3
         working-directory: ${{env.GITHUB_WORKSPACE}}
         run: python "C:\DeleakerConsole.py" --export-xml-report-on-exit "${{env.SOLUTION_FILE_PATH}}\build\x86_64\Debug\report.xml" --run "${{env.SOLUTION_FILE_PATH}}\build\x86_64\Debug\Detours.exe"
-
-      - name: Uploading results
-        uses: actions/upload-artifact@v4
-        with:
-          name: DebugChecking
-          path: |
-            ${{env.SOLUTION_FILE_PATH}}\build\**\*.xml
-          if-no-files-found: error
-
-  checking-release:
-    name: Checking Release
-    runs-on: self-hosted
-    needs: [ checking-debug, testing-release ]
-
-    steps:
-      - name: Downloading Release (x86)
-        uses: actions/download-artifact@v4
-        with:
-          name: BuildRelease32
-          path: |
-            ${{env.SOLUTION_FILE_PATH}}\build
-  
-      - name: Downloading Release (x86_64)
-        uses: actions/download-artifact@v4
-        with:
-          name: BuildRelease64
-          path: |
-            ${{env.SOLUTION_FILE_PATH}}\build
 
       - name: Checking Release (x86)
         if: always()
@@ -327,7 +301,7 @@ jobs:
       - name: Uploading results
         uses: actions/upload-artifact@v4
         with:
-          name: ReleaseChecking
+          name: DebugChecking
           path: |
             ${{env.SOLUTION_FILE_PATH}}\build\**\*.xml
           if-no-files-found: error
@@ -335,7 +309,7 @@ jobs:
   signing:
     name: Signing Release
     runs-on: self-hosted
-    needs: checking-release
+    needs: checking
 
     steps:
       - name: Downloading Release (x86)
