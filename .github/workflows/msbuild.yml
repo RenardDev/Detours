@@ -221,7 +221,7 @@ jobs:
 
       - name: Testing Release (x86)
         working-directory: ${{env.GITHUB_WORKSPACE}}
-        run: ${{env.SOLUTION_FILE_PATH}}\build\x86\Debug\Detours.exe
+        run: ${{env.SOLUTION_FILE_PATH}}\build\x86\Release\Detours.exe
 
   testing-release-x86-64:
     name: Testing Release (x86_64)
@@ -238,7 +238,7 @@ jobs:
 
       - name: Testing Release (x86_64)
         working-directory: ${{env.GITHUB_WORKSPACE}}
-        run: ${{env.SOLUTION_FILE_PATH}}\build\x86_64\Debug\Detours.exe
+        run: ${{env.SOLUTION_FILE_PATH}}\build\x86_64\Release\Detours.exe
 
   checking:
     name: Checking
