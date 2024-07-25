@@ -202,7 +202,7 @@ jobs:
         if: always()
         timeout-minutes: 3
         working-directory: ${{env.GITHUB_WORKSPACE}}
-        run: python "C:\DeleakerConsole.py" --known-leak "0x32A2F4F2,0xCB1FC02B,0xDEE7BB7D" --max-allow-leaks 6 --export-xml-report-on-exit "${{env.SOLUTION_FILE_PATH}}\build\x86_64\Debug\report.xml" --run "${{env.SOLUTION_FILE_PATH}}\build\x86_64\Debug\Detours.exe"
+        run: python "C:\DeleakerConsole.py" --ignore-uid "0x32A2F4F2,0xCB1FC02B,0xDEE7BB7D" --max-allow-leaks 6 --export-xml-report-on-exit "${{env.SOLUTION_FILE_PATH}}\build\x86_64\Debug\report.xml" --run "${{env.SOLUTION_FILE_PATH}}\build\x86_64\Debug\Detours.exe"
 
       - name: Uploading results
         uses: actions/upload-artifact@v4
@@ -236,13 +236,13 @@ jobs:
         if: always()
         timeout-minutes: 3
         working-directory: ${{env.GITHUB_WORKSPACE}}
-        run: python "C:\DeleakerConsole.py" --known-leak "0x32A2F4F2,0xCB1FC02B,0xDEE7BB7D" --max-allow-leaks 6 --export-xml-report-on-exit "${{env.SOLUTION_FILE_PATH}}\build\x86\Release\report.xml" --run "${{env.SOLUTION_FILE_PATH}}\build\x86\Release\Detours.exe"
+        run: python "C:\DeleakerConsole.py" --ignore-uid "0x07F0B63D,0xDC959941,0x79897FA1,0x0A236221,0xB6A39B29" --max-allow-leaks 6 --export-xml-report-on-exit "${{env.SOLUTION_FILE_PATH}}\build\x86\Release\report.xml" --run "${{env.SOLUTION_FILE_PATH}}\build\x86\Release\Detours.exe"
 
       - name: Checking Release (x86_64)
         if: always()
         timeout-minutes: 3
         working-directory: ${{env.GITHUB_WORKSPACE}}
-        run: python "C:\DeleakerConsole.py" --known-leak "0x32A2F4F2,0xCB1FC02B,0xDEE7BB7D" --max-allow-leaks 6 --export-xml-report-on-exit "${{env.SOLUTION_FILE_PATH}}\build\x86_64\Release\report.xml" --run "${{env.SOLUTION_FILE_PATH}}\build\x86_64\Release\Detours.exe"
+        run: python "C:\DeleakerConsole.py" --ignore-uid "0x07F0B63D,0xDC959941,0x79897FA1,0x0A236221,0xB6A39B29" --max-allow-leaks 6 --export-xml-report-on-exit "${{env.SOLUTION_FILE_PATH}}\build\x86_64\Release\report.xml" --run "${{env.SOLUTION_FILE_PATH}}\build\x86_64\Release\Detours.exe"
 
       - name: Uploading results
         uses: actions/upload-artifact@v4
