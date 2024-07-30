@@ -7540,7 +7540,7 @@ namespace Detours {
 							} else if (ReadOperand.Type == RD_OP_REG) {
 								ULONG_PTR unValue = GetRegisterValue(pCTX, ReadOperand.Info.Register.Reg, ReadOperand.Info.Register.Size);
 								if (reinterpret_cast<ULONG_PTR>(pAddress) == unValue) {
-									SetRegisterValue(pCTX, ReadOperand.Info.Register.Reg, ReadOperand.Info.Register.Size, unValue);
+									SetRegisterValue(pCTX, ReadOperand.Info.Register.Reg, ReadOperand.Info.Register.Size, reinterpret_cast<size_t>(pNewAddress));
 								}
 							} else if (ReadOperand.Type == RD_OP_MEM) {
 #ifdef _M_X64
@@ -7611,7 +7611,7 @@ namespace Detours {
 							} else if (WriteOperand.Type == RD_OP_REG) {
 								ULONG_PTR unValue = GetRegisterValue(pCTX, WriteOperand.Info.Register.Reg, WriteOperand.Info.Register.Size);
 								if (reinterpret_cast<ULONG_PTR>(pAddress) == unValue) {
-									SetRegisterValue(pCTX, WriteOperand.Info.Register.Reg, WriteOperand.Info.Register.Size, unValue);
+									SetRegisterValue(pCTX, WriteOperand.Info.Register.Reg, WriteOperand.Info.Register.Size, reinterpret_cast<size_t>(pNewAddress));
 								}
 							} else if (WriteOperand.Type == RD_OP_MEM) {
 #ifdef _M_X64
