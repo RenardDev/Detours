@@ -177,7 +177,7 @@ jobs:
   testing-debug-x86:
     name: Testing Debug (x86)
     runs-on: windows-latest
-    needs: building-debug-x86
+    needs: analysis
 
     steps:
       - name: Downloading Debug (x86)
@@ -195,7 +195,7 @@ jobs:
   testing-debug-x86-64:
     name: Testing Debug (x86_64)
     runs-on: windows-latest
-    needs: building-debug-x86-64
+    needs: analysis
 
     steps:
       - name: Downloading Debug (x86_64)
@@ -213,7 +213,7 @@ jobs:
   testing-release-x86:
     name: Testing Release (x86)
     runs-on: windows-latest
-    needs: building-release-x86
+    needs: analysis
 
     steps:
       - name: Downloading Release (x86)
@@ -231,7 +231,7 @@ jobs:
   testing-release-x86-64:
     name: Testing Release (x86_64)
     runs-on: windows-latest
-    needs: building-release-x86-64
+    needs: analysis
 
     steps:
       - name: Downloading Release (x86_64)
