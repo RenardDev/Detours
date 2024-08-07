@@ -29,24 +29,28 @@ jobs:
         run: dotnet restore ${{env.SOLUTION_FILE_PATH}}
 
       - name: Analysis Debug (x86)
+        if: always()
         working-directory: ${{env.GITHUB_WORKSPACE}}
         run: |
           mkdir "${{env.SOLUTION_FILE_PATH}}\build\x86\Debug"
           python "C:\PVS-Studio_Cmd.py" --settings "C:\Settings.xml" --target "${{env.SOLUTION_FILE_PATH}}\Detours.sln" --useSuppressFile "${{env.SOLUTION_FILE_PATH}}\SuppressionFile.suppress" --configuration Debug --platform x86 --output "${{env.SOLUTION_FILE_PATH}}\build\x86\Debug\results.plog"
 
       - name: Analysis Debug (x86_64)
+        if: always()
         working-directory: ${{env.GITHUB_WORKSPACE}}
         run: |
           mkdir "${{env.SOLUTION_FILE_PATH}}\build\x86_64\Debug"
           python "C:\PVS-Studio_Cmd.py" --settings "C:\Settings.xml" --target "${{env.SOLUTION_FILE_PATH}}\Detours.sln" --useSuppressFile "${{env.SOLUTION_FILE_PATH}}\SuppressionFile.suppress" --configuration Debug --platform x64 --output "${{env.SOLUTION_FILE_PATH}}\build\x86_64\Debug\results.plog"
 
       - name: Analysis Release (x86)
+        if: always()
         working-directory: ${{env.GITHUB_WORKSPACE}}
         run: |
           mkdir "${{env.SOLUTION_FILE_PATH}}\build\x86\Release"
           python "C:\PVS-Studio_Cmd.py" --settings "C:\Settings.xml" --target "${{env.SOLUTION_FILE_PATH}}\Detours.sln" --useSuppressFile "${{env.SOLUTION_FILE_PATH}}\SuppressionFile.suppress" --configuration Release --platform x86 --output "${{env.SOLUTION_FILE_PATH}}\build\x86\Debug\results.plog"
 
       - name: Analysis Release (x86_64)
+        if: always()
         working-directory: ${{env.GITHUB_WORKSPACE}}
         run: |
           mkdir "${{env.SOLUTION_FILE_PATH}}\build\x86_64\Release"
