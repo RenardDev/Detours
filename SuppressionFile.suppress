@@ -163,6 +163,14 @@
   </Detours>
   <Detours>
     <FileName>Detours.cpp</FileName>
+    <ErrorCode>V802</ErrorCode>
+    <Message>On _-bit platform, structure size can be reduced from _ to _ bytes by rearranging the fields according to their sizes in decreasing order.</Message>
+    <CodePrev>0</CodePrev>
+    <CodeCurrent>463190756</CodeCurrent>
+    <CodeNext>623829659</CodeNext>
+  </Detours>
+  <Detours>
+    <FileName>Detours.cpp</FileName>
     <ErrorCode>V835</ErrorCode>
     <Message>Passing cheap-to-copy argument by reference may lead to decreased performance. To avoid this, pass the second argument by value.</Message>
     <CodePrev>0</CodePrev>

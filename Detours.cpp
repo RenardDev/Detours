@@ -7597,14 +7597,18 @@ namespace Detours {
 						}
 
 						pInsn = pInstruction.get();
-						g_CachedInstructions.insert(it, std::make_pair(pExceptionAddress, std::move(pInstruction)));
+						g_CachedInstructions.emplace_hint(it, std::make_pair(pExceptionAddress, std::move(pInstruction)));
 					}
+				}
+
+				if (!pInsn) {
+					return;
 				}
 
 				switch (unOperation) {
 					case MEMORY_HOOK_OPERATION::MEMORY_READ: {
 						if (pInsn->OperandsCount) {
-							auto& ReadOperand = pInsn->Operands[pInsn->OperandsCount - 1];
+							auto ReadOperand = pInsn->Operands[pInsn->OperandsCount - 1];
 							if (!ReadOperand.Access.Read) {
 								return;
 							}
@@ -7644,18 +7648,16 @@ namespace Detours {
 									if (unBase) {
 										const size_t unOffset = reinterpret_cast<size_t>(pAddress) - unBase;
 										SetRegisterValue(pCTX, ReadOperand.Info.Memory.Base, ReadOperand.Info.Memory.BaseSize, reinterpret_cast<size_t>(pNewAddress) - unOffset);
-										auto OperandCopy = ReadOperand;
-										OperandCopy.Info.Memory.HasIndex = false;
-										g_CachedOperations.emplace_back(const_cast<void*>(pExceptionAddress), unOperation, const_cast<void*>(pAddress), OperandCopy, static_cast<char*>(pNewAddress) - unOffset);
+										ReadOperand.Info.Memory.HasIndex = false;
+										g_CachedOperations.emplace_back(const_cast<void*>(pExceptionAddress), unOperation, const_cast<void*>(pAddress), ReadOperand, static_cast<char*>(pNewAddress) - unOffset);
 										return;
 									}
 
 									if (unIndex) {
 										const size_t unOffset = reinterpret_cast<size_t>(pAddress) - unIndex;
 										SetRegisterValue(pCTX, ReadOperand.Info.Memory.Index, ReadOperand.Info.Memory.IndexSize, reinterpret_cast<size_t>(pNewAddress) - unOffset);
-										auto OperandCopy = ReadOperand;
-										OperandCopy.Info.Memory.HasBase = false;
-										g_CachedOperations.emplace_back(const_cast<void*>(pExceptionAddress), unOperation, const_cast<void*>(pAddress), OperandCopy, static_cast<char*>(pNewAddress) - unOffset);
+										ReadOperand.Info.Memory.HasBase = false;
+										g_CachedOperations.emplace_back(const_cast<void*>(pExceptionAddress), unOperation, const_cast<void*>(pAddress), ReadOperand, static_cast<char*>(pNewAddress) - unOffset);
 										return;
 									}
 								}
@@ -7675,7 +7677,7 @@ namespace Detours {
 
 					case MEMORY_HOOK_OPERATION::MEMORY_WRITE: {
 						if (pInsn->OperandsCount) {
-							auto& WriteOperand = pInsn->Operands[pInsn->OperandsCount - 1];
+							auto WriteOperand = pInsn->Operands[pInsn->OperandsCount - 1];
 							if (!WriteOperand.Access.Write) {
 								if (pInsn->OperandsCount > 1) {
 									WriteOperand = pInsn->Operands[pInsn->OperandsCount - 2];
@@ -7721,8 +7723,7 @@ namespace Detours {
 									if (unBase) {
 										const size_t unOffset = reinterpret_cast<size_t>(pAddress) - unBase;
 										SetRegisterValue(pCTX, WriteOperand.Info.Memory.Base, WriteOperand.Info.Memory.BaseSize, reinterpret_cast<size_t>(pNewAddress) - unOffset);
-										auto OperandCopy = WriteOperand;
-										OperandCopy.Info.Memory.HasIndex = false;
+										WriteOperand.Info.Memory.HasIndex = false;
 										g_CachedOperations.emplace_back(const_cast<void*>(pExceptionAddress), unOperation, const_cast<void*>(pAddress), OperandCopy, static_cast<char*>(pNewAddress) - unOffset);
 										return;
 									}
@@ -7730,8 +7731,7 @@ namespace Detours {
 									if (unIndex) {
 										const size_t unOffset = reinterpret_cast<size_t>(pAddress) - unIndex;
 										SetRegisterValue(pCTX, WriteOperand.Info.Memory.Index, WriteOperand.Info.Memory.IndexSize, reinterpret_cast<size_t>(pNewAddress) - unOffset);
-										auto OperandCopy = WriteOperand;
-										OperandCopy.Info.Memory.HasBase = false;
+										WriteOperand.Info.Memory.HasBase = false;
 										g_CachedOperations.emplace_back(const_cast<void*>(pExceptionAddress), unOperation, const_cast<void*>(pAddress), OperandCopy, static_cast<char*>(pNewAddress) - unOffset);
 										return;
 									}
