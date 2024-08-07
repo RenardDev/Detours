@@ -1556,8 +1556,9 @@ TEST_SUITE("Detours::Hook") {
 	typedef bool(__fastcall* fnFooOriginal)(void* pThis, void* /* unused */);
 	typedef bool(__fastcall* fnBooOriginal)(void* pThis, void* /* unused */);
 
-	bool MemoryHook(const PCONTEXT pCTX, Detours::Hook::MEMORY_HOOK_OPERATION unOperation, const void* pAddress, void** pNewAddress) {
+	bool MemoryHook(const PCONTEXT pCTX, const void* pExceptionAddress, Detours::Hook::MEMORY_HOOK_OPERATION unOperation, const void* pAddress, void** pNewAddress) {
 		UNREFERENCED_PARAMETER(pCTX);
+		UNREFERENCED_PARAMETER(pExceptionAddress);
 		UNREFERENCED_PARAMETER(unOperation);
 		UNREFERENCED_PARAMETER(pAddress);
 		UNREFERENCED_PARAMETER(pNewAddress);
@@ -1765,13 +1766,13 @@ TEST_SUITE("Detours::Hook") {
 		srand(time(nullptr) & 0xffffffff);
 		ULONG unBegin = Detours::KUserSharedData.SystemTime.LowPart;
 		for (size_t i = 0; i < 1'000'000; ++i) {
-			reinterpret_cast<unsigned char*>(pAddress)[rand() % (0x800000 - 1)] = 1;
+			reinterpret_cast<unsigned char*>(pAddress)[0] = 1;
 		}
 		MESSAGE("Benckmark with 1 000 000 iterations (without hook): ", (Detours::KUserSharedData.SystemTime.LowPart - unBegin) / 10000, " ms");
 		CHECK(Detours::Hook::HookMemory(MemoryHook, Region.GetRegionAddress(), Region.GetRegionCapacity()) == true);
 		unBegin = Detours::KUserSharedData.SystemTime.LowPart;
 		for (size_t i = 0; i < 1'000'000; ++i) {
-			reinterpret_cast<unsigned char*>(pAddress)[rand() % (0x800000 - 1)] = 2;
+			reinterpret_cast<unsigned char*>(pAddress)[0] = 2;
 		}
 		MESSAGE("Benckmark with 1 000 000 iterations (with hook): ", (Detours::KUserSharedData.SystemTime.LowPart - unBegin) / 10000, " ms");
 		CHECK(Detours::Hook::UnHookMemory(MemoryHook) == true);

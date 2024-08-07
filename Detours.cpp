@@ -3,6 +3,10 @@
 // Default
 #include <tchar.h>
 
+// STL
+#include <unordered_map>
+#include <deque>
+
 #ifndef MAX
 #define MAX(a, b) (((a) > (b)) ? (a) : (b))
 #endif
@@ -7507,10 +7511,36 @@ namespace Detours {
 					}
 					break;
 #endif
+				case RD_REG_RIP:
+#ifdef _M_X64
+					pCTX->Rip = unValue;
+#elif _M_IX86
+					pCTX->Eip = unValue;
+#endif
+					break;
 				default:
 					break;
 			}
 		}
+
+		typedef struct _CACHED_OPERATION {
+			_CACHED_OPERATION(void* pExceptionAddress, MEMORY_HOOK_OPERATION unOperation, void* pAddress, RD_OPERAND& Operand, void* pNewAddress) {
+				m_pExceptionAddress = pExceptionAddress;
+				m_unOperation = unOperation;
+				m_pAddress = pAddress;
+				m_Operand = Operand;
+				m_pNewAddress = pNewAddress;
+			}
+
+			void* m_pExceptionAddress;
+			MEMORY_HOOK_OPERATION m_unOperation;
+			void* m_pAddress;
+			RD_OPERAND m_Operand;
+			void* m_pNewAddress;
+		} CACHED_OPERATION, *PCACHED_OPERATION;
+
+		static std::deque<CACHED_OPERATION> g_CachedOperations;
+		static std::unordered_map<const void*, std::unique_ptr<INSTRUCTION>> g_CachedInstructions;
 
 		static void FixMemoryHookAddress(const PCONTEXT pCTX, const void* pExceptionAddress, MEMORY_HOOK_OPERATION unOperation, const void* pAddress, void* pNewAddress) {
 			if (!pCTX || !pAddress || !pNewAddress) {
@@ -7518,19 +7548,63 @@ namespace Detours {
 			}
 
 			if (pExceptionAddress) {
-				INSTRUCTION ins;
+				for (auto& CachedOperation : g_CachedOperations) {
+					if ((CachedOperation.m_pExceptionAddress == pExceptionAddress) && (CachedOperation.m_unOperation == unOperation) && (CachedOperation.m_pAddress == pAddress)) {
+						auto& Operand = CachedOperation.m_Operand;
+
+						if (Operand.Type == RD_OP_REG) {
+							SetRegisterValue(pCTX, Operand.Info.Register.Reg, Operand.Info.Register.Size, reinterpret_cast<ULONG_PTR>(CachedOperation.m_pNewAddress));
+							return;
+						} else if (Operand.Type == RD_OP_MEM) {
+							if (Operand.Info.Memory.HasIndex) {
+								SetRegisterValue(pCTX, Operand.Info.Memory.Index, Operand.Info.Memory.IndexSize, reinterpret_cast<ULONG_PTR>(CachedOperation.m_pNewAddress));
+								return;
+							}
+
+							if (Operand.Info.Memory.HasBase) {
+								SetRegisterValue(pCTX, Operand.Info.Memory.Base, Operand.Info.Memory.BaseSize, reinterpret_cast<ULONG_PTR>(CachedOperation.m_pNewAddress));
+								return;
+							}
+						}
+
+						break;
+					}
+				}
+
+				PINSTRUCTION pInsn = nullptr;
+
+				{
+					bool bIsCachedInstruction = false;
+
+					auto it = g_CachedInstructions.find(pExceptionAddress);
+					if (it != g_CachedInstructions.end()) {
+						pInsn = it->second.get();
+						bIsCachedInstruction = true;
+					}
+
+					if (!bIsCachedInstruction) {
+						auto pInstruction = std::make_unique<INSTRUCTION>();
+						if (!pInstruction) {
+							return;
+						}
+
 #ifdef _M_X64
-				if (!RD_SUCCESS(RdDecode(&ins, reinterpret_cast<unsigned char*>(const_cast<void*>(pExceptionAddress)), RD_CODE_64, RD_DATA_64))) {
+						if (!RD_SUCCESS(RdDecode(pInstruction.get(), reinterpret_cast<unsigned char*>(const_cast<void*>(pExceptionAddress)), RD_CODE_64, RD_DATA_64))) {
 #elif _M_IX86
-				if (!RD_SUCCESS(RdDecode(&ins, reinterpret_cast<unsigned char*>(const_cast<void*>(pExceptionAddress)), RD_CODE_32, RD_DATA_32))) {
+						if (!RD_SUCCESS(RdDecode(pInstruction.get(), reinterpret_cast<unsigned char*>(const_cast<void*>(pExceptionAddress)), RD_CODE_32, RD_DATA_32))) {
 #endif
-					return;
+							return;
+						}
+
+						pInsn = pInstruction.get();
+						g_CachedInstructions.insert(it, std::make_pair(pExceptionAddress, std::move(pInstruction)));
+					}
 				}
 
 				switch (unOperation) {
 					case MEMORY_HOOK_OPERATION::MEMORY_READ: {
-						if (ins.OperandsCount) {
-							auto& ReadOperand = ins.Operands[ins.OperandsCount - 1];
+						if (pInsn->OperandsCount) {
+							auto& ReadOperand = pInsn->Operands[pInsn->OperandsCount - 1];
 							if (!ReadOperand.Access.Read) {
 								return;
 							}
@@ -7541,6 +7615,8 @@ namespace Detours {
 								ULONG_PTR unValue = GetRegisterValue(pCTX, ReadOperand.Info.Register.Reg, ReadOperand.Info.Register.Size);
 								if (reinterpret_cast<ULONG_PTR>(pAddress) == unValue) {
 									SetRegisterValue(pCTX, ReadOperand.Info.Register.Reg, ReadOperand.Info.Register.Size, reinterpret_cast<size_t>(pNewAddress));
+									g_CachedOperations.emplace_back(const_cast<void*>(pExceptionAddress), unOperation, const_cast<void*>(pAddress), ReadOperand, pNewAddress);
+									return;
 								}
 							} else if (ReadOperand.Type == RD_OP_MEM) {
 #ifdef _M_X64
@@ -7568,16 +7644,20 @@ namespace Detours {
 									if (unBase) {
 										const size_t unOffset = reinterpret_cast<size_t>(pAddress) - unBase;
 										SetRegisterValue(pCTX, ReadOperand.Info.Memory.Base, ReadOperand.Info.Memory.BaseSize, reinterpret_cast<size_t>(pNewAddress) - unOffset);
+										auto OperandCopy = ReadOperand;
+										OperandCopy.Info.Memory.HasIndex = false;
+										g_CachedOperations.emplace_back(const_cast<void*>(pExceptionAddress), unOperation, const_cast<void*>(pAddress), OperandCopy, static_cast<char*>(pNewAddress) - unOffset);
 										return;
 									}
 
 									if (unIndex) {
 										const size_t unOffset = reinterpret_cast<size_t>(pAddress) - unIndex;
 										SetRegisterValue(pCTX, ReadOperand.Info.Memory.Index, ReadOperand.Info.Memory.IndexSize, reinterpret_cast<size_t>(pNewAddress) - unOffset);
+										auto OperandCopy = ReadOperand;
+										OperandCopy.Info.Memory.HasBase = false;
+										g_CachedOperations.emplace_back(const_cast<void*>(pExceptionAddress), unOperation, const_cast<void*>(pAddress), OperandCopy, static_cast<char*>(pNewAddress) - unOffset);
 										return;
 									}
-
-									return;
 								}
 							} else if (ReadOperand.Type == RD_OP_IMM) {
 								__debugbreak(); // TODO: Implement.
@@ -7594,11 +7674,11 @@ namespace Detours {
 					}
 
 					case MEMORY_HOOK_OPERATION::MEMORY_WRITE: {
-						if (ins.OperandsCount) {
-							auto& WriteOperand = ins.Operands[ins.OperandsCount - 1];
+						if (pInsn->OperandsCount) {
+							auto& WriteOperand = pInsn->Operands[pInsn->OperandsCount - 1];
 							if (!WriteOperand.Access.Write) {
-								if (ins.OperandsCount > 1) {
-									WriteOperand = ins.Operands[ins.OperandsCount - 2];
+								if (pInsn->OperandsCount > 1) {
+									WriteOperand = pInsn->Operands[pInsn->OperandsCount - 2];
 								}
 
 								if (!WriteOperand.Access.Write) {
@@ -7612,6 +7692,8 @@ namespace Detours {
 								ULONG_PTR unValue = GetRegisterValue(pCTX, WriteOperand.Info.Register.Reg, WriteOperand.Info.Register.Size);
 								if (reinterpret_cast<ULONG_PTR>(pAddress) == unValue) {
 									SetRegisterValue(pCTX, WriteOperand.Info.Register.Reg, WriteOperand.Info.Register.Size, reinterpret_cast<size_t>(pNewAddress));
+									g_CachedOperations.emplace_back(const_cast<void*>(pExceptionAddress), unOperation, const_cast<void*>(pAddress), WriteOperand, pNewAddress);
+									return;
 								}
 							} else if (WriteOperand.Type == RD_OP_MEM) {
 #ifdef _M_X64
@@ -7639,16 +7721,20 @@ namespace Detours {
 									if (unBase) {
 										const size_t unOffset = reinterpret_cast<size_t>(pAddress) - unBase;
 										SetRegisterValue(pCTX, WriteOperand.Info.Memory.Base, WriteOperand.Info.Memory.BaseSize, reinterpret_cast<size_t>(pNewAddress) - unOffset);
+										auto OperandCopy = WriteOperand;
+										OperandCopy.Info.Memory.HasIndex = false;
+										g_CachedOperations.emplace_back(const_cast<void*>(pExceptionAddress), unOperation, const_cast<void*>(pAddress), OperandCopy, static_cast<char*>(pNewAddress) - unOffset);
 										return;
 									}
 
 									if (unIndex) {
 										const size_t unOffset = reinterpret_cast<size_t>(pAddress) - unIndex;
 										SetRegisterValue(pCTX, WriteOperand.Info.Memory.Index, WriteOperand.Info.Memory.IndexSize, reinterpret_cast<size_t>(pNewAddress) - unOffset);
+										auto OperandCopy = WriteOperand;
+										OperandCopy.Info.Memory.HasBase = false;
+										g_CachedOperations.emplace_back(const_cast<void*>(pExceptionAddress), unOperation, const_cast<void*>(pAddress), OperandCopy, static_cast<char*>(pNewAddress) - unOffset);
 										return;
 									}
-
-									return;
 								}
 							} else if (WriteOperand.Type == RD_OP_IMM) {
 								__debugbreak(); // TODO: Implement.
@@ -7826,7 +7912,7 @@ namespace Detours {
 								}
 							}
 
-							const bool bResult = pRecord->m_pCallBack(pCTX, unOperation, pAddress, &pNewAddress);
+							const bool bResult = pRecord->m_pCallBack(pCTX, pExceptionAddress, unOperation, pAddress, &pNewAddress);
 							if (bResult) {
 								FixMemoryHookAddress(pCTX, pExceptionAddress, unOperation, pAddress, pNewAddress);
 							}
