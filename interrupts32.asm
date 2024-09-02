@@ -42,4 +42,9 @@
 		pop eax
 		ret
 	CallInterrupt endp
+
+	CallInrerruptReturn proc
+		add esp, 4
+		iretd
+	CallInrerruptReturn endp
 end

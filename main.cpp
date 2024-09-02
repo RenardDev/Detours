@@ -11,6 +11,7 @@
 #include <typeinfo>
 #include <iostream>
 #include <bitset>
+#include <unordered_map>
 
 // Detours
 #include "Detours.h"
@@ -25,8 +26,10 @@
 // interrupts32.asm/interrupts64.asm
 #ifdef _M_X64
 extern "C" unsigned long long __cdecl CallInterrupt(unsigned long long unRAX, unsigned long long unRCX, unsigned long long unRDX, unsigned long long unRBX, unsigned long long unRBP, unsigned long long unRSI, unsigned long long unRDI, unsigned long long unR8, unsigned long long unR9, unsigned long long unR10, unsigned long long unR11, unsigned long long unR12, unsigned long long unR13, unsigned long long unR14, unsigned long long unR15);
+extern "C" void __cdecl CallInrerruptReturn(unsigned long long unRIP, unsigned long long unCS, unsigned long long unRFLAGS, unsigned long long unRSP, unsigned long long unSS);
 #elif _M_IX86
 extern "C" unsigned int __cdecl CallInterrupt(unsigned int unEAX, unsigned int unECX, unsigned int unEDX, unsigned int unEBX, unsigned int unEBP, unsigned int unESI, unsigned int unEDI);
+extern "C" void __cdecl CallInrerruptReturn(unsigned int unEIP, unsigned int unCS, unsigned int unEFLAGS, unsigned int unESP, unsigned int unSS);
 #endif
 
 class BaseMessage {
@@ -1556,14 +1559,49 @@ TEST_SUITE("Detours::Hook") {
 	typedef bool(__fastcall* fnFooOriginal)(void* pThis, void* /* unused */);
 	typedef bool(__fastcall* fnBooOriginal)(void* pThis, void* /* unused */);
 
-	bool MemoryHook(const PCONTEXT pCTX, const void* pExceptionAddress, Detours::Hook::MEMORY_HOOK_OPERATION unOperation, const void* pAddress, void** pNewAddress) {
+	bool MemoryHook(const PCONTEXT pCTX, const void* pExceptionAddress, Detours::Hook::MEMORY_HOOK_OPERATION unOperation, const void* pHookAddress, const void* pAccessAddress, void** pNewAccessAddress) {
 		UNREFERENCED_PARAMETER(pCTX);
 		UNREFERENCED_PARAMETER(pExceptionAddress);
 		UNREFERENCED_PARAMETER(unOperation);
-		UNREFERENCED_PARAMETER(pAddress);
-		UNREFERENCED_PARAMETER(pNewAddress);
+		UNREFERENCED_PARAMETER(pHookAddress);
+		UNREFERENCED_PARAMETER(pAccessAddress);
+		UNREFERENCED_PARAMETER(pNewAccessAddress);
 
 		//_tprintf_s(_T("Mem access!\n"));
+
+		return true;
+	}
+
+	bool MemoryArrayHook(const PCONTEXT pCTX, const void* pExceptionAddress, Detours::Hook::MEMORY_HOOK_OPERATION unOperation, const void* pHookAddress, const void* pAccessAddress, void** pNewAccessAddress) {
+		UNREFERENCED_PARAMETER(pCTX);
+		UNREFERENCED_PARAMETER(pExceptionAddress);
+		UNREFERENCED_PARAMETER(unOperation);
+		UNREFERENCED_PARAMETER(pHookAddress);
+		UNREFERENCED_PARAMETER(pAccessAddress);
+		UNREFERENCED_PARAMETER(pNewAccessAddress);
+
+		//_tprintf_s(_T("Mem access!\n"));
+
+		static std::unordered_map<DWORD, size_t> Previous;
+		const size_t unCurrentOffset = reinterpret_cast<size_t>(pAccessAddress) - reinterpret_cast<size_t>(pHookAddress);
+		const DWORD unThreadID = GetCurrentThreadId();
+
+		static unsigned int pNewArray[] = {
+			6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 0
+		};
+
+		auto it = Previous.find(unThreadID);
+		if ((it == Previous.end()) || !unCurrentOffset) {
+			*pNewAccessAddress = pNewArray;
+			Previous[unThreadID] = unCurrentOffset;
+			return true;
+		}
+
+		if (unCurrentOffset == it->second + sizeof(unsigned int)) {
+			*pNewAccessAddress = reinterpret_cast<char*>(pNewArray) + unCurrentOffset;
+			Previous[unThreadID] = unCurrentOffset;
+			return true;
+		}
 
 		return true;
 	}
@@ -1724,7 +1762,60 @@ TEST_SUITE("Detours::Hook") {
 		return true;
 	}
 
-	TEST_CASE("MemoryHook") {
+	TEST_CASE("MemoryHook 1") {
+		static Detours::Memory::Page Page;
+		void* pData = Page.Alloc(Page.GetPageCapacity());
+		CHECK(pData != nullptr);
+
+		static const unsigned int pSourceArray[] = {
+			1, 2, 3, 4, 5, 0, // first array
+			1, 2, 3, 4, 5, 6, 0 // second array
+		};
+
+		memcpy(pData, pSourceArray, sizeof(pSourceArray));
+
+		printf("Before MemoryHook:\n");
+
+		printf("\n");
+		for (unsigned int i = 0; reinterpret_cast<unsigned int*>(pData)[i] != 0; ++i) {
+			printf("pData[%02X] (FIRST ARRAY)  = 0x%08X\n", i, reinterpret_cast<unsigned int*>(pData)[i]);
+		}
+
+		printf("\n");
+		for (unsigned int i = 6; reinterpret_cast<unsigned int*>(pData)[i] != 0; ++i) {
+			printf("pData[%02X] (SECOND ARRAY) = 0x%08X\n", i, reinterpret_cast<unsigned int*>(pData)[i]);
+		}
+
+		CHECK(Detours::Hook::HookMemory(MemoryArrayHook, &reinterpret_cast<unsigned int*>(pData)[5], sizeof(int) * 11) == true);
+
+		printf("\nAfter MemoryHook:\n");
+
+		printf("\n");
+		for (unsigned int i = 0; reinterpret_cast<unsigned int*>(pData)[i] != 0; ++i) {
+			printf("pData[%02X] (FIRST ARRAY)  = 0x%08X\n", i, reinterpret_cast<unsigned int*>(pData)[i]);
+		}
+
+		printf("\n");
+		for (unsigned int i = 6; reinterpret_cast<unsigned int*>(pData)[i] != 0; ++i) {
+			printf("pData[%02X] (SECOND ARRAY) = 0x%08X\n", i, reinterpret_cast<unsigned int*>(pData)[i]);
+		}
+
+		printf("\nAfter MemoryHook #2:\n");
+
+		printf("\n");
+		for (unsigned int i = 0; reinterpret_cast<unsigned int*>(pData)[i] != 0; ++i) {
+			printf("pData[%02X] (FIRST ARRAY)  = 0x%08X\n", i, reinterpret_cast<unsigned int*>(pData)[i]);
+		}
+
+		printf("\n");
+		for (unsigned int i = 6; reinterpret_cast<unsigned int*>(pData)[i] != 0; ++i) {
+			printf("pData[%02X] (SECOND ARRAY) = 0x%08X\n", i, reinterpret_cast<unsigned int*>(pData)[i]);
+		}
+
+		CHECK(Detours::Hook::UnHookMemory(MemoryArrayHook) == true);
+	}
+
+	TEST_CASE("MemoryHook 2") {
 		Detours::Memory::Region Region(nullptr, static_cast<size_t>(0x800000));
 		CHECK(Region.GetRegionAddress() != nullptr);
 		void* pAddress = Region.Alloc(1);

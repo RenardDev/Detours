@@ -60,4 +60,9 @@
 		pop rax
 		ret
 	CallInterrupt endp
+
+	CallInrerruptReturn proc
+		add rsp, 8
+		iretq
+	CallInrerruptReturn endp
 end
