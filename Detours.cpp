@@ -7864,7 +7864,6 @@ namespace Detours {
 #ifdef _M_X64
 				if (pCTX->Rip == reinterpret_cast<DWORD64>(pAddress)) {
 					pCTX->Rip = reinterpret_cast<DWORD64>(pNewAddress);
-					g_CachedOperations.emplace_back(const_cast<void*>(pExceptionAddress), unOperation, const_cast<void*>(pAddress), *pWriteOperand, static_cast<char*>(pNewAddress) - unOffset);
 				}
 #elif _M_IX86
 				if (pCTX->Eip == reinterpret_cast<DWORD>(pAddress)) {
