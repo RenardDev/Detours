@@ -26,10 +26,10 @@
 // interrupts32.asm/interrupts64.asm
 #ifdef _M_X64
 extern "C" unsigned long long __cdecl CallInterrupt(unsigned long long unRAX, unsigned long long unRCX, unsigned long long unRDX, unsigned long long unRBX, unsigned long long unRBP, unsigned long long unRSI, unsigned long long unRDI, unsigned long long unR8, unsigned long long unR9, unsigned long long unR10, unsigned long long unR11, unsigned long long unR12, unsigned long long unR13, unsigned long long unR14, unsigned long long unR15);
-extern "C" void __cdecl CallInrerruptReturn(unsigned long long unRIP, unsigned long long unCS, unsigned long long unRFLAGS, unsigned long long unRSP, unsigned long long unSS);
+//extern "C" void __cdecl CallInrerruptReturn(unsigned long long unRIP, unsigned long long unCS, unsigned long long unRFLAGS, unsigned long long unRSP, unsigned long long unSS);
 #elif _M_IX86
 extern "C" unsigned int __cdecl CallInterrupt(unsigned int unEAX, unsigned int unECX, unsigned int unEDX, unsigned int unEBX, unsigned int unEBP, unsigned int unESI, unsigned int unEDI);
-extern "C" void __cdecl CallInrerruptReturn(unsigned int unEIP, unsigned int unCS, unsigned int unEFLAGS, unsigned int unESP, unsigned int unSS);
+//extern "C" void __cdecl CallInrerruptReturn(unsigned int unEIP, unsigned int unCS, unsigned int unEFLAGS, unsigned int unESP, unsigned int unSS);
 #endif
 
 class BaseMessage {

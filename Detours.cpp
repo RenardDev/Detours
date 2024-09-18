@@ -1,4 +1,4 @@
-﻿#include "Detours.h"
+#include "Detours.h"
 
 // Default
 #include <tchar.h>
@@ -7524,12 +7524,13 @@ namespace Detours {
 		}
 
 		typedef struct _CACHED_OPERATION {
-			_CACHED_OPERATION(void* pExceptionAddress, MEMORY_HOOK_OPERATION unOperation, void* pAddress, RD_OPERAND& Operand, void* pNewAddress) {
+			_CACHED_OPERATION(void* pExceptionAddress, MEMORY_HOOK_OPERATION unOperation, void* pAddress, RD_OPERAND& Operand, void* pNewAddress, void* pRedirectExecutionAddress = nullptr) {
 				m_pExceptionAddress = pExceptionAddress;
 				m_unOperation = unOperation;
 				m_pAddress = pAddress;
 				m_Operand = Operand;
 				m_pNewAddress = pNewAddress;
+				m_pRedirectExecutionAddress = pRedirectExecutionAddress;
 			}
 
 			void* m_pExceptionAddress;
@@ -7537,6 +7538,7 @@ namespace Detours {
 			void* m_pAddress;
 			RD_OPERAND m_Operand;
 			void* m_pNewAddress;
+			void* m_pRedirectExecutionAddress;
 		} CACHED_OPERATION, *PCACHED_OPERATION;
 
 		static std::deque<CACHED_OPERATION> g_CachedOperations;
@@ -7587,6 +7589,14 @@ namespace Detours {
 					if ((CachedOperation.m_pExceptionAddress == pExceptionAddress) && (CachedOperation.m_unOperation == unOperation) && (CachedOperation.m_pAddress == pAddress)) {
 						auto& Operand = CachedOperation.m_Operand;
 
+						if (CachedOperation.m_pRedirectExecutionAddress) {
+#ifdef _M_X64
+							pCTX->Rip = reinterpret_cast<DWORD64>(CachedOperation.m_pRedirectExecutionAddress);
+#elif _M_IX86
+							pCTX->Eip = reinterpret_cast<DWORD>(CachedOperation.m_pRedirectExecutionAddress);
+#endif
+						}
+
 						if (Operand.Type == RD_OP_REG) {
 							SetRegisterValue(pCTX, Operand.Info.Register.Reg, Operand.Info.Register.Size, reinterpret_cast<ULONG_PTR>(CachedOperation.m_pNewAddress));
 							return;
@@ -7615,145 +7625,236 @@ namespace Detours {
 					return;
 				}
 
+				if (!insn.OperandsCount) {
+					__debugbreak(); // TODO: Implement (As example: FSAVE/FNSAVE)
+					return;
+				}
+
+				auto pReadOperand = GetReadOperand(insn.Operands, insn.OperandsCount);
+				auto pWriteOperand = GetWriteOperand(insn.Operands, insn.OperandsCount);
+
 				switch (unOperation) {
-					case MEMORY_HOOK_OPERATION::MEMORY_READ: {
-						if (insn.OperandsCount) {
-							auto pReadOperand = GetReadOperand(insn.Operands, insn.OperandsCount);
+					case MEMORY_HOOK_OPERATION::MEMORY_READ:
+						{
 							if (!pReadOperand) {
 								return;
 							}
 
-							if (pReadOperand->Type == RD_OP_NOT_PRESENT) {
-								return;
-							} else if (pReadOperand->Type == RD_OP_REG) {
-								ULONG_PTR unValue = GetRegisterValue(pCTX, pReadOperand->Info.Register.Reg, pReadOperand->Info.Register.Size);
-								if (reinterpret_cast<ULONG_PTR>(pAddress) == unValue) {
-									SetRegisterValue(pCTX, pReadOperand->Info.Register.Reg, pReadOperand->Info.Register.Size, reinterpret_cast<size_t>(pNewAddress));
-									g_CachedOperations.emplace_back(const_cast<void*>(pExceptionAddress), unOperation, const_cast<void*>(pAddress), *pReadOperand, pNewAddress);
-									return;
-								}
-							} else if (pReadOperand->Type == RD_OP_MEM) {
+							switch (pReadOperand->Type) {
+								case RD_OP_NOT_PRESENT:
+									break;
+								case RD_OP_REG:
+									{
+										const ULONG_PTR unValue = GetRegisterValue(pCTX, pReadOperand->Info.Register.Reg, pReadOperand->Info.Register.Size);
+										if (reinterpret_cast<ULONG_PTR>(pAddress) == unValue) {
+											SetRegisterValue(pCTX, pReadOperand->Info.Register.Reg, pReadOperand->Info.Register.Size, reinterpret_cast<size_t>(pNewAddress));
+											g_CachedOperations.emplace_back(const_cast<void*>(pExceptionAddress), unOperation, const_cast<void*>(pAddress), *pReadOperand, pNewAddress);
+											return;
+										}
+									}
+									break;
+								case RD_OP_MEM:
+									{
 #ifdef _M_X64
-								unsigned long long unBase = 0;
-								unsigned long long unIndex = 0;
+										unsigned long long unBase = 0;
+										unsigned long long unIndex = 0;
 #elif _M_IX86
-								unsigned int unBase = 0;
-								unsigned int unIndex = 0;
+										unsigned int unBase = 0;
+										unsigned int unIndex = 0;
 #endif
-								unsigned long long unDisp = 0;
+										unsigned long long unDisp = 0;
 
-								if (pReadOperand->Info.Memory.HasBase) {
-									unBase = GetRegisterValue(pCTX, pReadOperand->Info.Memory.Base, pReadOperand->Info.Memory.BaseSize);
-								}
+										if (pReadOperand->Info.Memory.HasBase) {
+											unBase = GetRegisterValue(pCTX, pReadOperand->Info.Memory.Base, pReadOperand->Info.Memory.BaseSize);
+										}
 
-								if (pReadOperand->Info.Memory.HasIndex) {
-									unIndex = GetRegisterValue(pCTX, pReadOperand->Info.Memory.Index, pReadOperand->Info.Memory.IndexSize) * pReadOperand->Info.Memory.Scale;
-								}
+										if (pReadOperand->Info.Memory.HasIndex) {
+											unIndex = GetRegisterValue(pCTX, pReadOperand->Info.Memory.Index, pReadOperand->Info.Memory.IndexSize) * pReadOperand->Info.Memory.Scale;
+										}
 
-								if (pReadOperand->Info.Memory.HasDisp) {
-									unDisp = pReadOperand->Info.Memory.Disp;
-								}
+										if (pReadOperand->Info.Memory.HasDisp) {
+											unDisp = pReadOperand->Info.Memory.Disp;
+										}
 
-								if (reinterpret_cast<ULONG_PTR>(pAddress) == unBase + unIndex + unDisp) {
-									if (unBase) {
-										const size_t unOffset = reinterpret_cast<size_t>(pAddress) - unBase;
-										SetRegisterValue(pCTX, pReadOperand->Info.Memory.Base, pReadOperand->Info.Memory.BaseSize, reinterpret_cast<size_t>(pNewAddress) - unOffset);
-										pReadOperand->Info.Memory.HasIndex = false;
-										g_CachedOperations.emplace_back(const_cast<void*>(pExceptionAddress), unOperation, const_cast<void*>(pAddress), *pReadOperand, static_cast<char*>(pNewAddress) - unOffset);
-										return;
+										if (reinterpret_cast<ULONG_PTR>(pAddress) == unBase + unIndex + unDisp) {
+											if (unBase) {
+												const size_t unOffset = reinterpret_cast<size_t>(pAddress) - unBase;
+												SetRegisterValue(pCTX, pReadOperand->Info.Memory.Base, pReadOperand->Info.Memory.BaseSize, reinterpret_cast<size_t>(pNewAddress) - unOffset);
+												pReadOperand->Info.Memory.HasIndex = false;
+												g_CachedOperations.emplace_back(const_cast<void*>(pExceptionAddress), unOperation, const_cast<void*>(pAddress), *pReadOperand, static_cast<char*>(pNewAddress) - unOffset);
+												return;
+											}
+
+											if (unIndex) {
+												const size_t unOffset = reinterpret_cast<size_t>(pAddress) - unIndex;
+												SetRegisterValue(pCTX, pReadOperand->Info.Memory.Index, pReadOperand->Info.Memory.IndexSize, reinterpret_cast<size_t>(pNewAddress) - unOffset);
+												pReadOperand->Info.Memory.HasBase = false;
+												g_CachedOperations.emplace_back(const_cast<void*>(pExceptionAddress), unOperation, const_cast<void*>(pAddress), *pReadOperand, static_cast<char*>(pNewAddress) - unOffset);
+												return;
+											}
+										}
 									}
+									break;
+								case RD_OP_IMM:
+								case RD_OP_OFFS:
+								case RD_OP_ADDR:
+								case RD_OP_CONST:
+									{
+										if (!pWriteOperand) {
+											return;
+										}
 
-									if (unIndex) {
-										const size_t unOffset = reinterpret_cast<size_t>(pAddress) - unIndex;
-										SetRegisterValue(pCTX, pReadOperand->Info.Memory.Index, pReadOperand->Info.Memory.IndexSize, reinterpret_cast<size_t>(pNewAddress) - unOffset);
-										pReadOperand->Info.Memory.HasBase = false;
-										g_CachedOperations.emplace_back(const_cast<void*>(pExceptionAddress), unOperation, const_cast<void*>(pAddress), *pReadOperand, static_cast<char*>(pNewAddress) - unOffset);
-										return;
+#ifdef _M_X64
+										void* pRedirectExecutionAddress = reinterpret_cast<char*>(pCTX->Rip) + insn.Length;
+#elif _M_IX86
+										void* pRedirectExecutionAddress = reinterpret_cast<char*>(pCTX->Eip) + insn.Length;
+#endif
+
+										switch (pWriteOperand->Type) {
+											case RD_OP_NOT_PRESENT:
+												break;
+											case RD_OP_REG:
+												{
+													ULONG_PTR unValue = 0;
+													switch (pWriteOperand->Info.Register.Size) {
+														case 1:
+															unValue = *reinterpret_cast<unsigned char*>(pNewAddress);
+															break;
+														case 2:
+															unValue = *reinterpret_cast<unsigned short*>(pNewAddress);
+															break;
+														case 4:
+															unValue = *reinterpret_cast<unsigned int*>(pNewAddress);
+															break;
+#ifdef _M_X64
+														case 8:
+															unValue = *reinterpret_cast<unsigned long long*>(pNewAddress);
+															break;
+#endif
+														default:
+															__debugbreak();
+															break;
+													}
+													SetRegisterValue(pCTX, pWriteOperand->Info.Register.Reg, pWriteOperand->Info.Register.Size, unValue);
+													g_CachedOperations.emplace_back(const_cast<void*>(pExceptionAddress), unOperation, const_cast<void*>(pAddress), *pWriteOperand, pNewAddress, pRedirectExecutionAddress);
+												}
+												break;
+											case RD_OP_MEM:
+												{
+													ULONG_PTR unValue = 0;
+													switch (pWriteOperand->Info.Memory.BaseSize) {
+														case 1:
+															unValue = *reinterpret_cast<unsigned char*>(pNewAddress);
+															break;
+														case 2:
+															unValue = *reinterpret_cast<unsigned short*>(pNewAddress);
+															break;
+														case 4:
+															unValue = *reinterpret_cast<unsigned int*>(pNewAddress);
+															break;
+#ifdef _M_X64
+														case 8:
+															unValue = *reinterpret_cast<unsigned long long*>(pNewAddress);
+															break;
+#endif
+														default:
+															__debugbreak();
+															break;
+													}
+													SetRegisterValue(pCTX, pWriteOperand->Info.Memory.Base, pWriteOperand->Info.Memory.BaseSize, unValue);
+													g_CachedOperations.emplace_back(const_cast<void*>(pExceptionAddress), unOperation, const_cast<void*>(pAddress), *pWriteOperand, pNewAddress, pRedirectExecutionAddress);
+												}
+												break;
+											case RD_OP_IMM:
+											case RD_OP_OFFS:
+											case RD_OP_ADDR:
+											case RD_OP_CONST:
+												break;
+											default:
+												break;
+										}
 									}
-								}
-							} else if (pReadOperand->Type == RD_OP_IMM) {
-								__debugbreak(); // TODO: Implement.
-							} else if (pReadOperand->Type == RD_OP_OFFS) {
-								__debugbreak(); // TODO: Implement.
-							} else if (pReadOperand->Type == RD_OP_ADDR) {
-								__debugbreak(); // TODO: Implement.
-							} else if (pReadOperand->Type == RD_OP_CONST) {
-								__debugbreak(); // TODO: Implement.
+									break;
+								default:
+									break;
 							}
-						}
 
-						return;
+							return;
 					}
 
-					case MEMORY_HOOK_OPERATION::MEMORY_WRITE: {
-						if (insn.OperandsCount) {
-							auto pWriteOperand = GetWriteOperand(insn.Operands, insn.OperandsCount);
+					case MEMORY_HOOK_OPERATION::MEMORY_WRITE:
+						{
 							if (!pWriteOperand) {
 								return;
 							}
 
-							if (pWriteOperand->Type == RD_OP_NOT_PRESENT) {
-								return;
-							} else if (pWriteOperand->Type == RD_OP_REG) {
-								ULONG_PTR unValue = GetRegisterValue(pCTX, pWriteOperand->Info.Register.Reg, pWriteOperand->Info.Register.Size);
-								if (reinterpret_cast<ULONG_PTR>(pAddress) == unValue) {
-									SetRegisterValue(pCTX, pWriteOperand->Info.Register.Reg, pWriteOperand->Info.Register.Size, reinterpret_cast<size_t>(pNewAddress));
-									g_CachedOperations.emplace_back(const_cast<void*>(pExceptionAddress), unOperation, const_cast<void*>(pAddress), *pWriteOperand, pNewAddress);
-									return;
-								}
-							} else if (pWriteOperand->Type == RD_OP_MEM) {
-#ifdef _M_X64
-								unsigned long long unBase = 0;
-								unsigned long long unIndex = 0;
-#elif _M_IX86
-								unsigned int unBase = 0;
-								unsigned int unIndex = 0;
-#endif
-								unsigned long long unDisp = 0;
-
-								if (pWriteOperand->Info.Memory.HasBase) {
-									unBase = GetRegisterValue(pCTX, pWriteOperand->Info.Memory.Base, pWriteOperand->Info.Memory.BaseSize);
-								}
-
-								if (pWriteOperand->Info.Memory.HasIndex) {
-									unIndex = GetRegisterValue(pCTX, pWriteOperand->Info.Memory.Index, pWriteOperand->Info.Memory.IndexSize) * pWriteOperand->Info.Memory.Scale;
-								}
-
-								if (pWriteOperand->Info.Memory.HasDisp) {
-									unDisp = pWriteOperand->Info.Memory.Disp;
-								}
-
-								if (reinterpret_cast<ULONG_PTR>(pAddress) == unBase + unIndex + unDisp) {
-									if (unBase) {
-										const size_t unOffset = reinterpret_cast<size_t>(pAddress) - unBase;
-										SetRegisterValue(pCTX, pWriteOperand->Info.Memory.Base, pWriteOperand->Info.Memory.BaseSize, reinterpret_cast<size_t>(pNewAddress) - unOffset);
-										pWriteOperand->Info.Memory.HasIndex = false;
-										g_CachedOperations.emplace_back(const_cast<void*>(pExceptionAddress), unOperation, const_cast<void*>(pAddress), *pWriteOperand, static_cast<char*>(pNewAddress) - unOffset);
-										return;
+							switch (pWriteOperand->Type) {
+								case RD_OP_NOT_PRESENT:
+									break;
+								case RD_OP_REG:
+									{
+									const ULONG_PTR unValue = GetRegisterValue(pCTX, pWriteOperand->Info.Register.Reg, pWriteOperand->Info.Register.Size);
+										if (reinterpret_cast<ULONG_PTR>(pAddress) == unValue) {
+											SetRegisterValue(pCTX, pWriteOperand->Info.Register.Reg, pWriteOperand->Info.Register.Size, reinterpret_cast<size_t>(pNewAddress));
+											g_CachedOperations.emplace_back(const_cast<void*>(pExceptionAddress), unOperation, const_cast<void*>(pAddress), *pWriteOperand, pNewAddress);
+											return;
+										}
 									}
+									break;
+								case RD_OP_MEM:
+									{
+	#ifdef _M_X64
+										unsigned long long unBase = 0;
+										unsigned long long unIndex = 0;
+	#elif _M_IX86
+										unsigned int unBase = 0;
+										unsigned int unIndex = 0;
+	#endif
+										unsigned long long unDisp = 0;
 
-									if (unIndex) {
-										const size_t unOffset = reinterpret_cast<size_t>(pAddress) - unIndex;
-										SetRegisterValue(pCTX, pWriteOperand->Info.Memory.Index, pWriteOperand->Info.Memory.IndexSize, reinterpret_cast<size_t>(pNewAddress) - unOffset);
-										pWriteOperand->Info.Memory.HasBase = false;
-										g_CachedOperations.emplace_back(const_cast<void*>(pExceptionAddress), unOperation, const_cast<void*>(pAddress), *pWriteOperand, static_cast<char*>(pNewAddress) - unOffset);
-										return;
+										if (pWriteOperand->Info.Memory.HasBase) {
+											unBase = GetRegisterValue(pCTX, pWriteOperand->Info.Memory.Base, pWriteOperand->Info.Memory.BaseSize);
+										}
+
+										if (pWriteOperand->Info.Memory.HasIndex) {
+											unIndex = GetRegisterValue(pCTX, pWriteOperand->Info.Memory.Index, pWriteOperand->Info.Memory.IndexSize) * pWriteOperand->Info.Memory.Scale;
+										}
+
+										if (pWriteOperand->Info.Memory.HasDisp) {
+											unDisp = pWriteOperand->Info.Memory.Disp;
+										}
+
+										if (reinterpret_cast<ULONG_PTR>(pAddress) == unBase + unIndex + unDisp) {
+											if (unBase) {
+												const size_t unOffset = reinterpret_cast<size_t>(pAddress) - unBase;
+												SetRegisterValue(pCTX, pWriteOperand->Info.Memory.Base, pWriteOperand->Info.Memory.BaseSize, reinterpret_cast<size_t>(pNewAddress) - unOffset);
+												pWriteOperand->Info.Memory.HasIndex = false;
+												g_CachedOperations.emplace_back(const_cast<void*>(pExceptionAddress), unOperation, const_cast<void*>(pAddress), *pWriteOperand, static_cast<char*>(pNewAddress) - unOffset);
+												return;
+											}
+
+											if (unIndex) {
+												const size_t unOffset = reinterpret_cast<size_t>(pAddress) - unIndex;
+												SetRegisterValue(pCTX, pWriteOperand->Info.Memory.Index, pWriteOperand->Info.Memory.IndexSize, reinterpret_cast<size_t>(pNewAddress) - unOffset);
+												pWriteOperand->Info.Memory.HasBase = false;
+												g_CachedOperations.emplace_back(const_cast<void*>(pExceptionAddress), unOperation, const_cast<void*>(pAddress), *pWriteOperand, static_cast<char*>(pNewAddress) - unOffset);
+												return;
+											}
+										}
 									}
-								}
-							} else if (pWriteOperand->Type == RD_OP_IMM) {
-								__debugbreak(); // TODO: Implement.
-							} else if (pWriteOperand->Type == RD_OP_OFFS) {
-								__debugbreak(); // TODO: Implement.
-							} else if (pWriteOperand->Type == RD_OP_ADDR) {
-								__debugbreak(); // TODO: Implement.
-							} else if (pWriteOperand->Type == RD_OP_CONST) {
-								__debugbreak(); // TODO: Implement.
+									break;
+								case RD_OP_IMM:
+								case RD_OP_OFFS:
+								case RD_OP_ADDR:
+								case RD_OP_CONST:
+								case RD_OP_BANK:
+									break;
+								default:
+									break;
 							}
+
+							return;
 						}
-
-						return;
-					}
-
 					default:
 						break;
 				}
@@ -7763,6 +7864,7 @@ namespace Detours {
 #ifdef _M_X64
 				if (pCTX->Rip == reinterpret_cast<DWORD64>(pAddress)) {
 					pCTX->Rip = reinterpret_cast<DWORD64>(pNewAddress);
+					g_CachedOperations.emplace_back(const_cast<void*>(pExceptionAddress), unOperation, const_cast<void*>(pAddress), *pWriteOperand, static_cast<char*>(pNewAddress) - unOffset);
 				}
 #elif _M_IX86
 				if (pCTX->Eip == reinterpret_cast<DWORD>(pAddress)) {
