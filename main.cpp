@@ -1767,23 +1767,32 @@ TEST_SUITE("Detours::Hook") {
 		void* pData = Page.Alloc(Page.GetPageCapacity());
 		CHECK(pData != nullptr);
 
-		static const unsigned int pSourceArray[] = {
+		static const unsigned int pSourceMultiArray[] = {
 			1, 2, 3, 4, 5, 0, // first array
 			1, 2, 3, 4, 5, 6, 0 // second array
 		};
 
-		memcpy(pData, pSourceArray, sizeof(pSourceArray));
+		memcpy(pData, pSourceMultiArray, sizeof(pSourceMultiArray));
 
 		printf("Before MemoryHook:\n");
 
 		printf("\n");
-		for (unsigned int i = 0; reinterpret_cast<unsigned int*>(pData)[i] != 0; ++i) {
-			printf("pData[%02X] (FIRST ARRAY)  = 0x%08X\n", i, reinterpret_cast<unsigned int*>(pData)[i]);
+
+		unsigned int* pMultiArrays = reinterpret_cast<unsigned int*>(pData);
+		unsigned int unCount = 0;
+		unsigned int unValue = 0;
+		while ((unValue = pMultiArrays[unCount]) != 0) {
+			printf("pData[%02X] (FIRST ARRAY)   = 0x%08X\n", unCount, unValue);
+			++unCount;
 		}
 
 		printf("\n");
-		for (unsigned int i = 6; reinterpret_cast<unsigned int*>(pData)[i] != 0; ++i) {
-			printf("pData[%02X] (SECOND ARRAY) = 0x%08X\n", i, reinterpret_cast<unsigned int*>(pData)[i]);
+
+		unCount = 0;
+		unValue = 0;
+		while ((unValue = pMultiArrays[unCount]) != 0) {
+			printf("pData[%02X] (SECOND ARRAY)  = 0x%08X\n", unCount, unValue);
+			++unCount;
 		}
 
 		CHECK(Detours::Hook::HookMemory(MemoryArrayHook, &reinterpret_cast<unsigned int*>(pData)[5], sizeof(int) * 11) == true);
@@ -1791,25 +1800,41 @@ TEST_SUITE("Detours::Hook") {
 		printf("\nAfter MemoryHook:\n");
 
 		printf("\n");
-		for (unsigned int i = 0; reinterpret_cast<unsigned int*>(pData)[i] != 0; ++i) {
-			printf("pData[%02X] (FIRST ARRAY)  = 0x%08X\n", i, reinterpret_cast<unsigned int*>(pData)[i]);
+
+		unCount = 0;
+		unValue = 0;
+		while ((unValue = pMultiArrays[unCount]) != 0) {
+			printf("pData[%02X] (FIRST ARRAY)   = 0x%08X\n", unCount, unValue);
+			++unCount;
 		}
 
 		printf("\n");
-		for (unsigned int i = 6; reinterpret_cast<unsigned int*>(pData)[i] != 0; ++i) {
-			printf("pData[%02X] (SECOND ARRAY) = 0x%08X\n", i, reinterpret_cast<unsigned int*>(pData)[i]);
+
+		unCount = 0;
+		unValue = 0;
+		while ((unValue = pMultiArrays[unCount]) != 0) {
+			printf("pData[%02X] (SECOND ARRAY)  = 0x%08X\n", unCount, unValue);
+			++unCount;
 		}
 
 		printf("\nAfter MemoryHook #2:\n");
 
 		printf("\n");
-		for (unsigned int i = 0; reinterpret_cast<unsigned int*>(pData)[i] != 0; ++i) {
-			printf("pData[%02X] (FIRST ARRAY)  = 0x%08X\n", i, reinterpret_cast<unsigned int*>(pData)[i]);
+
+		unCount = 0;
+		unValue = 0;
+		while ((unValue = pMultiArrays[unCount]) != 0) {
+			printf("pData[%02X] (FIRST ARRAY)   = 0x%08X\n", unCount, unValue);
+			++unCount;
 		}
 
 		printf("\n");
-		for (unsigned int i = 6; reinterpret_cast<unsigned int*>(pData)[i] != 0; ++i) {
-			printf("pData[%02X] (SECOND ARRAY) = 0x%08X\n", i, reinterpret_cast<unsigned int*>(pData)[i]);
+
+		unCount = 0;
+		unValue = 0;
+		while ((unValue = pMultiArrays[unCount]) != 0) {
+			printf("pData[%02X] (SECOND ARRAY)  = 0x%08X\n", unCount, unValue);
+			++unCount;
 		}
 
 		CHECK(Detours::Hook::UnHookMemory(MemoryArrayHook) == true);
