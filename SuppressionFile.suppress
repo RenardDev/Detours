@@ -573,6 +573,14 @@
     <FileName>main.cpp</FileName>
     <ErrorCode>V566</ErrorCode>
     <Message>The integer constant is converted to pointer. Possibly an error or a bad coding style: reinterpret_cast&lt; unsigned int * &gt; (_x_)</Message>
+    <CodePrev>0</CodePrev>
+    <CodeCurrent>1814642854</CodeCurrent>
+    <CodeNext>0</CodeNext>
+  </Detours>
+  <Detours>
+    <FileName>main.cpp</FileName>
+    <ErrorCode>V566</ErrorCode>
+    <Message>The integer constant is converted to pointer. Possibly an error or a bad coding style: reinterpret_cast&lt; unsigned int * &gt; (_x_)</Message>
     <CodePrev>4165284930</CodePrev>
     <CodeCurrent>2139378968</CodeCurrent>
     <CodeNext>0</CodeNext>
@@ -582,6 +590,14 @@
     <ErrorCode>V566</ErrorCode>
     <Message>The integer constant is converted to pointer. Possibly an error or a bad coding style: reinterpret_cast&lt; void * &gt; (_x_)</Message>
     <CodePrev>1860045993</CodePrev>
+    <CodeCurrent>3389638323</CodeCurrent>
+    <CodeNext>0</CodeNext>
+  </Detours>
+  <Detours>
+    <FileName>main.cpp</FileName>
+    <ErrorCode>V566</ErrorCode>
+    <Message>The integer constant is converted to pointer. Possibly an error or a bad coding style: reinterpret_cast&lt; void * &gt; (_x_)</Message>
+    <CodePrev>0</CodePrev>
     <CodeCurrent>3389638323</CodeCurrent>
     <CodeNext>0</CodeNext>
   </Detours>
