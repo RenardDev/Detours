@@ -3,6 +3,9 @@ name: MSBuild
 on:
   push:
     branches: [ "main" ]
+    paths-ignore:
+     - LICENSE
+     - README.md
 #  pull_request:
 #    branches: [ "main" ]
 
@@ -167,6 +170,7 @@ jobs:
           python "C:\PVS-Studio_Cmd.py" --settings "C:\Settings.xml" --target "${{env.SOLUTION_FILE_PATH}}\Detours.sln" --useSuppressFile "${{env.SOLUTION_FILE_PATH}}\SuppressionFile.suppress" --configuration Release --platform x64 --output "${{env.SOLUTION_FILE_PATH}}\build\x86_64\Debug\results.plog"
 
       - name: Uploading results
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: Analysis
@@ -305,6 +309,7 @@ jobs:
         run: python "C:\DeleakerConsole.py" --export-xml-report-on-exit "${{env.SOLUTION_FILE_PATH}}\build\x86_64\Release\report.xml" --run "${{env.SOLUTION_FILE_PATH}}\build\x86_64\Release\Detours.exe"
 
       - name: Uploading results
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: DebugChecking
