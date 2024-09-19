@@ -7668,11 +7668,11 @@ namespace Detours {
 #endif
 										unsigned long long unDisp = 0;
 
-										if (pReadOperand->Info.Memory.HasBase) {
+										if (pReadOperand->Info.Memory.HasBase && pReadOperand->Info.Memory.BaseSize) {
 											unBase = GetRegisterValue(pCTX, pReadOperand->Info.Memory.Base, pReadOperand->Info.Memory.BaseSize);
 										}
 
-										if (pReadOperand->Info.Memory.HasIndex) {
+										if (pReadOperand->Info.Memory.HasIndex && pReadOperand->Info.Memory.IndexSize) {
 											unIndex = GetRegisterValue(pCTX, pReadOperand->Info.Memory.Index, pReadOperand->Info.Memory.IndexSize) * pReadOperand->Info.Memory.Scale;
 										}
 
@@ -7681,21 +7681,21 @@ namespace Detours {
 										}
 
 										if (reinterpret_cast<ULONG_PTR>(pAddress) == unBase + unIndex + unDisp) {
-											//if (unBase) {
+											if (unBase) {
 												const size_t unOffset = reinterpret_cast<size_t>(pAddress) - unBase;
 												SetRegisterValue(pCTX, pReadOperand->Info.Memory.Base, pReadOperand->Info.Memory.BaseSize, reinterpret_cast<size_t>(pNewAddress) - unOffset);
 												pReadOperand->Info.Memory.HasIndex = false;
 												g_CachedOperations.emplace_back(const_cast<void*>(pExceptionAddress), unOperation, const_cast<void*>(pAddress), *pReadOperand, static_cast<char*>(pNewAddress) - unOffset);
 												return;
-											//}
+											}
 
-											//if (unIndex) {
-											//	const size_t unOffset = reinterpret_cast<size_t>(pAddress) - unIndex;
-											//	SetRegisterValue(pCTX, pReadOperand->Info.Memory.Index, pReadOperand->Info.Memory.IndexSize, reinterpret_cast<size_t>(pNewAddress) - unOffset);
-											//	pReadOperand->Info.Memory.HasBase = false;
-											//	g_CachedOperations.emplace_back(const_cast<void*>(pExceptionAddress), unOperation, const_cast<void*>(pAddress), *pReadOperand, static_cast<char*>(pNewAddress) - unOffset);
-											//	return;
-											//}
+											if (unIndex) {
+												const size_t unOffset = reinterpret_cast<size_t>(pAddress) - unIndex;
+												SetRegisterValue(pCTX, pReadOperand->Info.Memory.Index, pReadOperand->Info.Memory.IndexSize, reinterpret_cast<size_t>(pNewAddress) - unOffset);
+												pReadOperand->Info.Memory.HasBase = false;
+												g_CachedOperations.emplace_back(const_cast<void*>(pExceptionAddress), unOperation, const_cast<void*>(pAddress), *pReadOperand, static_cast<char*>(pNewAddress) - unOffset);
+												return;
+											}
 										}
 									}
 									break;
@@ -7816,11 +7816,11 @@ namespace Detours {
 	#endif
 										unsigned long long unDisp = 0;
 
-										if (pWriteOperand->Info.Memory.HasBase) {
+										if (pWriteOperand->Info.Memory.HasBase && pWriteOperand->Info.Memory.BaseSize) {
 											unBase = GetRegisterValue(pCTX, pWriteOperand->Info.Memory.Base, pWriteOperand->Info.Memory.BaseSize);
 										}
 
-										if (pWriteOperand->Info.Memory.HasIndex) {
+										if (pWriteOperand->Info.Memory.HasIndex && pWriteOperand->Info.Memory.IndexSize) {
 											unIndex = GetRegisterValue(pCTX, pWriteOperand->Info.Memory.Index, pWriteOperand->Info.Memory.IndexSize) * pWriteOperand->Info.Memory.Scale;
 										}
 
@@ -7829,21 +7829,21 @@ namespace Detours {
 										}
 
 										if (reinterpret_cast<ULONG_PTR>(pAddress) == unBase + unIndex + unDisp) {
-											//if (unBase) {
+											if (unBase) {
 												const size_t unOffset = reinterpret_cast<size_t>(pAddress) - unBase;
 												SetRegisterValue(pCTX, pWriteOperand->Info.Memory.Base, pWriteOperand->Info.Memory.BaseSize, reinterpret_cast<size_t>(pNewAddress) - unOffset);
 												pWriteOperand->Info.Memory.HasIndex = false;
 												g_CachedOperations.emplace_back(const_cast<void*>(pExceptionAddress), unOperation, const_cast<void*>(pAddress), *pWriteOperand, static_cast<char*>(pNewAddress) - unOffset);
 												return;
-											//}
+											}
 
-											//if (unIndex) {
-											//	const size_t unOffset = reinterpret_cast<size_t>(pAddress) - unIndex;
-											//	SetRegisterValue(pCTX, pWriteOperand->Info.Memory.Index, pWriteOperand->Info.Memory.IndexSize, reinterpret_cast<size_t>(pNewAddress) - unOffset);
-											//	pWriteOperand->Info.Memory.HasBase = false;
-											//	g_CachedOperations.emplace_back(const_cast<void*>(pExceptionAddress), unOperation, const_cast<void*>(pAddress), *pWriteOperand, static_cast<char*>(pNewAddress) - unOffset);
-											//	return;
-											//}
+											if (unIndex) {
+												const size_t unOffset = reinterpret_cast<size_t>(pAddress) - unIndex;
+												SetRegisterValue(pCTX, pWriteOperand->Info.Memory.Index, pWriteOperand->Info.Memory.IndexSize, reinterpret_cast<size_t>(pNewAddress) - unOffset);
+												pWriteOperand->Info.Memory.HasBase = false;
+												g_CachedOperations.emplace_back(const_cast<void*>(pExceptionAddress), unOperation, const_cast<void*>(pAddress), *pWriteOperand, static_cast<char*>(pNewAddress) - unOffset);
+												return;
+											}
 										}
 									}
 									break;
@@ -7852,6 +7852,7 @@ namespace Detours {
 								case RD_OP_ADDR:
 								case RD_OP_CONST:
 								case RD_OP_BANK:
+									__debugbreak();
 									break;
 								default:
 									break;

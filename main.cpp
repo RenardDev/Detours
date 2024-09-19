@@ -1616,15 +1616,15 @@ TEST_SUITE("Detours::Hook") {
 
 		if (unOperation == Detours::Hook::MEMORY_HOOK_OPERATION::MEMORY_READ) {
 #ifdef _M_X64
-			_tprintf_s(_T("[VirtualMemoryHook]  READ at 0x%016llX\n"), reinterpret_cast<size_t>(pAccessAddress));
+			//_tprintf_s(_T("[VirtualMemoryHook]  READ at 0x%016llX\n"), reinterpret_cast<size_t>(pAccessAddress));
 #elif _M_IX86
-			_tprintf_s(_T("[VirtualMemoryHook]  READ at 0x%08X\n"), reinterpret_cast<size_t>(pAccessAddress));
+			//_tprintf_s(_T("[VirtualMemoryHook]  READ at 0x%08X\n"), reinterpret_cast<size_t>(pAccessAddress));
 #endif
 		} else if (unOperation == Detours::Hook::MEMORY_HOOK_OPERATION::MEMORY_WRITE) {
 #ifdef _M_X64
-			_tprintf_s(_T("[VirtualMemoryHook] WRITE at 0x%016llX\n"), reinterpret_cast<size_t>(pAccessAddress));
+			//_tprintf_s(_T("[VirtualMemoryHook] WRITE at 0x%016llX\n"), reinterpret_cast<size_t>(pAccessAddress));
 #elif _M_IX86
-			_tprintf_s(_T("[VirtualMemoryHook] WRITE at 0x%08X\n"), reinterpret_cast<size_t>(pAccessAddress));
+			//_tprintf_s(_T("[VirtualMemoryHook] WRITE at 0x%08X\n"), reinterpret_cast<size_t>(pAccessAddress));
 #endif
 		}
 
@@ -1898,23 +1898,36 @@ TEST_SUITE("Detours::Hook") {
 		CHECK(reinterpret_cast<unsigned char*>(pAddress)[2] == 0xC3);
 	}
 
+#ifndef DEBUG
+// FIXME: MemoryHook don't support instructions with imm in write operand
+//        Like `mov dword ptr [1], 0xDEEDBEEF`
+#pragma optimize("g", off)
+#endif
+
 	TEST_CASE("MemoryHook 3") {
+
 		CHECK(Detours::Hook::HookMemory(VirtualMemoryHook, reinterpret_cast<void*>(0x00000001), sizeof(int) * 3, true) == true);
-		
-		reinterpret_cast<unsigned int*>(0x1)[0] = 0xDEEDBEEF;
-		reinterpret_cast<unsigned int*>(0x1)[1] = 0xDEEDFACE;
-		reinterpret_cast<unsigned int*>(0x1)[2] = 0xFACE;
 
-		//printf("*(0x1)     = 0x%X\n", reinterpret_cast<unsigned int*>(0x1)[0]);
-		//printf("*(0x1 + 4) = 0x%X\n", reinterpret_cast<unsigned int*>(0x1)[1]);
-		//printf("*(0x1 + 8) = 0x%X\n", reinterpret_cast<unsigned int*>(0x1)[2]);
+		unsigned int* pVirtualAddress = reinterpret_cast<unsigned int*>(0x1);
 
-		CHECK(reinterpret_cast<unsigned int*>(0x1)[0] == 0xDEEDBEEF);
-		CHECK(reinterpret_cast<unsigned int*>(0x1)[1] == 0xDEEDFACE);
-		CHECK(reinterpret_cast<unsigned int*>(0x1)[2] == 0xFACE);
+		pVirtualAddress[0] = 0xDEEDBEEF;
+		pVirtualAddress[1] = 0xDEEDFACE;
+		pVirtualAddress[2] = 0xFACE;
+
+		printf("*(0x1)     = 0x%X\n", pVirtualAddress[0]);
+		printf("*(0x1 + 4) = 0x%X\n", pVirtualAddress[1]);
+		printf("*(0x1 + 8) = 0x%X\n", pVirtualAddress[2]);
+
+		CHECK(pVirtualAddress[0] == 0xDEEDBEEF);
+		CHECK(pVirtualAddress[1] == 0xDEEDFACE);
+		CHECK(pVirtualAddress[2] == 0xFACE);
 
 		CHECK(Detours::Hook::UnHookMemory(VirtualMemoryHook) == true);
 	}
+
+#ifndef DEBUG
+#pragma optimize("g", on)
+#endif
 
 	TEST_CASE("MemoryHook [benchmark]" * doctest::skip(false)) {
 		Detours::Memory::Region Region(nullptr, static_cast<size_t>(0x800000));
