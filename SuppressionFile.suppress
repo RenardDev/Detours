@@ -555,6 +555,62 @@
   </Detours>
   <Detours>
     <FileName>main.cpp</FileName>
+    <ErrorCode>V566</ErrorCode>
+    <Message>The integer constant is converted to pointer. Possibly an error or a bad coding style: reinterpret_cast&lt; unsigned int * &gt; (_x_)</Message>
+    <CodePrev>0</CodePrev>
+    <CodeCurrent>381039254</CodeCurrent>
+    <CodeNext>381071978</CodeNext>
+  </Detours>
+  <Detours>
+    <FileName>main.cpp</FileName>
+    <ErrorCode>V566</ErrorCode>
+    <Message>The integer constant is converted to pointer. Possibly an error or a bad coding style: reinterpret_cast&lt; unsigned int * &gt; (_x_)</Message>
+    <CodePrev>381039254</CodePrev>
+    <CodeCurrent>381071978</CodeCurrent>
+    <CodeNext>4050350976</CodeNext>
+  </Detours>
+  <Detours>
+    <FileName>main.cpp</FileName>
+    <ErrorCode>V566</ErrorCode>
+    <Message>The integer constant is converted to pointer. Possibly an error or a bad coding style: reinterpret_cast&lt; unsigned int * &gt; (_x_)</Message>
+    <CodePrev>4165284930</CodePrev>
+    <CodeCurrent>2139378968</CodeCurrent>
+    <CodeNext>0</CodeNext>
+  </Detours>
+  <Detours>
+    <FileName>main.cpp</FileName>
+    <ErrorCode>V566</ErrorCode>
+    <Message>The integer constant is converted to pointer. Possibly an error or a bad coding style: reinterpret_cast&lt; void * &gt; (_x_)</Message>
+    <CodePrev>1860045993</CodePrev>
+    <CodeCurrent>3389638323</CodeCurrent>
+    <CodeNext>0</CodeNext>
+  </Detours>
+  <Detours>
+    <FileName>main.cpp</FileName>
+    <ErrorCode>V566</ErrorCode>
+    <Message>The integer constant is converted to pointer. Possibly an error or a bad coding style: reinterpret_cast&lt; unsigned int * &gt; (_x_)</Message>
+    <CodePrev>381071978</CodePrev>
+    <CodeCurrent>4050350976</CodeCurrent>
+    <CodeNext>0</CodeNext>
+  </Detours>
+  <Detours>
+    <FileName>main.cpp</FileName>
+    <ErrorCode>V566</ErrorCode>
+    <Message>The integer constant is converted to pointer. Possibly an error or a bad coding style: reinterpret_cast&lt; unsigned int * &gt; (_x_)</Message>
+    <CodePrev>0</CodePrev>
+    <CodeCurrent>4165276732</CodeCurrent>
+    <CodeNext>4165284930</CodeNext>
+  </Detours>
+  <Detours>
+    <FileName>main.cpp</FileName>
+    <ErrorCode>V566</ErrorCode>
+    <Message>The integer constant is converted to pointer. Possibly an error or a bad coding style: reinterpret_cast&lt; unsigned int * &gt; (_x_)</Message>
+    <CodePrev>4165276732</CodePrev>
+    <CodeCurrent>4165284930</CodeCurrent>
+    <CodeNext>2139378968</CodeNext>
+  </Detours>
+  <Detours>
+    <FileName>main.cpp</FileName>
     <ErrorCode>V599</ErrorCode>
     <Message>The virtual destructor is not present, although the 'BaseTestingRTTI' class contains virtual functions.</Message>
     <CodePrev>71443353</CodePrev>
