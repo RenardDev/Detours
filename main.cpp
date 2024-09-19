@@ -1606,6 +1606,31 @@ TEST_SUITE("Detours::Hook") {
 		return true;
 	}
 
+	bool VirtualMemoryHook(const PCONTEXT pCTX, const void* pExceptionAddress, Detours::Hook::MEMORY_HOOK_OPERATION unOperation, const void* pHookAddress, const void* pAccessAddress, void** pNewAccessAddress) {
+		UNREFERENCED_PARAMETER(pCTX);
+		UNREFERENCED_PARAMETER(pExceptionAddress);
+		UNREFERENCED_PARAMETER(unOperation);
+		UNREFERENCED_PARAMETER(pHookAddress);
+		UNREFERENCED_PARAMETER(pAccessAddress);
+		UNREFERENCED_PARAMETER(pNewAccessAddress);
+
+		if (unOperation == Detours::Hook::MEMORY_HOOK_OPERATION::MEMORY_READ) {
+#ifdef _M_X64
+			_tprintf_s(_T("[VirtualMemoryHook]  READ at 0x%016llX\n"), reinterpret_cast<size_t>(pAccessAddress));
+#elif _M_IX86
+			_tprintf_s(_T("[VirtualMemoryHook]  READ at 0x%08X\n"), reinterpret_cast<size_t>(pAccessAddress));
+#endif
+		} else if (unOperation == Detours::Hook::MEMORY_HOOK_OPERATION::MEMORY_WRITE) {
+#ifdef _M_X64
+			_tprintf_s(_T("[VirtualMemoryHook] WRITE at 0x%016llX\n"), reinterpret_cast<size_t>(pAccessAddress));
+#elif _M_IX86
+			_tprintf_s(_T("[VirtualMemoryHook] WRITE at 0x%08X\n"), reinterpret_cast<size_t>(pAccessAddress));
+#endif
+		}
+
+		return true;
+	}
+
 	bool InterruptHook(const PCONTEXT pCTX, const unsigned char unInterrupt) {
 		_tprintf_s(_T("[InterruptHook] Called `int 0x%02X`\n"), unInterrupt);
 #ifdef _M_X64
@@ -1774,10 +1799,9 @@ TEST_SUITE("Detours::Hook") {
 
 		memcpy(pData, pSourceMultiArray, sizeof(pSourceMultiArray));
 
-		printf("Before MemoryHook:\n");
+		printf("\nBefore MemoryHook:\n");
 
 		printf("\n");
-
 		unsigned int* pMultiArrays = reinterpret_cast<unsigned int*>(pData);
 		unsigned int unCount = 0;
 		unsigned int unValue = 0;
@@ -1787,11 +1811,11 @@ TEST_SUITE("Detours::Hook") {
 		}
 
 		printf("\n");
-
+		pMultiArrays = reinterpret_cast<unsigned int*>(pData) + 6;
 		unCount = 0;
 		unValue = 0;
 		while ((unValue = pMultiArrays[unCount]) != 0) {
-			printf("pData[%02X] (SECOND ARRAY)  = 0x%08X\n", unCount, unValue);
+			printf("pData[%02X] (SECOND ARRAY)  = 0x%08X\n", unCount + 6, unValue);
 			++unCount;
 		}
 
@@ -1799,41 +1823,41 @@ TEST_SUITE("Detours::Hook") {
 
 		printf("\nAfter MemoryHook:\n");
 
-		printf("\n");
-
+		printf("First array:\n");
+		pMultiArrays = reinterpret_cast<unsigned int*>(pData);
 		unCount = 0;
 		unValue = 0;
 		while ((unValue = pMultiArrays[unCount]) != 0) {
-			printf("pData[%02X] (FIRST ARRAY)   = 0x%08X\n", unCount, unValue);
+			printf("pData[%02X] = 0x%08X\n", unCount, unValue);
 			++unCount;
 		}
 
-		printf("\n");
-
+		printf("Second array:\n");
+		pMultiArrays = reinterpret_cast<unsigned int*>(pData) + 6;
 		unCount = 0;
 		unValue = 0;
 		while ((unValue = pMultiArrays[unCount]) != 0) {
-			printf("pData[%02X] (SECOND ARRAY)  = 0x%08X\n", unCount, unValue);
+			printf("pData[%02X] = 0x%08X\n", unCount + 6, unValue);
 			++unCount;
 		}
 
 		printf("\nAfter MemoryHook #2:\n");
 
-		printf("\n");
-
+		printf("First array:\n");
+		pMultiArrays = reinterpret_cast<unsigned int*>(pData);
 		unCount = 0;
 		unValue = 0;
 		while ((unValue = pMultiArrays[unCount]) != 0) {
-			printf("pData[%02X] (FIRST ARRAY)   = 0x%08X\n", unCount, unValue);
+			printf("pData[%02X] = 0x%08X\n", unCount, unValue);
 			++unCount;
 		}
 
-		printf("\n");
-
+		printf("Second array:\n");
+		pMultiArrays = reinterpret_cast<unsigned int*>(pData) + 6;
 		unCount = 0;
 		unValue = 0;
 		while ((unValue = pMultiArrays[unCount]) != 0) {
-			printf("pData[%02X] (SECOND ARRAY)  = 0x%08X\n", unCount, unValue);
+			printf("pData[%02X] = 0x%08X\n", unCount + 6, unValue);
 			++unCount;
 		}
 
@@ -1872,6 +1896,24 @@ TEST_SUITE("Detours::Hook") {
 		CHECK(reinterpret_cast<unsigned char*>(pAddress)[0] == 0xB0);
 		CHECK(reinterpret_cast<unsigned char*>(pAddress)[1] == 0x01);
 		CHECK(reinterpret_cast<unsigned char*>(pAddress)[2] == 0xC3);
+	}
+
+	TEST_CASE("MemoryHook 3") {
+		CHECK(Detours::Hook::HookMemory(VirtualMemoryHook, reinterpret_cast<void*>(0x00000001), sizeof(int) * 3, true) == true);
+		
+		reinterpret_cast<unsigned int*>(0x1)[0] = 0xDEEDBEEF;
+		reinterpret_cast<unsigned int*>(0x1)[1] = 0xDEEDFACE;
+		reinterpret_cast<unsigned int*>(0x1)[2] = 0xFACE;
+
+		//printf("*(0x1)     = 0x%X\n", reinterpret_cast<unsigned int*>(0x1)[0]);
+		//printf("*(0x1 + 4) = 0x%X\n", reinterpret_cast<unsigned int*>(0x1)[1]);
+		//printf("*(0x1 + 8) = 0x%X\n", reinterpret_cast<unsigned int*>(0x1)[2]);
+
+		CHECK(reinterpret_cast<unsigned int*>(0x1)[0] == 0xDEEDBEEF);
+		CHECK(reinterpret_cast<unsigned int*>(0x1)[1] == 0xDEEDFACE);
+		CHECK(reinterpret_cast<unsigned int*>(0x1)[2] == 0xFACE);
+
+		CHECK(Detours::Hook::UnHookMemory(VirtualMemoryHook) == true);
 	}
 
 	TEST_CASE("MemoryHook [benchmark]" * doctest::skip(false)) {

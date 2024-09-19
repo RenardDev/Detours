@@ -158,14 +158,15 @@ namespace Detours {
 			m_pCallBack = nullptr;
 			m_pAddress = nullptr;
 			m_unSize = 0;
-			m_bSupportTrampoline = false;
+			m_bAllowVirtualAddress = false;
 		}
 
 		fnMemoryHookCallBack m_pCallBack;
 		void* m_pAddress;
 		size_t m_unSize;
-		bool m_bSupportTrampoline;
+		bool m_bAllowVirtualAddress;
 		std::deque<std::pair<std::unique_ptr<Page>, std::unique_ptr<Page>>> m_Pages;
+		std::deque<std::pair<std::pair<void*, size_t>, std::unique_ptr<Page>>> m_VirtualPages;
 	} MEMORY_HOOK_RECORD, *PMEMORY_HOOK_RECORD;
 	
 	// ----------------------------------------------------------------
@@ -5253,7 +5254,7 @@ namespace Detours {
 		// __get_pages_info
 		// ----------------------------------------------------------------
 
-		static inline std::vector<PAGE_INFO> __get_pages_info(void* pAddress, size_t unSize) {
+		static inline std::vector<PAGE_INFO> __get_pages_info(void* pAddress, size_t unSize, bool bUnLimitBounds = false) {
 			std::vector<PAGE_INFO> vecPages;
 			if (!pAddress || !unSize) {
 				return vecPages;
@@ -5268,11 +5269,12 @@ namespace Detours {
 				unAllocationGranularity = sysinf.dwAllocationGranularity;
 			}
 
-			const size_t unBegin = MAX(reinterpret_cast<size_t>(pMinimumApplicationAddress), reinterpret_cast<size_t>(pAddress));
-			const size_t unEnd = MIN(reinterpret_cast<size_t>(pMaximumApplicationAddress), reinterpret_cast<size_t>(pAddress) + unSize);
+			const size_t unBegin = !bUnLimitBounds ? MAX(reinterpret_cast<size_t>(pMinimumApplicationAddress), reinterpret_cast<size_t>(pAddress)) : reinterpret_cast<size_t>(pAddress);
+			const size_t unEnd = !bUnLimitBounds ? MIN(reinterpret_cast<size_t>(pMaximumApplicationAddress), reinterpret_cast<size_t>(pAddress) + unSize) : reinterpret_cast<size_t>(pAddress) + unSize;
 
 			PAGE_INFO pi;
 			memset(&pi, 0, sizeof(pi));
+
 			for (size_t unAddress = unBegin; unAddress < unEnd; unAddress = __align_up(MIN(unAddress, reinterpret_cast<size_t>(pi.m_pBaseAddress)) + pi.m_unSize, static_cast<size_t>(unPageSize))) {
 				if (!__get_page_info(reinterpret_cast<void*>(unAddress), &pi)) {
 					break;
@@ -5288,7 +5290,7 @@ namespace Detours {
 		// __get_regions_info
 		// ----------------------------------------------------------------
 
-		static inline std::vector<REGION_INFO> __get_regions_info(void* pAddress, size_t unSize, bool bCombine = false) {
+		static inline std::vector<REGION_INFO> __get_regions_info(void* pAddress, size_t unSize, bool bCombine = false, bool bUnLimitBounds = false) {
 			std::vector<REGION_INFO> vecRegions;
 			if (!pAddress || !unSize) {
 				return vecRegions;
@@ -5303,10 +5305,12 @@ namespace Detours {
 				unAllocationGranularity = sysinf.dwAllocationGranularity;
 			}
 
-			const size_t unBegin = MAX(reinterpret_cast<size_t>(pMinimumApplicationAddress), reinterpret_cast<size_t>(pAddress));
-			const size_t unEnd = MIN(reinterpret_cast<size_t>(pMaximumApplicationAddress), reinterpret_cast<size_t>(pAddress) + unSize);
+			const size_t unBegin = !bUnLimitBounds ? MAX(reinterpret_cast<size_t>(pMinimumApplicationAddress), reinterpret_cast<size_t>(pAddress)) : reinterpret_cast<size_t>(pAddress);
+			const size_t unEnd = !bUnLimitBounds ? MIN(reinterpret_cast<size_t>(pMaximumApplicationAddress), reinterpret_cast<size_t>(pAddress) + unSize) : reinterpret_cast<size_t>(pAddress) + unSize;
+
 			REGION_INFO ri;
 			memset(&ri, 0, sizeof(ri));
+
 			for (size_t unAddress = unBegin; unAddress < unEnd; unAddress = __align_up(MIN(unAddress, reinterpret_cast<size_t>(ri.m_pBaseAddress)) + ri.m_unSize, static_cast<size_t>(unAllocationGranularity))) {
 				if (!__get_region_info(reinterpret_cast<void*>(unAddress), &ri)) {
 					break;
@@ -7677,21 +7681,21 @@ namespace Detours {
 										}
 
 										if (reinterpret_cast<ULONG_PTR>(pAddress) == unBase + unIndex + unDisp) {
-											if (unBase) {
+											//if (unBase) {
 												const size_t unOffset = reinterpret_cast<size_t>(pAddress) - unBase;
 												SetRegisterValue(pCTX, pReadOperand->Info.Memory.Base, pReadOperand->Info.Memory.BaseSize, reinterpret_cast<size_t>(pNewAddress) - unOffset);
 												pReadOperand->Info.Memory.HasIndex = false;
 												g_CachedOperations.emplace_back(const_cast<void*>(pExceptionAddress), unOperation, const_cast<void*>(pAddress), *pReadOperand, static_cast<char*>(pNewAddress) - unOffset);
 												return;
-											}
+											//}
 
-											if (unIndex) {
-												const size_t unOffset = reinterpret_cast<size_t>(pAddress) - unIndex;
-												SetRegisterValue(pCTX, pReadOperand->Info.Memory.Index, pReadOperand->Info.Memory.IndexSize, reinterpret_cast<size_t>(pNewAddress) - unOffset);
-												pReadOperand->Info.Memory.HasBase = false;
-												g_CachedOperations.emplace_back(const_cast<void*>(pExceptionAddress), unOperation, const_cast<void*>(pAddress), *pReadOperand, static_cast<char*>(pNewAddress) - unOffset);
-												return;
-											}
+											//if (unIndex) {
+											//	const size_t unOffset = reinterpret_cast<size_t>(pAddress) - unIndex;
+											//	SetRegisterValue(pCTX, pReadOperand->Info.Memory.Index, pReadOperand->Info.Memory.IndexSize, reinterpret_cast<size_t>(pNewAddress) - unOffset);
+											//	pReadOperand->Info.Memory.HasBase = false;
+											//	g_CachedOperations.emplace_back(const_cast<void*>(pExceptionAddress), unOperation, const_cast<void*>(pAddress), *pReadOperand, static_cast<char*>(pNewAddress) - unOffset);
+											//	return;
+											//}
 										}
 									}
 									break;
@@ -7825,21 +7829,21 @@ namespace Detours {
 										}
 
 										if (reinterpret_cast<ULONG_PTR>(pAddress) == unBase + unIndex + unDisp) {
-											if (unBase) {
+											//if (unBase) {
 												const size_t unOffset = reinterpret_cast<size_t>(pAddress) - unBase;
 												SetRegisterValue(pCTX, pWriteOperand->Info.Memory.Base, pWriteOperand->Info.Memory.BaseSize, reinterpret_cast<size_t>(pNewAddress) - unOffset);
 												pWriteOperand->Info.Memory.HasIndex = false;
 												g_CachedOperations.emplace_back(const_cast<void*>(pExceptionAddress), unOperation, const_cast<void*>(pAddress), *pWriteOperand, static_cast<char*>(pNewAddress) - unOffset);
 												return;
-											}
+											//}
 
-											if (unIndex) {
-												const size_t unOffset = reinterpret_cast<size_t>(pAddress) - unIndex;
-												SetRegisterValue(pCTX, pWriteOperand->Info.Memory.Index, pWriteOperand->Info.Memory.IndexSize, reinterpret_cast<size_t>(pNewAddress) - unOffset);
-												pWriteOperand->Info.Memory.HasBase = false;
-												g_CachedOperations.emplace_back(const_cast<void*>(pExceptionAddress), unOperation, const_cast<void*>(pAddress), *pWriteOperand, static_cast<char*>(pNewAddress) - unOffset);
-												return;
-											}
+											//if (unIndex) {
+											//	const size_t unOffset = reinterpret_cast<size_t>(pAddress) - unIndex;
+											//	SetRegisterValue(pCTX, pWriteOperand->Info.Memory.Index, pWriteOperand->Info.Memory.IndexSize, reinterpret_cast<size_t>(pNewAddress) - unOffset);
+											//	pWriteOperand->Info.Memory.HasBase = false;
+											//	g_CachedOperations.emplace_back(const_cast<void*>(pExceptionAddress), unOperation, const_cast<void*>(pAddress), *pWriteOperand, static_cast<char*>(pNewAddress) - unOffset);
+											//	return;
+											//}
 										}
 									}
 									break;
@@ -7998,37 +8002,84 @@ namespace Detours {
 				return false;
 			}
 
+			bool bIsVirtualAddress = false;
+
+			PAGE_INFO pi;
+			if (!__get_page_info(const_cast<void*>(pAddress), &pi)) {
+				return false;
+			}
+
+			if ((pi.m_unState == MEM_FREE) && (pi.m_unProtection == PAGE_NOACCESS) && (pi.m_unType == 0)) {
+				bIsVirtualAddress = true;
+			}
+
 			for (auto it = g_MemoryHookRecords.begin(); it != g_MemoryHookRecords.end(); ++it) {
 				const auto& pRecord = *it;
 				if (!pRecord) {
 					continue;
 				}
 
+				if (bIsVirtualAddress && !pRecord->m_bAllowVirtualAddress) {
+					continue;
+				}
+
 				if (__is_in_range(pRecord->m_pAddress, pRecord->m_unSize, pAddress)) {
-					for (auto& PagePair : pRecord->m_Pages) {
-						const auto& Page = PagePair.first;
-						if (__is_in_range(Page->GetPageAddress(), Page->GetPageCapacity(), pAddress)) {
-							const size_t unOffset = reinterpret_cast<size_t>(pAddress) - reinterpret_cast<size_t>(Page->GetPageAddress());
-							void* pNewAddress = reinterpret_cast<char*>(PagePair.second->GetPageAddress()) + unOffset;
 
-							if (pRecord->m_bSupportTrampoline) {
-								if (!PagePair.first->RestoreProtection()) {
-									return false;
+					if (!bIsVirtualAddress) {
+						for (auto& PagePair : pRecord->m_Pages) {
+							const auto& Page = PagePair.first;
+
+							if (__is_in_range(Page->GetPageAddress(), Page->GetPageCapacity(), pAddress)) {
+								const size_t unOffset = reinterpret_cast<size_t>(pAddress) - reinterpret_cast<size_t>(Page->GetPageAddress());
+								void* pNewAddress = reinterpret_cast<char*>(PagePair.second->GetPageAddress()) + unOffset;
+
+								//if (pRecord->m_bSupportTrampoline) {
+								//	if (!PagePair.first->RestoreProtection()) {
+								//		return false;
+								//	}
+								//}
+
+								const bool bResult = pRecord->m_pCallBack(pCTX, pExceptionAddress, unOperation, pRecord->m_pAddress, pAddress, &pNewAddress);
+								if (bResult) {
+									FixMemoryHookAddress(pCTX, pExceptionAddress, unOperation, pAddress, pNewAddress);
 								}
-							}
 
-							const bool bResult = pRecord->m_pCallBack(pCTX, pExceptionAddress, unOperation, pRecord->m_pAddress, pAddress, &pNewAddress);
-							if (bResult) {
-								FixMemoryHookAddress(pCTX, pExceptionAddress, unOperation, pAddress, pNewAddress);
-							}
+								//if (pRecord->m_bSupportTrampoline) {
+								//	if (!PagePair.first->ChangeProtection(PAGE_NOACCESS)) {
+								//		return false;
+								//	}
+								//}
 
-							if (pRecord->m_bSupportTrampoline) {
-								if (!PagePair.first->ChangeProtection(PAGE_NOACCESS)) {
-									return false;
+								return bResult;
+							}
+						}
+					} else {
+						for (auto& PagePair : pRecord->m_VirtualPages) {
+							const auto& Page = PagePair.first;
+
+							if (__is_in_range(Page.first, Page.second, pAddress)) {
+								const size_t unOffset = reinterpret_cast<size_t>(pAddress) - reinterpret_cast<size_t>(Page.first);
+								void* pNewAddress = reinterpret_cast<char*>(PagePair.second->GetPageAddress()) + unOffset;
+
+								//if (pRecord->m_bSupportTrampoline) {
+								//	if (!PagePair.first->RestoreProtection()) {
+								//		return false;
+								//	}
+								//}
+
+								const bool bResult = pRecord->m_pCallBack(pCTX, pExceptionAddress, unOperation, pRecord->m_pAddress, pAddress, &pNewAddress);
+								if (bResult) {
+									FixMemoryHookAddress(pCTX, pExceptionAddress, unOperation, pAddress, pNewAddress);
 								}
-							}
 
-							return bResult;
+								//if (pRecord->m_bSupportTrampoline) {
+								//	if (!PagePair.first->ChangeProtection(PAGE_NOACCESS)) {
+								//		return false;
+								//	}
+								//}
+
+								return bResult;
+							}
 						}
 					}
 
@@ -8037,13 +8088,26 @@ namespace Detours {
 
 				void* pNewAddress = nullptr;
 				bool bAround = false;
-				for (auto& PagePair : pRecord->m_Pages) {
-					const auto& Page = PagePair.first;
-					if (__is_in_range(Page->GetPageAddress(), Page->GetPageCapacity(), pAddress)) {
-						const size_t unOffset = reinterpret_cast<size_t>(pAddress) - reinterpret_cast<size_t>(Page->GetPageAddress());
-						pNewAddress = reinterpret_cast<char*>(PagePair.second->GetPageAddress()) + unOffset;
-						bAround = true;
-						break;
+
+				if (!bIsVirtualAddress) {
+					for (auto& PagePair : pRecord->m_Pages) {
+						const auto& Page = PagePair.first;
+						if (__is_in_range(Page->GetPageAddress(), Page->GetPageCapacity(), pAddress)) {
+							const size_t unOffset = reinterpret_cast<size_t>(pAddress) - reinterpret_cast<size_t>(Page->GetPageAddress());
+							pNewAddress = reinterpret_cast<char*>(PagePair.second->GetPageAddress()) + unOffset;
+							bAround = true;
+							break;
+						}
+					}
+				} else {
+					for (auto& PagePair : pRecord->m_VirtualPages) {
+						const auto& Page = PagePair.first;
+						if (__is_in_range(Page.first, Page.second, pAddress)) {
+							const size_t unOffset = reinterpret_cast<size_t>(pAddress) - reinterpret_cast<size_t>(Page.first);
+							pNewAddress = reinterpret_cast<char*>(PagePair.second->GetPageAddress()) + unOffset;
+							bAround = true;
+							break;
+						}
 					}
 				}
 
@@ -85126,7 +85190,7 @@ namespace Detours {
 		// Memory Hook
 		// ----------------------------------------------------------------
 
-		bool HookMemory(const fnMemoryHookCallBack pCallBack, void* pAddress, size_t unSize, bool bSupportTrampoline) {
+		bool HookMemory(const fnMemoryHookCallBack pCallBack, void* pAddress, size_t unSize, bool bAllowVirtualAddress) {
 			if (!pCallBack || !pAddress || !unSize) {
 				return false;
 			}
@@ -85137,21 +85201,39 @@ namespace Detours {
 				}
 			}
 
-			auto vecPages = __get_pages_info(pAddress, unSize);
+			auto vecPages = __get_pages_info(pAddress, unSize, true);
 			if (vecPages.empty()) {
 				return false;
 			}
 
-			DWORD unDEPPolicy = 0;
-			BOOL bPermament = FALSE;
-			if (!GetProcessDEPPolicy(reinterpret_cast<HANDLE>(-1), &unDEPPolicy, &bPermament)) {
+			bool bIsVirtualAddress = false;
+
+			auto& FrontPageInfo = vecPages.front();
+			if ((FrontPageInfo.m_unState == MEM_FREE) && (FrontPageInfo.m_unProtection == PAGE_NOACCESS) && (FrontPageInfo.m_unType == 0)) {
+				bIsVirtualAddress = true;
+			}
+
+			auto& BackPageInfo = vecPages.back();
+			if ((BackPageInfo.m_unState == MEM_FREE) && (BackPageInfo.m_unProtection == PAGE_NOACCESS) && (BackPageInfo.m_unType == 0)) {
+				bIsVirtualAddress = true;
+			}
+
+			if (bIsVirtualAddress && !bAllowVirtualAddress) {
 				return false;
 			}
 
-			if (!unDEPPolicy) {
-				for (auto& PageInfo : vecPages) {
-					if (PageInfo.m_unProtection & (PAGE_EXECUTE | PAGE_EXECUTE_READ | PAGE_EXECUTE_READWRITE | PAGE_EXECUTE_WRITECOPY)) {
-						return false;
+			if (!bIsVirtualAddress) {
+				DWORD unDEPPolicy = 0;
+				BOOL bPermament = FALSE;
+				if (!GetProcessDEPPolicy(reinterpret_cast<HANDLE>(-1), &unDEPPolicy, &bPermament)) {
+					return false;
+				}
+
+				if (!unDEPPolicy) {
+					for (auto& PageInfo : vecPages) {
+						if (PageInfo.m_unProtection & (PAGE_EXECUTE | PAGE_EXECUTE_READ | PAGE_EXECUTE_READWRITE | PAGE_EXECUTE_WRITECOPY)) {
+							return false;
+						}
 					}
 				}
 			}
@@ -85164,28 +85246,37 @@ namespace Detours {
 			pRecord->m_pCallBack = pCallBack;
 			pRecord->m_pAddress = pAddress;
 			pRecord->m_unSize = unSize;
-			pRecord->m_bSupportTrampoline = bSupportTrampoline;
+			pRecord->m_bAllowVirtualAddress = bAllowVirtualAddress;
 
 			for (auto& PageInfo : vecPages) {
-				auto pOriginalPage = std::make_unique<Page>(PageInfo.m_pBaseAddress, false);
-				if (!pOriginalPage) {
-					return false;
-				}
 
 				auto pPage = std::make_unique<Page>();
 				if (!pPage) {
 					return false;
 				}
 
-				if (!pPage->CloneFrom(pOriginalPage.get())) {
-					return false;
-				}
+				if (!bIsVirtualAddress) {
+					auto pOriginalPage = std::make_unique<Page>(PageInfo.m_pBaseAddress, false);
+					if (!pOriginalPage) {
+						return false;
+					}
 
-				if (!pOriginalPage->ChangeProtection(PAGE_NOACCESS)) {
-					return false;
-				}
+					if (!pPage->CloneFrom(pOriginalPage.get())) {
+						return false;
+					}
 
-				pRecord->m_Pages.emplace_back(std::make_pair(std::move(pOriginalPage), std::move(pPage)));
+					if (!pOriginalPage->ChangeProtection(PAGE_NOACCESS)) {
+						return false;
+					}
+
+					pRecord->m_Pages.emplace_back(std::make_pair(std::move(pOriginalPage), std::move(pPage)));
+				} else {
+					if (!pPage->ChangeProtection(PAGE_EXECUTE_READWRITE)) {
+						return false;
+					}
+
+					pRecord->m_VirtualPages.emplace_back(std::make_pair(std::make_pair(PageInfo.m_pBaseAddress, PageInfo.m_unSize), std::move(pPage)));
+				}
 			}
 
 			g_MemoryHookRecords.emplace_back(std::move(pRecord));
@@ -85199,13 +85290,15 @@ namespace Detours {
 
 			for (auto it = g_MemoryHookRecords.begin(); it != g_MemoryHookRecords.end(); ++it) {
 				if ((*it)->m_pCallBack == pCallBack) {
-					for (auto& PagePair : (*it)->m_Pages) {
-						if (!PagePair.second->CloneTo(PagePair.first.get())) {
-							return false;
-						}
+					if (!(*it)->m_bAllowVirtualAddress) {
+						for (auto& PagePair : (*it)->m_Pages) {
+							if (!PagePair.second->CloneTo(PagePair.first.get())) {
+								return false;
+							}
 
-						if (!PagePair.first->RestoreProtection()) {
-							return false;
+							if (!PagePair.first->RestoreProtection()) {
+								return false;
+							}
 						}
 					}
 

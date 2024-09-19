@@ -5551,7 +5551,7 @@ namespace Detours {
 		// Memory Hook
 		// ----------------------------------------------------------------
 
-		bool HookMemory(const fnMemoryHookCallBack pCallBack, void* pAddress, size_t unSize, bool bSupportTrampoline = false);
+		bool HookMemory(const fnMemoryHookCallBack pCallBack, void* pAddress, size_t unSize, bool bAllowVirtualAddress = false);
 		bool UnHookMemory(const fnMemoryHookCallBack pCallBack);
 
 		// ----------------------------------------------------------------
