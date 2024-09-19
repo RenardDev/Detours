@@ -1901,7 +1901,7 @@ TEST_SUITE("Detours::Hook") {
 #ifndef DEBUG
 // FIXME: MemoryHook don't support instructions with imm in write operand
 //        Like `mov dword ptr [1], 0xDEEDBEEF`
-#pragma optimize("g", off)
+#pragma optimize("", off)
 #endif
 
 	TEST_CASE("MemoryHook 3") {
@@ -1914,9 +1914,9 @@ TEST_SUITE("Detours::Hook") {
 		pVirtualAddress[1] = 0xDEEDFACE;
 		pVirtualAddress[2] = 0xFACE;
 
-		printf("*(0x1)     = 0x%X\n", pVirtualAddress[0]);
-		printf("*(0x1 + 4) = 0x%X\n", pVirtualAddress[1]);
-		printf("*(0x1 + 8) = 0x%X\n", pVirtualAddress[2]);
+		//printf("*(0x1)     = 0x%X\n", pVirtualAddress[0]);
+		//printf("*(0x1 + 4) = 0x%X\n", pVirtualAddress[1]);
+		//printf("*(0x1 + 8) = 0x%X\n", pVirtualAddress[2]);
 
 		CHECK(pVirtualAddress[0] == 0xDEEDBEEF);
 		CHECK(pVirtualAddress[1] == 0xDEEDFACE);
@@ -1926,7 +1926,7 @@ TEST_SUITE("Detours::Hook") {
 	}
 
 #ifndef DEBUG
-#pragma optimize("g", on)
+#pragma optimize("", on)
 #endif
 
 	TEST_CASE("MemoryHook [benchmark]" * doctest::skip(false)) {

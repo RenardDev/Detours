@@ -7668,11 +7668,11 @@ namespace Detours {
 #endif
 										unsigned long long unDisp = 0;
 
-										if (pReadOperand->Info.Memory.HasBase && pReadOperand->Info.Memory.BaseSize) {
+										if (pReadOperand->Info.Memory.HasBase) {
 											unBase = GetRegisterValue(pCTX, pReadOperand->Info.Memory.Base, pReadOperand->Info.Memory.BaseSize);
 										}
 
-										if (pReadOperand->Info.Memory.HasIndex && pReadOperand->Info.Memory.IndexSize) {
+										if (pReadOperand->Info.Memory.HasIndex) {
 											unIndex = GetRegisterValue(pCTX, pReadOperand->Info.Memory.Index, pReadOperand->Info.Memory.IndexSize) * pReadOperand->Info.Memory.Scale;
 										}
 
@@ -7816,11 +7816,11 @@ namespace Detours {
 	#endif
 										unsigned long long unDisp = 0;
 
-										if (pWriteOperand->Info.Memory.HasBase && pWriteOperand->Info.Memory.BaseSize) {
+										if (pWriteOperand->Info.Memory.HasBase) {
 											unBase = GetRegisterValue(pCTX, pWriteOperand->Info.Memory.Base, pWriteOperand->Info.Memory.BaseSize);
 										}
 
-										if (pWriteOperand->Info.Memory.HasIndex && pWriteOperand->Info.Memory.IndexSize) {
+										if (pWriteOperand->Info.Memory.HasIndex) {
 											unIndex = GetRegisterValue(pCTX, pWriteOperand->Info.Memory.Index, pWriteOperand->Info.Memory.IndexSize) * pWriteOperand->Info.Memory.Scale;
 										}
 
