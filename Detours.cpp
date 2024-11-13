@@ -153,6 +153,7 @@ namespace Detours {
 	// MEMORY_HOOK_RECORD
 	// ----------------------------------------------------------------
 
+	/*
 	typedef struct _MEMORY_HOOK_RECORD {
 		_MEMORY_HOOK_RECORD() {
 			m_pCallBack = nullptr;
@@ -168,6 +169,7 @@ namespace Detours {
 		std::deque<std::pair<std::unique_ptr<Page>, std::unique_ptr<Page>>> m_Pages;
 		std::deque<std::pair<std::pair<void*, size_t>, std::unique_ptr<Page>>> m_VirtualPages;
 	} MEMORY_HOOK_RECORD, *PMEMORY_HOOK_RECORD;
+	*/
 	
 	// ----------------------------------------------------------------
 	// INTERRUPT_HOOK_RECORD
@@ -187,7 +189,7 @@ namespace Detours {
 	// Storage
 	// ----------------------------------------------------------------
 
-	static std::deque<std::unique_ptr<MEMORY_HOOK_RECORD>> g_MemoryHookRecords;
+	// static std::deque<std::unique_ptr<MEMORY_HOOK_RECORD>> g_MemoryHookRecords;
 	static std::deque<std::unique_ptr<INTERRUPT_HOOK_RECORD>> g_InterruptHookRecords;
 	static MemoryManager g_MemoryManager;
 	static Storage g_HookStorage;
@@ -6870,6 +6872,7 @@ namespace Detours {
 		// MemoryHookCallBack
 		// ----------------------------------------------------------------
 
+		/*
 		static ULONG_PTR GetRegisterValue(const PCONTEXT pCTX, unsigned int unRegister, unsigned int unSize) {
 			switch (unRegister) {
 				case RDR_RAX:
@@ -8120,6 +8123,7 @@ namespace Detours {
 
 			return false;
 		}
+		*/
 
 		// ----------------------------------------------------------------
 		// InterruptHookCallBack
@@ -8188,7 +8192,7 @@ namespace Detours {
 			if (m_pVEH) {
 
 				// Built-in CallBacks
-				AddCallBack(MemoryHookCallBack); // Memory Hooks
+				//AddCallBack(MemoryHookCallBack); // Memory Hooks
 				AddCallBack(InterruptHookCallBack); // Interrupt Hooks
 			}
 		}
@@ -8199,7 +8203,7 @@ namespace Detours {
 
 				// Built-in CallBacks
 				RemoveCallBack(InterruptHookCallBack); // Interrupt Hooks
-				RemoveCallBack(MemoryHookCallBack); // Memory Hooks
+				//RemoveCallBack(MemoryHookCallBack); // Memory Hooks
 			}
 		}
 
@@ -85190,7 +85194,7 @@ namespace Detours {
 		// ----------------------------------------------------------------
 		// Memory Hook
 		// ----------------------------------------------------------------
-
+		/*
 		bool HookMemory(const fnMemoryHookCallBack pCallBack, void* pAddress, size_t unSize, bool bAllowVirtualAddress) {
 			if (!pCallBack || !pAddress || !unSize) {
 				return false;
@@ -85310,6 +85314,7 @@ namespace Detours {
 
 			return false;
 		}
+		*/
 
 		// ----------------------------------------------------------------
 		// Interrupt Hook

@@ -5532,27 +5532,27 @@ namespace Detours {
 	namespace Hook {
 
 		// ----------------------------------------------------------------
-		// Memory Hook Operation
+		// Memory Hook Operation (Experimental!!!)
 		// ----------------------------------------------------------------
 
-		typedef enum _MEMORY_HOOK_OPERATION : unsigned char {
-			MEMORY_READ    = 0,
-			MEMORY_WRITE   = 1,
-			MEMORY_EXECUTE = 2
-		} MEMORY_HOOK_OPERATION, *PMEMORY_HOOK_OPERATION;
+		//typedef enum _MEMORY_HOOK_OPERATION : unsigned char {
+		//	MEMORY_READ    = 0,
+		//	MEMORY_WRITE   = 1,
+		//	MEMORY_EXECUTE = 2
+		//} MEMORY_HOOK_OPERATION, *PMEMORY_HOOK_OPERATION;
 
 		// ----------------------------------------------------------------
 		// Memory Hook CallBack
 		// ----------------------------------------------------------------
 
-		using fnMemoryHookCallBack = bool(*)(const PCONTEXT pCTX, const void* pExceptionAddress, MEMORY_HOOK_OPERATION unOperation, const void* pHookAddress, const void* pAccessAddress, void** pNewAccessAddress);
+		//using fnMemoryHookCallBack = bool(*)(const PCONTEXT pCTX, const void* pExceptionAddress, MEMORY_HOOK_OPERATION unOperation, const void* pHookAddress, const void* pAccessAddress, void** pNewAccessAddress);
 
 		// ----------------------------------------------------------------
 		// Memory Hook
 		// ----------------------------------------------------------------
 
-		bool HookMemory(const fnMemoryHookCallBack pCallBack, void* pAddress, size_t unSize, bool bAllowVirtualAddress = false);
-		bool UnHookMemory(const fnMemoryHookCallBack pCallBack);
+		//bool HookMemory(const fnMemoryHookCallBack pCallBack, void* pAddress, size_t unSize, bool bAllowVirtualAddress = false);
+		//bool UnHookMemory(const fnMemoryHookCallBack pCallBack);
 
 		// ----------------------------------------------------------------
 		// Interrupt Hook CallBack

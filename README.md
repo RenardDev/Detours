@@ -91,8 +91,6 @@ A set of tools for working with software modifications in two files (Detours.h, 
 * RdGetOperandRlut - Retrieves the operand register lookup table for the decoded instruction.
 
 # Detours::Hook
-* HookMemory - Hooks a memory address with the specified callback.
-* UnHookMemory - Unhooks a memory address with the specified callback.
 * HookInterrupt - Hooks the specified interrupt with the given callback.
 * UnHookInterrupt - Unhooks the specified interrupt.
 * VTableFunctionHook - Class for hooking virtual table (VTable) functions.

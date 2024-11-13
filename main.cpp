@@ -1559,6 +1559,7 @@ TEST_SUITE("Detours::Hook") {
 	typedef bool(__fastcall* fnFooOriginal)(void* pThis, void* /* unused */);
 	typedef bool(__fastcall* fnBooOriginal)(void* pThis, void* /* unused */);
 
+	/*
 	bool MemoryHook(const PCONTEXT pCTX, const void* pExceptionAddress, Detours::Hook::MEMORY_HOOK_OPERATION unOperation, const void* pHookAddress, const void* pAccessAddress, void** pNewAccessAddress) {
 		UNREFERENCED_PARAMETER(pCTX);
 		UNREFERENCED_PARAMETER(pExceptionAddress);
@@ -1630,6 +1631,7 @@ TEST_SUITE("Detours::Hook") {
 
 		return true;
 	}
+	*/
 
 	bool InterruptHook(const PCONTEXT pCTX, const unsigned char unInterrupt) {
 		_tprintf_s(_T("[InterruptHook] Called `int 0x%02X`\n"), unInterrupt);
@@ -1787,6 +1789,7 @@ TEST_SUITE("Detours::Hook") {
 		return true;
 	}
 
+	/*
 	TEST_CASE("MemoryHook 1") {
 		static Detours::Memory::Page Page;
 		void* pData = Page.Alloc(Page.GetPageCapacity());
@@ -1948,6 +1951,7 @@ TEST_SUITE("Detours::Hook") {
 		MESSAGE("Benckmark with 1 000 000 iterations (with hook): ", (Detours::KUserSharedData.SystemTime.LowPart - unBegin) / 10000, " ms");
 		CHECK(Detours::Hook::UnHookMemory(MemoryHook) == true);
 	}
+	*/
 
 	TEST_CASE("InterruptHook") { // TODO: Incorrect return from CallInterrupt on 64 bit.
 		CHECK(Detours::Hook::HookInterrupt(InterruptHook, 0x7E) == true);
