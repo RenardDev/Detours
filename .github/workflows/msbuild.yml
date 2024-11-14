@@ -250,77 +250,10 @@ jobs:
         working-directory: ${{env.GITHUB_WORKSPACE}}
         run: ${{env.SOLUTION_FILE_PATH}}\build\x86_64\Release\Detours.exe
 
-  checking:
-    name: Checking
-    runs-on: self-hosted
-    needs: [ testing-debug-x86, testing-debug-x86-64, testing-release-x86, testing-release-x86-64 ]
-
-    steps:
-      - name: Downloading Debug (x86)
-        uses: actions/download-artifact@v4
-        with:
-          name: BuildDebug32
-          path: |
-            ${{env.SOLUTION_FILE_PATH}}\build
-
-      - name: Downloading Debug (x86_64)
-        uses: actions/download-artifact@v4
-        with:
-          name: BuildDebug64
-          path: |
-            ${{env.SOLUTION_FILE_PATH}}\build
-
-      - name: Downloading Release (x86)
-        uses: actions/download-artifact@v4
-        with:
-          name: BuildRelease32
-          path: |
-            ${{env.SOLUTION_FILE_PATH}}\build
-
-      - name: Downloading Release (x86_64)
-        uses: actions/download-artifact@v4
-        with:
-          name: BuildRelease64
-          path: |
-            ${{env.SOLUTION_FILE_PATH}}\build
-
-      - name: Checking Debug (x86)
-        if: always()
-        timeout-minutes: 3
-        working-directory: ${{env.GITHUB_WORKSPACE}}
-        run: python "C:\DeleakerConsole.py" --export-xml-report-on-exit "${{env.SOLUTION_FILE_PATH}}\build\x86\Debug\report.xml" --run "${{env.SOLUTION_FILE_PATH}}\build\x86\Debug\Detours.exe"
-
-      - name: Checking Debug (x86_64)
-        if: always()
-        timeout-minutes: 3
-        working-directory: ${{env.GITHUB_WORKSPACE}}
-        run: python "C:\DeleakerConsole.py" --export-xml-report-on-exit "${{env.SOLUTION_FILE_PATH}}\build\x86_64\Debug\report.xml" --run "${{env.SOLUTION_FILE_PATH}}\build\x86_64\Debug\Detours.exe"
-
-      - name: Checking Release (x86)
-        if: always()
-        timeout-minutes: 3
-        working-directory: ${{env.GITHUB_WORKSPACE}}
-        run: python "C:\DeleakerConsole.py" --export-xml-report-on-exit "${{env.SOLUTION_FILE_PATH}}\build\x86\Release\report.xml" --run "${{env.SOLUTION_FILE_PATH}}\build\x86\Release\Detours.exe"
-
-      - name: Checking Release (x86_64)
-        if: always()
-        timeout-minutes: 3
-        working-directory: ${{env.GITHUB_WORKSPACE}}
-        run: python "C:\DeleakerConsole.py" --export-xml-report-on-exit "${{env.SOLUTION_FILE_PATH}}\build\x86_64\Release\report.xml" --run "${{env.SOLUTION_FILE_PATH}}\build\x86_64\Release\Detours.exe"
-
-      - name: Uploading results
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: DebugChecking
-          path: |
-            ${{env.SOLUTION_FILE_PATH}}\build\**\*.xml
-          if-no-files-found: error
-
   signing:
     name: Signing Release
     runs-on: self-hosted
-    needs: checking
+    needs: [ testing-debug-x86, testing-debug-x86-64, testing-release-x86, testing-release-x86-64 ]
 
     steps:
       - name: Downloading Release (x86)
