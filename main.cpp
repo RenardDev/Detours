@@ -938,7 +938,7 @@ TEST_SUITE("Detours::RTTI") {
 		g_pTestingRTTI = new TestingRTTI();
 		CHECK(g_pTestingRTTI != nullptr);
 
-		const auto& pObject = Detours::RTTI::FindObject(GetModuleHandle(nullptr), ".?AVTestingRTTI@@");
+		const auto& pObject = Detours::RTTI::FindObject(GetModuleHandle(nullptr), ".?AVTestingRTTI@@", ".?AVBaseTestingRTTI@@");
 		CHECK(pObject != nullptr);
 		const auto& pVTable = pObject->GetVTable();
 		CHECK(pVTable != nullptr);
@@ -960,7 +960,7 @@ TEST_SUITE("Detours::RTTI") {
 		const auto& pMsg2 = new MessageTwo();
 		CHECK(pMsg2 != nullptr);
 
-		const auto& pBaseMessageObject = Detours::RTTI::FindObject(GetModuleHandle(nullptr), ".?AVBaseMessage@@", false);
+		const auto& pBaseMessageObject = Detours::RTTI::FindObject(GetModuleHandle(nullptr), ".?AVBaseMessage@@", nullptr, false);
 		CHECK(pBaseMessageObject != nullptr);
 
 		const auto& pMessageOneObject = Detours::RTTI::FindObject(GetModuleHandle(nullptr), ".?AVMessageOne@@");

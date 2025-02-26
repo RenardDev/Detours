@@ -1914,15 +1914,15 @@ namespace Detours {
 		// FindObject
 		// ----------------------------------------------------------------
 
-		std::unique_ptr<Object> FindObject(void const* const pBaseAddress, void const* const pAddress, const size_t unSize, char const* const szName, bool bCompleteObject = true);
-		std::unique_ptr<Object> FindObject(void const* const pAddress, const size_t unSize, char const* const szName, bool bCompleteObject = true);
-		std::unique_ptr<Object> FindObject(const HMODULE hModule, char const* const szName, bool bCompleteObject = true);
+		std::unique_ptr<Object> FindObject(void const* const pBaseAddress, void const* const pAddress, const size_t unSize, char const* const szName, const char* szParentName = nullptr, bool bCompleteObject = true);
+		std::unique_ptr<Object> FindObject(void const* const pAddress, const size_t unSize, char const* const szName, const char* szParentName = nullptr, bool bCompleteObject = true);
+		std::unique_ptr<Object> FindObject(const HMODULE hModule, char const* const szName, const char* szParentName = nullptr, bool bCompleteObject = true);
 		std::unique_ptr<Object> FindObjectA(char const* const szModuleName, char const* const szName, bool bCompleteObject = true);
-		std::unique_ptr<Object> FindObjectW(wchar_t const* const szModuleName, char const* const szName, bool bCompleteObject = true);
+		std::unique_ptr<Object> FindObjectW(wchar_t const* const szModuleName, char const* const szName, const char* szParentName = nullptr, bool bCompleteObject = true);
 #ifdef _UNICODE
-		std::unique_ptr<Object> FindObject(wchar_t const* const szModuleName, char const* const szName, bool bCompleteObject = true);
+		std::unique_ptr<Object> FindObject(wchar_t const* const szModuleName, char const* const szName, const char* szParentName = nullptr, bool bCompleteObject = true);
 #else
-		std::unique_ptr<Object> FindObject(char const* const szModuleName, char const* const szName, bool bCompleteObject = true);
+		std::unique_ptr<Object> FindObject(char const* const szModuleName, char const* const szName, const char* szParentName = nullptr, bool bCompleteObject = true);
 #endif
 	}
 

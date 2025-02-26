@@ -3156,7 +3156,7 @@ namespace Detours {
 
 					auto pBaseObject = FindObject(pBaseAddress, pAddress, unSize, pCurrentTD->m_szName);
 					if (!pBaseObject) {
-						pBaseObject = FindObject(pBaseAddress, pAddress, unSize, pCurrentTD->m_szName, false);
+						pBaseObject = FindObject(pBaseAddress, pAddress, unSize, pCurrentTD->m_szName, nullptr, false);
 						if (!pBaseObject) {
 							m_vecBaseClasses.emplace_back(std::make_unique<Object>(pBaseAddress, pAddress, unSize, pCurrentTD, pCurrentCHD, pCurrentBCA, nullptr, nullptr));
 							continue;
@@ -3654,10 +3654,32 @@ namespace Detours {
 		}
 
 		// ----------------------------------------------------------------
+		// HasBaseClass
+		// ----------------------------------------------------------------
+
+		static inline bool HasBaseClass(Object* pObject, const char* szParentName) {
+			if (!pObject || !szParentName) {
+				return false;
+			}
+
+			for (const auto& pBase : pObject->GetBaseObjects()) {
+				if (strncmp(pBase->GetTypeDescriptor()->m_szName, szParentName, 0x1000) == 0) {
+					return true;
+				}
+
+				//if (HasBaseClass(pBase.get(), szParentName)) {
+				//	return true;
+				//}
+			}
+
+			return false;
+		}
+
+		// ----------------------------------------------------------------
 		// FindObject
 		// ----------------------------------------------------------------
 
-		std::unique_ptr<Object> FindObject(void const* const pBaseAddress, void const* const pAddress, const size_t unSize, char const* const szName, bool bCompleteObject) {
+		std::unique_ptr<Object> FindObject(void const* const pBaseAddress, void const* const pAddress, const size_t unSize, char const* const szName, const char* szParentName, bool bCompleteObject) {
 			if (!pBaseAddress || !pAddress || !unSize || !szName) {
 				return nullptr;
 			}
@@ -3755,7 +3777,13 @@ namespace Detours {
 									return nullptr;
 								}
 
-								return std::make_unique<Object>(pBaseAddress, pAddress, unSize, pTypeDescriptor, pClassHierarchyDescriptor, pBaseClassArray, pCompleteObjectLocator, reinterpret_cast<void**>(reinterpret_cast<char*>(pCompleteObjectLocatorReference) + sizeof(void*)));
+								auto pCandidate = std::make_unique<Object>(pBaseAddress, pAddress, unSize, pTypeDescriptor, pClassHierarchyDescriptor, pBaseClassArray, pCompleteObjectLocator, reinterpret_cast<void**>(reinterpret_cast<char*>(pCompleteObjectLocatorReference) + sizeof(void*)));
+								if (szParentName && !HasBaseClass(pCandidate.get(), szParentName)) {
+									pReference = reinterpret_cast<void*>(reinterpret_cast<char*>(pReference) + 1);
+									continue;
+								}
+
+								return pCandidate;
 							}
 						}
 					} else {
@@ -3790,7 +3818,13 @@ namespace Detours {
 #elif _M_IX86
 						if (pBaseClassDescriptor->m_pTypeDescriptor == pTypeDescriptor) {
 #endif
-							return std::make_unique<Object>(pBaseAddress, pAddress, unSize, pTypeDescriptor, pClassHierarchyDescriptor, pBaseClassArray, nullptr, nullptr);
+							auto pCandidate = std::make_unique<Object>(pBaseAddress, pAddress, unSize, pTypeDescriptor, pClassHierarchyDescriptor, pBaseClassArray, nullptr, nullptr);
+							if (szParentName && !HasBaseClass(pCandidate.get(), szParentName)) {
+								pReference = reinterpret_cast<void*>(reinterpret_cast<char*>(pReference) + 1);
+								continue;
+							}
+
+							return pCandidate;
 						}
 					}
 
@@ -3803,11 +3837,11 @@ namespace Detours {
 			return nullptr;
 		}
 
-		std::unique_ptr<Object> FindObject(void const* const pAddress, const size_t unSize, char const* const szName, bool bCompleteObject) {
-			return FindObject(pAddress, pAddress, unSize, szName, bCompleteObject);
+		std::unique_ptr<Object> FindObject(void const* const pAddress, const size_t unSize, char const* const szName, const char* szParentName, bool bCompleteObject) {
+			return FindObject(pAddress, pAddress, unSize, szName, szParentName, bCompleteObject);
 		}
 
-		std::unique_ptr<Object> FindObject(const HMODULE hModule, char const* const szName, bool bCompleteObject) {
+		std::unique_ptr<Object> FindObject(const HMODULE hModule, char const* const szName, const char* szParentName, bool bCompleteObject) {
 			if (!hModule || !szName) {
 				return nullptr;
 			}
@@ -3816,10 +3850,10 @@ namespace Detours {
 			const auto& pNTHs = reinterpret_cast<PIMAGE_NT_HEADERS>(reinterpret_cast<char*>(hModule) + pDH->e_lfanew);
 			const auto& pOH = &(pNTHs->OptionalHeader);
 
-			return FindObject(reinterpret_cast<void*>(hModule), static_cast<size_t>(pOH->SizeOfImage) - 1, szName, bCompleteObject);
+			return FindObject(reinterpret_cast<void*>(hModule), static_cast<size_t>(pOH->SizeOfImage) - 1, szName, szParentName, bCompleteObject);
 		}
 
-		std::unique_ptr<Object> FindObjectA(char const* const szModuleName, char const* const szName, bool bCompleteObject) {
+		std::unique_ptr<Object> FindObjectA(char const* const szModuleName, char const* const szName, const char* szParentName, bool bCompleteObject) {
 			if (!szModuleName || !szName) {
 				return nullptr;
 			}
@@ -3829,10 +3863,10 @@ namespace Detours {
 				return nullptr;
 			}
 
-			return FindObject(hModule, szName, bCompleteObject);
+			return FindObject(hModule, szName, szParentName, bCompleteObject);
 		}
 
-		std::unique_ptr<Object> FindObjectW(wchar_t const* const szModuleName, char const* const szName, bool bCompleteObject) {
+		std::unique_ptr<Object> FindObjectW(wchar_t const* const szModuleName, char const* const szName, const char* szParentName, bool bCompleteObject) {
 			if (!szModuleName || !szName) {
 				return nullptr;
 			}
@@ -3842,16 +3876,16 @@ namespace Detours {
 				return nullptr;
 			}
 
-			return FindObject(hModule, szName, bCompleteObject);
+			return FindObject(hModule, szName, szParentName, bCompleteObject);
 		}
 
 #ifdef _UNICODE
-		std::unique_ptr<Object> FindObject(wchar_t const* const szModuleName, char const* const szName, bool bCompleteObject) {
-			return FindObjectW(szModuleName, szName, bCompleteObject);
+		std::unique_ptr<Object> FindObject(wchar_t const* const szModuleName, char const* const szName, const char* szParentName, bool bCompleteObject) {
+			return FindObjectW(szModuleName, szName, szParentName, bCompleteObject);
 		}
 #else
-		std::unique_ptr<Object> FindObject(char const* const szModuleName, char const* const szName, bool bCompleteObject) {
-			return FindObjectA(szModuleName, szName, bCompleteObject);
+		std::unique_ptr<Object> FindObject(char const* const szModuleName, char const* const szName, const char* szParentName, bool bCompleteObject) {
+			return FindObjectA(szModuleName, szName, szParentName, bCompleteObject);
 		}
 #endif
 	}
