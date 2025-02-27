@@ -39,7 +39,7 @@ A set of tools for working with software modifications in two files (Detours.h, 
 * FindSignature - Searches for a signature pattern.
 * FindData - Searches for a specified data pattern.
 
-# Detours::RTTI [Beta]
+# Detours::RTTI
 * Object - Represents an object in memory with rich type information, including its base classes, type descriptor, class hierarchy descriptor, complete object locator, and virtual function table (VTable). The class supports dynamic casting for polymorphic objects.
 * FindObject - Locates an object in memory based on specified parameters, including module information, object name, and whether to search for the complete object.
 

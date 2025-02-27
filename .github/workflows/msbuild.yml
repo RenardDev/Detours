@@ -125,63 +125,10 @@ jobs:
             ${{env.SOLUTION_FILE_PATH}}\build\**\*.pdb
           if-no-files-found: error
 
-
-  analysis:
-    name: Analysis
-    runs-on: self-hosted
-    needs: [ building-debug-x86, building-debug-x86-64, building-release-x86, building-release-x86-64 ]
-
-    steps:
-      - uses: actions/checkout@v4.1.7
-  
-      - name: Add MSBuild to PATH
-        uses: microsoft/setup-msbuild@v1.1.3
-  
-      - name: Restore NuGet packages
-        working-directory: ${{env.GITHUB_WORKSPACE}}
-        run: dotnet restore ${{env.SOLUTION_FILE_PATH}}
-
-      - name: Analysis Debug (x86)
-        if: always()
-        working-directory: ${{env.GITHUB_WORKSPACE}}
-        run: |
-          mkdir "${{env.SOLUTION_FILE_PATH}}\build\x86\Debug"
-          python "C:\PVS-Studio_Cmd.py" --settings "C:\Settings.xml" --target "${{env.SOLUTION_FILE_PATH}}\Detours.sln" --useSuppressFile "${{env.SOLUTION_FILE_PATH}}\SuppressionFile.suppress" --configuration Debug --platform x86 --output "${{env.SOLUTION_FILE_PATH}}\build\x86\Debug\results.plog"
-
-      - name: Analysis Debug (x86_64)
-        if: always()
-        working-directory: ${{env.GITHUB_WORKSPACE}}
-        run: |
-          mkdir "${{env.SOLUTION_FILE_PATH}}\build\x86_64\Debug"
-          python "C:\PVS-Studio_Cmd.py" --settings "C:\Settings.xml" --target "${{env.SOLUTION_FILE_PATH}}\Detours.sln" --useSuppressFile "${{env.SOLUTION_FILE_PATH}}\SuppressionFile.suppress" --configuration Debug --platform x64 --output "${{env.SOLUTION_FILE_PATH}}\build\x86_64\Debug\results.plog"
-
-      - name: Analysis Release (x86)
-        if: always()
-        working-directory: ${{env.GITHUB_WORKSPACE}}
-        run: |
-          mkdir "${{env.SOLUTION_FILE_PATH}}\build\x86\Release"
-          python "C:\PVS-Studio_Cmd.py" --settings "C:\Settings.xml" --target "${{env.SOLUTION_FILE_PATH}}\Detours.sln" --useSuppressFile "${{env.SOLUTION_FILE_PATH}}\SuppressionFile.suppress" --configuration Release --platform x86 --output "${{env.SOLUTION_FILE_PATH}}\build\x86\Debug\results.plog"
-
-      - name: Analysis Release (x86_64)
-        if: always()
-        working-directory: ${{env.GITHUB_WORKSPACE}}
-        run: |
-          mkdir "${{env.SOLUTION_FILE_PATH}}\build\x86_64\Release"
-          python "C:\PVS-Studio_Cmd.py" --settings "C:\Settings.xml" --target "${{env.SOLUTION_FILE_PATH}}\Detours.sln" --useSuppressFile "${{env.SOLUTION_FILE_PATH}}\SuppressionFile.suppress" --configuration Release --platform x64 --output "${{env.SOLUTION_FILE_PATH}}\build\x86_64\Debug\results.plog"
-
-      - name: Uploading results
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: Analysis
-          path: |
-            ${{env.SOLUTION_FILE_PATH}}\build\**\*.plog
-          if-no-files-found: error
-
   testing-debug-x86:
     name: Testing Debug (x86)
     runs-on: windows-latest
-    needs: analysis
+    needs: building-debug-x86
 
     steps:
       - name: Downloading Debug (x86)
@@ -199,7 +146,7 @@ jobs:
   testing-debug-x86-64:
     name: Testing Debug (x86_64)
     runs-on: windows-latest
-    needs: analysis
+    needs: building-debug-x86-64
 
     steps:
       - name: Downloading Debug (x86_64)
@@ -217,7 +164,7 @@ jobs:
   testing-release-x86:
     name: Testing Release (x86)
     runs-on: windows-latest
-    needs: analysis
+    needs: building-release-x86
 
     steps:
       - name: Downloading Release (x86)
@@ -235,7 +182,7 @@ jobs:
   testing-release-x86-64:
     name: Testing Release (x86_64)
     runs-on: windows-latest
-    needs: analysis
+    needs: building-release-x86-64
 
     steps:
       - name: Downloading Release (x86_64)
@@ -249,39 +196,3 @@ jobs:
         timeout-minutes: 3
         working-directory: ${{env.GITHUB_WORKSPACE}}
         run: ${{env.SOLUTION_FILE_PATH}}\build\x86_64\Release\Detours.exe
-
-  signing:
-    name: Signing Release
-    runs-on: self-hosted
-    needs: [ testing-debug-x86, testing-debug-x86-64, testing-release-x86, testing-release-x86-64 ]
-
-    steps:
-      - name: Downloading Release (x86)
-        uses: actions/download-artifact@v4
-        with:
-          name: BuildRelease32
-          path: |
-            ${{env.SOLUTION_FILE_PATH}}\build
-  
-      - name: Downloading Release (x86_64)
-        uses: actions/download-artifact@v4
-        with:
-          name: BuildRelease64
-          path: |
-            ${{env.SOLUTION_FILE_PATH}}\build
-
-      - name: Signing Release (x86)
-        working-directory: ${{env.GITHUB_WORKSPACE}}
-        run: python "C:\SignExecutable.py" "${{env.SOLUTION_FILE_PATH}}\build\x86\Release\Detours.exe"
-
-      - name: Signing Release (x86_64)
-        working-directory: ${{env.GITHUB_WORKSPACE}}
-        run: python "C:\SignExecutable.py" "${{env.SOLUTION_FILE_PATH}}\build\x86_64\Release\Detours.exe"
-
-      - name: Uploading Release
-        uses: actions/upload-artifact@v4
-        with:
-          name: Production
-          path: |
-            ${{env.SOLUTION_FILE_PATH}}\build\**\Release\*.exe
-          if-no-files-found: error
