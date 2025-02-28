@@ -963,7 +963,7 @@ TEST_SUITE("Detours::RTTI") {
 		const auto& pBaseMessageObject = Detours::RTTI::FindObject(GetModuleHandle(nullptr), ".?AVBaseMessage@@", nullptr, false);
 		CHECK(pBaseMessageObject != nullptr);
 
-		const auto& pMessageOneObject = Detours::RTTI::FindObject(GetModuleHandle(nullptr), ".?AVMessageOne@@");
+		const auto& pMessageOneObject = Detours::RTTI::FindObject(GetModuleHandle(nullptr), ".?AVMessageOne@@", ".?AVBaseMessage@@");
 		CHECK(pMessageOneObject != nullptr);
 
 		const auto& pMessageTwoObject = Detours::RTTI::FindObject(GetModuleHandle(nullptr), ".?AVMessageTwo@@");
