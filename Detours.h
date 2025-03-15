@@ -60,6 +60,8 @@
 	DECLARE_SECTION(NAME)                       \
 	CHANGE_SECTION_ATTRIBUTES(NAME, ATTRIBUTES)
 
+#define MERGE_SECTION(FROM, TO) LINKER_OPTION("/MERGE:" FROM "=" TO)
+
 #define DEFINE_DATA_IN_SECTION(NAME) __declspec(allocate(NAME))
 #define DEFINE_CODE_IN_SECTION(NAME) __declspec(code_seg(NAME))
 
