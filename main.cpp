@@ -10,7 +10,6 @@
 #include <cstdio>
 #include <typeinfo>
 #include <iostream>
-#include <bitset>
 #include <unordered_map>
 
 // Detours
@@ -91,14 +90,13 @@ private:
 	bool m_bBoo;
 };
 
-DECLARE_SECTION(".cdata")
 DEFINE_SECTION(".cdata", SECTION_READWRITE)
-DEFINE_SECTION(".ctext", SECTION_READWRITE)
+DEFINE_SECTION(".ctext", SECTION_EXECUTE_READ)
 
-DEFINE_IN_SECTION(".cdata") __declspec(dllexport) BaseTestingRTTI* g_pBaseTestingRTTI = nullptr;
-DEFINE_IN_SECTION(".cdata") __declspec(dllexport) TestingRTTI* g_pTestingRTTI = nullptr;
+DEFINE_DATA_IN_SECTION(".cdata") __declspec(dllexport) BaseTestingRTTI* g_pBaseTestingRTTI = nullptr;
+DEFINE_DATA_IN_SECTION(".cdata") __declspec(dllexport) TestingRTTI* g_pTestingRTTI = nullptr;
 
-DEFINE_IN_CODE_SECTION(".ctext") __declspec(dllexport) int DemoSum(int nA, int nB) {
+DEFINE_CODE_IN_SECTION(".ctext") __declspec(dllexport) int DemoSum(int nA, int nB) {
 	return nA + nB / nA;
 }
 

@@ -36,23 +36,32 @@
 // ----------------------------------------------------------------
 
 // MSVC - Linker
+
 #define LINKER_OPTION(OPTION) __pragma(comment(linker, OPTION))
 
 // MSVC - Symbols
+
 #define INCLUDE(SYMBOL_NAME) LINKER_OPTION("/INCLUDE:" SYMBOL_NAME)
 #define SELF_INCLUDE INCLUDE(__FUNCDNAME__)
 #define EXPORT(SYMBOL_NAME, ALIAS_NAME) LINKER_OPTION("/EXPORT:" ALIAS_NAME "=" SYMBOL_NAME)
 #define SELF_EXPORT(ALIAS_NAME) EXPORT(__FUNCDNAME__, ALIAS_NAME)
 
 // MSVC - Sections
-#define DECLARE_SECTION(NAME) __pragma(section(NAME))
+
+#define DECLARE_SECTION(NAME) __pragma(section(NAME, execute))
+
 #define SECTION_READONLY "R"
 #define SECTION_READWRITE "RW"
 #define SECTION_EXECUTE_READ "ER"
 #define SECTION_EXECUTE_READWRITE "ERW"
-#define DEFINE_SECTION(NAME, ATTRIBUTES) LINKER_OPTION("/SECTION:" NAME "," ATTRIBUTES)
-#define DEFINE_IN_SECTION(NAME) __declspec(allocate(NAME))
-#define DEFINE_IN_CODE_SECTION(NAME) __declspec(code_seg(NAME))
+#define CHANGE_SECTION_ATTRIBUTES(NAME, ATTRIBUTES) LINKER_OPTION("/SECTION:" NAME "," ATTRIBUTES)
+
+#define DEFINE_SECTION(NAME, ATTRIBUTES)        \
+	DECLARE_SECTION(NAME)                       \
+	CHANGE_SECTION_ATTRIBUTES(NAME, ATTRIBUTES)
+
+#define DEFINE_DATA_IN_SECTION(NAME) __declspec(allocate(NAME))
+#define DEFINE_CODE_IN_SECTION(NAME) __declspec(code_seg(NAME))
 
 #ifndef PROCESSOR_FEATURE_MAX
 #define PROCESSOR_FEATURE_MAX 64
