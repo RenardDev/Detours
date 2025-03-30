@@ -928,6 +928,8 @@ TEST_SUITE("Detours::Scan") {
 	}
 }
 
+#pragma optimize("", off)
+
 TEST_SUITE("Detours::RTTI") {
 	TEST_CASE("FindRTTI") {
 		g_pBaseTestingRTTI = new BaseTestingRTTI();
@@ -976,6 +978,8 @@ TEST_SUITE("Detours::RTTI") {
 		delete pMsg2;
 	}
 }
+
+#pragma optimize("", on)
 
 TEST_SUITE("Detours::Sync") {
 
@@ -1961,6 +1965,8 @@ TEST_SUITE("Detours::Hook") {
 		CHECK(Detours::Hook::UnHookInterrupt(InterruptHook) == true);
 	}
 
+#pragma optimize("", off)
+
 	TEST_CASE("VTableFunctionHook") {
 		g_pBaseTestingRTTI = new BaseTestingRTTI();
 		CHECK(g_pBaseTestingRTTI != nullptr);
@@ -2027,6 +2033,8 @@ TEST_SUITE("Detours::Hook") {
 		delete g_pBaseTestingRTTI;
 	}
 
+#pragma optimize("", on)
+
 	TEST_CASE("InlineWrapperHook") {
 		HMODULE hKernel32 = GetModuleHandle(_T("kernel32.dll"));
 		CHECK(hKernel32 != nullptr);
@@ -2075,6 +2083,8 @@ TEST_SUITE("Detours::Hook") {
 		CHECK(RawSleepHook.Release() == true);
 	}
 
+#pragma optimize("", off)
+
 	TEST_CASE("RawHook 3") {
 		g_pBaseTestingRTTI = new BaseTestingRTTI();
 		CHECK(g_pBaseTestingRTTI != nullptr);
@@ -2097,6 +2107,8 @@ TEST_SUITE("Detours::Hook") {
 		delete g_pBaseTestingRTTI;
 		delete g_pTestingRTTI;
 	}
+
+#pragma optimize("", on)
 
 	unsigned int DemoFunction() { SELF_EXPORT("DemoFunction");
 		int cpuinfo[4];
