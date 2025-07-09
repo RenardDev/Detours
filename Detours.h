@@ -2192,7 +2192,7 @@ namespace Detours {
 		public:
 			bool Suspend();
 			void Resume();
-			bool IsAddressExecuting(void* pAddress, size_t unSize);
+			bool IsInExecuting(void* pAddress, size_t unSize);
 			void FixExecutionAddress(void* pAddress, void* pNewAddress);
 
 		private:

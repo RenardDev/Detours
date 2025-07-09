@@ -288,7 +288,7 @@ namespace Detours {
 		static DWORD64 WINAPI GetModuleBaseByAddress(HANDLE hProcess, DWORD64 unAddress) {
 			MEMORY_BASIC_INFORMATION mbi;
 			if (VirtualQueryEx(hProcess, reinterpret_cast<LPCVOID>(unAddress), &mbi, sizeof(mbi))) {
-				return reinterpret_cast<DWORD64>(mbi.AllocationBase);
+				return reinterpret_cast<DWORD64>(mbi.BaseAddress);
 			}
 
 			return 0;
@@ -301,15 +301,10 @@ namespace Detours {
 				return vecCallStack;
 			}
 
-			if (SuspendThread(hThread) == static_cast<DWORD>(-1)) {
-				return vecCallStack;
-			}
-
 			CONTEXT ctx = { 0 };
 			ctx.ContextFlags = CONTEXT_FULL;
 
 			if (!GetThreadContext(hThread, &ctx)) {
-				ResumeThread(hThread);
 				return vecCallStack;
 			}
 
@@ -344,7 +339,6 @@ namespace Detours {
 				vecCallStack.push_back(reinterpret_cast<void*>(frame.AddrReturn.Offset));
 			}
 
-			ResumeThread(hThread);
 			return vecCallStack;
 		}
 
@@ -381,10 +375,6 @@ namespace Detours {
 				return vecCallStack;
 			}
 
-			if (SuspendThread(hThread) == static_cast<DWORD>(-1)) {
-				return vecCallStack;
-			}
-
 			if (!GetThreadContext(hThread, ctx)) {
 				return vecCallStack;
 			}
@@ -404,6 +394,10 @@ namespace Detours {
 				return vecCallStack;
 			}
 
+			if (!pCET->Ia32Pl3SspMsr) {
+				return vecCallStack;
+			}
+
 			MEMORY_BASIC_INFORMATION mbi;
 			if (!VirtualQuery(reinterpret_cast<void*>(pCET->Ia32Pl3SspMsr), &mbi, sizeof(mbi))) {
 				return vecCallStack;
@@ -415,7 +409,6 @@ namespace Detours {
 				vecCallStack.push_back(pReturnAddress);
 			}
 
-			ResumeThread(hThread);
 			return vecCallStack;
 		}
 	}
@@ -4701,19 +4694,12 @@ namespace Detours {
 			m_Threads.clear();
 		}
 
-		bool Suspender::IsAddressExecuting(void* pAddress, size_t unSize) {
+		bool Suspender::IsInExecuting(void* pAddress, size_t unSize) {
 			if (!pAddress || !unSize) {
 				return false;
 			}
 
 			for (auto& thread : m_Threads) {
-				auto vecCallStack = GetCallStack(thread.m_hHandle);
-				for (const auto& ReturnAddress : vecCallStack) {
-					if ((ReturnAddress >= pAddress) && (ReturnAddress < (reinterpret_cast<char*>(pAddress) + unSize))) {
-						return true;
-					}
-				}
-
 				auto vecShadowCallStack = GetShadowCallStack(thread.m_hHandle);
 				for (const auto& ReturnAddress : vecShadowCallStack) {
 					if ((ReturnAddress >= pAddress) && (ReturnAddress < (reinterpret_cast<char*>(pAddress) + unSize))) {
@@ -4721,7 +4707,14 @@ namespace Detours {
 					}
 				}
 
-				return false;
+				if (vecShadowCallStack.empty()) {
+					auto vecCallStack = GetCallStack(thread.m_hHandle);
+					for (const auto& ReturnAddress : vecCallStack) {
+						if ((ReturnAddress >= pAddress) && (ReturnAddress < (reinterpret_cast<char*>(pAddress) + unSize))) {
+							return true;
+						}
+					}
+				}
 			}
 
 			return false;
@@ -85931,7 +85924,7 @@ namespace Detours {
 				while (true) {
 					bool bIsExecuting = false;
 
-					if (g_Suspender.IsAddressExecuting(m_pAddress, unCopyingSize)) {
+					if (g_Suspender.IsInExecuting(m_pAddress, unCopyingSize)) {
 						bIsExecuting = true;
 						break;
 					}
@@ -86045,13 +86038,13 @@ namespace Detours {
 				while (true) {
 					bool bIsExecuting = false;
 
-					if (g_Suspender.IsAddressExecuting(m_pAddress, m_unOriginalBytes)) {
+					if (g_Suspender.IsInExecuting(m_pAddress, m_unOriginalBytes)) {
 						bIsExecuting = true;
 						break;
 					}
 
 					if (!bIsExecuting) {
-						if (g_Suspender.IsAddressExecuting(m_pTrampoline, HOOK_INLINE_TRAMPOLINE_SIZE)) {
+						if (g_Suspender.IsInExecuting(m_pTrampoline, HOOK_INLINE_TRAMPOLINE_SIZE)) {
 							bIsExecuting = true;
 							break;
 						}
@@ -86468,7 +86461,7 @@ namespace Detours {
 				while (true) {
 					bool bIsExecuting = false;
 
-					if (g_Suspender.IsAddressExecuting(m_pAddress, unCopyingSize)) {
+					if (g_Suspender.IsInExecuting(m_pAddress, unCopyingSize)) {
 						bIsExecuting = true;
 						break;
 					}
@@ -86588,20 +86581,20 @@ namespace Detours {
 				while (true) {
 					bool bIsExecuting = false;
 
-					if (g_Suspender.IsAddressExecuting(m_pAddress, m_unOriginalBytes)) {
+					if (g_Suspender.IsInExecuting(m_pAddress, m_unOriginalBytes)) {
 						bIsExecuting = true;
 						break;
 					}
 
 					if (!bIsExecuting) {
-						if (g_Suspender.IsAddressExecuting(m_pWrapper, HOOK_INLINE_WRAPPER_SIZE)) {
+						if (g_Suspender.IsInExecuting(m_pWrapper, HOOK_INLINE_WRAPPER_SIZE)) {
 							bIsExecuting = true;
 							break;
 						}
 					}
 
 					if (!bIsExecuting) {
-						if (g_Suspender.IsAddressExecuting(m_pTrampoline, HOOK_INLINE_TRAMPOLINE_SIZE)) {
+						if (g_Suspender.IsInExecuting(m_pTrampoline, HOOK_INLINE_TRAMPOLINE_SIZE)) {
 							bIsExecuting = true;
 							break;
 						}
@@ -88067,7 +88060,7 @@ namespace Detours {
 				while (true) {
 					bool bIsExecuting = false;
 
-					if (g_Suspender.IsAddressExecuting(m_pAddress, unCopyingSize)) {
+					if (g_Suspender.IsInExecuting(m_pAddress, unCopyingSize)) {
 						bIsExecuting = true;
 						break;
 					}
@@ -88191,20 +88184,20 @@ namespace Detours {
 				while (true) {
 					bool bIsExecuting = false;
 
-					if (g_Suspender.IsAddressExecuting(m_pAddress, m_unOriginalBytes)) {
+					if (g_Suspender.IsInExecuting(m_pAddress, m_unOriginalBytes)) {
 						bIsExecuting = true;
 						break;
 					}
 
 					if (!bIsExecuting) {
-						if (g_Suspender.IsAddressExecuting(m_pWrapper, HOOK_RAW_WRAPPER_SIZE)) {
+						if (g_Suspender.IsInExecuting(m_pWrapper, HOOK_RAW_WRAPPER_SIZE)) {
 							bIsExecuting = true;
 							break;
 						}
 					}
 
 					if (!bIsExecuting) {
-						if (g_Suspender.IsAddressExecuting(m_pTrampoline, HOOK_RAW_TRAMPOLINE_SIZE)) {
+						if (g_Suspender.IsInExecuting(m_pTrampoline, HOOK_RAW_TRAMPOLINE_SIZE)) {
 							bIsExecuting = true;
 							break;
 						}
@@ -88252,13 +88245,13 @@ namespace Detours {
 				while (true) {
 					bool bIsExecuting = false;
 
-					if (g_Suspender.IsAddressExecuting(m_pWrapper, HOOK_RAW_WRAPPER_SIZE)) {
+					if (g_Suspender.IsInExecuting(m_pWrapper, HOOK_RAW_WRAPPER_SIZE)) {
 						bIsExecuting = true;
 						break;
 					}
 
 					if (!bIsExecuting) {
-						if (g_Suspender.IsAddressExecuting(m_pTrampoline, HOOK_RAW_TRAMPOLINE_SIZE)) {
+						if (g_Suspender.IsInExecuting(m_pTrampoline, HOOK_RAW_TRAMPOLINE_SIZE)) {
 							bIsExecuting = true;
 							break;
 						}
