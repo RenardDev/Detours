@@ -1412,6 +1412,25 @@ namespace Detours {
 	PTEB GetTEB(HANDLE hThread);
 
 	// ----------------------------------------------------------------
+	// CallStack
+	// ----------------------------------------------------------------
+
+	namespace CallStack {
+
+		// ----------------------------------------------------------------
+		// GetCallStack
+		// ----------------------------------------------------------------
+
+		std::vector<void*> GetCallStack(HANDLE hThread, size_t unMaxEntries = 100);
+
+		// ----------------------------------------------------------------
+		// GetShadowCallStack
+		// ----------------------------------------------------------------
+
+		std::vector<void*> GetShadowCallStack(HANDLE hThread);
+	}
+
+	// ----------------------------------------------------------------
 	// LDR
 	// ----------------------------------------------------------------
 
@@ -2173,7 +2192,7 @@ namespace Detours {
 		public:
 			bool Suspend();
 			void Resume();
-			bool IsAddressExecuting(void* pAddress);
+			bool IsAddressExecuting(void* pAddress, size_t unSize);
 			void FixExecutionAddress(void* pAddress, void* pNewAddress);
 
 		private:

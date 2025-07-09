@@ -2,6 +2,7 @@
 
 // Default
 #include <tchar.h>
+#include <DbgHelp.h>
 
 // STL
 #include <unordered_map>
@@ -136,6 +137,7 @@ namespace Detours {
 	// Namespaces
 	// ----------------------------------------------------------------
 
+	using namespace CallStack;
 	using namespace LDR;
 	using namespace Codec;
 	using namespace Hexadecimal;
@@ -271,6 +273,151 @@ namespace Detours {
 		}
 
 		return static_cast<PTEB>(tbi.TebBaseAddress);
+	}
+
+	// ----------------------------------------------------------------
+	// CallStack
+	// ----------------------------------------------------------------
+
+	namespace CallStack {
+
+		// ----------------------------------------------------------------
+		// GetCallStack
+		// ----------------------------------------------------------------
+
+		static DWORD64 WINAPI GetModuleBaseByAddress(HANDLE hProcess, DWORD64 unAddress) {
+			MEMORY_BASIC_INFORMATION mbi;
+			if (VirtualQueryEx(hProcess, reinterpret_cast<LPCVOID>(unAddress), &mbi, sizeof(mbi))) {
+				return reinterpret_cast<DWORD64>(mbi.AllocationBase);
+			}
+
+			return 0;
+		}
+
+		std::vector<void*> GetCallStack(HANDLE hThread, size_t unMaxEntries) {
+			std::vector<void*> vecCallStack;
+
+			if (!hThread || (hThread == INVALID_HANDLE_VALUE) || !unMaxEntries) {
+				return vecCallStack;
+			}
+
+			if (SuspendThread(hThread) == static_cast<DWORD>(-1)) {
+				return vecCallStack;
+			}
+
+			CONTEXT ctx = { 0 };
+			ctx.ContextFlags = CONTEXT_FULL;
+
+			if (!GetThreadContext(hThread, &ctx)) {
+				ResumeThread(hThread);
+				return vecCallStack;
+			}
+
+			STACKFRAME64 frame = { 0 };
+			DWORD unMachineType = 0;
+
+#ifdef _M_X64
+			unMachineType = IMAGE_FILE_MACHINE_AMD64;
+			frame.AddrPC.Offset = ctx.Rip;
+			frame.AddrFrame.Offset = ctx.Rbp;
+			frame.AddrStack.Offset = ctx.Rsp;
+#elif _M_IX86
+			unMachineType = IMAGE_FILE_MACHINE_I386;
+			frame.AddrPC.Offset = ctx.Eip;
+			frame.AddrFrame.Offset = ctx.Ebp;
+			frame.AddrStack.Offset = ctx.Esp;
+#endif
+
+			frame.AddrPC.Mode = AddrModeFlat;
+			frame.AddrFrame.Mode = AddrModeFlat;
+			frame.AddrStack.Mode = AddrModeFlat;
+
+			for (size_t i = 0; i < unMaxEntries; ++i) {
+				if (!StackWalk64(unMachineType, GetCurrentProcess(), hThread, &frame, &ctx, nullptr, nullptr, GetModuleBaseByAddress, nullptr)) {
+					break;
+				}
+
+				if (!frame.AddrReturn.Offset) {
+					break;
+				}
+
+				vecCallStack.push_back(reinterpret_cast<void*>(frame.AddrReturn.Offset));
+			}
+
+			ResumeThread(hThread);
+			return vecCallStack;
+		}
+
+		// ----------------------------------------------------------------
+		// GetShadowCallStack
+		// ----------------------------------------------------------------
+
+		std::vector<void*> GetShadowCallStack(HANDLE hThread) {
+			std::vector<void*> vecCallStack;
+
+			if (!hThread || (hThread == INVALID_HANDLE_VALUE)) {
+				return vecCallStack;
+			}
+
+			if (!(GetEnabledXStateFeatures() & XSTATE_MASK_CET_U)) {
+				return vecCallStack;
+			}
+
+			DWORD unContextSize = 0;
+			InitializeContext2(nullptr, CONTEXT_XSTATE, nullptr, &unContextSize, XSTATE_MASK_CET_U);
+			if (!unContextSize) {
+				return vecCallStack;
+			}
+
+			auto pBuffer = std::make_unique<BYTE[]>(unContextSize);
+			if (!pBuffer) {
+				return vecCallStack;
+			}
+
+			memset(pBuffer.get(), 0, unContextSize);
+
+			PCONTEXT ctx = nullptr;
+			if (!InitializeContext2(pBuffer.get(), CONTEXT_XSTATE, &ctx, &unContextSize, XSTATE_MASK_CET_U)) {
+				return vecCallStack;
+			}
+
+			if (SuspendThread(hThread) == static_cast<DWORD>(-1)) {
+				return vecCallStack;
+			}
+
+			if (!GetThreadContext(hThread, ctx)) {
+				return vecCallStack;
+			}
+
+			DWORD64 unFeatureMask = 0;
+			if (!GetXStateFeaturesMask(ctx, &unFeatureMask)) {
+				return vecCallStack;
+			}
+
+			if (!(unFeatureMask & XSTATE_MASK_CET_U)) {
+				return vecCallStack;
+			}
+
+			DWORD unCETSize = 0;
+			auto pCET = reinterpret_cast<PXSAVE_CET_U_FORMAT>(LocateXStateFeature(ctx, XSTATE_CET_U, &unCETSize));
+			if (!pCET) {
+				return vecCallStack;
+			}
+
+			MEMORY_BASIC_INFORMATION mbi;
+			if (!VirtualQuery(reinterpret_cast<void*>(pCET->Ia32Pl3SspMsr), &mbi, sizeof(mbi))) {
+				return vecCallStack;
+			}
+
+			const size_t unUsedSpace = reinterpret_cast<size_t>(mbi.BaseAddress) + mbi.RegionSize - static_cast<size_t>(pCET->Ia32Pl3SspMsr);
+			for (size_t unOffset = 0; unOffset < unUsedSpace; unOffset += sizeof(void*)) {
+				void* pReturnAddress = *reinterpret_cast<void**>(reinterpret_cast<char*>(pCET->Ia32Pl3SspMsr) + unOffset);
+				vecCallStack.push_back(pReturnAddress);
+			}
+
+			ResumeThread(hThread);
+			return vecCallStack;
+		}
 	}
 
 	// ----------------------------------------------------------------
@@ -4554,23 +4701,27 @@ namespace Detours {
 			m_Threads.clear();
 		}
 
-		bool Suspender::IsAddressExecuting(void* pAddress) {
-			if (!pAddress) {
+		bool Suspender::IsAddressExecuting(void* pAddress, size_t unSize) {
+			if (!pAddress || !unSize) {
 				return false;
 			}
 
 			for (auto& thread : m_Threads) {
-				auto pTEB = GetTEB(thread.m_hHandle);
-				if (!pTEB) {
-					continue;
+				auto vecCallStack = GetCallStack(thread.m_hHandle);
+				for (const auto& ReturnAddress : vecCallStack) {
+					if ((ReturnAddress >= pAddress) && (ReturnAddress < (reinterpret_cast<char*>(pAddress) + unSize))) {
+						return true;
+					}
 				}
 
-				auto pFoundAddress = FindData(pTEB->NtTib.StackLimit, reinterpret_cast<size_t>(pTEB->NtTib.StackBase) - reinterpret_cast<size_t>(pTEB->NtTib.StackLimit) - 1, reinterpret_cast<unsigned char const* const>(&pAddress), sizeof(void*));
-				if (!pFoundAddress) {
-					continue;
+				auto vecShadowCallStack = GetShadowCallStack(thread.m_hHandle);
+				for (const auto& ReturnAddress : vecShadowCallStack) {
+					if ((ReturnAddress >= pAddress) && (ReturnAddress < (reinterpret_cast<char*>(pAddress) + unSize))) {
+						return true;
+					}
 				}
 
-				return true;
+				return false;
 			}
 
 			return false;
@@ -85780,11 +85931,9 @@ namespace Detours {
 				while (true) {
 					bool bIsExecuting = false;
 
-					for (size_t unIndex = 0; unIndex < unCopyingSize; ++unIndex) {
-						if (g_Suspender.IsAddressExecuting(reinterpret_cast<unsigned char*>(m_pAddress) + unIndex)) {
-							bIsExecuting = true;
-							break;
-						}
+					if (g_Suspender.IsAddressExecuting(m_pAddress, unCopyingSize)) {
+						bIsExecuting = true;
+						break;
 					}
 
 					if (!bIsExecuting) {
@@ -85896,19 +86045,15 @@ namespace Detours {
 				while (true) {
 					bool bIsExecuting = false;
 
-					for (size_t unIndex = 0; unIndex < m_unOriginalBytes; ++unIndex) {
-						if (g_Suspender.IsAddressExecuting(reinterpret_cast<unsigned char*>(m_pAddress) + unIndex)) {
-							bIsExecuting = true;
-							break;
-						}
+					if (g_Suspender.IsAddressExecuting(m_pAddress, m_unOriginalBytes)) {
+						bIsExecuting = true;
+						break;
 					}
 
 					if (!bIsExecuting) {
-						for (size_t unIndex = 0; unIndex < HOOK_INLINE_TRAMPOLINE_SIZE; ++unIndex) {
-							if (g_Suspender.IsAddressExecuting(reinterpret_cast<unsigned char*>(m_pTrampoline) + unIndex)) {
-								bIsExecuting = true;
-								break;
-							}
+						if (g_Suspender.IsAddressExecuting(m_pTrampoline, HOOK_INLINE_TRAMPOLINE_SIZE)) {
+							bIsExecuting = true;
+							break;
 						}
 					}
 
@@ -86323,11 +86468,9 @@ namespace Detours {
 				while (true) {
 					bool bIsExecuting = false;
 
-					for (size_t unIndex = 0; unIndex < unCopyingSize; ++unIndex) {
-						if (g_Suspender.IsAddressExecuting(reinterpret_cast<unsigned char*>(m_pAddress) + unIndex)) {
-							bIsExecuting = true;
-							break;
-						}
+					if (g_Suspender.IsAddressExecuting(m_pAddress, unCopyingSize)) {
+						bIsExecuting = true;
+						break;
 					}
 
 					if (!bIsExecuting) {
@@ -86445,28 +86588,22 @@ namespace Detours {
 				while (true) {
 					bool bIsExecuting = false;
 
-					for (size_t unIndex = 0; unIndex < m_unOriginalBytes; ++unIndex) {
-						if (g_Suspender.IsAddressExecuting(reinterpret_cast<unsigned char*>(m_pAddress) + unIndex)) {
+					if (g_Suspender.IsAddressExecuting(m_pAddress, m_unOriginalBytes)) {
+						bIsExecuting = true;
+						break;
+					}
+
+					if (!bIsExecuting) {
+						if (g_Suspender.IsAddressExecuting(m_pWrapper, HOOK_INLINE_WRAPPER_SIZE)) {
 							bIsExecuting = true;
 							break;
 						}
 					}
 
 					if (!bIsExecuting) {
-						for (size_t unIndex = 0; unIndex < HOOK_INLINE_WRAPPER_SIZE; ++unIndex) {
-							if (g_Suspender.IsAddressExecuting(reinterpret_cast<unsigned char*>(m_pWrapper) + unIndex)) {
-								bIsExecuting = true;
-								break;
-							}
-						}
-					}
-
-					if (!bIsExecuting) {
-						for (size_t unIndex = 0; unIndex < HOOK_INLINE_TRAMPOLINE_SIZE; ++unIndex) {
-							if (g_Suspender.IsAddressExecuting(reinterpret_cast<unsigned char*>(m_pTrampoline) + unIndex)) {
-								bIsExecuting = true;
-								break;
-							}
+						if (g_Suspender.IsAddressExecuting(m_pTrampoline, HOOK_INLINE_TRAMPOLINE_SIZE)) {
+							bIsExecuting = true;
+							break;
 						}
 					}
 
@@ -87930,11 +88067,9 @@ namespace Detours {
 				while (true) {
 					bool bIsExecuting = false;
 
-					for (size_t unIndex = 0; unIndex < unCopyingSize; ++unIndex) {
-						if (g_Suspender.IsAddressExecuting(reinterpret_cast<unsigned char*>(m_pAddress) + unIndex)) {
-							bIsExecuting = true;
-							break;
-						}
+					if (g_Suspender.IsAddressExecuting(m_pAddress, unCopyingSize)) {
+						bIsExecuting = true;
+						break;
 					}
 
 					if (!bIsExecuting) {
@@ -88056,28 +88191,22 @@ namespace Detours {
 				while (true) {
 					bool bIsExecuting = false;
 
-					for (size_t unIndex = 0; unIndex < m_unOriginalBytes; ++unIndex) {
-						if (g_Suspender.IsAddressExecuting(reinterpret_cast<unsigned char*>(m_pAddress) + unIndex)) {
+					if (g_Suspender.IsAddressExecuting(m_pAddress, m_unOriginalBytes)) {
+						bIsExecuting = true;
+						break;
+					}
+
+					if (!bIsExecuting) {
+						if (g_Suspender.IsAddressExecuting(m_pWrapper, HOOK_RAW_WRAPPER_SIZE)) {
 							bIsExecuting = true;
 							break;
 						}
 					}
 
 					if (!bIsExecuting) {
-						for (size_t unIndex = 0; unIndex < HOOK_RAW_WRAPPER_SIZE; ++unIndex) {
-							if (g_Suspender.IsAddressExecuting(reinterpret_cast<unsigned char*>(m_pWrapper) + unIndex)) {
-								bIsExecuting = true;
-								break;
-							}
-						}
-					}
-
-					if (!bIsExecuting) {
-						for (size_t unIndex = 0; unIndex < HOOK_RAW_TRAMPOLINE_SIZE; ++unIndex) {
-							if (g_Suspender.IsAddressExecuting(reinterpret_cast<unsigned char*>(m_pTrampoline) + unIndex)) {
-								bIsExecuting = true;
-								break;
-							}
+						if (g_Suspender.IsAddressExecuting(m_pTrampoline, HOOK_RAW_TRAMPOLINE_SIZE)) {
+							bIsExecuting = true;
+							break;
 						}
 					}
 
@@ -88123,19 +88252,15 @@ namespace Detours {
 				while (true) {
 					bool bIsExecuting = false;
 
-					for (size_t unIndex = 0; unIndex < HOOK_RAW_WRAPPER_SIZE; ++unIndex) {
-						if (g_Suspender.IsAddressExecuting(reinterpret_cast<unsigned char*>(m_pWrapper) + unIndex)) {
-							bIsExecuting = true;
-							break;
-						}
+					if (g_Suspender.IsAddressExecuting(m_pWrapper, HOOK_RAW_WRAPPER_SIZE)) {
+						bIsExecuting = true;
+						break;
 					}
 
 					if (!bIsExecuting) {
-						for (size_t unIndex = 0; unIndex < HOOK_RAW_TRAMPOLINE_SIZE; ++unIndex) {
-							if (g_Suspender.IsAddressExecuting(reinterpret_cast<unsigned char*>(m_pTrampoline) + unIndex)) {
-								bIsExecuting = true;
-								break;
-							}
+						if (g_Suspender.IsAddressExecuting(m_pTrampoline, HOOK_RAW_TRAMPOLINE_SIZE)) {
+							bIsExecuting = true;
+							break;
 						}
 					}
 
