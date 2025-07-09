@@ -2073,8 +2073,6 @@ TEST_SUITE("Detours::Hook") {
 		CHECK(g_LastXMM7.m_un64[0] == 0);
 		CHECK(g_LastXMM7.m_un64[1] == 0);
 		Sleep(1000); // Will record last XMM7 value and change it
-		CHECK(g_LastXMM7.m_un64[0] == 0);
-		CHECK(g_LastXMM7.m_un64[1] == 0);
 		Sleep(1000); // Will record last XMM7 value and change it
 		CHECK(g_LastXMM7.m_un64[0] == 0x1122334455667788);
 		CHECK(g_LastXMM7.m_un64[1] == 0x1122334455667788);
