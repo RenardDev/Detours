@@ -642,6 +642,10 @@
 #define HOOK_RAW_TRAMPOLINE_SIZE 0x30 // Max trampoline size.
 #endif // !HOOK_RAW_TRAMPOLINE_SIZE
 
+#ifndef CALLSTACK_MAX_ENTRIES
+#define CALLSTACK_MAX_ENTRIES 32 // Max entries for callstack
+#endif // !CALLSTACK_MAX_ENTRIES
+
 // ----------------------------------------------------------------
 // Detours
 // ----------------------------------------------------------------
@@ -1421,13 +1425,19 @@ namespace Detours {
 		// GetCallStack
 		// ----------------------------------------------------------------
 
-		std::vector<void*> GetCallStack(HANDLE hThread, size_t unMaxEntries = 100);
+		std::vector<void*> GetCallStack(HANDLE hThread, size_t unMaxEntries = CALLSTACK_MAX_ENTRIES);
+
+		// ----------------------------------------------------------------
+		// GetShadowStack
+		// ----------------------------------------------------------------
+
+		bool GetShadowStack(HANDLE hThread, void*** pShadowStack, size_t* pSize);
 
 		// ----------------------------------------------------------------
 		// GetShadowCallStack
 		// ----------------------------------------------------------------
 
-		std::vector<void*> GetShadowCallStack(HANDLE hThread);
+		std::vector<void*> GetShadowCallStack(HANDLE hThread, size_t unMaxEntries = CALLSTACK_MAX_ENTRIES);
 	}
 
 	// ----------------------------------------------------------------

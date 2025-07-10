@@ -343,70 +343,98 @@ namespace Detours {
 		}
 
 		// ----------------------------------------------------------------
-		// GetShadowCallStack
+		// GetShadowStack
 		// ----------------------------------------------------------------
 
-		std::vector<void*> GetShadowCallStack(HANDLE hThread) {
-			std::vector<void*> vecCallStack;
-
+		bool GetShadowStack(HANDLE hThread, void*** pShadowStack, size_t* pSize) {
 			if (!hThread || (hThread == INVALID_HANDLE_VALUE)) {
-				return vecCallStack;
+				return false;
 			}
 
 			if (!(GetEnabledXStateFeatures() & XSTATE_MASK_CET_U)) {
-				return vecCallStack;
+				return false;
 			}
 
 			DWORD unContextSize = 0;
+#pragma warning(push)
+#pragma warning(disable : 6387)
 			InitializeContext2(nullptr, CONTEXT_XSTATE, nullptr, &unContextSize, XSTATE_MASK_CET_U);
+#pragma warning(pop)
 			if (!unContextSize) {
-				return vecCallStack;
+				return false;
 			}
 
 			auto pBuffer = std::make_unique<BYTE[]>(unContextSize);
 			if (!pBuffer) {
-				return vecCallStack;
+				return false;
 			}
 
 			memset(pBuffer.get(), 0, unContextSize);
 
 			PCONTEXT ctx = nullptr;
 			if (!InitializeContext2(pBuffer.get(), CONTEXT_XSTATE, &ctx, &unContextSize, XSTATE_MASK_CET_U)) {
-				return vecCallStack;
+				return false;
 			}
 
 			if (!GetThreadContext(hThread, ctx)) {
-				return vecCallStack;
+				return false;
 			}
 
 			DWORD64 unFeatureMask = 0;
 			if (!GetXStateFeaturesMask(ctx, &unFeatureMask)) {
-				return vecCallStack;
+				return false;
 			}
 
 			if (!(unFeatureMask & XSTATE_MASK_CET_U)) {
-				return vecCallStack;
+				return false;
 			}
 
 			DWORD unCETSize = 0;
 			auto pCET = reinterpret_cast<PXSAVE_CET_U_FORMAT>(LocateXStateFeature(ctx, XSTATE_CET_U, &unCETSize));
 			if (!pCET) {
-				return vecCallStack;
+				return false;
 			}
 
 			if (!pCET->Ia32Pl3SspMsr) {
-				return vecCallStack;
+				return false;
 			}
 
 			MEMORY_BASIC_INFORMATION mbi;
-			if (!VirtualQuery(reinterpret_cast<void*>(pCET->Ia32Pl3SspMsr), &mbi, sizeof(mbi))) {
+			if (!VirtualQuery(reinterpret_cast<void**>(pCET->Ia32Pl3SspMsr), &mbi, sizeof(mbi))) {
+				return false;
+			}
+
+			if (pShadowStack) {
+				*pShadowStack = reinterpret_cast<void**>(pCET->Ia32Pl3SspMsr);
+			}
+
+			if (pSize) {
+				*pSize = (reinterpret_cast<size_t>(mbi.BaseAddress) + mbi.RegionSize - static_cast<size_t>(pCET->Ia32Pl3SspMsr)) / sizeof(void*);
+			}
+
+			return true;
+		}
+
+		// ----------------------------------------------------------------
+		// GetShadowCallStack
+		// ----------------------------------------------------------------
+
+		std::vector<void*> GetShadowCallStack(HANDLE hThread, size_t unMaxEntries) {
+			std::vector<void*> vecCallStack;
+
+			if (!hThread || (hThread == INVALID_HANDLE_VALUE)) {
 				return vecCallStack;
 			}
 
-			const size_t unUsedSpace = reinterpret_cast<size_t>(mbi.BaseAddress) + mbi.RegionSize - static_cast<size_t>(pCET->Ia32Pl3SspMsr);
-			for (size_t unOffset = 0; unOffset < unUsedSpace; unOffset += sizeof(void*)) {
-				void* pReturnAddress = *reinterpret_cast<void**>(reinterpret_cast<char*>(pCET->Ia32Pl3SspMsr) + unOffset);
-				vecCallStack.push_back(pReturnAddress);
+			void** pShadowStack = nullptr;
+			size_t unShadowStackSize = 0;
+			if (!GetShadowStack(hThread, &pShadowStack, &unShadowStackSize)) {
+				return vecCallStack;
+			}
+
+			size_t unEntries = MIN(unShadowStackSize, unMaxEntries);
+			for (size_t i = 0; i < unEntries; ++i) {
+				vecCallStack.push_back(pShadowStack[i]);
 			}
 
 			return vecCallStack;
@@ -85926,7 +85954,6 @@ namespace Detours {
 
 					if (g_Suspender.IsInExecuting(m_pAddress, unCopyingSize)) {
 						bIsExecuting = true;
-						break;
 					}
 
 					if (!bIsExecuting) {
@@ -85935,9 +85962,9 @@ namespace Detours {
 
 					g_Suspender.Resume();
 
-					for (unsigned int i = 0; i < 1'000'000'000UL; ++i) {
-						_mm_pause();
-					}
+					//for (unsigned int i = 0; i < 1'000'000'000UL; ++i) {
+					//	_mm_pause();
+					//}
 
 					if (!g_Suspender.Suspend()) {
 						m_pOriginalBytes = nullptr;
@@ -86040,13 +86067,11 @@ namespace Detours {
 
 					if (g_Suspender.IsInExecuting(m_pAddress, m_unOriginalBytes)) {
 						bIsExecuting = true;
-						break;
 					}
 
 					if (!bIsExecuting) {
 						if (g_Suspender.IsInExecuting(m_pTrampoline, HOOK_INLINE_TRAMPOLINE_SIZE)) {
 							bIsExecuting = true;
-							break;
 						}
 					}
 
@@ -86056,9 +86081,9 @@ namespace Detours {
 
 					g_Suspender.Resume();
 
-					for (unsigned int i = 0; i < 1'000'000'000UL; ++i) {
-						_mm_pause();
-					}
+					//for (unsigned int i = 0; i < 1'000'000'000UL; ++i) {
+					//	_mm_pause();
+					//}
 
 					if (!g_Suspender.Suspend()) {
 						return false;
@@ -86463,7 +86488,6 @@ namespace Detours {
 
 					if (g_Suspender.IsInExecuting(m_pAddress, unCopyingSize)) {
 						bIsExecuting = true;
-						break;
 					}
 
 					if (!bIsExecuting) {
@@ -86472,9 +86496,9 @@ namespace Detours {
 
 					g_Suspender.Resume();
 
-					for (unsigned int i = 0; i < 1'000'000'000UL; ++i) {
-						_mm_pause();
-					}
+					//for (unsigned int i = 0; i < 1'000'000'000UL; ++i) {
+					//	_mm_pause();
+					//}
 
 					if (!g_Suspender.Suspend()) {
 						m_pOriginalBytes = nullptr;
@@ -86583,20 +86607,17 @@ namespace Detours {
 
 					if (g_Suspender.IsInExecuting(m_pAddress, m_unOriginalBytes)) {
 						bIsExecuting = true;
-						break;
 					}
 
 					if (!bIsExecuting) {
 						if (g_Suspender.IsInExecuting(m_pWrapper, HOOK_INLINE_WRAPPER_SIZE)) {
 							bIsExecuting = true;
-							break;
 						}
 					}
 
 					if (!bIsExecuting) {
 						if (g_Suspender.IsInExecuting(m_pTrampoline, HOOK_INLINE_TRAMPOLINE_SIZE)) {
 							bIsExecuting = true;
-							break;
 						}
 					}
 
@@ -86606,9 +86627,9 @@ namespace Detours {
 
 					g_Suspender.Resume();
 
-					for (unsigned int i = 0; i < 1'000'000'000UL; ++i) {
-						_mm_pause();
-					}
+					//for (unsigned int i = 0; i < 1'000'000'000UL; ++i) {
+					//	_mm_pause();
+					//}
 
 					if (!g_Suspender.Suspend()) {
 						return false;
@@ -88071,9 +88092,9 @@ namespace Detours {
 
 					g_Suspender.Resume();
 
-					for (unsigned int i = 0; i < 1'000'000'000UL; ++i) {
-						_mm_pause();
-					}
+					//for (unsigned int i = 0; i < 1'000'000'000UL; ++i) {
+					//	_mm_pause();
+					//}
 
 					if (!g_Suspender.Suspend()) {
 						m_pOriginalBytes = nullptr;
@@ -88186,20 +88207,17 @@ namespace Detours {
 
 					if (g_Suspender.IsInExecuting(m_pAddress, m_unOriginalBytes)) {
 						bIsExecuting = true;
-						break;
 					}
 
 					if (!bIsExecuting) {
 						if (g_Suspender.IsInExecuting(m_pWrapper, HOOK_RAW_WRAPPER_SIZE)) {
 							bIsExecuting = true;
-							break;
 						}
 					}
 
 					if (!bIsExecuting) {
 						if (g_Suspender.IsInExecuting(m_pTrampoline, HOOK_RAW_TRAMPOLINE_SIZE)) {
 							bIsExecuting = true;
-							break;
 						}
 					}
 
@@ -88209,9 +88227,9 @@ namespace Detours {
 
 					g_Suspender.Resume();
 
-					for (unsigned int i = 0; i < 1'000'000'000UL; ++i) {
-						_mm_pause();
-					}
+					//for (unsigned int i = 0; i < 1'000'000'000UL; ++i) {
+					//	_mm_pause();
+					//}
 
 					if (!g_Suspender.Suspend()) {
 						return false;
@@ -88247,13 +88265,11 @@ namespace Detours {
 
 					if (g_Suspender.IsInExecuting(m_pWrapper, HOOK_RAW_WRAPPER_SIZE)) {
 						bIsExecuting = true;
-						break;
 					}
 
 					if (!bIsExecuting) {
 						if (g_Suspender.IsInExecuting(m_pTrampoline, HOOK_RAW_TRAMPOLINE_SIZE)) {
 							bIsExecuting = true;
-							break;
 						}
 					}
 
@@ -88263,9 +88279,9 @@ namespace Detours {
 
 					g_Suspender.Resume();
 
-					for (unsigned int i = 0; i < 1'000'000'000UL; ++i) {
-						_mm_pause();
-					}
+					//for (unsigned int i = 0; i < 1'000'000'000UL; ++i) {
+					//	_mm_pause();
+					//}
 
 					if (!g_Suspender.Suspend()) {
 						return false;
