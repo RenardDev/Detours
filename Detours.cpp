@@ -85962,10 +85962,6 @@ namespace Detours {
 
 					g_Suspender.Resume();
 
-					//for (unsigned int i = 0; i < 1'000'000'000UL; ++i) {
-					//	_mm_pause();
-					//}
-
 					if (!g_Suspender.Suspend()) {
 						m_pOriginalBytes = nullptr;
 						m_unOriginalBytes = 0;
@@ -86080,10 +86076,6 @@ namespace Detours {
 					}
 
 					g_Suspender.Resume();
-
-					//for (unsigned int i = 0; i < 1'000'000'000UL; ++i) {
-					//	_mm_pause();
-					//}
 
 					if (!g_Suspender.Suspend()) {
 						return false;
@@ -86496,10 +86488,6 @@ namespace Detours {
 
 					g_Suspender.Resume();
 
-					//for (unsigned int i = 0; i < 1'000'000'000UL; ++i) {
-					//	_mm_pause();
-					//}
-
 					if (!g_Suspender.Suspend()) {
 						m_pOriginalBytes = nullptr;
 						m_unOriginalBytes = 0;
@@ -86626,10 +86614,6 @@ namespace Detours {
 					}
 
 					g_Suspender.Resume();
-
-					//for (unsigned int i = 0; i < 1'000'000'000UL; ++i) {
-					//	_mm_pause();
-					//}
 
 					if (!g_Suspender.Suspend()) {
 						return false;
@@ -88092,10 +88076,6 @@ namespace Detours {
 
 					g_Suspender.Resume();
 
-					//for (unsigned int i = 0; i < 1'000'000'000UL; ++i) {
-					//	_mm_pause();
-					//}
-
 					if (!g_Suspender.Suspend()) {
 						m_pOriginalBytes = nullptr;
 						m_unOriginalBytes = 0;
@@ -88227,10 +88207,6 @@ namespace Detours {
 
 					g_Suspender.Resume();
 
-					//for (unsigned int i = 0; i < 1'000'000'000UL; ++i) {
-					//	_mm_pause();
-					//}
-
 					if (!g_Suspender.Suspend()) {
 						return false;
 					}
@@ -88278,10 +88254,6 @@ namespace Detours {
 					}
 
 					g_Suspender.Resume();
-
-					//for (unsigned int i = 0; i < 1'000'000'000UL; ++i) {
-					//	_mm_pause();
-					//}
 
 					if (!g_Suspender.Suspend()) {
 						return false;

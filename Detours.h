@@ -643,7 +643,7 @@
 #endif // !HOOK_RAW_TRAMPOLINE_SIZE
 
 #ifndef CALLSTACK_MAX_ENTRIES
-#define CALLSTACK_MAX_ENTRIES 32 // Max entries for callstack
+#define CALLSTACK_MAX_ENTRIES 8 // Max entries for callstack
 #endif // !CALLSTACK_MAX_ENTRIES
 
 // ----------------------------------------------------------------
