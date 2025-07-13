@@ -18,6 +18,11 @@ A set of tools for working with software modifications in two files (Detours.h, 
 * GetPEB - Gets *Process Environment Block* (PEB) of the currently running process.
 * GetTEB - Gets *Thread Environment Block* (TEB) of the current thread or thread from a handle.
 
+# Detours::CallStack
+* GetCallStack - Returns the call stack for a specific thread.
+* GetShadowStack - Returns the shadow stack for a specific thread.
+* GetShadowCallStack - Returns the shadow call stack for a specific thread.
+
 # Detours::LDR
 * FindModuleListEntry - Finds a module list entry.
 * FindModuleDataTableEntry - Finds a module data table entry.
