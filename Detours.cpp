@@ -4722,7 +4722,26 @@ namespace Detours {
 			m_Threads.clear();
 		}
 
-		bool Suspender::IsInExecuting(void* pAddress, size_t unSize) {
+		bool Suspender::IsRegionExecuting(void* pAddress, size_t unSize) {
+			if (!pAddress || !unSize) {
+				return false;
+			}
+
+			for (auto& thread : m_Threads) {
+#ifdef _M_X64
+				void* pIP = reinterpret_cast<void*>(thread.m_CTX.Rip);
+#elif _M_IX86
+				void* pIP = reinterpret_cast<void*>(thread.m_CTX.Eip);
+#endif
+				if ((pIP >= pAddress) && (pIP < (reinterpret_cast<char*>(pAddress) + unSize))) {
+					return true;
+				}
+			}
+
+			return false;
+		}
+
+		bool Suspender::IsRegionInCallStacks(void* pAddress, size_t unSize) {
 			if (!pAddress || !unSize) {
 				return false;
 			}
@@ -85950,13 +85969,7 @@ namespace Detours {
 
 			if (bWaitForHook) {
 				while (true) {
-					bool bIsExecuting = false;
-
-					if (g_Suspender.IsInExecuting(m_pAddress, unCopyingSize)) {
-						bIsExecuting = true;
-					}
-
-					if (!bIsExecuting) {
+					if (!g_Suspender.IsRegionExecuting(m_pAddress, unCopyingSize)) {
 						break;
 					}
 
@@ -86059,19 +86072,7 @@ namespace Detours {
 
 			if (bWaitForUnHook) {
 				while (true) {
-					bool bIsExecuting = false;
-
-					if (g_Suspender.IsInExecuting(m_pAddress, m_unOriginalBytes)) {
-						bIsExecuting = true;
-					}
-
-					if (!bIsExecuting) {
-						if (g_Suspender.IsInExecuting(m_pTrampoline, HOOK_INLINE_TRAMPOLINE_SIZE)) {
-							bIsExecuting = true;
-						}
-					}
-
-					if (!bIsExecuting) {
+					if (!g_Suspender.IsRegionExecuting(m_pAddress, m_unOriginalBytes) && !g_Suspender.IsRegionExecuting(m_pTrampoline, HOOK_INLINE_TRAMPOLINE_SIZE) && !g_Suspender.IsRegionInCallStacks(m_pTrampoline, HOOK_INLINE_TRAMPOLINE_SIZE)) {
 						break;
 					}
 
@@ -86476,13 +86477,7 @@ namespace Detours {
 
 			if (bWaitForHook) {
 				while (true) {
-					bool bIsExecuting = false;
-
-					if (g_Suspender.IsInExecuting(m_pAddress, unCopyingSize)) {
-						bIsExecuting = true;
-					}
-
-					if (!bIsExecuting) {
+					if (!g_Suspender.IsRegionExecuting(m_pAddress, unCopyingSize)) {
 						break;
 					}
 
@@ -86591,25 +86586,7 @@ namespace Detours {
 
 			if (bWaitForUnHook) {
 				while (true) {
-					bool bIsExecuting = false;
-
-					if (g_Suspender.IsInExecuting(m_pAddress, m_unOriginalBytes)) {
-						bIsExecuting = true;
-					}
-
-					if (!bIsExecuting) {
-						if (g_Suspender.IsInExecuting(m_pWrapper, HOOK_INLINE_WRAPPER_SIZE)) {
-							bIsExecuting = true;
-						}
-					}
-
-					if (!bIsExecuting) {
-						if (g_Suspender.IsInExecuting(m_pTrampoline, HOOK_INLINE_TRAMPOLINE_SIZE)) {
-							bIsExecuting = true;
-						}
-					}
-
-					if (!bIsExecuting) {
+					if (!g_Suspender.IsRegionExecuting(m_pAddress, m_unOriginalBytes) && !g_Suspender.IsRegionExecuting(m_pWrapper, HOOK_INLINE_WRAPPER_SIZE) && !g_Suspender.IsRegionExecuting(m_pTrampoline, HOOK_INLINE_TRAMPOLINE_SIZE) && !g_Suspender.IsRegionInCallStacks(m_pWrapper, HOOK_INLINE_WRAPPER_SIZE) && !g_Suspender.IsRegionInCallStacks(m_pTrampoline, HOOK_INLINE_TRAMPOLINE_SIZE)) {
 						break;
 					}
 
@@ -88063,14 +88040,7 @@ namespace Detours {
 
 			if (bWaitForHook) {
 				while (true) {
-					bool bIsExecuting = false;
-
-					if (g_Suspender.IsInExecuting(m_pAddress, unCopyingSize)) {
-						bIsExecuting = true;
-						break;
-					}
-
-					if (!bIsExecuting) {
+					if (!g_Suspender.IsRegionExecuting(m_pAddress, unCopyingSize)) {
 						break;
 					}
 
@@ -88183,25 +88153,7 @@ namespace Detours {
 
 			if (bWaitForUnHook) {
 				while (true) {
-					bool bIsExecuting = false;
-
-					if (g_Suspender.IsInExecuting(m_pAddress, m_unOriginalBytes)) {
-						bIsExecuting = true;
-					}
-
-					if (!bIsExecuting) {
-						if (g_Suspender.IsInExecuting(m_pWrapper, HOOK_RAW_WRAPPER_SIZE)) {
-							bIsExecuting = true;
-						}
-					}
-
-					if (!bIsExecuting) {
-						if (g_Suspender.IsInExecuting(m_pTrampoline, HOOK_RAW_TRAMPOLINE_SIZE)) {
-							bIsExecuting = true;
-						}
-					}
-
-					if (!bIsExecuting) {
+					if (!g_Suspender.IsRegionExecuting(m_pAddress, m_unOriginalBytes) && !g_Suspender.IsRegionExecuting(m_pWrapper, HOOK_RAW_WRAPPER_SIZE) && !g_Suspender.IsRegionExecuting(m_pTrampoline, HOOK_RAW_TRAMPOLINE_SIZE) && !g_Suspender.IsRegionInCallStacks(m_pWrapper, HOOK_RAW_WRAPPER_SIZE) && !g_Suspender.IsRegionInCallStacks(m_pTrampoline, HOOK_RAW_TRAMPOLINE_SIZE)) {
 						break;
 					}
 
@@ -88233,40 +88185,6 @@ namespace Detours {
 				__debugbreak();
 				g_Suspender.Resume();
 				return false;
-			}
-
-			if (bWaitForUnHook) {
-				while (true) {
-					bool bIsExecuting = false;
-
-					if (g_Suspender.IsInExecuting(m_pWrapper, HOOK_RAW_WRAPPER_SIZE)) {
-						bIsExecuting = true;
-					}
-
-					if (!bIsExecuting) {
-						if (g_Suspender.IsInExecuting(m_pTrampoline, HOOK_RAW_TRAMPOLINE_SIZE)) {
-							bIsExecuting = true;
-						}
-					}
-
-					if (!bIsExecuting) {
-						break;
-					}
-
-					g_Suspender.Resume();
-
-					if (!g_Suspender.Suspend()) {
-						return false;
-					}
-				}
-			} else {
-				for (size_t unIndex = 0; unIndex < HOOK_RAW_WRAPPER_SIZE; ++unIndex) {
-					g_Suspender.FixExecutionAddress(reinterpret_cast<unsigned char*>(m_pWrapper) + unIndex, reinterpret_cast<unsigned char*>(m_pAddress));
-				}
-
-				for (size_t unIndex = 0; unIndex < HOOK_RAW_TRAMPOLINE_SIZE; ++unIndex) {
-					g_Suspender.FixExecutionAddress(reinterpret_cast<unsigned char*>(m_pTrampoline) + unIndex, reinterpret_cast<unsigned char*>(m_pAddress) + unIndex);
-				}
 			}
 
 			m_pOriginalBytes = nullptr;
