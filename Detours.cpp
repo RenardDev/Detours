@@ -152,26 +152,55 @@ namespace Detours {
 	using namespace Hook;
 
 	// ----------------------------------------------------------------
+	// HARDWARE_HOOK_RECORD
+	// ----------------------------------------------------------------
+
+	typedef struct _HARDWARE_HOOK_RECORD {
+		_HARDWARE_HOOK_RECORD() {
+			m_pCallBack = nullptr;
+			m_unThreadID = 0;
+			m_pAddress = nullptr;
+			m_unRegister = HARDWARE_HOOK_REGISTER::REGISTER_DR0;
+			m_unType = HARDWARE_HOOK_TYPE::TYPE_EXECUTE;
+			m_unSize = 0;
+			m_bPendingRestore = false;
+			m_unOriginalDR7 = 0;
+		}
+
+		fnHardwareHookCallBack m_pCallBack;
+		DWORD m_unThreadID;
+		void* m_pAddress;
+		HARDWARE_HOOK_REGISTER m_unRegister;
+		HARDWARE_HOOK_TYPE m_unType;
+		unsigned char m_unSize;
+		bool m_bPendingRestore;
+#ifdef _M_X64
+		DWORD64 m_unOriginalDR7;
+#elif _M_IX86
+		DWORD m_unOriginalDR7;
+#endif
+	} HARDWARE_HOOK_RECORD, *PHARDWARE_HOOK_RECORD;
+
+	// ----------------------------------------------------------------
 	// MEMORY_HOOK_RECORD
 	// ----------------------------------------------------------------
 
-	/*
 	typedef struct _MEMORY_HOOK_RECORD {
 		_MEMORY_HOOK_RECORD() {
 			m_pCallBack = nullptr;
 			m_pAddress = nullptr;
 			m_unSize = 0;
-			m_bAllowVirtualAddress = false;
+			m_bPendingRestore = false;
+			m_unThreadID = 0;
 		}
 
 		fnMemoryHookCallBack m_pCallBack;
 		void* m_pAddress;
 		size_t m_unSize;
-		bool m_bAllowVirtualAddress;
-		std::deque<std::pair<std::unique_ptr<Page>, std::unique_ptr<Page>>> m_Pages;
-		std::deque<std::pair<std::pair<void*, size_t>, std::unique_ptr<Page>>> m_VirtualPages;
+		std::deque<std::unique_ptr<Page>> m_Pages;
+		bool m_bPendingRestore;
+		DWORD m_unThreadID;
 	} MEMORY_HOOK_RECORD, *PMEMORY_HOOK_RECORD;
-	*/
 	
 	// ----------------------------------------------------------------
 	// INTERRUPT_HOOK_RECORD
@@ -191,7 +220,8 @@ namespace Detours {
 	// Storage
 	// ----------------------------------------------------------------
 
-	// static std::deque<std::unique_ptr<MEMORY_HOOK_RECORD>> g_MemoryHookRecords;
+	static std::deque<std::unique_ptr<HARDWARE_HOOK_RECORD>> g_HardwareHookRecords;
+	static std::deque<std::unique_ptr<MEMORY_HOOK_RECORD>> g_MemoryHookRecords;
 	static std::deque<std::unique_ptr<INTERRUPT_HOOK_RECORD>> g_InterruptHookRecords;
 	static MemoryManager g_MemoryManager;
 	static Storage g_HookStorage;
@@ -7019,1117 +7049,314 @@ namespace Detours {
 		}
 
 		// ----------------------------------------------------------------
+		// HardwareHookCallBack
+		// ----------------------------------------------------------------
+
+		struct REGISTER_DR6 {
+			unsigned int m_unB0 : 1;  // Bit 0: Breakpoint 0 condition detected
+			unsigned int m_unB1 : 1;  // Bit 1: Breakpoint 1 condition detected
+			unsigned int m_unB2 : 1;  // Bit 2: Breakpoint 2 condition detected
+			unsigned int m_unB3 : 1;  // Bit 3: Breakpoint 3 condition detected
+			unsigned int : 8;         // Bit 4-11: Reserved
+			unsigned int m_unBD : 1;  // Bit 12: Debug register access detected
+			unsigned int m_unBS : 1;  // Bit 13: Single step
+			unsigned int m_unBT : 1;  // Bit 14: Task switch
+			unsigned int m_unRTM : 1; // Bit 15: Restricted Transactional Memory
+			unsigned int : 16;        // Bit 16-31: Reserved
+#ifdef _M_X64
+			unsigned int : 32;        // Bit 32-63: Reserved (x64 upper bits)
+#endif
+		};
+
+		struct REGISTER_DR7 {
+			unsigned int m_unL0 : 1;   // Bit 0: Local breakpoint 0 enable
+			unsigned int m_unG0 : 1;   // Bit 1: Global breakpoint 0 enable
+			unsigned int m_unL1 : 1;   // Bit 2: Local breakpoint 1 enable
+			unsigned int m_unG1 : 1;   // Bit 3: Global breakpoint 1 enable
+			unsigned int m_unL2 : 1;   // Bit 4: Local breakpoint 2 enable
+			unsigned int m_unG2 : 1;   // Bit 5: Global breakpoint 2 enable
+			unsigned int m_unL3 : 1;   // Bit 6: Local breakpoint 3 enable
+			unsigned int m_unG3 : 1;   // Bit 7: Global breakpoint 3 enable
+			unsigned int m_unLE : 1;   // Bit 8: Local exact breakpoint enable
+			unsigned int m_unGE : 1;   // Bit 9: Global exact breakpoint enable
+			unsigned int : 3;          // Bit 10-12: Reserved
+			unsigned int m_unGD : 1;   // Bit 13: General detect enable
+			unsigned int : 2;          // Bit 14-15: Reserved
+			unsigned int m_unRW0 : 2;  // Bit 16-17: Breakpoint 0 condition
+			unsigned int m_unLEN0 : 2; // Bit 18-19: Breakpoint 0 length
+			unsigned int m_unRW1 : 2;  // Bit 20-21: Breakpoint 1 condition
+			unsigned int m_unLEN1 : 2; // Bit 22-23: Breakpoint 1 length
+			unsigned int m_unRW2 : 2;  // Bit 24-25: Breakpoint 2 condition
+			unsigned int m_unLEN2 : 2; // Bit 26-27: Breakpoint 2 length
+			unsigned int m_unRW3 : 2;  // Bit 28-29: Breakpoint 3 condition
+			unsigned int m_unLEN3 : 2; // Bit 30-31: Breakpoint 3 length
+#ifdef _M_X64
+			unsigned int : 32;         // Bit 32-63: Reserved
+#endif
+		};
+
+		struct REGISTER_FLAGS {
+			unsigned int m_unCF : 1;   // Bit 0: Carry Flag
+			unsigned int : 1;          // Bit 1: Reserved (always 1 on older CPUs)
+			unsigned int m_unPF : 1;   // Bit 2: Parity Flag
+			unsigned int : 1;          // Bit 3: Reserved
+			unsigned int m_unAF : 1;   // Bit 4: Auxiliary Carry Flag
+			unsigned int : 1;          // Bit 5: Reserved
+			unsigned int m_unZF : 1;   // Bit 6: Zero Flag
+			unsigned int m_unSF : 1;   // Bit 7: Sign Flag
+			unsigned int m_unTF : 1;   // Bit 8: Trap Flag
+			unsigned int m_unIF : 1;   // Bit 9: Interrupt Enable Flag
+			unsigned int m_unDF : 1;   // Bit 10: Direction Flag
+			unsigned int m_unOF : 1;   // Bit 11: Overflow Flag
+			unsigned int m_unIOPL : 2; // Bit 12-13: I/O Privilege Level
+			unsigned int m_unNT : 1;   // Bit 14: Nested Task
+			unsigned int : 1;          // Bit 15: Reserved
+			unsigned int m_unRF : 1;   // Bit 16: Resume Flag
+			unsigned int m_unVM : 1;   // Bit 17: Virtual 8086 Mode Flag
+			unsigned int m_unAC : 1;   // Bit 18: Alignment Check
+			unsigned int m_unVIF : 1;  // Bit 19: Virtual Interrupt Flag
+			unsigned int m_unVIP : 1;  // Bit 20: Virtual Interrupt Pending
+			unsigned int m_unID : 1;   // Bit 21: ID Flag
+			unsigned int : 10;         // Bit 22-31: Reserved
+#ifdef _M_X64
+			unsigned int : 32;         // Bit 32-63: Reserved
+#endif
+		};
+
+		static bool HardwareHookCallBack(const EXCEPTION_RECORD& Exception, PCONTEXT pCTX) {
+			if (Exception.ExceptionCode != EXCEPTION_SINGLE_STEP) {
+				return false;
+			}
+
+			DWORD unCurrentTID = GetCurrentThreadId();
+			REGISTER_DR6& DR6 = *reinterpret_cast<REGISTER_DR6*>(&pCTX->Dr6);
+			REGISTER_DR7& DR7 = *reinterpret_cast<REGISTER_DR7*>(&pCTX->Dr7);
+			REGISTER_FLAGS& FLAGS = *reinterpret_cast<REGISTER_FLAGS*>(&pCTX->EFlags);
+
+			for (auto it = g_HardwareHookRecords.begin(); it != g_HardwareHookRecords.end(); ++it) {
+				if ((*it)->m_unThreadID != unCurrentTID) {
+					continue;
+				}
+
+				if ((*it)->m_bPendingRestore) {
+					FLAGS.m_unTF = 0;
+
+					switch ((*it)->m_unRegister) {
+						case HARDWARE_HOOK_REGISTER::REGISTER_DR0:
+							DR6.m_unB0 = 0;
+							break;
+
+						case HARDWARE_HOOK_REGISTER::REGISTER_DR1:
+							DR6.m_unB1 = 0;
+							break;
+
+						case HARDWARE_HOOK_REGISTER::REGISTER_DR2:
+							DR6.m_unB2 = 0;
+							break;
+
+						case HARDWARE_HOOK_REGISTER::REGISTER_DR3:
+							DR6.m_unB3 = 0;
+							break;
+					}
+
+					pCTX->Dr7 = (*it)->m_unOriginalDR7;
+
+					switch ((*it)->m_unRegister) {
+						case HARDWARE_HOOK_REGISTER::REGISTER_DR0:
+#ifdef _M_X64
+							pCTX->Dr0 = reinterpret_cast<DWORD64>((*it)->m_pAddress);
+#elif _M_IX86
+							pCTX->Dr0 = reinterpret_cast<DWORD>((*it)->m_pAddress);
+#endif
+							break;
+
+						case HARDWARE_HOOK_REGISTER::REGISTER_DR1:
+#ifdef _M_X64
+							pCTX->Dr1 = reinterpret_cast<DWORD64>((*it)->m_pAddress);
+#elif _M_IX86
+							pCTX->Dr1 = reinterpret_cast<DWORD>((*it)->m_pAddress);
+#endif
+							break;
+
+						case HARDWARE_HOOK_REGISTER::REGISTER_DR2:
+#ifdef _M_X64
+							pCTX->Dr2 = reinterpret_cast<DWORD64>((*it)->m_pAddress);
+#elif _M_IX86
+							pCTX->Dr2 = reinterpret_cast<DWORD>((*it)->m_pAddress);
+#endif
+							break;
+
+						case HARDWARE_HOOK_REGISTER::REGISTER_DR3:
+#ifdef _M_X64
+							pCTX->Dr3 = reinterpret_cast<DWORD64>((*it)->m_pAddress);
+#elif _M_IX86
+							pCTX->Dr3 = reinterpret_cast<DWORD>((*it)->m_pAddress);
+#endif
+							break;
+					}
+
+					switch ((*it)->m_unRegister) {
+						case HARDWARE_HOOK_REGISTER::REGISTER_DR0:
+							DR7.m_unL0 = 1;
+							break;
+						case HARDWARE_HOOK_REGISTER::REGISTER_DR1:
+							DR7.m_unL1 = 1;
+							break;
+						case HARDWARE_HOOK_REGISTER::REGISTER_DR2:
+							DR7.m_unL2 = 1;
+							break;
+						case HARDWARE_HOOK_REGISTER::REGISTER_DR3:
+							DR7.m_unL3 = 1;
+							break;
+					}
+
+					(*it)->m_bPendingRestore = false;
+
+					return true;
+				} else {
+					if (!DR6.m_unB0 && !DR6.m_unB1 && !DR6.m_unB2 && !DR6.m_unB3) {
+						continue;
+					}
+
+					bool bMatch = false;
+					bool bEnabled = false;
+
+					switch ((*it)->m_unRegister) {
+						case HARDWARE_HOOK_REGISTER::REGISTER_DR0:
+							if (DR6.m_unB0) {
+								bMatch = true;
+							}
+
+							if (DR7.m_unL0 || DR7.m_unG0) {
+								bEnabled = true;
+							}
+
+							break;
+
+						case HARDWARE_HOOK_REGISTER::REGISTER_DR1:
+							if (DR6.m_unB1) {
+								bMatch = true;
+							}
+
+							if (DR7.m_unL1 || DR7.m_unG1) {
+								bEnabled = true;
+							}
+
+							break;
+
+						case HARDWARE_HOOK_REGISTER::REGISTER_DR2:
+							if (DR6.m_unB1) {
+								bMatch = true;
+							}
+
+							if (DR7.m_unL1 || DR7.m_unG1) {
+								bEnabled = true;
+							}
+
+							break;
+
+						case HARDWARE_HOOK_REGISTER::REGISTER_DR3:
+							if (DR6.m_unB1) {
+								bMatch = true;
+							}
+
+							if (DR7.m_unL1 || DR7.m_unG1) {
+								bEnabled = true;
+							}
+
+							break;
+					}
+
+					if (!bMatch || !bEnabled) {
+						continue;
+					}
+
+					(*it)->m_bPendingRestore = true;
+					(*it)->m_unOriginalDR7 = pCTX->Dr7;
+
+					switch ((*it)->m_unRegister) {
+						case HARDWARE_HOOK_REGISTER::REGISTER_DR0:
+							DR6.m_unB0 = 0;
+							break;
+						case HARDWARE_HOOK_REGISTER::REGISTER_DR1:
+							DR6.m_unB1 = 0;
+							break;
+						case HARDWARE_HOOK_REGISTER::REGISTER_DR2:
+							DR6.m_unB2 = 0;
+							break;
+						case HARDWARE_HOOK_REGISTER::REGISTER_DR3:
+							DR6.m_unB3 = 0;
+							break;
+					}
+
+					switch ((*it)->m_unRegister) {
+						case HARDWARE_HOOK_REGISTER::REGISTER_DR0:
+							DR7.m_unL0 = 0;
+							DR7.m_unG0 = 0;
+							break;
+
+						case HARDWARE_HOOK_REGISTER::REGISTER_DR1:
+							DR7.m_unL1 = 0;
+							DR7.m_unG1 = 0;
+							break;
+
+						case HARDWARE_HOOK_REGISTER::REGISTER_DR2:
+							DR7.m_unL2 = 0;
+							DR7.m_unG2 = 0;
+							break;
+
+						case HARDWARE_HOOK_REGISTER::REGISTER_DR3:
+							DR7.m_unL3 = 0;
+							DR7.m_unG3 = 0;
+							break;
+					}
+
+					FLAGS.m_unTF = 1;
+
+					(*it)->m_pCallBack(pCTX);
+
+					return true;
+				}
+			}
+
+			return false;
+		}
+
+		// ----------------------------------------------------------------
 		// MemoryHookCallBack
 		// ----------------------------------------------------------------
 
-		/*
-		static ULONG_PTR GetRegisterValue(const PCONTEXT pCTX, unsigned int unRegister, unsigned int unSize) {
-			switch (unRegister) {
-				case RDR_RAX:
-#ifdef _M_X64
-					switch (unSize) {
-						case 1:
-							return static_cast<unsigned char>(pCTX->Rax);
-						case 2:
-							return static_cast<unsigned short>(pCTX->Rax);
-						case 4:
-							return static_cast<unsigned int>(pCTX->Rax);
-						default:
-							return pCTX->Rax;
-					}
-#elif _M_IX86
-					switch (unSize) {
-						case 1:
-							return static_cast<unsigned char>(pCTX->Eax);
-						case 2:
-							return static_cast<unsigned short>(pCTX->Eax);
-						default:
-							return pCTX->Eax;
-					}
-#endif
-				case RDR_RCX:
-#ifdef _M_X64
-					switch (unSize) {
-						case 1:
-							return static_cast<unsigned char>(pCTX->Rcx);
-						case 2:
-							return static_cast<unsigned short>(pCTX->Rcx);
-						case 4:
-							return static_cast<unsigned int>(pCTX->Rcx);
-						default:
-							return pCTX->Rcx;
-					}
-#elif _M_IX86
-					switch (unSize) {
-						case 1:
-							return static_cast<unsigned char>(pCTX->Ecx);
-						case 2:
-							return static_cast<unsigned short>(pCTX->Ecx);
-						default:
-							return pCTX->Ecx;
-					}
-#endif
-				case RDR_RDX:
-#ifdef _M_X64
-					switch (unSize) {
-						case 1:
-							return static_cast<unsigned char>(pCTX->Rdx);
-						case 2:
-							return static_cast<unsigned short>(pCTX->Rdx);
-						case 4:
-							return static_cast<unsigned int>(pCTX->Rdx);
-						default:
-							return pCTX->Rdx;
-					}
-#elif _M_IX86
-					switch (unSize) {
-						case 1:
-							return static_cast<unsigned char>(pCTX->Edx);
-						case 2:
-							return static_cast<unsigned short>(pCTX->Edx);
-						default:
-							return pCTX->Edx;
-					}
-#endif
-				case RDR_RBX:
-#ifdef _M_X64
-					switch (unSize) {
-						case 1:
-							return static_cast<unsigned char>(pCTX->Rbx);
-						case 2:
-							return static_cast<unsigned short>(pCTX->Rbx);
-						case 4:
-							return static_cast<unsigned int>(pCTX->Rbx);
-						default:
-							return pCTX->Rbx;
-					}
-#elif _M_IX86
-					switch (unSize) {
-						case 1:
-							return static_cast<unsigned char>(pCTX->Ebx);
-						case 2:
-							return static_cast<unsigned short>(pCTX->Ebx);
-						default:
-							return pCTX->Ebx;
-					}
-#endif
-				case RDR_RSP:
-#ifdef _M_X64
-					switch (unSize) {
-						case 1:
-							return static_cast<unsigned char>(pCTX->Rsp);
-						case 2:
-							return static_cast<unsigned short>(pCTX->Rsp);
-						case 4:
-							return static_cast<unsigned int>(pCTX->Rsp);
-						default:
-							return pCTX->Rsp;
-					}
-#elif _M_IX86
-					switch (unSize) {
-						case 1:
-							return static_cast<unsigned char>(pCTX->Esp);
-						case 2:
-							return static_cast<unsigned short>(pCTX->Esp);
-						default:
-							return pCTX->Esp;
-					}
-#endif
-				case RDR_RBP:
-#ifdef _M_X64
-					switch (unSize) {
-						case 1:
-							return static_cast<unsigned char>(pCTX->Rbp);
-						case 2:
-							return static_cast<unsigned short>(pCTX->Rbp);
-						case 4:
-							return static_cast<unsigned int>(pCTX->Rbp);
-						default:
-							return pCTX->Rbp;
-					}
-#elif _M_IX86
-					switch (unSize) {
-						case 1:
-							return static_cast<unsigned char>(pCTX->Ebp);
-						case 2:
-							return static_cast<unsigned short>(pCTX->Ebp);
-						default:
-							return pCTX->Ebp;
-					}
-#endif
-				case RDR_RSI:
-#ifdef _M_X64
-					switch (unSize) {
-						case 1:
-							return static_cast<unsigned char>(pCTX->Rsi);
-						case 2:
-							return static_cast<unsigned short>(pCTX->Rsi);
-						case 4:
-							return static_cast<unsigned int>(pCTX->Rsi);
-						default:
-							return pCTX->Rsi;
-					}
-#elif _M_IX86
-					switch (unSize) {
-						case 1:
-							return static_cast<unsigned char>(pCTX->Esi);
-						case 2:
-							return static_cast<unsigned short>(pCTX->Esi);
-						default:
-							return pCTX->Esi;
-					}
-#endif
-				case RDR_RDI:
-#ifdef _M_X64
-					switch (unSize) {
-						case 1:
-							return static_cast<unsigned char>(pCTX->Rdi);
-						case 2:
-							return static_cast<unsigned short>(pCTX->Rdi);
-						case 4:
-							return static_cast<unsigned int>(pCTX->Rdi);
-						default:
-							return pCTX->Rdi;
-					}
-#elif _M_IX86
-					switch (unSize) {
-						case 1:
-							return static_cast<unsigned char>(pCTX->Eax);
-						case 2:
-							return static_cast<unsigned short>(pCTX->Eax);
-						default:
-							return pCTX->Eax;
-					}
-#endif
-#ifdef _M_X64
-				case RDR_R8:
-					switch (unSize) {
-						case 1:
-							return static_cast<unsigned char>(pCTX->R8);
-						case 2:
-							return static_cast<unsigned short>(pCTX->R8);
-						case 4:
-							return static_cast<unsigned int>(pCTX->R8);
-						default:
-							return pCTX->R8;
-					}
-				case RDR_R9:
-					switch (unSize) {
-						case 1:
-							return static_cast<unsigned char>(pCTX->R9);
-						case 2:
-							return static_cast<unsigned short>(pCTX->R9);
-						case 4:
-							return static_cast<unsigned int>(pCTX->R9);
-						default:
-							return pCTX->R9;
-					}
-				case RDR_R10:
-					switch (unSize) {
-						case 1:
-							return static_cast<unsigned char>(pCTX->R10);
-						case 2:
-							return static_cast<unsigned short>(pCTX->R10);
-						case 4:
-							return static_cast<unsigned int>(pCTX->R10);
-						default:
-							return pCTX->R10;
-					}
-				case RDR_R11:
-					switch (unSize) {
-						case 1:
-							return static_cast<unsigned char>(pCTX->R11);
-						case 2:
-							return static_cast<unsigned short>(pCTX->R11);
-						case 4:
-							return static_cast<unsigned int>(pCTX->R11);
-						default:
-							return pCTX->R11;
-					}
-				case RDR_R12:
-					switch (unSize) {
-						case 1:
-							return static_cast<unsigned char>(pCTX->R12);
-						case 2:
-							return static_cast<unsigned short>(pCTX->R12);
-						case 4:
-							return static_cast<unsigned int>(pCTX->R12);
-						default:
-							return pCTX->R12;
-					}
-				case RDR_R13:
-					switch (unSize) {
-						case 1:
-							return static_cast<unsigned char>(pCTX->R13);
-						case 2:
-							return static_cast<unsigned short>(pCTX->R13);
-						case 4:
-							return static_cast<unsigned int>(pCTX->R13);
-						default:
-							return pCTX->R13;
-					}
-				case RDR_R14:
-					switch (unSize) {
-						case 1:
-							return static_cast<unsigned char>(pCTX->R14);
-						case 2:
-							return static_cast<unsigned short>(pCTX->R14);
-						case 4:
-							return static_cast<unsigned int>(pCTX->R14);
-						default:
-							return pCTX->R14;
-					}
-				case RDR_R15:
-					switch (unSize) {
-						case 1:
-							return static_cast<unsigned char>(pCTX->R15);
-						case 2:
-							return static_cast<unsigned short>(pCTX->R15);
-						case 4:
-							return static_cast<unsigned int>(pCTX->R15);
-						default:
-							return pCTX->R15;
-					}
-#endif
-				default:
-					return 0;
-			}
-		}
-
-		static void SetRegisterValue(const PCONTEXT pCTX, unsigned int unRegister, unsigned int unSize, ULONG_PTR unValue) {
-			switch (unRegister) {
-				case RDR_RAX:
-#ifdef _M_X64
-					switch (unSize) {
-						case 1:
-							*reinterpret_cast<unsigned char*>(&pCTX->Rax) = static_cast<unsigned char>(unValue);
-							break;
-						case 2:
-							*reinterpret_cast<unsigned short*>(&pCTX->Rax) = static_cast<unsigned short>(unValue);
-							break;
-						case 4:
-							*reinterpret_cast<unsigned int*>(&pCTX->Rax) = static_cast<unsigned int>(unValue);
-							break;
-						default:
-							pCTX->Rax = unValue;
-							break;
-					}
-#elif _M_IX86
-					switch (unSize) {
-						case 1:
-							*reinterpret_cast<unsigned char*>(&pCTX->Eax) = static_cast<unsigned char>(unValue);
-							break;
-						case 2:
-							*reinterpret_cast<unsigned short*>(&pCTX->Eax) = static_cast<unsigned short>(unValue);
-							break;
-						default:
-							pCTX->Eax = unValue;
-							break;
-					}
-#endif
-					break;
-				case RDR_RCX:
-#ifdef _M_X64
-					switch (unSize) {
-						case 1:
-							*reinterpret_cast<unsigned char*>(&pCTX->Rcx) = static_cast<unsigned char>(unValue);
-							break;
-						case 2:
-							*reinterpret_cast<unsigned short*>(&pCTX->Rcx) = static_cast<unsigned short>(unValue);
-							break;
-						case 4:
-							*reinterpret_cast<unsigned int*>(&pCTX->Rcx) = static_cast<unsigned int>(unValue);
-							break;
-						default:
-							pCTX->Rcx = unValue;
-							break;
-					}
-#elif _M_IX86
-					switch (unSize) {
-						case 1:
-							*reinterpret_cast<unsigned char*>(&pCTX->Ecx) = static_cast<unsigned char>(unValue);
-							break;
-						case 2:
-							*reinterpret_cast<unsigned short*>(&pCTX->Ecx) = static_cast<unsigned short>(unValue);
-							break;
-						default:
-							pCTX->Ecx = unValue;
-							break;
-					}
-#endif
-					break;
-				case RDR_RDX:
-#ifdef _M_X64
-					switch (unSize) {
-						case 1:
-							*reinterpret_cast<unsigned char*>(&pCTX->Rdx) = static_cast<unsigned char>(unValue);
-							break;
-						case 2:
-							*reinterpret_cast<unsigned short*>(&pCTX->Rdx) = static_cast<unsigned short>(unValue);
-							break;
-						case 4:
-							*reinterpret_cast<unsigned int*>(&pCTX->Rdx) = static_cast<unsigned int>(unValue);
-							break;
-						default:
-							pCTX->Rdx = unValue;
-							break;
-					}
-#elif _M_IX86
-					switch (unSize) {
-						case 1:
-							*reinterpret_cast<unsigned char*>(&pCTX->Edx) = static_cast<unsigned char>(unValue);
-							break;
-						case 2:
-							*reinterpret_cast<unsigned short*>(&pCTX->Edx) = static_cast<unsigned short>(unValue);
-							break;
-						default:
-							pCTX->Edx = unValue;
-							break;
-					}
-#endif
-					break;
-				case RDR_RBX:
-#ifdef _M_X64
-					switch (unSize) {
-						case 1:
-							*reinterpret_cast<unsigned char*>(&pCTX->Rbx) = static_cast<unsigned char>(unValue);
-							break;
-						case 2:
-							*reinterpret_cast<unsigned short*>(&pCTX->Rbx) = static_cast<unsigned short>(unValue);
-							break;
-						case 4:
-							*reinterpret_cast<unsigned int*>(&pCTX->Rbx) = static_cast<unsigned int>(unValue);
-							break;
-						default:
-							pCTX->Rbx = unValue;
-							break;
-					}
-#elif _M_IX86
-					switch (unSize) {
-						case 1:
-							*reinterpret_cast<unsigned char*>(&pCTX->Ebx) = static_cast<unsigned char>(unValue);
-							break;
-						case 2:
-							*reinterpret_cast<unsigned short*>(&pCTX->Ebx) = static_cast<unsigned short>(unValue);
-							break;
-						default:
-							pCTX->Ebx = unValue;
-							break;
-					}
-#endif
-					break;
-				case RDR_RSP:
-#ifdef _M_X64
-					switch (unSize) {
-						case 1:
-							*reinterpret_cast<unsigned char*>(&pCTX->Rsp) = static_cast<unsigned char>(unValue);
-							break;
-						case 2:
-							*reinterpret_cast<unsigned short*>(&pCTX->Rsp) = static_cast<unsigned short>(unValue);
-							break;
-						case 4:
-							*reinterpret_cast<unsigned int*>(&pCTX->Rsp) = static_cast<unsigned int>(unValue);
-							break;
-						default:
-							pCTX->Rsp = unValue;
-							break;
-					}
-#elif _M_IX86
-					switch (unSize) {
-						case 1:
-							*reinterpret_cast<unsigned char*>(&pCTX->Esp) = static_cast<unsigned char>(unValue);
-							break;
-						case 2:
-							*reinterpret_cast<unsigned short*>(&pCTX->Esp) = static_cast<unsigned short>(unValue);
-							break;
-						default:
-							pCTX->Esp = unValue;
-							break;
-					}
-#endif
-					break;
-				case RDR_RBP:
-#ifdef _M_X64
-					switch (unSize) {
-						case 1:
-							*reinterpret_cast<unsigned char*>(&pCTX->Rbp) = static_cast<unsigned char>(unValue);
-							break;
-						case 2:
-							*reinterpret_cast<unsigned short*>(&pCTX->Rbp) = static_cast<unsigned short>(unValue);
-							break;
-						case 4:
-							*reinterpret_cast<unsigned int*>(&pCTX->Rbp) = static_cast<unsigned int>(unValue);
-							break;
-						default:
-							pCTX->Rbp = unValue;
-							break;
-					}
-#elif _M_IX86
-					switch (unSize) {
-						case 1:
-							*reinterpret_cast<unsigned char*>(&pCTX->Ebp) = static_cast<unsigned char>(unValue);
-							break;
-						case 2:
-							*reinterpret_cast<unsigned short*>(&pCTX->Ebp) = static_cast<unsigned short>(unValue);
-							break;
-						default:
-							pCTX->Ebp = unValue;
-							break;
-					}
-#endif
-					break;
-				case RDR_RSI:
-#ifdef _M_X64
-					switch (unSize) {
-						case 1:
-							*reinterpret_cast<unsigned char*>(&pCTX->Rsi) = static_cast<unsigned char>(unValue);
-							break;
-						case 2:
-							*reinterpret_cast<unsigned short*>(&pCTX->Rsi) = static_cast<unsigned short>(unValue);
-							break;
-						case 4:
-							*reinterpret_cast<unsigned int*>(&pCTX->Rsi) = static_cast<unsigned int>(unValue);
-							break;
-						default:
-							pCTX->Rsi = unValue;
-							break;
-					}
-#elif _M_IX86
-					switch (unSize) {
-						case 1:
-							*reinterpret_cast<unsigned char*>(&pCTX->Esi) = static_cast<unsigned char>(unValue);
-							break;
-						case 2:
-							*reinterpret_cast<unsigned short*>(&pCTX->Esi) = static_cast<unsigned short>(unValue);
-							break;
-						default:
-							pCTX->Esi = unValue;
-							break;
-					}
-#endif
-					break;
-				case RDR_RDI:
-#ifdef _M_X64
-					switch (unSize) {
-						case 1:
-							*reinterpret_cast<unsigned char*>(&pCTX->Rdi) = static_cast<unsigned char>(unValue);
-							break;
-						case 2:
-							*reinterpret_cast<unsigned short*>(&pCTX->Rdi) = static_cast<unsigned short>(unValue);
-							break;
-						case 4:
-							*reinterpret_cast<unsigned int*>(&pCTX->Rdi) = static_cast<unsigned int>(unValue);
-							break;
-						default:
-							pCTX->Rdi = unValue;
-							break;
-					}
-#elif _M_IX86
-					switch (unSize) {
-						case 1:
-							*reinterpret_cast<unsigned char*>(&pCTX->Edi) = static_cast<unsigned char>(unValue);
-							break;
-						case 2:
-							*reinterpret_cast<unsigned short*>(&pCTX->Edi) = static_cast<unsigned short>(unValue);
-							break;
-						default:
-							pCTX->Edi = unValue;
-							break;
-					}
-#endif
-					break;
-#ifdef _M_X64
-				case RDR_R8:
-					switch (unSize) {
-						case 1:
-							*reinterpret_cast<unsigned char*>(&pCTX->R8) = static_cast<unsigned char>(unValue);
-							break;
-						case 2:
-							*reinterpret_cast<unsigned short*>(&pCTX->R8) = static_cast<unsigned short>(unValue);
-							break;
-						case 4:
-							*reinterpret_cast<unsigned int*>(&pCTX->R8) = static_cast<unsigned int>(unValue);
-							break;
-						default:
-							pCTX->R8 = unValue;
-							break;
-					}
-					break;
-				case RDR_R9:
-					switch (unSize) {
-						case 1:
-							*reinterpret_cast<unsigned char*>(&pCTX->R9) = static_cast<unsigned char>(unValue);
-							break;
-						case 2:
-							*reinterpret_cast<unsigned short*>(&pCTX->R9) = static_cast<unsigned short>(unValue);
-							break;
-						case 4:
-							*reinterpret_cast<unsigned int*>(&pCTX->R9) = static_cast<unsigned int>(unValue);
-							break;
-						default:
-							pCTX->R9 = unValue;
-							break;
-					}
-					break;
-				case RDR_R10:
-					switch (unSize) {
-						case 1:
-							*reinterpret_cast<unsigned char*>(&pCTX->R10) = static_cast<unsigned char>(unValue);
-							break;
-						case 2:
-							*reinterpret_cast<unsigned short*>(&pCTX->R10) = static_cast<unsigned short>(unValue);
-							break;
-						case 4:
-							*reinterpret_cast<unsigned int*>(&pCTX->R10) = static_cast<unsigned int>(unValue);
-							break;
-						default:
-							pCTX->R10 = unValue;
-							break;
-					}
-					break;
-				case RDR_R11:
-					switch (unSize) {
-						case 1:
-							*reinterpret_cast<unsigned char*>(&pCTX->R11) = static_cast<unsigned char>(unValue);
-							break;
-						case 2:
-							*reinterpret_cast<unsigned short*>(&pCTX->R11) = static_cast<unsigned short>(unValue);
-							break;
-						case 4:
-							*reinterpret_cast<unsigned int*>(&pCTX->R11) = static_cast<unsigned int>(unValue);
-							break;
-						default:
-							pCTX->R11 = unValue;
-							break;
-					}
-					break;
-				case RDR_R12:
-					switch (unSize) {
-						case 1:
-							*reinterpret_cast<unsigned char*>(&pCTX->R12) = static_cast<unsigned char>(unValue);
-							break;
-						case 2:
-							*reinterpret_cast<unsigned short*>(&pCTX->R12) = static_cast<unsigned short>(unValue);
-							break;
-						case 4:
-							*reinterpret_cast<unsigned int*>(&pCTX->R12) = static_cast<unsigned int>(unValue);
-							break;
-						default:
-							pCTX->R12 = unValue;
-							break;
-					}
-					break;
-				case RDR_R13:
-					switch (unSize) {
-						case 1:
-							*reinterpret_cast<unsigned char*>(&pCTX->R13) = static_cast<unsigned char>(unValue);
-							break;
-						case 2:
-							*reinterpret_cast<unsigned short*>(&pCTX->R13) = static_cast<unsigned short>(unValue);
-							break;
-						case 4:
-							*reinterpret_cast<unsigned int*>(&pCTX->R13) = static_cast<unsigned int>(unValue);
-							break;
-						default:
-							pCTX->R13 = unValue;
-							break;
-					}
-					break;
-				case RDR_R14:
-					switch (unSize) {
-						case 1:
-							*reinterpret_cast<unsigned char*>(&pCTX->R14) = static_cast<unsigned char>(unValue);
-							break;
-						case 2:
-							*reinterpret_cast<unsigned short*>(&pCTX->R14) = static_cast<unsigned short>(unValue);
-							break;
-						case 4:
-							*reinterpret_cast<unsigned int*>(&pCTX->R14) = static_cast<unsigned int>(unValue);
-							break;
-						default:
-							pCTX->R14 = unValue;
-							break;
-					}
-					break;
-				case RDR_R15:
-					switch (unSize) {
-						case 1:
-							*reinterpret_cast<unsigned char*>(&pCTX->R15) = static_cast<unsigned char>(unValue);
-							break;
-						case 2:
-							*reinterpret_cast<unsigned short*>(&pCTX->R15) = static_cast<unsigned short>(unValue);
-							break;
-						case 4:
-							*reinterpret_cast<unsigned int*>(&pCTX->R15) = static_cast<unsigned int>(unValue);
-							break;
-						default:
-							pCTX->R15 = unValue;
-							break;
-					}
-					break;
-#endif
-				case RD_REG_RIP:
-#ifdef _M_X64
-					pCTX->Rip = unValue;
-#elif _M_IX86
-					pCTX->Eip = unValue;
-#endif
-					break;
-				default:
-					break;
-			}
-		}
-
-		typedef struct _CACHED_OPERATION {
-			_CACHED_OPERATION(void* pExceptionAddress, MEMORY_HOOK_OPERATION unOperation, void* pAddress, RD_OPERAND& Operand, void* pNewAddress, void* pRedirectExecutionAddress = nullptr) {
-				m_pExceptionAddress = pExceptionAddress;
-				m_unOperation = unOperation;
-				m_pAddress = pAddress;
-				m_Operand = Operand;
-				m_pNewAddress = pNewAddress;
-				m_pRedirectExecutionAddress = pRedirectExecutionAddress;
-			}
-
-			void* m_pExceptionAddress;
-			MEMORY_HOOK_OPERATION m_unOperation;
-			void* m_pAddress;
-			RD_OPERAND m_Operand;
-			void* m_pNewAddress;
-			void* m_pRedirectExecutionAddress;
-		} CACHED_OPERATION, *PCACHED_OPERATION;
-
-		static std::deque<CACHED_OPERATION> g_CachedOperations;
-
-		PRD_OPERAND GetReadOperand(PRD_OPERAND pOperands, unsigned char unCount) {
-			if (!pOperands || !unCount) {
-				return nullptr;
-			}
-
-			for (unsigned char i = 0; i < unCount; ++i) {
-				if (pOperands[i].Access.Read) {
-					if ((pOperands[i].Type == RD_OP_IMM) && !pOperands[i].Info.Immediate.Imm) {
-						continue;
-					}
-
-					return &pOperands[i];
-				}
-			}
-
-			return nullptr;
-		}
-		
-		PRD_OPERAND GetWriteOperand(PRD_OPERAND pOperands, unsigned char unCount) {
-			if (!pOperands || !unCount) {
-				return nullptr;
-			}
-
-			for (unsigned char i = 0; i < unCount; ++i) {
-				if (pOperands[i].Access.Write) {
-					if ((pOperands[i].Type == RD_OP_IMM) && !pOperands[i].Info.Immediate.Imm) {
-						continue;
-					}
-
-					return &pOperands[i];
-				}
-			}
-
-			return nullptr;
-		}
-
-		static void FixMemoryHookAddress(const PCONTEXT pCTX, const void* pExceptionAddress, MEMORY_HOOK_OPERATION unOperation, const void* pAddress, void* pNewAddress) {
-			if (!pCTX || !pAddress || !pNewAddress) {
-				return;
-			}
-
-			if (pExceptionAddress) {
-				for (auto& CachedOperation : g_CachedOperations) {
-					if ((CachedOperation.m_pExceptionAddress == pExceptionAddress) && (CachedOperation.m_unOperation == unOperation) && (CachedOperation.m_pAddress == pAddress)) {
-						auto& Operand = CachedOperation.m_Operand;
-
-						if (CachedOperation.m_pRedirectExecutionAddress) {
-#ifdef _M_X64
-							pCTX->Rip = reinterpret_cast<DWORD64>(CachedOperation.m_pRedirectExecutionAddress);
-#elif _M_IX86
-							pCTX->Eip = reinterpret_cast<DWORD>(CachedOperation.m_pRedirectExecutionAddress);
-#endif
-						}
-
-						if (Operand.Type == RD_OP_REG) {
-							SetRegisterValue(pCTX, Operand.Info.Register.Reg, Operand.Info.Register.Size, reinterpret_cast<ULONG_PTR>(CachedOperation.m_pNewAddress));
-							return;
-						} else if (Operand.Type == RD_OP_MEM) {
-							if (Operand.Info.Memory.HasIndex) {
-								SetRegisterValue(pCTX, Operand.Info.Memory.Index, Operand.Info.Memory.IndexSize, reinterpret_cast<ULONG_PTR>(CachedOperation.m_pNewAddress));
-								return;
-							}
-
-							if (Operand.Info.Memory.HasBase) {
-								SetRegisterValue(pCTX, Operand.Info.Memory.Base, Operand.Info.Memory.BaseSize, reinterpret_cast<ULONG_PTR>(CachedOperation.m_pNewAddress));
-								return;
-							}
-						}
-
-						break;
-					}
-				}
-
-				INSTRUCTION insn;
-#ifdef _M_X64
-				if (!RD_SUCCESS(RdDecode(&insn, reinterpret_cast<unsigned char*>(const_cast<void*>(pExceptionAddress)), RD_CODE_64, RD_DATA_64))) {
-#elif _M_IX86
-				if (!RD_SUCCESS(RdDecode(&insn, reinterpret_cast<unsigned char*>(const_cast<void*>(pExceptionAddress)), RD_CODE_32, RD_DATA_32))) {
-#endif
-					return;
-				}
-
-				if (!insn.OperandsCount) {
-					__debugbreak(); // TODO: Implement (As example: FSAVE/FNSAVE)
-					return;
-				}
-
-				auto pReadOperand = GetReadOperand(insn.Operands, insn.OperandsCount);
-				auto pWriteOperand = GetWriteOperand(insn.Operands, insn.OperandsCount);
-
-				switch (unOperation) {
-					case MEMORY_HOOK_OPERATION::MEMORY_READ:
-						{
-							if (!pReadOperand) {
-								return;
-							}
-
-							switch (pReadOperand->Type) {
-								case RD_OP_NOT_PRESENT:
-									break;
-								case RD_OP_REG:
-									{
-										const ULONG_PTR unValue = GetRegisterValue(pCTX, pReadOperand->Info.Register.Reg, pReadOperand->Info.Register.Size);
-										if (reinterpret_cast<ULONG_PTR>(pAddress) == unValue) {
-											SetRegisterValue(pCTX, pReadOperand->Info.Register.Reg, pReadOperand->Info.Register.Size, reinterpret_cast<size_t>(pNewAddress));
-											g_CachedOperations.emplace_back(const_cast<void*>(pExceptionAddress), unOperation, const_cast<void*>(pAddress), *pReadOperand, pNewAddress);
-											return;
-										}
-									}
-									break;
-								case RD_OP_MEM:
-									{
-#ifdef _M_X64
-										unsigned long long unBase = 0;
-										unsigned long long unIndex = 0;
-#elif _M_IX86
-										unsigned int unBase = 0;
-										unsigned int unIndex = 0;
-#endif
-										unsigned long long unDisp = 0;
-
-										if (pReadOperand->Info.Memory.HasBase) {
-											unBase = GetRegisterValue(pCTX, pReadOperand->Info.Memory.Base, pReadOperand->Info.Memory.BaseSize);
-										}
-
-										if (pReadOperand->Info.Memory.HasIndex) {
-											unIndex = GetRegisterValue(pCTX, pReadOperand->Info.Memory.Index, pReadOperand->Info.Memory.IndexSize) * pReadOperand->Info.Memory.Scale;
-										}
-
-										if (pReadOperand->Info.Memory.HasDisp) {
-											unDisp = pReadOperand->Info.Memory.Disp;
-										}
-
-										if (reinterpret_cast<ULONG_PTR>(pAddress) == unBase + unIndex + unDisp) {
-											if (unBase) {
-												const size_t unOffset = reinterpret_cast<size_t>(pAddress) - unBase;
-												SetRegisterValue(pCTX, pReadOperand->Info.Memory.Base, pReadOperand->Info.Memory.BaseSize, reinterpret_cast<size_t>(pNewAddress) - unOffset);
-												pReadOperand->Info.Memory.HasIndex = false;
-												g_CachedOperations.emplace_back(const_cast<void*>(pExceptionAddress), unOperation, const_cast<void*>(pAddress), *pReadOperand, static_cast<char*>(pNewAddress) - unOffset);
-												return;
-											}
-
-											if (unIndex) {
-												const size_t unOffset = reinterpret_cast<size_t>(pAddress) - unIndex;
-												SetRegisterValue(pCTX, pReadOperand->Info.Memory.Index, pReadOperand->Info.Memory.IndexSize, reinterpret_cast<size_t>(pNewAddress) - unOffset);
-												pReadOperand->Info.Memory.HasBase = false;
-												g_CachedOperations.emplace_back(const_cast<void*>(pExceptionAddress), unOperation, const_cast<void*>(pAddress), *pReadOperand, static_cast<char*>(pNewAddress) - unOffset);
-												return;
-											}
-										}
-									}
-									break;
-								case RD_OP_IMM:
-								case RD_OP_OFFS:
-								case RD_OP_ADDR:
-								case RD_OP_CONST:
-									{
-										if (!pWriteOperand) {
-											return;
-										}
-
-#ifdef _M_X64
-										void* pRedirectExecutionAddress = reinterpret_cast<char*>(pCTX->Rip) + insn.Length;
-#elif _M_IX86
-										void* pRedirectExecutionAddress = reinterpret_cast<char*>(pCTX->Eip) + insn.Length;
-#endif
-
-										switch (pWriteOperand->Type) {
-											case RD_OP_NOT_PRESENT:
-												break;
-											case RD_OP_REG:
-												{
-													ULONG_PTR unValue = 0;
-													switch (pWriteOperand->Info.Register.Size) {
-														case 1:
-															unValue = *reinterpret_cast<unsigned char*>(pNewAddress);
-															break;
-														case 2:
-															unValue = *reinterpret_cast<unsigned short*>(pNewAddress);
-															break;
-														case 4:
-															unValue = *reinterpret_cast<unsigned int*>(pNewAddress);
-															break;
-#ifdef _M_X64
-														case 8:
-															unValue = *reinterpret_cast<unsigned long long*>(pNewAddress);
-															break;
-#endif
-														default:
-															__debugbreak();
-															break;
-													}
-													SetRegisterValue(pCTX, pWriteOperand->Info.Register.Reg, pWriteOperand->Info.Register.Size, unValue);
-													g_CachedOperations.emplace_back(const_cast<void*>(pExceptionAddress), unOperation, const_cast<void*>(pAddress), *pWriteOperand, pNewAddress, pRedirectExecutionAddress);
-												}
-												break;
-											case RD_OP_MEM:
-												{
-													ULONG_PTR unValue = 0;
-													switch (pWriteOperand->Info.Memory.BaseSize) {
-														case 1:
-															unValue = *reinterpret_cast<unsigned char*>(pNewAddress);
-															break;
-														case 2:
-															unValue = *reinterpret_cast<unsigned short*>(pNewAddress);
-															break;
-														case 4:
-															unValue = *reinterpret_cast<unsigned int*>(pNewAddress);
-															break;
-#ifdef _M_X64
-														case 8:
-															unValue = *reinterpret_cast<unsigned long long*>(pNewAddress);
-															break;
-#endif
-														default:
-															__debugbreak();
-															break;
-													}
-													SetRegisterValue(pCTX, pWriteOperand->Info.Memory.Base, pWriteOperand->Info.Memory.BaseSize, unValue);
-													g_CachedOperations.emplace_back(const_cast<void*>(pExceptionAddress), unOperation, const_cast<void*>(pAddress), *pWriteOperand, pNewAddress, pRedirectExecutionAddress);
-												}
-												break;
-											case RD_OP_IMM:
-											case RD_OP_OFFS:
-											case RD_OP_ADDR:
-											case RD_OP_CONST:
-												break;
-											default:
-												break;
-										}
-									}
-									break;
-								default:
-									break;
-							}
-
-							return;
-					}
-
-					case MEMORY_HOOK_OPERATION::MEMORY_WRITE:
-						{
-							if (!pWriteOperand) {
-								return;
-							}
-
-							switch (pWriteOperand->Type) {
-								case RD_OP_NOT_PRESENT:
-									break;
-								case RD_OP_REG:
-									{
-									const ULONG_PTR unValue = GetRegisterValue(pCTX, pWriteOperand->Info.Register.Reg, pWriteOperand->Info.Register.Size);
-										if (reinterpret_cast<ULONG_PTR>(pAddress) == unValue) {
-											SetRegisterValue(pCTX, pWriteOperand->Info.Register.Reg, pWriteOperand->Info.Register.Size, reinterpret_cast<size_t>(pNewAddress));
-											g_CachedOperations.emplace_back(const_cast<void*>(pExceptionAddress), unOperation, const_cast<void*>(pAddress), *pWriteOperand, pNewAddress);
-											return;
-										}
-									}
-									break;
-								case RD_OP_MEM:
-									{
-	#ifdef _M_X64
-										unsigned long long unBase = 0;
-										unsigned long long unIndex = 0;
-	#elif _M_IX86
-										unsigned int unBase = 0;
-										unsigned int unIndex = 0;
-	#endif
-										unsigned long long unDisp = 0;
-
-										if (pWriteOperand->Info.Memory.HasBase) {
-											unBase = GetRegisterValue(pCTX, pWriteOperand->Info.Memory.Base, pWriteOperand->Info.Memory.BaseSize);
-										}
-
-										if (pWriteOperand->Info.Memory.HasIndex) {
-											unIndex = GetRegisterValue(pCTX, pWriteOperand->Info.Memory.Index, pWriteOperand->Info.Memory.IndexSize) * pWriteOperand->Info.Memory.Scale;
-										}
-
-										if (pWriteOperand->Info.Memory.HasDisp) {
-											unDisp = pWriteOperand->Info.Memory.Disp;
-										}
-
-										if (reinterpret_cast<ULONG_PTR>(pAddress) == unBase + unIndex + unDisp) {
-											if (unBase) {
-												const size_t unOffset = reinterpret_cast<size_t>(pAddress) - unBase;
-												SetRegisterValue(pCTX, pWriteOperand->Info.Memory.Base, pWriteOperand->Info.Memory.BaseSize, reinterpret_cast<size_t>(pNewAddress) - unOffset);
-												pWriteOperand->Info.Memory.HasIndex = false;
-												g_CachedOperations.emplace_back(const_cast<void*>(pExceptionAddress), unOperation, const_cast<void*>(pAddress), *pWriteOperand, static_cast<char*>(pNewAddress) - unOffset);
-												return;
-											}
-
-											if (unIndex) {
-												const size_t unOffset = reinterpret_cast<size_t>(pAddress) - unIndex;
-												SetRegisterValue(pCTX, pWriteOperand->Info.Memory.Index, pWriteOperand->Info.Memory.IndexSize, reinterpret_cast<size_t>(pNewAddress) - unOffset);
-												pWriteOperand->Info.Memory.HasBase = false;
-												g_CachedOperations.emplace_back(const_cast<void*>(pExceptionAddress), unOperation, const_cast<void*>(pAddress), *pWriteOperand, static_cast<char*>(pNewAddress) - unOffset);
-												return;
-											}
-										}
-									}
-									break;
-								case RD_OP_IMM:
-								case RD_OP_OFFS:
-								case RD_OP_ADDR:
-								case RD_OP_CONST:
-								case RD_OP_BANK:
-									__debugbreak();
-									break;
-								default:
-									break;
-							}
-
-							return;
-						}
-					default:
-						break;
-				}
-			}
-
-			if (unOperation == MEMORY_HOOK_OPERATION::MEMORY_EXECUTE) {
-#ifdef _M_X64
-				if (pCTX->Rip == reinterpret_cast<DWORD64>(pAddress)) {
-					pCTX->Rip = reinterpret_cast<DWORD64>(pNewAddress);
-				}
-#elif _M_IX86
-				if (pCTX->Eip == reinterpret_cast<DWORD>(pAddress)) {
-					pCTX->Eip = reinterpret_cast<DWORD>(pNewAddress);
-				}
-#endif
-#ifdef _M_X64
-				if (pCTX->Rax == reinterpret_cast<DWORD64>(pAddress)) {
-					pCTX->Rax = reinterpret_cast<DWORD64>(pNewAddress);
-				}
-#elif _M_IX86
-				if (pCTX->Eax == reinterpret_cast<DWORD>(pAddress)) {
-					pCTX->Eax = reinterpret_cast<DWORD>(pNewAddress);
-				}
-#endif
-#ifdef _M_X64
-				if (pCTX->Rcx == reinterpret_cast<DWORD64>(pAddress)) {
-					pCTX->Rcx = reinterpret_cast<DWORD64>(pNewAddress);
-				}
-#elif _M_IX86
-				if (pCTX->Ecx == reinterpret_cast<DWORD>(pAddress)) {
-					pCTX->Ecx = reinterpret_cast<DWORD>(pNewAddress);
-				}
-#endif
-#ifdef _M_X64
-				if (pCTX->Rdx == reinterpret_cast<DWORD64>(pAddress)) {
-					pCTX->Rdx = reinterpret_cast<DWORD64>(pNewAddress);
-				}
-#elif _M_IX86
-				if (pCTX->Edx == reinterpret_cast<DWORD>(pAddress)) {
-					pCTX->Edx = reinterpret_cast<DWORD>(pNewAddress);
-				}
-#endif
-#ifdef _M_X64
-				if (pCTX->Rbx == reinterpret_cast<DWORD64>(pAddress)) {
-					pCTX->Rbx = reinterpret_cast<DWORD64>(pNewAddress);
-				}
-#elif _M_IX86
-				if (pCTX->Ebx == reinterpret_cast<DWORD>(pAddress)) {
-					pCTX->Ebx = reinterpret_cast<DWORD>(pNewAddress);
-				}
-#endif
-#ifdef _M_X64
-				if (pCTX->Rsp == reinterpret_cast<DWORD64>(pAddress)) {
-					pCTX->Rsp = reinterpret_cast<DWORD64>(pNewAddress);
-				}
-#elif _M_IX86
-				if (pCTX->Esp == reinterpret_cast<DWORD>(pAddress)) {
-					pCTX->Esp = reinterpret_cast<DWORD>(pNewAddress);
-				}
-#endif
-#ifdef _M_X64
-				if (pCTX->Rbp == reinterpret_cast<DWORD64>(pAddress)) {
-					pCTX->Rbp = reinterpret_cast<DWORD64>(pNewAddress);
-				}
-#elif _M_IX86
-				if (pCTX->Ebp == reinterpret_cast<DWORD>(pAddress)) {
-					pCTX->Ebp = reinterpret_cast<DWORD>(pNewAddress);
-				}
-#endif
-#ifdef _M_X64
-				if (pCTX->Rsi == reinterpret_cast<DWORD64>(pAddress)) {
-					pCTX->Rsi = reinterpret_cast<DWORD64>(pNewAddress);
-				}
-#elif _M_IX86
-				if (pCTX->Esi == reinterpret_cast<DWORD>(pAddress)) {
-					pCTX->Esi = reinterpret_cast<DWORD>(pNewAddress);
-				}
-#endif
-#ifdef _M_X64
-				if (pCTX->Rdi == reinterpret_cast<DWORD64>(pAddress)) {
-					pCTX->Rdi = reinterpret_cast<DWORD64>(pNewAddress);
-				}
-#elif _M_IX86
-				if (pCTX->Edi == reinterpret_cast<DWORD>(pAddress)) {
-					pCTX->Edi = reinterpret_cast<DWORD>(pNewAddress);
-				}
-#endif
-#ifdef _M_X64
-				if (pCTX->R8 == reinterpret_cast<DWORD64>(pAddress)) {
-					pCTX->R8 = reinterpret_cast<DWORD64>(pNewAddress);
-				}
-				if (pCTX->R9 == reinterpret_cast<DWORD64>(pAddress)) {
-					pCTX->R9 = reinterpret_cast<DWORD64>(pNewAddress);
-				}
-				if (pCTX->R10 == reinterpret_cast<DWORD64>(pAddress)) {
-					pCTX->R10 = reinterpret_cast<DWORD64>(pNewAddress);
-				}
-				if (pCTX->R11 == reinterpret_cast<DWORD64>(pAddress)) {
-					pCTX->R11 = reinterpret_cast<DWORD64>(pNewAddress);
-				}
-				if (pCTX->R12 == reinterpret_cast<DWORD64>(pAddress)) {
-					pCTX->R12 = reinterpret_cast<DWORD64>(pNewAddress);
-				}
-				if (pCTX->R13 == reinterpret_cast<DWORD64>(pAddress)) {
-					pCTX->R13 = reinterpret_cast<DWORD64>(pNewAddress);
-				}
-				if (pCTX->R14 == reinterpret_cast<DWORD64>(pAddress)) {
-					pCTX->R14 = reinterpret_cast<DWORD64>(pNewAddress);
-				}
-				if (pCTX->R15 == reinterpret_cast<DWORD64>(pAddress)) {
-					pCTX->R15 = reinterpret_cast<DWORD64>(pNewAddress);
-				}
-#endif
-			}
-		}
-
 		static bool MemoryHookCallBack(const EXCEPTION_RECORD& Exception, const PCONTEXT pCTX) {
+
+			DWORD unCurrentTID = GetCurrentThreadId();
+			REGISTER_FLAGS& FLAGS = *reinterpret_cast<REGISTER_FLAGS*>(&pCTX->EFlags);
+
+			if (Exception.ExceptionCode == EXCEPTION_SINGLE_STEP) {
+				for (auto it = g_MemoryHookRecords.begin(); it != g_MemoryHookRecords.end(); ++it) {
+					const auto& pRecord = *it;
+					if (!pRecord) {
+						continue;
+					}
+
+					if (pRecord->m_bPendingRestore && (pRecord->m_unThreadID == unCurrentTID)) {
+						for (auto& pPage : pRecord->m_Pages) {
+							if (!pPage->ChangeProtection(PAGE_NOACCESS)) {
+								return false;
+							}
+						}
+
+						pRecord->m_bPendingRestore = false;
+						pRecord->m_unThreadID = 0;
+
+						FLAGS.m_unTF = 0;
+
+						return true;
+					}
+				}
+
+				return false;
+			}
+
 			if (Exception.ExceptionCode != EXCEPTION_ACCESS_VIOLATION) {
 				return false;
 			}
@@ -8156,124 +7383,36 @@ namespace Detours {
 				return false;
 			}
 
-			bool bIsVirtualAddress = false;
-
-			PAGE_INFO pi;
-			if (!__get_page_info(const_cast<void*>(pAddress), &pi)) {
-				return false;
-			}
-
-			if ((pi.m_unState == MEM_FREE) && (pi.m_unProtection == PAGE_NOACCESS) && (pi.m_unType == 0)) {
-				bIsVirtualAddress = true;
-			}
-
 			for (auto it = g_MemoryHookRecords.begin(); it != g_MemoryHookRecords.end(); ++it) {
 				const auto& pRecord = *it;
 				if (!pRecord) {
 					continue;
 				}
 
-				if (bIsVirtualAddress && !pRecord->m_bAllowVirtualAddress) {
+				if (pRecord->m_bPendingRestore) {
 					continue;
 				}
 
+				for (auto& Page : pRecord->m_Pages) {
+					if (!Page->RestoreProtection()) {
+						return false;
+					}
+				}
+
+				pRecord->m_bPendingRestore = true;
+				pRecord->m_unThreadID = GetCurrentThreadId();
+
+				FLAGS.m_unTF = 1;
+
 				if (__is_in_range(pRecord->m_pAddress, pRecord->m_unSize, pAddress)) {
-
-					if (!bIsVirtualAddress) {
-						for (auto& PagePair : pRecord->m_Pages) {
-							const auto& Page = PagePair.first;
-
-							if (__is_in_range(Page->GetPageAddress(), Page->GetPageCapacity(), pAddress)) {
-								const size_t unOffset = reinterpret_cast<size_t>(pAddress) - reinterpret_cast<size_t>(Page->GetPageAddress());
-								void* pNewAddress = reinterpret_cast<char*>(PagePair.second->GetPageAddress()) + unOffset;
-
-								//if (pRecord->m_bSupportTrampoline) {
-								//	if (!PagePair.first->RestoreProtection()) {
-								//		return false;
-								//	}
-								//}
-
-								const bool bResult = pRecord->m_pCallBack(pCTX, pExceptionAddress, unOperation, pRecord->m_pAddress, pAddress, &pNewAddress);
-								if (bResult) {
-									FixMemoryHookAddress(pCTX, pExceptionAddress, unOperation, pAddress, pNewAddress);
-								}
-
-								//if (pRecord->m_bSupportTrampoline) {
-								//	if (!PagePair.first->ChangeProtection(PAGE_NOACCESS)) {
-								//		return false;
-								//	}
-								//}
-
-								return bResult;
-							}
-						}
-					} else {
-						for (auto& PagePair : pRecord->m_VirtualPages) {
-							const auto& Page = PagePair.first;
-
-							if (__is_in_range(Page.first, Page.second, pAddress)) {
-								const size_t unOffset = reinterpret_cast<size_t>(pAddress) - reinterpret_cast<size_t>(Page.first);
-								void* pNewAddress = reinterpret_cast<char*>(PagePair.second->GetPageAddress()) + unOffset;
-
-								//if (pRecord->m_bSupportTrampoline) {
-								//	if (!PagePair.first->RestoreProtection()) {
-								//		return false;
-								//	}
-								//}
-
-								const bool bResult = pRecord->m_pCallBack(pCTX, pExceptionAddress, unOperation, pRecord->m_pAddress, pAddress, &pNewAddress);
-								if (bResult) {
-									FixMemoryHookAddress(pCTX, pExceptionAddress, unOperation, pAddress, pNewAddress);
-								}
-
-								//if (pRecord->m_bSupportTrampoline) {
-								//	if (!PagePair.first->ChangeProtection(PAGE_NOACCESS)) {
-								//		return false;
-								//	}
-								//}
-
-								return bResult;
-							}
-						}
-					}
-
-					return false;
+					pRecord->m_pCallBack(pCTX, pExceptionAddress, unOperation, pRecord->m_pAddress, pAddress);
 				}
 
-				void* pNewAddress = nullptr;
-				bool bAround = false;
-
-				if (!bIsVirtualAddress) {
-					for (auto& PagePair : pRecord->m_Pages) {
-						const auto& Page = PagePair.first;
-						if (__is_in_range(Page->GetPageAddress(), Page->GetPageCapacity(), pAddress)) {
-							const size_t unOffset = reinterpret_cast<size_t>(pAddress) - reinterpret_cast<size_t>(Page->GetPageAddress());
-							pNewAddress = reinterpret_cast<char*>(PagePair.second->GetPageAddress()) + unOffset;
-							bAround = true;
-							break;
-						}
-					}
-				} else {
-					for (auto& PagePair : pRecord->m_VirtualPages) {
-						const auto& Page = PagePair.first;
-						if (__is_in_range(Page.first, Page.second, pAddress)) {
-							const size_t unOffset = reinterpret_cast<size_t>(pAddress) - reinterpret_cast<size_t>(Page.first);
-							pNewAddress = reinterpret_cast<char*>(PagePair.second->GetPageAddress()) + unOffset;
-							bAround = true;
-							break;
-						}
-					}
-				}
-
-				if (bAround) {
-					FixMemoryHookAddress(pCTX, pExceptionAddress, unOperation, pAddress, pNewAddress);
-					return true;
-				}
+				return true;
 			}
 
 			return false;
 		}
-		*/
 
 		// ----------------------------------------------------------------
 		// InterruptHookCallBack
@@ -8342,7 +7481,8 @@ namespace Detours {
 			if (m_pVEH) {
 
 				// Built-in CallBacks
-				//AddCallBack(MemoryHookCallBack); // Memory Hooks
+				AddCallBack(HardwareHookCallBack); // Hardware Hooks
+				AddCallBack(MemoryHookCallBack); // Memory Hooks
 				AddCallBack(InterruptHookCallBack); // Interrupt Hooks
 			}
 		}
@@ -8353,7 +7493,8 @@ namespace Detours {
 
 				// Built-in CallBacks
 				RemoveCallBack(InterruptHookCallBack); // Interrupt Hooks
-				//RemoveCallBack(MemoryHookCallBack); // Memory Hooks
+				RemoveCallBack(MemoryHookCallBack); // Memory Hooks
+				RemoveCallBack(HardwareHookCallBack); // Hardware Hooks
 			}
 		}
 
@@ -85342,10 +84483,252 @@ namespace Detours {
 	namespace Hook {
 
 		// ----------------------------------------------------------------
+		// Hardware Hook
+		// ----------------------------------------------------------------
+
+		bool HookHardware(const fnHardwareHookCallBack pCallBack, DWORD unThreadID, void* pAddress, HARDWARE_HOOK_REGISTER unRegister, HARDWARE_HOOK_TYPE unType, unsigned char unSize) {
+			if (!unThreadID || !pCallBack || !pAddress || !unSize) {
+				return false;
+			}
+
+			if ((unSize != 1) && (unSize != 2) && (unSize != 4)) {
+				return false;
+			}
+
+			for (auto& Record : g_HardwareHookRecords) {
+				if (Record->m_pCallBack == pCallBack) {
+					return false;
+				}
+			}
+
+			auto pRecord = std::make_unique<HARDWARE_HOOK_RECORD>();
+			if (!pRecord) {
+				return false;
+			}
+
+			pRecord->m_pCallBack = pCallBack;
+			pRecord->m_unThreadID = unThreadID;
+			pRecord->m_pAddress = pAddress;
+			pRecord->m_unRegister = unRegister;
+			pRecord->m_unType = unType;
+			pRecord->m_unSize = unSize;
+			pRecord->m_bPendingRestore = false;
+			pRecord->m_unOriginalDR7 = 0;
+
+			HANDLE hThread = OpenThread(THREAD_GET_CONTEXT | THREAD_SET_CONTEXT, FALSE, unThreadID);
+			if (!hThread || (hThread == INVALID_HANDLE_VALUE)) {
+				return false;
+			}
+
+			CONTEXT ctx = { 0 };
+			ctx.ContextFlags = CONTEXT_DEBUG_REGISTERS;
+			if (!GetThreadContext(hThread, &ctx)) {
+				CloseHandle(hThread);
+				return false;
+			}
+
+			unsigned char unDRIndex = 0;
+			switch (unRegister) {
+				case HARDWARE_HOOK_REGISTER::REGISTER_DR0:
+#ifdef _M_X64
+					ctx.Dr0 = reinterpret_cast<DWORD64>(pAddress);
+#elif _M_IX86
+					ctx.Dr0 = reinterpret_cast<DWORD>(pAddress);
+#endif
+					unDRIndex = 0;
+					break;
+
+				case HARDWARE_HOOK_REGISTER::REGISTER_DR1:
+#ifdef _M_X64
+					ctx.Dr1 = reinterpret_cast<DWORD64>(pAddress);
+#elif _M_IX86
+					ctx.Dr1 = reinterpret_cast<DWORD>(pAddress);
+#endif
+					unDRIndex = 1;
+					break;
+
+				case HARDWARE_HOOK_REGISTER::REGISTER_DR2:
+#ifdef _M_X64
+					ctx.Dr2 = reinterpret_cast<DWORD64>(pAddress);
+#elif _M_IX86
+					ctx.Dr2 = reinterpret_cast<DWORD>(pAddress);
+#endif
+					unDRIndex = 2;
+					break;
+
+				case HARDWARE_HOOK_REGISTER::REGISTER_DR3:
+#ifdef _M_X64
+					ctx.Dr3 = reinterpret_cast<DWORD64>(pAddress);
+#elif _M_IX86
+					ctx.Dr3 = reinterpret_cast<DWORD>(pAddress);
+#endif
+					unDRIndex = 3;
+					break;
+			}
+
+			unsigned char unTypeValue = 0;
+			switch (unType) {
+				case HARDWARE_HOOK_TYPE::TYPE_EXECUTE: unTypeValue = 0; break;
+				case HARDWARE_HOOK_TYPE::TYPE_WRITE:   unTypeValue = 1; break;
+				case HARDWARE_HOOK_TYPE::TYPE_IO:      unTypeValue = 2; break;
+				case HARDWARE_HOOK_TYPE::TYPE_ACCESS:  unTypeValue = 3; break;
+			}
+
+			unsigned char unSizeValue = 0;
+			switch (unSize) {
+				case 1: unSizeValue = 0; break;
+				case 2: unSizeValue = 1; break;
+				case 4: unSizeValue = 3; break;
+			}
+
+			REGISTER_DR7& DR7 = *reinterpret_cast<REGISTER_DR7*>(&ctx.Dr7);
+
+			switch (unDRIndex) {
+				case 0:
+					DR7.m_unL0 = 0;
+					DR7.m_unRW0 = 0;
+					DR7.m_unLEN0 = 0;
+					break;
+
+				case 1:
+					DR7.m_unL1 = 0;
+					DR7.m_unRW1 = 0;
+					DR7.m_unLEN1 = 0;
+					break;
+
+				case 2:
+					DR7.m_unL2 = 0;
+					DR7.m_unRW2 = 0;
+					DR7.m_unLEN2 = 0;
+					break;
+
+				case 3:
+					DR7.m_unL3 = 0;
+					DR7.m_unRW3 = 0;
+					DR7.m_unLEN3 = 0;
+					break;
+			}
+
+			switch (unDRIndex) {
+				case 0:
+					DR7.m_unL0 = 1;
+					DR7.m_unRW0 = unTypeValue;
+					DR7.m_unLEN0 = unSizeValue;
+					break;
+
+				case 1:
+					DR7.m_unL1 = 1;
+					DR7.m_unRW1 = unTypeValue;
+					DR7.m_unLEN1 = unSizeValue;
+					break;
+
+				case 2:
+					DR7.m_unL2 = 1;
+					DR7.m_unRW2 = unTypeValue;
+					DR7.m_unLEN2 = unSizeValue;
+					break;
+
+				case 3:
+					DR7.m_unL3 = 1;
+					DR7.m_unRW3 = unTypeValue;
+					DR7.m_unLEN3 = unSizeValue;
+					break;
+			}
+
+			if (!SetThreadContext(hThread, &ctx)) {
+				CloseHandle(hThread);
+				return false;
+			}
+
+			g_HardwareHookRecords.emplace_back(std::move(pRecord));
+
+			CloseHandle(hThread);
+			return true;
+		}
+
+		bool UnHookHardware(const fnHardwareHookCallBack pCallBack, DWORD unThreadID) {
+			if (!unThreadID || !pCallBack) {
+				return false;
+			}
+
+			for (auto it = g_HardwareHookRecords.begin(); it != g_HardwareHookRecords.end(); ++it) {
+				if (((*it)->m_pCallBack == pCallBack) && ((*it)->m_unThreadID == unThreadID)) {
+					HANDLE hThread = OpenThread(THREAD_GET_CONTEXT | THREAD_SET_CONTEXT, FALSE, unThreadID);
+					if (hThread && (hThread != INVALID_HANDLE_VALUE)) {
+						CONTEXT ctx = { 0 };
+						ctx.ContextFlags = CONTEXT_DEBUG_REGISTERS;
+
+						if (GetThreadContext(hThread, &ctx)) {
+							unsigned char unDRIndex = 0;
+							switch ((*it)->m_unRegister) {
+								case HARDWARE_HOOK_REGISTER::REGISTER_DR0:
+									ctx.Dr0 = 0;
+									unDRIndex = 0;
+									break;
+
+								case HARDWARE_HOOK_REGISTER::REGISTER_DR1:
+									ctx.Dr1 = 0;
+									unDRIndex = 1;
+									break;
+
+								case HARDWARE_HOOK_REGISTER::REGISTER_DR2:
+									ctx.Dr2 = 0;
+									unDRIndex = 2;
+									break;
+
+								case HARDWARE_HOOK_REGISTER::REGISTER_DR3:
+									ctx.Dr3 = 0;
+									unDRIndex = 3;
+									break;
+							}
+
+							REGISTER_DR7& DR7 = *reinterpret_cast<REGISTER_DR7*>(&ctx.Dr7);
+
+							switch (unDRIndex) {
+								case 0:
+									DR7.m_unL0 = 0;
+									DR7.m_unRW0 = 0;
+									DR7.m_unLEN0 = 0;
+									break;
+
+								case 1:
+									DR7.m_unL1 = 0;
+									DR7.m_unRW1 = 0;
+									DR7.m_unLEN1 = 0;
+									break;
+
+								case 2:
+									DR7.m_unL2 = 0;
+									DR7.m_unRW2 = 0;
+									DR7.m_unLEN2 = 0;
+									break;
+
+								case 3:
+									DR7.m_unL3 = 0;
+									DR7.m_unRW3 = 0;
+									DR7.m_unLEN3 = 0;
+									break;
+							}
+
+							SetThreadContext(hThread, &ctx);
+						}
+
+						CloseHandle(hThread);
+					}
+
+					g_HardwareHookRecords.erase(it);
+					return true;
+				}
+			}
+
+			return false;
+		}
+
+		// ----------------------------------------------------------------
 		// Memory Hook
 		// ----------------------------------------------------------------
-		/*
-		bool HookMemory(const fnMemoryHookCallBack pCallBack, void* pAddress, size_t unSize, bool bAllowVirtualAddress) {
+
+		bool HookMemory(const fnMemoryHookCallBack pCallBack, void* pAddress, size_t unSize) {
 			if (!pCallBack || !pAddress || !unSize) {
 				return false;
 			}
@@ -85373,24 +84756,8 @@ namespace Detours {
 				bIsVirtualAddress = true;
 			}
 
-			if (bIsVirtualAddress && !bAllowVirtualAddress) {
+			if (bIsVirtualAddress) {
 				return false;
-			}
-
-			if (!bIsVirtualAddress) {
-				DWORD unDEPPolicy = 0;
-				BOOL bPermament = FALSE;
-				if (!GetProcessDEPPolicy(reinterpret_cast<HANDLE>(-1), &unDEPPolicy, &bPermament)) {
-					return false;
-				}
-
-				if (!unDEPPolicy) {
-					for (auto& PageInfo : vecPages) {
-						if (PageInfo.m_unProtection & (PAGE_EXECUTE | PAGE_EXECUTE_READ | PAGE_EXECUTE_READWRITE | PAGE_EXECUTE_WRITECOPY)) {
-							return false;
-						}
-					}
-				}
 			}
 
 			auto pRecord = std::make_unique<MEMORY_HOOK_RECORD>();
@@ -85401,59 +84768,36 @@ namespace Detours {
 			pRecord->m_pCallBack = pCallBack;
 			pRecord->m_pAddress = pAddress;
 			pRecord->m_unSize = unSize;
-			pRecord->m_bAllowVirtualAddress = bAllowVirtualAddress;
+			pRecord->m_bPendingRestore = false;
+			pRecord->m_unThreadID = 0;
 
 			for (auto& PageInfo : vecPages) {
-
-				auto pPage = std::make_unique<Page>();
+				auto pPage = std::make_unique<Page>(PageInfo.m_pBaseAddress, false);
 				if (!pPage) {
 					return false;
 				}
 
-				if (!bIsVirtualAddress) {
-					auto pOriginalPage = std::make_unique<Page>(PageInfo.m_pBaseAddress, false);
-					if (!pOriginalPage) {
-						return false;
-					}
-
-					if (!pPage->CloneFrom(pOriginalPage.get())) {
-						return false;
-					}
-
-					if (!pOriginalPage->ChangeProtection(PAGE_NOACCESS)) {
-						return false;
-					}
-
-					pRecord->m_Pages.emplace_back(std::make_pair(std::move(pOriginalPage), std::move(pPage)));
-				} else {
-					if (!pPage->ChangeProtection(PAGE_EXECUTE_READWRITE)) {
-						return false;
-					}
-
-					pRecord->m_VirtualPages.emplace_back(std::make_pair(std::make_pair(PageInfo.m_pBaseAddress, PageInfo.m_unSize), std::move(pPage)));
+				if (!pPage->ChangeProtection(PAGE_NOACCESS)) {
+					return false;
 				}
+
+				pRecord->m_Pages.emplace_back(std::move(pPage));
 			}
 
 			g_MemoryHookRecords.emplace_back(std::move(pRecord));
 			return true;
 		}
 
-		bool UnHookMemory(const fnMemoryHookCallBack pCallBack) {
+		bool UnHookMemory(const fnMemoryHookCallBack pCallBack, void* pAddress) {
 			if (!pCallBack) {
 				return false;
 			}
 
 			for (auto it = g_MemoryHookRecords.begin(); it != g_MemoryHookRecords.end(); ++it) {
-				if ((*it)->m_pCallBack == pCallBack) {
-					if (!(*it)->m_bAllowVirtualAddress) {
-						for (auto& PagePair : (*it)->m_Pages) {
-							if (!PagePair.second->CloneTo(PagePair.first.get())) {
-								return false;
-							}
-
-							if (!PagePair.first->RestoreProtection()) {
-								return false;
-							}
+				if (((*it)->m_pCallBack == pCallBack) && ((*it)->m_pAddress == pAddress)) {
+					for (auto& pPage : (*it)->m_Pages) {
+						if (!pPage->RestoreProtection()) {
+							return false;
 						}
 					}
 
@@ -85464,7 +84808,6 @@ namespace Detours {
 
 			return false;
 		}
-		*/
 
 		// ----------------------------------------------------------------
 		// Interrupt Hook

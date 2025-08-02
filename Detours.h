@@ -5573,27 +5573,62 @@ namespace Detours {
 	namespace Hook {
 
 		// ----------------------------------------------------------------
-		// Memory Hook Operation (Experimental!!!)
+		// Hardware Hook Register
 		// ----------------------------------------------------------------
 
-		//typedef enum _MEMORY_HOOK_OPERATION : unsigned char {
-		//	MEMORY_READ    = 0,
-		//	MEMORY_WRITE   = 1,
-		//	MEMORY_EXECUTE = 2
-		//} MEMORY_HOOK_OPERATION, *PMEMORY_HOOK_OPERATION;
+		typedef enum _HARDWARE_HOOK_REGISTER : unsigned char {
+			REGISTER_DR0 = 0,
+			REGISTER_DR1 = 1,
+			REGISTER_DR2 = 2,
+			REGISTER_DR3 = 3
+		} HARDWARE_HOOK_REGISTER, *PHARDWARE_HOOK_REGISTER;
+
+		// ----------------------------------------------------------------
+		// Hardware Hook Type
+		// ----------------------------------------------------------------
+
+		typedef enum _HARDWARE_HOOK_TYPE : unsigned char {
+			TYPE_EXECUTE = 0,
+			TYPE_WRITE   = 1,
+			TYPE_IO      = 2,
+			TYPE_ACCESS  = 3
+		} HARDWARE_HOOK_TYPE, *PHARDWARE_HOOK_TYPE;
+
+		// ----------------------------------------------------------------
+		// Hardware Hook CallBack
+		// ----------------------------------------------------------------
+
+		using fnHardwareHookCallBack = void(*)(const PCONTEXT pCTX);
+
+		// ----------------------------------------------------------------
+		// Hardware Hook
+		// ----------------------------------------------------------------
+
+		bool HookHardware(const fnHardwareHookCallBack pCallBack, DWORD unThreadID, void* pAddress, HARDWARE_HOOK_REGISTER unRegister, HARDWARE_HOOK_TYPE unType, unsigned char unSize = 1);
+		bool UnHookHardware(const fnHardwareHookCallBack pCallBack, DWORD unThreadID);
+
+		// ----------------------------------------------------------------
+		// Memory Hook Operation
+		// ----------------------------------------------------------------
+
+		typedef enum _MEMORY_HOOK_OPERATION : unsigned char {
+			MEMORY_READ    = 0,
+			MEMORY_WRITE   = 1,
+			MEMORY_EXECUTE = 2
+		} MEMORY_HOOK_OPERATION, *PMEMORY_HOOK_OPERATION;
 
 		// ----------------------------------------------------------------
 		// Memory Hook CallBack
 		// ----------------------------------------------------------------
 
-		//using fnMemoryHookCallBack = bool(*)(const PCONTEXT pCTX, const void* pExceptionAddress, MEMORY_HOOK_OPERATION unOperation, const void* pHookAddress, const void* pAccessAddress, void** pNewAccessAddress);
+		using fnMemoryHookCallBack = void(*)(const PCONTEXT pCTX, const void* pExceptionAddress, MEMORY_HOOK_OPERATION unOperation, const void* pAddress, const void* pAccessAddress);
 
 		// ----------------------------------------------------------------
 		// Memory Hook
 		// ----------------------------------------------------------------
 
-		//bool HookMemory(const fnMemoryHookCallBack pCallBack, void* pAddress, size_t unSize, bool bAllowVirtualAddress = false);
-		//bool UnHookMemory(const fnMemoryHookCallBack pCallBack);
+		bool HookMemory(const fnMemoryHookCallBack pCallBack, void* pAddress, size_t unSize);
+		bool UnHookMemory(const fnMemoryHookCallBack pCallBack, void* pAddress);
 
 		// ----------------------------------------------------------------
 		// Interrupt Hook CallBack
