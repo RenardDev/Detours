@@ -233,12 +233,6 @@ namespace Detours {
 	const volatile KUSER_SHARED_DATA& KUserSharedData = *reinterpret_cast<PKUSER_SHARED_DATA>(0x7FFE0000);
 
 	// ----------------------------------------------------------------
-	// KHYPERVISOR_SHARED_DATA
-	// ----------------------------------------------------------------
-
-	const volatile KHYPERVISOR_SHARED_DATA& KHypervisorSharedData = *reinterpret_cast<PKHYPERVISOR_SHARED_DATA>(0x7FFEE000); // FIXME: Address is incorrect on some Windows versions.
-
-	// ----------------------------------------------------------------
 	// PEB
 	// ----------------------------------------------------------------
 
@@ -315,6 +309,8 @@ namespace Detours {
 		// GetCallStack
 		// ----------------------------------------------------------------
 
+		using fnStackWalk64 = BOOL(__stdcall*)(DWORD MachineType, HANDLE hProcess, HANDLE hThread, LPSTACKFRAME64 StackFrame, PVOID ContextRecord, PREAD_PROCESS_MEMORY_ROUTINE64 ReadMemoryRoutine, PFUNCTION_TABLE_ACCESS_ROUTINE64 FunctionTableAccessRoutine, PGET_MODULE_BASE_ROUTINE64 GetModuleBaseRoutine, PTRANSLATE_ADDRESS_ROUTINE64 TranslateAddress);
+
 		static DWORD64 WINAPI GetModuleBaseByAddress(HANDLE hProcess, DWORD64 unAddress) {
 			MEMORY_BASIC_INFORMATION mbi;
 			if (VirtualQueryEx(hProcess, reinterpret_cast<LPCVOID>(unAddress), &mbi, sizeof(mbi))) {
@@ -329,6 +325,19 @@ namespace Detours {
 
 			if (!hThread || (hThread == INVALID_HANDLE_VALUE) || !unMaxEntries) {
 				return vecCallStack;
+			}
+
+			static fnStackWalk64 StackWalk64 = nullptr;
+			if (!StackWalk64) {
+				HMODULE hDbgHelp = GetModuleHandle(_T("DbgHelp.dll"));
+				if (!hDbgHelp) {
+					return vecCallStack;
+				}
+
+				StackWalk64 = reinterpret_cast<fnStackWalk64>(GetProcAddress(hDbgHelp, "StackWalk64"));
+				if (!StackWalk64) {
+					return vecCallStack;
+				}
 			}
 
 			CONTEXT ctx = { 0 };
@@ -7245,22 +7254,22 @@ namespace Detours {
 							break;
 
 						case HARDWARE_HOOK_REGISTER::REGISTER_DR2:
-							if (DR6.m_unB1) {
+							if (DR6.m_unB2) {
 								bMatch = true;
 							}
 
-							if (DR7.m_unL1 || DR7.m_unG1) {
+							if (DR7.m_unL2 || DR7.m_unG2) {
 								bEnabled = true;
 							}
 
 							break;
 
 						case HARDWARE_HOOK_REGISTER::REGISTER_DR3:
-							if (DR6.m_unB1) {
+							if (DR6.m_unB3) {
 								bMatch = true;
 							}
 
-							if (DR7.m_unL1 || DR7.m_unG1) {
+							if (DR7.m_unL3 || DR7.m_unG3) {
 								bEnabled = true;
 							}
 
@@ -84568,17 +84577,31 @@ namespace Detours {
 
 			unsigned char unTypeValue = 0;
 			switch (unType) {
-				case HARDWARE_HOOK_TYPE::TYPE_EXECUTE: unTypeValue = 0; break;
-				case HARDWARE_HOOK_TYPE::TYPE_WRITE:   unTypeValue = 1; break;
-				case HARDWARE_HOOK_TYPE::TYPE_IO:      unTypeValue = 2; break;
-				case HARDWARE_HOOK_TYPE::TYPE_ACCESS:  unTypeValue = 3; break;
+				case HARDWARE_HOOK_TYPE::TYPE_EXECUTE:
+					unTypeValue = 0;
+					break;
+				case HARDWARE_HOOK_TYPE::TYPE_WRITE:
+					unTypeValue = 1;
+					break;
+				case HARDWARE_HOOK_TYPE::TYPE_IO:
+					unTypeValue = 2;
+					break;
+				case HARDWARE_HOOK_TYPE::TYPE_ACCESS:
+					unTypeValue = 3;
+					break;
 			}
 
 			unsigned char unSizeValue = 0;
 			switch (unSize) {
-				case 1: unSizeValue = 0; break;
-				case 2: unSizeValue = 1; break;
-				case 4: unSizeValue = 3; break;
+				case 1:
+					unSizeValue = 0;
+					break;
+				case 2:
+					unSizeValue = 1;
+					break;
+				case 4:
+					unSizeValue = 3;
+					break;
 			}
 
 			REGISTER_DR7& DR7 = *reinterpret_cast<REGISTER_DR7*>(&ctx.Dr7);

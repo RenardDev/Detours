@@ -797,19 +797,6 @@ namespace Detours {
 	extern const volatile KUSER_SHARED_DATA& KUserSharedData;
 
 	// ----------------------------------------------------------------
-	// KHYPERVISOR_SHARED_DATA
-	// ----------------------------------------------------------------
-
-	typedef struct _KHYPERVISOR_SHARED_DATA {
-		ULONG Present;
-		ULONG Reserved1;
-		ULONGLONG MultiplierValue;
-		ULONGLONG AdditionalOffset;
-	} KHYPERVISOR_SHARED_DATA, *PKHYPERVISOR_SHARED_DATA;
-
-	extern const volatile KHYPERVISOR_SHARED_DATA& KHypervisorSharedData;
-
-	// ----------------------------------------------------------------
 	// LDR
 	// ----------------------------------------------------------------
 
