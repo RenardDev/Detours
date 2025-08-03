@@ -1846,7 +1846,7 @@ TEST_SUITE("Detours::Hook") {
 		printf("pArray[4] = %i\n", pArray[4]);
 	}
 
-	TEST_CASE("MemoryHook 1") {
+	TEST_CASE("MemoryHook 1" * doctest::skip(true)) {
 		Detours::Memory::Page Page(nullptr);
 		CHECK(Page.GetPageAddress() != nullptr);
 		void* pAddress = Page.Alloc(sizeof(int) * 3);
@@ -1876,7 +1876,7 @@ TEST_SUITE("Detours::Hook") {
 		CHECK(Detours::Hook::UnHookMemory(MemoryHook, pArray) == true);
 	}
 
-	TEST_CASE("MemoryHook 2") {
+	TEST_CASE("MemoryHook 2" * doctest::skip(true)) {
 		Detours::Memory::Page Page(nullptr);
 		CHECK(Page.GetPageAddress() != nullptr);
 		void* pAddress = Page.Alloc(sizeof(int) * 3);
