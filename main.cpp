@@ -144,12 +144,6 @@ TEST_SUITE("Detours::KUserSharedData") {
 	}
 }
 
-TEST_SUITE("Detours::KHypervisorSharedData" * doctest::skip() * doctest::description("Address is incorrect on some Windows versions.")) {
-	TEST_CASE("Present") {
-		CHECK(Detours::KHypervisorSharedData.Present == 1);
-	}
-}
-
 TEST_SUITE("Detours::GetPEB") {
 	TEST_CASE("Windows Version") {
 		auto pPEB = Detours::GetPEB();
