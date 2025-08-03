@@ -1564,7 +1564,45 @@ TEST_SUITE("Detours::Hook") {
 	void HardwareHook(const PCONTEXT pCTX) {
 		UNREFERENCED_PARAMETER(pCTX);
 
-		_tprintf_s(_T("Mem access!\n"));
+		_tprintf_s(_T("Mem access! TID=%lu\n"), GetThreadId(GetCurrentThread()));
+	}
+
+	DWORD WINAPI ThreadAccesser(LPVOID lpParameter) {
+		reinterpret_cast<unsigned int*>(lpParameter)[0] = 4;
+		return 0;
+	}
+
+	DWORD WINAPI ThreadAccesserLoop(LPVOID lpParameter) {
+		while ((rand() % 10000) != 9999) {
+			//for (unsigned int i = 0; i < 1'000'000; ++i) {
+			//	_mm_pause();
+			//}
+
+			reinterpret_cast<unsigned int*>(lpParameter)[0] = 4;
+		}
+
+		return 0;
+	}
+
+	DWORD WINAPI ThreadAccesser2(LPVOID lpParameter) {
+		reinterpret_cast<unsigned int*>(lpParameter)[0] = 0xDEEDBEEF;
+		reinterpret_cast<unsigned int*>(lpParameter)[1] = 0xDEEDFACE;
+		reinterpret_cast<unsigned int*>(lpParameter)[2] = 0xFACE;
+		return 0;
+	}
+
+	DWORD WINAPI ThreadAccesser2Loop(LPVOID lpParameter) {
+		while ((rand() % 10000) != 9999) {
+			//for (unsigned int i = 0; i < 1'000'000; ++i) {
+			//	_mm_pause();
+			//}
+
+			reinterpret_cast<unsigned int*>(lpParameter)[0] = 0xDEEDBEEF;
+			reinterpret_cast<unsigned int*>(lpParameter)[1] = 0xDEEDFACE;
+			reinterpret_cast<unsigned int*>(lpParameter)[2] = 0xFACE;
+		}
+
+		return 0;
 	}
 
 	void MemoryHook(const PCONTEXT pCTX, const void* pExceptionAddress, Detours::Hook::MEMORY_HOOK_OPERATION unOperation, const void* pHookAddress, const void* pAccessAddress) {
@@ -1574,7 +1612,7 @@ TEST_SUITE("Detours::Hook") {
 		UNREFERENCED_PARAMETER(pHookAddress);
 		UNREFERENCED_PARAMETER(pAccessAddress);
 
-		_tprintf_s(_T("Mem access!\n"));
+		_tprintf_s(_T("Mem access! TID=%lu\n"), GetThreadId(GetCurrentThread()));
 	}
 
 	bool InterruptHook(const PCONTEXT pCTX, const unsigned char unInterrupt) {
@@ -1738,16 +1776,80 @@ TEST_SUITE("Detours::Hook") {
 			1, 2, 3, 4, 5
 		};
 
+		printf("pArray[2] = %i\n", pArray[2]);
 		printf("pArray[3] = %i\n", pArray[3]);
+		printf("pArray[4] = %i\n", pArray[4]);
 
 		DWORD unCurrentTID = GetCurrentThreadId();
-		CHECK(Detours::Hook::HookHardware(HardwareHook, unCurrentTID, &reinterpret_cast<unsigned int*>(pArray)[3], Detours::Hook::HARDWARE_HOOK_REGISTER::REGISTER_DR1, Detours::Hook::HARDWARE_HOOK_TYPE::TYPE_ACCESS, 4) == true);
+		CHECK(Detours::Hook::HookHardware(HardwareHook, unCurrentTID, &reinterpret_cast<unsigned int*>(pArray)[3], Detours::Hook::HARDWARE_HOOK_REGISTER::REGISTER_DR0, Detours::Hook::HARDWARE_HOOK_TYPE::TYPE_ACCESS, 4) == true);
 
+		DWORD unTID = 0;
+		HANDLE hThread = CreateThread(nullptr, NULL, ThreadAccesser, &reinterpret_cast<unsigned int*>(pArray)[3], CREATE_SUSPENDED, &unTID);
+		CHECK(hThread != nullptr);
+		CHECK(hThread != INVALID_HANDLE_VALUE);
+		CHECK(Detours::Hook::HookHardware(HardwareHook, unTID, &reinterpret_cast<unsigned int*>(pArray)[3], Detours::Hook::HARDWARE_HOOK_REGISTER::REGISTER_DR0, Detours::Hook::HARDWARE_HOOK_TYPE::TYPE_ACCESS, 4) == true);
+
+		printf("pArray[2] = %i\n", pArray[2]);
 		printf("pArray[3] = %i\n", pArray[3]);
+		printf("pArray[4] = %i\n", pArray[4]);
 
+		ResumeThread(hThread);
+
+		WaitForSingleObject(hThread, INFINITE);
+
+		CloseHandle(hThread);
+
+		CHECK(Detours::Hook::UnHookHardware(HardwareHook, unTID) == true);
 		CHECK(Detours::Hook::UnHookHardware(HardwareHook, unCurrentTID) == true);
 
+		printf("pArray[2] = %i\n", pArray[2]);
 		printf("pArray[3] = %i\n", pArray[3]);
+		printf("pArray[4] = %i\n", pArray[4]);
+	}
+
+	TEST_CASE("HardwareHook 2") {
+		static unsigned int pArray[] = {
+			1, 2, 3, 4, 5
+		};
+
+		printf("pArray[2] = %i\n", pArray[2]);
+		printf("pArray[3] = %i\n", pArray[3]);
+		printf("pArray[4] = %i\n", pArray[4]);
+
+		DWORD unCurrentTID = GetCurrentThreadId();
+		CHECK(Detours::Hook::HookHardware(HardwareHook, unCurrentTID, &reinterpret_cast<unsigned int*>(pArray)[3], Detours::Hook::HARDWARE_HOOK_REGISTER::REGISTER_DR0, Detours::Hook::HARDWARE_HOOK_TYPE::TYPE_ACCESS, 4) == true);
+
+		DWORD unTID1 = 0;
+		HANDLE hThread1 = CreateThread(nullptr, NULL, ThreadAccesserLoop, &reinterpret_cast<unsigned int*>(pArray)[3], CREATE_SUSPENDED, &unTID1);
+		DWORD unTID2 = 0;
+		HANDLE hThread2 = CreateThread(nullptr, NULL, ThreadAccesserLoop, &reinterpret_cast<unsigned int*>(pArray)[3], CREATE_SUSPENDED, &unTID2);
+		CHECK(hThread1 != nullptr);
+		CHECK(hThread1 != INVALID_HANDLE_VALUE);
+		CHECK(hThread2 != nullptr);
+		CHECK(hThread2 != INVALID_HANDLE_VALUE);
+		CHECK(Detours::Hook::HookHardware(HardwareHook, unTID1, &reinterpret_cast<unsigned int*>(pArray)[3], Detours::Hook::HARDWARE_HOOK_REGISTER::REGISTER_DR0, Detours::Hook::HARDWARE_HOOK_TYPE::TYPE_ACCESS, 4) == true);
+		CHECK(Detours::Hook::HookHardware(HardwareHook, unTID2, &reinterpret_cast<unsigned int*>(pArray)[3], Detours::Hook::HARDWARE_HOOK_REGISTER::REGISTER_DR0, Detours::Hook::HARDWARE_HOOK_TYPE::TYPE_ACCESS, 4) == true);
+
+		printf("pArray[2] = %i\n", pArray[2]);
+		printf("pArray[3] = %i\n", pArray[3]);
+		printf("pArray[4] = %i\n", pArray[4]);
+
+		ResumeThread(hThread1);
+		ResumeThread(hThread2);
+
+		WaitForSingleObject(hThread1, INFINITE);
+		WaitForSingleObject(hThread2, INFINITE);
+
+		CloseHandle(hThread1);
+		CloseHandle(hThread2);
+
+		CHECK(Detours::Hook::UnHookHardware(HardwareHook, unTID2) == true);
+		CHECK(Detours::Hook::UnHookHardware(HardwareHook, unTID1) == true);
+		CHECK(Detours::Hook::UnHookHardware(HardwareHook, unCurrentTID) == true);
+
+		printf("pArray[2] = %i\n", pArray[2]);
+		printf("pArray[3] = %i\n", pArray[3]);
+		printf("pArray[4] = %i\n", pArray[4]);
 	}
 
 	TEST_CASE("MemoryHook 1") {
@@ -1757,11 +1859,57 @@ TEST_SUITE("Detours::Hook") {
 
 		int* pArray = reinterpret_cast<int*>(pAddress);
 
+		HANDLE hThread = CreateThread(nullptr, NULL, ThreadAccesser2, pArray, CREATE_SUSPENDED, nullptr);
+		CHECK(hThread != nullptr);
+		CHECK(hThread != INVALID_HANDLE_VALUE);
+
 		CHECK(Detours::Hook::HookMemory(MemoryHook, pArray, sizeof(int) * 3) == true);
 
 		pArray[0] = 0xDEEDBEEF;
 		pArray[1] = 0xDEEDFACE;
 		pArray[2] = 0xFACE;
+
+		ResumeThread(hThread);
+
+		WaitForSingleObject(hThread, INFINITE);
+
+		CloseHandle(hThread);
+
+		CHECK(pArray[0] == 0xDEEDBEEF);
+		CHECK(pArray[1] == 0xDEEDFACE);
+		CHECK(pArray[2] == 0xFACE);
+
+		CHECK(Detours::Hook::UnHookMemory(MemoryHook, pArray) == true);
+	}
+
+	TEST_CASE("MemoryHook 2") {
+		Detours::Memory::Page Page(nullptr);
+		CHECK(Page.GetPageAddress() != nullptr);
+		void* pAddress = Page.Alloc(sizeof(int) * 3);
+
+		int* pArray = reinterpret_cast<int*>(pAddress);
+
+		HANDLE hThread1 = CreateThread(nullptr, NULL, ThreadAccesser2Loop, pArray, CREATE_SUSPENDED, nullptr);
+		HANDLE hThread2 = CreateThread(nullptr, NULL, ThreadAccesser2Loop, pArray, CREATE_SUSPENDED, nullptr);
+		CHECK(hThread1 != nullptr);
+		CHECK(hThread1 != INVALID_HANDLE_VALUE);
+		CHECK(hThread2 != nullptr);
+		CHECK(hThread2 != INVALID_HANDLE_VALUE);
+
+		CHECK(Detours::Hook::HookMemory(MemoryHook, pArray, sizeof(int) * 3) == true);
+
+		pArray[0] = 0xDEEDBEEF;
+		pArray[1] = 0xDEEDFACE;
+		pArray[2] = 0xFACE;
+
+		ResumeThread(hThread1);
+		ResumeThread(hThread2);
+
+		WaitForSingleObject(hThread1, INFINITE);
+		WaitForSingleObject(hThread2, INFINITE);
+
+		CloseHandle(hThread1);
+		CloseHandle(hThread2);
 
 		CHECK(pArray[0] == 0xDEEDBEEF);
 		CHECK(pArray[1] == 0xDEEDFACE);
