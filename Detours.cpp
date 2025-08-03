@@ -84496,7 +84496,7 @@ namespace Detours {
 		// ----------------------------------------------------------------
 
 		bool HookHardware(const fnHardwareHookCallBack pCallBack, DWORD unThreadID, void* pAddress, HARDWARE_HOOK_REGISTER unRegister, HARDWARE_HOOK_TYPE unType, unsigned char unSize) {
-			if (!unThreadID || !pCallBack || !pAddress || !unSize) {
+			if (!pCallBack || !unThreadID || !pAddress || !unSize) {
 				return false;
 			}
 
@@ -84505,7 +84505,7 @@ namespace Detours {
 			}
 
 			for (auto& Record : g_HardwareHookRecords) {
-				if (Record->m_pCallBack == pCallBack) {
+				if ((Record->m_pCallBack == pCallBack) && (Record->m_unThreadID == unThreadID)) {
 					return false;
 				}
 			}
@@ -84670,7 +84670,7 @@ namespace Detours {
 		}
 
 		bool UnHookHardware(const fnHardwareHookCallBack pCallBack, DWORD unThreadID) {
-			if (!unThreadID || !pCallBack) {
+			if (!pCallBack || !unThreadID) {
 				return false;
 			}
 
