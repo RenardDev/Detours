@@ -1566,7 +1566,7 @@ TEST_SUITE("Detours::Hook") {
 
 		_tprintf_s(_T("Mem access! TID=%lu\n"), GetCurrentThreadId());
 
-		Detours::Hook::UnHookHardware(HardwareSelfUnHook, GetCurrentThreadId(), Detours::Hook::HARDWARE_HOOK_REGISTER::REGISTER_DR0);
+		Detours::Hook::UnHookHardware(GetCurrentThreadId(), Detours::Hook::HARDWARE_HOOK_REGISTER::REGISTER_DR0);
 	}
 
 	DWORD WINAPI ThreadAccesser(LPVOID lpParameter) {
@@ -1795,13 +1795,13 @@ TEST_SUITE("Detours::Hook") {
 		printf("pArray[4] = %i\n", pArray[4]);
 
 		DWORD unCurrentTID = GetCurrentThreadId();
-		CHECK(Detours::Hook::HookHardware(HardwareHook, unCurrentTID, Detours::Hook::HARDWARE_HOOK_REGISTER::REGISTER_DR0, &reinterpret_cast<unsigned int*>(pArray)[3], Detours::Hook::HARDWARE_HOOK_TYPE::TYPE_ACCESS, 4) == true);
+		CHECK(Detours::Hook::HookHardware(unCurrentTID, Detours::Hook::HARDWARE_HOOK_REGISTER::REGISTER_DR0, HardwareHook, &reinterpret_cast<unsigned int*>(pArray)[3], Detours::Hook::HARDWARE_HOOK_TYPE::TYPE_ACCESS, 4) == true);
 
 		DWORD unTID = 0;
 		HANDLE hThread = CreateThread(nullptr, NULL, ThreadAccesser, &reinterpret_cast<unsigned int*>(pArray)[3], CREATE_SUSPENDED, &unTID);
 		CHECK(hThread != nullptr);
 		CHECK(hThread != INVALID_HANDLE_VALUE);
-		CHECK(Detours::Hook::HookHardware(HardwareHook, unTID, Detours::Hook::HARDWARE_HOOK_REGISTER::REGISTER_DR0, &reinterpret_cast<unsigned int*>(pArray)[3], Detours::Hook::HARDWARE_HOOK_TYPE::TYPE_ACCESS, 4) == true);
+		CHECK(Detours::Hook::HookHardware(unTID, Detours::Hook::HARDWARE_HOOK_REGISTER::REGISTER_DR0, HardwareHook, &reinterpret_cast<unsigned int*>(pArray)[3], Detours::Hook::HARDWARE_HOOK_TYPE::TYPE_ACCESS, 4) == true);
 
 		printf("pArray[2] = %i\n", pArray[2]);
 		printf("pArray[3] = %i\n", pArray[3]);
@@ -1813,8 +1813,8 @@ TEST_SUITE("Detours::Hook") {
 
 		CloseHandle(hThread);
 
-		CHECK(Detours::Hook::UnHookHardware(HardwareHook, unTID, Detours::Hook::HARDWARE_HOOK_REGISTER::REGISTER_DR0) == true);
-		CHECK(Detours::Hook::UnHookHardware(HardwareHook, unCurrentTID, Detours::Hook::HARDWARE_HOOK_REGISTER::REGISTER_DR0) == true);
+		CHECK(Detours::Hook::UnHookHardware(unTID, Detours::Hook::HARDWARE_HOOK_REGISTER::REGISTER_DR0) == true);
+		CHECK(Detours::Hook::UnHookHardware(unCurrentTID, Detours::Hook::HARDWARE_HOOK_REGISTER::REGISTER_DR0) == true);
 
 		printf("pArray[2] = %i\n", pArray[2]);
 		printf("pArray[3] = %i\n", pArray[3]);
@@ -1831,7 +1831,7 @@ TEST_SUITE("Detours::Hook") {
 		printf("pArray[4] = %i\n", pArray[4]);
 
 		DWORD unCurrentTID = GetCurrentThreadId();
-		CHECK(Detours::Hook::HookHardware(HardwareHook, unCurrentTID, Detours::Hook::HARDWARE_HOOK_REGISTER::REGISTER_DR0, &reinterpret_cast<unsigned int*>(pArray)[3], Detours::Hook::HARDWARE_HOOK_TYPE::TYPE_ACCESS, 4) == true);
+		CHECK(Detours::Hook::HookHardware(unCurrentTID, Detours::Hook::HARDWARE_HOOK_REGISTER::REGISTER_DR0, HardwareHook, &reinterpret_cast<unsigned int*>(pArray)[3], Detours::Hook::HARDWARE_HOOK_TYPE::TYPE_ACCESS, 4) == true);
 
 		DWORD unTID1 = 0;
 		HANDLE hThread1 = CreateThread(nullptr, NULL, ThreadAccesserLoop, &reinterpret_cast<unsigned int*>(pArray)[3], CREATE_SUSPENDED, &unTID1);
@@ -1841,8 +1841,8 @@ TEST_SUITE("Detours::Hook") {
 		CHECK(hThread1 != INVALID_HANDLE_VALUE);
 		CHECK(hThread2 != nullptr);
 		CHECK(hThread2 != INVALID_HANDLE_VALUE);
-		CHECK(Detours::Hook::HookHardware(HardwareHook, unTID1, Detours::Hook::HARDWARE_HOOK_REGISTER::REGISTER_DR0, &reinterpret_cast<unsigned int*>(pArray)[3], Detours::Hook::HARDWARE_HOOK_TYPE::TYPE_ACCESS, 4) == true);
-		CHECK(Detours::Hook::HookHardware(HardwareHook, unTID2, Detours::Hook::HARDWARE_HOOK_REGISTER::REGISTER_DR0, &reinterpret_cast<unsigned int*>(pArray)[3], Detours::Hook::HARDWARE_HOOK_TYPE::TYPE_ACCESS, 4) == true);
+		CHECK(Detours::Hook::HookHardware(unTID1, Detours::Hook::HARDWARE_HOOK_REGISTER::REGISTER_DR0, HardwareHook , &reinterpret_cast<unsigned int*>(pArray)[3], Detours::Hook::HARDWARE_HOOK_TYPE::TYPE_ACCESS, 4) == true);
+		CHECK(Detours::Hook::HookHardware(unTID2, Detours::Hook::HARDWARE_HOOK_REGISTER::REGISTER_DR0, HardwareHook, &reinterpret_cast<unsigned int*>(pArray)[3], Detours::Hook::HARDWARE_HOOK_TYPE::TYPE_ACCESS, 4) == true);
 
 		printf("pArray[2] = %i\n", pArray[2]);
 		printf("pArray[3] = %i\n", pArray[3]);
@@ -1857,9 +1857,9 @@ TEST_SUITE("Detours::Hook") {
 		CloseHandle(hThread1);
 		CloseHandle(hThread2);
 
-		CHECK(Detours::Hook::UnHookHardware(HardwareHook, unTID2, Detours::Hook::HARDWARE_HOOK_REGISTER::REGISTER_DR0) == true);
-		CHECK(Detours::Hook::UnHookHardware(HardwareHook, unTID1, Detours::Hook::HARDWARE_HOOK_REGISTER::REGISTER_DR0) == true);
-		CHECK(Detours::Hook::UnHookHardware(HardwareHook, unCurrentTID, Detours::Hook::HARDWARE_HOOK_REGISTER::REGISTER_DR0) == true);
+		CHECK(Detours::Hook::UnHookHardware(unTID2, Detours::Hook::HARDWARE_HOOK_REGISTER::REGISTER_DR0) == true);
+		CHECK(Detours::Hook::UnHookHardware(unTID1, Detours::Hook::HARDWARE_HOOK_REGISTER::REGISTER_DR0) == true);
+		CHECK(Detours::Hook::UnHookHardware(unCurrentTID, Detours::Hook::HARDWARE_HOOK_REGISTER::REGISTER_DR0) == true);
 
 		printf("pArray[2] = %i\n", pArray[2]);
 		printf("pArray[3] = %i\n", pArray[3]);
@@ -1876,7 +1876,7 @@ TEST_SUITE("Detours::Hook") {
 		printf("pArray[4] = %i\n", pArray[4]);
 
 		DWORD unCurrentTID = GetCurrentThreadId();
-		CHECK(Detours::Hook::HookHardware(HardwareSelfUnHook, unCurrentTID, Detours::Hook::HARDWARE_HOOK_REGISTER::REGISTER_DR0, &reinterpret_cast<unsigned int*>(pArray)[3], Detours::Hook::HARDWARE_HOOK_TYPE::TYPE_ACCESS, 4) == true);
+		CHECK(Detours::Hook::HookHardware(unCurrentTID, Detours::Hook::HARDWARE_HOOK_REGISTER::REGISTER_DR0, HardwareSelfUnHook, &reinterpret_cast<unsigned int*>(pArray)[3], Detours::Hook::HARDWARE_HOOK_TYPE::TYPE_ACCESS, 4) == true);
 
 		printf("pArray[2] = %i\n", pArray[2]);
 		printf("pArray[3] = %i\n", pArray[3]);

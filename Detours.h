@@ -5591,8 +5591,8 @@ namespace Detours {
 		// Hardware Hook
 		// ----------------------------------------------------------------
 
-		bool HookHardware(const fnHardwareHookCallBack pCallBack, DWORD unThreadID, HARDWARE_HOOK_REGISTER unRegister, void* pAddress, HARDWARE_HOOK_TYPE unType, unsigned char unSize = 1);
-		bool UnHookHardware(const fnHardwareHookCallBack pCallBack, DWORD unThreadID, HARDWARE_HOOK_REGISTER unRegister);
+		bool HookHardware(DWORD unThreadID, HARDWARE_HOOK_REGISTER unRegister, const fnHardwareHookCallBack pCallBack, void* pAddress, HARDWARE_HOOK_TYPE unType, unsigned char unSize = 1);
+		bool UnHookHardware(DWORD unThreadID, HARDWARE_HOOK_REGISTER unRegister);
 
 		// ----------------------------------------------------------------
 		// Memory Hook Operation
