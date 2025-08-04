@@ -7372,7 +7372,7 @@ namespace Detours {
 					}
 
 					auto tit = pRecord->m_ThreadStates.find(unCurrentTID);
-					if (tit != pRecord->m_ThreadStates.end() && tit->second.m_bPendingRestore) {
+					if ((tit != pRecord->m_ThreadStates.end()) && tit->second.m_bPendingRestore) {
 						if (!pRecord->m_bPendingDeletion) {
 							for (const auto& pPage : pRecord->m_Pages) {
 								if (pPage && !pPage->ChangeProtection(PAGE_NOACCESS)) {
