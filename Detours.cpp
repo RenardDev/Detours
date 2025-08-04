@@ -159,26 +159,22 @@ namespace Detours {
 		_HARDWARE_HOOK_RECORD() {
 			m_pCallBack = nullptr;
 			m_unThreadID = 0;
-			m_pAddress = nullptr;
 			m_unRegister = HARDWARE_HOOK_REGISTER::REGISTER_DR0;
+			m_pAddress = nullptr;
 			m_unType = HARDWARE_HOOK_TYPE::TYPE_EXECUTE;
 			m_unSize = 0;
 			m_bPendingRestore = false;
-			m_unOriginalDR7 = 0;
+			m_bPendingDeletion = false;
 		}
 
 		fnHardwareHookCallBack m_pCallBack;
 		DWORD m_unThreadID;
-		void* m_pAddress;
 		HARDWARE_HOOK_REGISTER m_unRegister;
+		void* m_pAddress;
 		HARDWARE_HOOK_TYPE m_unType;
 		unsigned char m_unSize;
 		bool m_bPendingRestore;
-#ifdef _M_X64
-		DWORD64 m_unOriginalDR7;
-#elif _M_IX86
-		DWORD m_unOriginalDR7;
-#endif
+		bool m_bPendingDeletion;
 	} HARDWARE_HOOK_RECORD, *PHARDWARE_HOOK_RECORD;
 
 	// ----------------------------------------------------------------
@@ -190,16 +186,21 @@ namespace Detours {
 			m_pCallBack = nullptr;
 			m_pAddress = nullptr;
 			m_unSize = 0;
-			m_bPendingRestore = false;
-			m_unThreadID = 0;
+			m_bPendingDeletion = false;
 		}
 
 		fnMemoryHookCallBack m_pCallBack;
 		void* m_pAddress;
 		size_t m_unSize;
 		std::deque<std::unique_ptr<Page>> m_Pages;
-		bool m_bPendingRestore;
-		DWORD m_unThreadID;
+		bool m_bPendingDeletion;
+
+		struct THREAD_RESTORE_INFO {
+			bool m_bPendingRestore;
+			DWORD m_unThreadID;
+		};
+
+		std::unordered_map<DWORD, THREAD_RESTORE_INFO> m_ThreadStates;
 	} MEMORY_HOOK_RECORD, *PMEMORY_HOOK_RECORD;
 	
 	// ----------------------------------------------------------------
@@ -7168,7 +7169,44 @@ namespace Detours {
 							break;
 					}
 
-					pCTX->Dr7 = (*it)->m_unOriginalDR7;
+					if ((*it)->m_bPendingDeletion) {
+						g_HardwareHookRecords.erase(it);
+						return true;
+					}
+
+					unsigned char unTypeValue = 0;
+					switch ((*it)->m_unType) {
+						case HARDWARE_HOOK_TYPE::TYPE_EXECUTE:
+							unTypeValue = 0;
+							break;
+
+						case HARDWARE_HOOK_TYPE::TYPE_WRITE:
+							unTypeValue = 1;
+							break;
+
+						case HARDWARE_HOOK_TYPE::TYPE_IO:
+							unTypeValue = 2;
+							break;
+
+						case HARDWARE_HOOK_TYPE::TYPE_ACCESS:
+							unTypeValue = 3;
+							break;
+					}
+
+					unsigned char unSizeValue = 0;
+					switch ((*it)->m_unSize) {
+						case 1:
+							unSizeValue = 0;
+							break;
+
+						case 2:
+							unSizeValue = 1;
+							break;
+
+						case 4:
+							unSizeValue = 3;
+							break;
+					}
 
 					switch ((*it)->m_unRegister) {
 						case HARDWARE_HOOK_REGISTER::REGISTER_DR0:
@@ -7177,6 +7215,9 @@ namespace Detours {
 #elif _M_IX86
 							pCTX->Dr0 = reinterpret_cast<DWORD>((*it)->m_pAddress);
 #endif
+							DR7.m_unL0 = 1;
+							DR7.m_unRW0 = unTypeValue;
+							DR7.m_unLEN0 = unSizeValue;
 							break;
 
 						case HARDWARE_HOOK_REGISTER::REGISTER_DR1:
@@ -7185,6 +7226,9 @@ namespace Detours {
 #elif _M_IX86
 							pCTX->Dr1 = reinterpret_cast<DWORD>((*it)->m_pAddress);
 #endif
+							DR7.m_unL1 = 1;
+							DR7.m_unRW1 = unTypeValue;
+							DR7.m_unLEN1 = unSizeValue;
 							break;
 
 						case HARDWARE_HOOK_REGISTER::REGISTER_DR2:
@@ -7193,6 +7237,9 @@ namespace Detours {
 #elif _M_IX86
 							pCTX->Dr2 = reinterpret_cast<DWORD>((*it)->m_pAddress);
 #endif
+							DR7.m_unL2 = 1;
+							DR7.m_unRW2 = unTypeValue;
+							DR7.m_unLEN2 = unSizeValue;
 							break;
 
 						case HARDWARE_HOOK_REGISTER::REGISTER_DR3:
@@ -7201,21 +7248,9 @@ namespace Detours {
 #elif _M_IX86
 							pCTX->Dr3 = reinterpret_cast<DWORD>((*it)->m_pAddress);
 #endif
-							break;
-					}
-
-					switch ((*it)->m_unRegister) {
-						case HARDWARE_HOOK_REGISTER::REGISTER_DR0:
-							DR7.m_unL0 = 1;
-							break;
-						case HARDWARE_HOOK_REGISTER::REGISTER_DR1:
-							DR7.m_unL1 = 1;
-							break;
-						case HARDWARE_HOOK_REGISTER::REGISTER_DR2:
-							DR7.m_unL2 = 1;
-							break;
-						case HARDWARE_HOOK_REGISTER::REGISTER_DR3:
 							DR7.m_unL3 = 1;
+							DR7.m_unRW3 = unTypeValue;
+							DR7.m_unLEN3 = unSizeValue;
 							break;
 					}
 
@@ -7224,7 +7259,7 @@ namespace Detours {
 					return true;
 				} else {
 					if (!DR6.m_unB0 && !DR6.m_unB1 && !DR6.m_unB2 && !DR6.m_unB3) {
-						continue;
+						return false;
 					}
 
 					bool bMatch = false;
@@ -7281,40 +7316,28 @@ namespace Detours {
 					}
 
 					(*it)->m_bPendingRestore = true;
-					(*it)->m_unOriginalDR7 = pCTX->Dr7;
 
 					switch ((*it)->m_unRegister) {
 						case HARDWARE_HOOK_REGISTER::REGISTER_DR0:
 							DR6.m_unB0 = 0;
-							break;
-						case HARDWARE_HOOK_REGISTER::REGISTER_DR1:
-							DR6.m_unB1 = 0;
-							break;
-						case HARDWARE_HOOK_REGISTER::REGISTER_DR2:
-							DR6.m_unB2 = 0;
-							break;
-						case HARDWARE_HOOK_REGISTER::REGISTER_DR3:
-							DR6.m_unB3 = 0;
-							break;
-					}
-
-					switch ((*it)->m_unRegister) {
-						case HARDWARE_HOOK_REGISTER::REGISTER_DR0:
 							DR7.m_unL0 = 0;
 							DR7.m_unG0 = 0;
 							break;
 
 						case HARDWARE_HOOK_REGISTER::REGISTER_DR1:
+							DR6.m_unB1 = 0;
 							DR7.m_unL1 = 0;
 							DR7.m_unG1 = 0;
 							break;
 
 						case HARDWARE_HOOK_REGISTER::REGISTER_DR2:
+							DR6.m_unB2 = 0;
 							DR7.m_unL2 = 0;
 							DR7.m_unG2 = 0;
 							break;
 
 						case HARDWARE_HOOK_REGISTER::REGISTER_DR3:
+							DR6.m_unB3 = 0;
 							DR7.m_unL3 = 0;
 							DR7.m_unG3 = 0;
 							break;
@@ -7336,34 +7359,40 @@ namespace Detours {
 		// ----------------------------------------------------------------
 
 		static bool MemoryHookCallBack(const EXCEPTION_RECORD& Exception, const PCONTEXT pCTX) {
-
 			DWORD unCurrentTID = GetCurrentThreadId();
 			REGISTER_FLAGS& FLAGS = *reinterpret_cast<REGISTER_FLAGS*>(&pCTX->EFlags);
 
 			if (Exception.ExceptionCode == EXCEPTION_SINGLE_STEP) {
-				for (auto it = g_MemoryHookRecords.begin(); it != g_MemoryHookRecords.end(); ++it) {
+				auto it = g_MemoryHookRecords.begin();
+				while (it != g_MemoryHookRecords.end()) {
 					const auto& pRecord = *it;
 					if (!pRecord) {
+						++it;
 						continue;
 					}
 
-					if (pRecord->m_bPendingRestore && (pRecord->m_unThreadID == unCurrentTID)) {
-						for (auto& pPage : pRecord->m_Pages) {
-							if (!pPage->ChangeProtection(PAGE_NOACCESS)) {
-								return false;
+					auto tit = pRecord->m_ThreadStates.find(unCurrentTID);
+					if (tit != pRecord->m_ThreadStates.end() && tit->second.m_bPendingRestore) {
+						if (!pRecord->m_bPendingDeletion) {
+							for (const auto& pPage : pRecord->m_Pages) {
+								if (pPage && !pPage->ChangeProtection(PAGE_NOACCESS)) {
+									return false;
+								}
 							}
 						}
 
-						pRecord->m_bPendingRestore = false;
-						pRecord->m_unThreadID = 0;
+						pRecord->m_ThreadStates.erase(tit);
+					}
 
-						FLAGS.m_unTF = 0;
-
-						return true;
+					if (pRecord->m_bPendingDeletion) {
+						it = g_MemoryHookRecords.erase(it);
+					} else {
+						++it;
 					}
 				}
 
-				return false;
+				FLAGS.m_unTF = 0;
+				return true;
 			}
 
 			if (Exception.ExceptionCode != EXCEPTION_ACCESS_VIOLATION) {
@@ -7375,7 +7404,7 @@ namespace Detours {
 			}
 
 			const ULONG_PTR unAccessType = Exception.ExceptionInformation[0];
-			if ((unAccessType != 0) && (unAccessType != 1) && (unAccessType != 8)) { // READ, WRITE, EXECUTE (DEP)
+			if ((unAccessType != 0) && (unAccessType != 1) && (unAccessType != 8)) {
 				return false;
 			}
 
@@ -7388,39 +7417,51 @@ namespace Detours {
 
 			const void* pExceptionAddress = (unAccessType != 8) ? reinterpret_cast<void*>(Exception.ExceptionAddress) : nullptr;
 			const void* pAddress = reinterpret_cast<void*>(Exception.ExceptionInformation[1]);
+
 			if (!pAddress || (pAddress == reinterpret_cast<void*>(-1))) {
 				return false;
 			}
 
-			for (auto it = g_MemoryHookRecords.begin(); it != g_MemoryHookRecords.end(); ++it) {
-				const auto& pRecord = *it;
+			PMEMORY_HOOK_RECORD pTargetRecord = nullptr;
+			for (const auto& pRecord : g_MemoryHookRecords) {
 				if (!pRecord) {
 					continue;
 				}
 
-				if (pRecord->m_bPendingRestore) {
-					continue;
-				}
-
-				for (auto& Page : pRecord->m_Pages) {
-					if (!Page->RestoreProtection()) {
-						return false;
+				for (const auto& pPage : pRecord->m_Pages) {
+					if (pPage && __is_in_range(pPage->GetPageAddress(), pPage->GetPageCapacity(), pAddress)) {
+						pTargetRecord = pRecord.get();
+						break;
 					}
 				}
 
-				pRecord->m_bPendingRestore = true;
-				pRecord->m_unThreadID = GetCurrentThreadId();
-
-				FLAGS.m_unTF = 1;
-
-				if (__is_in_range(pRecord->m_pAddress, pRecord->m_unSize, pAddress)) {
-					pRecord->m_pCallBack(pCTX, pExceptionAddress, unOperation, pRecord->m_pAddress, pAddress);
+				if (pTargetRecord) {
+					break;
 				}
-
-				return true;
 			}
 
-			return false;
+			if (!pTargetRecord) {
+				return false;
+			}
+
+			auto& ti = pTargetRecord->m_ThreadStates[unCurrentTID];
+			ti.m_unThreadID = unCurrentTID;
+			ti.m_bPendingRestore = true;
+
+			for (const auto& pPage : pTargetRecord->m_Pages) {
+				if (pPage && !pPage->RestoreProtection()) {
+					pTargetRecord->m_ThreadStates.erase(unCurrentTID);
+					return false;
+				}
+			}
+
+			FLAGS.m_unTF = 1;
+
+			if (__is_in_range(pTargetRecord->m_pAddress, pTargetRecord->m_unSize, pAddress)) {
+				pTargetRecord->m_pCallBack(pCTX, pExceptionAddress, unOperation, pTargetRecord->m_pAddress, pAddress);
+			}
+
+			return true;
 		}
 
 		// ----------------------------------------------------------------
@@ -84495,37 +84536,50 @@ namespace Detours {
 		// Hardware Hook
 		// ----------------------------------------------------------------
 
-		bool HookHardware(const fnHardwareHookCallBack pCallBack, DWORD unThreadID, void* pAddress, HARDWARE_HOOK_REGISTER unRegister, HARDWARE_HOOK_TYPE unType, unsigned char unSize) {
+		bool HookHardware(const fnHardwareHookCallBack pCallBack, DWORD unThreadID, HARDWARE_HOOK_REGISTER unRegister, void* pAddress, HARDWARE_HOOK_TYPE unType, unsigned char unSize) {
+			if (!g_Suspender.Suspend()) {
+				return false;
+			}
+
 			if (!pCallBack || !unThreadID || !pAddress || !unSize) {
+				g_Suspender.Resume();
 				return false;
 			}
 
 			if ((unSize != 1) && (unSize != 2) && (unSize != 4)) {
+				g_Suspender.Resume();
 				return false;
 			}
 
-			for (auto& Record : g_HardwareHookRecords) {
-				if ((Record->m_pCallBack == pCallBack) && (Record->m_unThreadID == unThreadID)) {
+			for (auto& pRecord : g_HardwareHookRecords) {
+				if (pRecord->m_bPendingDeletion) {
+					continue;
+				}
+
+				if ((pRecord->m_pCallBack == pCallBack) && (pRecord->m_unThreadID == unThreadID) && (pRecord->m_unRegister == unRegister)) {
+					g_Suspender.Resume();
 					return false;
 				}
 			}
 
 			auto pRecord = std::make_unique<HARDWARE_HOOK_RECORD>();
 			if (!pRecord) {
+				g_Suspender.Resume();
 				return false;
 			}
 
 			pRecord->m_pCallBack = pCallBack;
 			pRecord->m_unThreadID = unThreadID;
-			pRecord->m_pAddress = pAddress;
 			pRecord->m_unRegister = unRegister;
+			pRecord->m_pAddress = pAddress;
 			pRecord->m_unType = unType;
 			pRecord->m_unSize = unSize;
 			pRecord->m_bPendingRestore = false;
-			pRecord->m_unOriginalDR7 = 0;
+			pRecord->m_bPendingDeletion = false;
 
 			HANDLE hThread = OpenThread(THREAD_GET_CONTEXT | THREAD_SET_CONTEXT, FALSE, unThreadID);
 			if (!hThread || (hThread == INVALID_HANDLE_VALUE)) {
+				g_Suspender.Resume();
 				return false;
 			}
 
@@ -84533,6 +84587,7 @@ namespace Detours {
 			ctx.ContextFlags = CONTEXT_DEBUG_REGISTERS;
 			if (!GetThreadContext(hThread, &ctx)) {
 				CloseHandle(hThread);
+				g_Suspender.Resume();
 				return false;
 			}
 
@@ -84580,12 +84635,15 @@ namespace Detours {
 				case HARDWARE_HOOK_TYPE::TYPE_EXECUTE:
 					unTypeValue = 0;
 					break;
+
 				case HARDWARE_HOOK_TYPE::TYPE_WRITE:
 					unTypeValue = 1;
 					break;
+
 				case HARDWARE_HOOK_TYPE::TYPE_IO:
 					unTypeValue = 2;
 					break;
+
 				case HARDWARE_HOOK_TYPE::TYPE_ACCESS:
 					unTypeValue = 3;
 					break;
@@ -84596,9 +84654,12 @@ namespace Detours {
 				case 1:
 					unSizeValue = 0;
 					break;
+
 				case 2:
+
 					unSizeValue = 1;
 					break;
+
 				case 4:
 					unSizeValue = 3;
 					break;
@@ -84660,90 +84721,112 @@ namespace Detours {
 
 			if (!SetThreadContext(hThread, &ctx)) {
 				CloseHandle(hThread);
+				g_Suspender.Resume();
 				return false;
 			}
 
 			g_HardwareHookRecords.emplace_back(std::move(pRecord));
 
 			CloseHandle(hThread);
+			g_Suspender.Resume();
 			return true;
 		}
 
-		bool UnHookHardware(const fnHardwareHookCallBack pCallBack, DWORD unThreadID) {
+		bool UnHookHardware(const fnHardwareHookCallBack pCallBack, DWORD unThreadID, HARDWARE_HOOK_REGISTER unRegister) {
+			if (!g_Suspender.Suspend()) {
+				return false;
+			}
+
 			if (!pCallBack || !unThreadID) {
+				g_Suspender.Resume();
 				return false;
 			}
 
 			for (auto it = g_HardwareHookRecords.begin(); it != g_HardwareHookRecords.end(); ++it) {
-				if (((*it)->m_pCallBack == pCallBack) && ((*it)->m_unThreadID == unThreadID)) {
+				if ((*it)->m_bPendingDeletion) {
+					continue;
+				}
+
+				if (((*it)->m_pCallBack == pCallBack) && ((*it)->m_unThreadID == unThreadID) && ((*it)->m_unRegister == unRegister)) {
 					HANDLE hThread = OpenThread(THREAD_GET_CONTEXT | THREAD_SET_CONTEXT, FALSE, unThreadID);
-					if (hThread && (hThread != INVALID_HANDLE_VALUE)) {
-						CONTEXT ctx = { 0 };
-						ctx.ContextFlags = CONTEXT_DEBUG_REGISTERS;
-
-						if (GetThreadContext(hThread, &ctx)) {
-							unsigned char unDRIndex = 0;
-							switch ((*it)->m_unRegister) {
-								case HARDWARE_HOOK_REGISTER::REGISTER_DR0:
-									ctx.Dr0 = 0;
-									unDRIndex = 0;
-									break;
-
-								case HARDWARE_HOOK_REGISTER::REGISTER_DR1:
-									ctx.Dr1 = 0;
-									unDRIndex = 1;
-									break;
-
-								case HARDWARE_HOOK_REGISTER::REGISTER_DR2:
-									ctx.Dr2 = 0;
-									unDRIndex = 2;
-									break;
-
-								case HARDWARE_HOOK_REGISTER::REGISTER_DR3:
-									ctx.Dr3 = 0;
-									unDRIndex = 3;
-									break;
-							}
-
-							REGISTER_DR7& DR7 = *reinterpret_cast<REGISTER_DR7*>(&ctx.Dr7);
-
-							switch (unDRIndex) {
-								case 0:
-									DR7.m_unL0 = 0;
-									DR7.m_unRW0 = 0;
-									DR7.m_unLEN0 = 0;
-									break;
-
-								case 1:
-									DR7.m_unL1 = 0;
-									DR7.m_unRW1 = 0;
-									DR7.m_unLEN1 = 0;
-									break;
-
-								case 2:
-									DR7.m_unL2 = 0;
-									DR7.m_unRW2 = 0;
-									DR7.m_unLEN2 = 0;
-									break;
-
-								case 3:
-									DR7.m_unL3 = 0;
-									DR7.m_unRW3 = 0;
-									DR7.m_unLEN3 = 0;
-									break;
-							}
-
-							SetThreadContext(hThread, &ctx);
-						}
-
-						CloseHandle(hThread);
+					if (!hThread) {
+						g_Suspender.Resume();
+						return true;
 					}
 
-					g_HardwareHookRecords.erase(it);
+					if (hThread == INVALID_HANDLE_VALUE) {
+						g_Suspender.Resume();
+						return false;
+					}
+
+					CONTEXT ctx = { 0 };
+					ctx.ContextFlags = CONTEXT_DEBUG_REGISTERS;
+
+					if (GetThreadContext(hThread, &ctx)) {
+						unsigned char unDRIndex = 0;
+						switch ((*it)->m_unRegister) {
+							case HARDWARE_HOOK_REGISTER::REGISTER_DR0:
+								ctx.Dr0 = 0;
+								unDRIndex = 0;
+								break;
+
+							case HARDWARE_HOOK_REGISTER::REGISTER_DR1:
+								ctx.Dr1 = 0;
+								unDRIndex = 1;
+								break;
+
+							case HARDWARE_HOOK_REGISTER::REGISTER_DR2:
+								ctx.Dr2 = 0;
+								unDRIndex = 2;
+								break;
+
+							case HARDWARE_HOOK_REGISTER::REGISTER_DR3:
+								ctx.Dr3 = 0;
+								unDRIndex = 3;
+								break;
+						}
+
+						REGISTER_DR7& DR7 = *reinterpret_cast<REGISTER_DR7*>(&ctx.Dr7);
+
+						switch (unDRIndex) {
+							case 0:
+								DR7.m_unL0 = 0;
+								DR7.m_unRW0 = 0;
+								DR7.m_unLEN0 = 0;
+								break;
+
+							case 1:
+								DR7.m_unL1 = 0;
+								DR7.m_unRW1 = 0;
+								DR7.m_unLEN1 = 0;
+								break;
+
+							case 2:
+								DR7.m_unL2 = 0;
+								DR7.m_unRW2 = 0;
+								DR7.m_unLEN2 = 0;
+								break;
+
+							case 3:
+								DR7.m_unL3 = 0;
+								DR7.m_unRW3 = 0;
+								DR7.m_unLEN3 = 0;
+								break;
+						}
+
+						SetThreadContext(hThread, &ctx);
+					}
+
+					CloseHandle(hThread);
+
+					(*it)->m_bPendingDeletion = true;
+
+					g_Suspender.Resume();
 					return true;
 				}
 			}
 
+			g_Suspender.Resume();
 			return false;
 		}
 
@@ -84752,18 +84835,25 @@ namespace Detours {
 		// ----------------------------------------------------------------
 
 		bool HookMemory(const fnMemoryHookCallBack pCallBack, void* pAddress, size_t unSize) {
+			if (!g_Suspender.Suspend()) {
+				return false;
+			}
+
 			if (!pCallBack || !pAddress || !unSize) {
+				g_Suspender.Resume();
 				return false;
 			}
 
 			for (auto& Record : g_MemoryHookRecords) {
 				if (Record->m_pCallBack == pCallBack) {
+					g_Suspender.Resume();
 					return false;
 				}
 			}
 
 			auto vecPages = __get_pages_info(pAddress, unSize, true);
 			if (vecPages.empty()) {
+				g_Suspender.Resume();
 				return false;
 			}
 
@@ -84780,27 +84870,29 @@ namespace Detours {
 			}
 
 			if (bIsVirtualAddress) {
+				g_Suspender.Resume();
 				return false;
 			}
 
 			auto pRecord = std::make_unique<MEMORY_HOOK_RECORD>();
 			if (!pRecord) {
+				g_Suspender.Resume();
 				return false;
 			}
 
 			pRecord->m_pCallBack = pCallBack;
 			pRecord->m_pAddress = pAddress;
 			pRecord->m_unSize = unSize;
-			pRecord->m_bPendingRestore = false;
-			pRecord->m_unThreadID = 0;
 
 			for (auto& PageInfo : vecPages) {
 				auto pPage = std::make_unique<Page>(PageInfo.m_pBaseAddress, false);
 				if (!pPage) {
+					g_Suspender.Resume();
 					return false;
 				}
 
 				if (!pPage->ChangeProtection(PAGE_NOACCESS)) {
+					g_Suspender.Resume();
 					return false;
 				}
 
@@ -84808,27 +84900,42 @@ namespace Detours {
 			}
 
 			g_MemoryHookRecords.emplace_back(std::move(pRecord));
+
+			g_Suspender.Resume();
 			return true;
 		}
 
-		bool UnHookMemory(const fnMemoryHookCallBack pCallBack, void* pAddress) {
+		bool UnHookMemory(const fnMemoryHookCallBack pCallBack) {
+			if (!g_Suspender.Suspend()) {
+				return false;
+			}
+
 			if (!pCallBack) {
+				g_Suspender.Resume();
 				return false;
 			}
 
 			for (auto it = g_MemoryHookRecords.begin(); it != g_MemoryHookRecords.end(); ++it) {
-				if (((*it)->m_pCallBack == pCallBack) && ((*it)->m_pAddress == pAddress)) {
+				if ((*it)->m_pCallBack == pCallBack) {
+					if ((*it)->m_bPendingDeletion) {
+						continue;
+					}
+
 					for (auto& pPage : (*it)->m_Pages) {
 						if (!pPage->RestoreProtection()) {
+							g_Suspender.Resume();
 							return false;
 						}
 					}
 
-					g_MemoryHookRecords.erase(it);
+					(*it)->m_bPendingDeletion = true;
+
+					g_Suspender.Resume();
 					return true;
 				}
 			}
 
+			g_Suspender.Resume();
 			return false;
 		}
 
