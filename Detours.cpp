@@ -84844,8 +84844,12 @@ namespace Detours {
 				return false;
 			}
 
-			for (auto& Record : g_MemoryHookRecords) {
-				if (Record->m_pCallBack == pCallBack) {
+			for (auto& pRecord : g_MemoryHookRecords) {
+				if (pRecord->m_bPendingDeletion) {
+					continue;
+				}
+
+				if (pRecord->m_pCallBack == pCallBack) {
 					g_Suspender.Resume();
 					return false;
 				}
