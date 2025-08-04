@@ -1558,7 +1558,15 @@ TEST_SUITE("Detours::Hook") {
 	void HardwareHook(const PCONTEXT pCTX) {
 		UNREFERENCED_PARAMETER(pCTX);
 
-		_tprintf_s(_T("Mem access! TID=%lu\n"), GetThreadId(GetCurrentThread()));
+		_tprintf_s(_T("Mem access! TID=%lu\n"), GetCurrentThreadId());
+	}
+
+	void HardwareSelfUnHook(const PCONTEXT pCTX) {
+		UNREFERENCED_PARAMETER(pCTX);
+
+		_tprintf_s(_T("Mem access! TID=%lu\n"), GetCurrentThreadId());
+
+		Detours::Hook::UnHookHardware(HardwareSelfUnHook, GetCurrentThreadId(), Detours::Hook::HARDWARE_HOOK_REGISTER::REGISTER_DR0);
 	}
 
 	DWORD WINAPI ThreadAccesser(LPVOID lpParameter) {
@@ -1984,7 +1992,7 @@ TEST_SUITE("Detours::Hook") {
 			reinterpret_cast<unsigned char*>(pAddress)[0] = 2;
 		}
 		MESSAGE("Benckmark with 1 000 000 iterations (with hook): ", (Detours::KUserSharedData.SystemTime.LowPart - unBegin) / 10000, " ms");
-		CHECK(Detours::Hook::UnHookMemory(MemoryHook, Region.GetRegionAddress()) == true);
+		CHECK(Detours::Hook::UnHookMemory(MemoryHook) == true);
 	}
 
 	TEST_CASE("InterruptHook") { // TODO: Incorrect return from CallInterrupt on 64 bit.
