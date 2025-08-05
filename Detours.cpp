@@ -7146,7 +7146,8 @@ namespace Detours {
 				if ((*it)->m_bPendingRestore) {
 					eflags.m_unTF = 0;
 
-					switch ((*it)->m_unRegister) {
+					if (!(*it)->m_bPendingDeletion) {
+						switch ((*it)->m_unRegister) {
 						case HARDWARE_HOOK_REGISTER::REGISTER_DR0:
 							dr6.m_unB0 = 0;
 							break;
@@ -7162,10 +7163,10 @@ namespace Detours {
 						case HARDWARE_HOOK_REGISTER::REGISTER_DR3:
 							dr6.m_unB3 = 0;
 							break;
-					}
+						}
 
-					unsigned char unTypeValue = 0;
-					switch ((*it)->m_unType) {
+						unsigned char unTypeValue = 0;
+						switch ((*it)->m_unType) {
 						case HARDWARE_HOOK_TYPE::TYPE_EXECUTE:
 							unTypeValue = 0;
 							break;
@@ -7181,10 +7182,10 @@ namespace Detours {
 						case HARDWARE_HOOK_TYPE::TYPE_ACCESS:
 							unTypeValue = 3;
 							break;
-					}
+						}
 
-					unsigned char unSizeValue = 0;
-					switch ((*it)->m_unSize) {
+						unsigned char unSizeValue = 0;
+						switch ((*it)->m_unSize) {
 						case 1:
 							unSizeValue = 0;
 							break;
@@ -7196,9 +7197,9 @@ namespace Detours {
 						case 4:
 							unSizeValue = 3;
 							break;
-					}
+						}
 
-					switch ((*it)->m_unRegister) {
+						switch ((*it)->m_unRegister) {
 						case HARDWARE_HOOK_REGISTER::REGISTER_DR0:
 #ifdef _M_X64
 							pCTX->Dr0 = reinterpret_cast<DWORD64>((*it)->m_pAddress);
@@ -7242,6 +7243,7 @@ namespace Detours {
 							dr7.m_unRW3 = unTypeValue;
 							dr7.m_unLEN3 = unSizeValue;
 							break;
+						}
 					}
 
 					(*it)->m_bPendingRestore = false;
