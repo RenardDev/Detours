@@ -7362,15 +7362,16 @@ namespace Detours {
 			auto& eflags = *reinterpret_cast<REGISTER_FLAGS*>(&pCTX->EFlags);
 
 			if (Exception.ExceptionCode == EXCEPTION_SINGLE_STEP) {
-				for (auto it = g_MemoryHookRecords.begin(); it != g_MemoryHookRecords.end();) {
+				for (auto it = g_MemoryHookRecords.begin(); it != g_MemoryHookRecords.end(); ++it) {
 					const auto& pRecord = *it;
 					if (!pRecord) {
-						++it;
 						continue;
 					}
 
 					auto pit = pRecord->m_PendingRestoreThreads.find(unCurrentTID);
 					if (pit != pRecord->m_PendingRestoreThreads.end()) {
+						eflags.m_unTF = 0;
+
 						if (!pRecord->m_bPendingDeletion) {
 							for (const auto& pPage : pRecord->m_Pages) {
 								if (!pPage || !pPage->ChangeProtection(PAGE_NOACCESS)) {
@@ -7380,18 +7381,16 @@ namespace Detours {
 						}
 
 						pRecord->m_PendingRestoreThreads.erase(pit);
-					}
 
-					if (pRecord->m_bPendingDeletion) {
-						it = g_MemoryHookRecords.erase(it);
-					} else {
-						++it;
+						if (pRecord->m_bPendingDeletion && pRecord->m_PendingRestoreThreads.empty()) {
+							g_MemoryHookRecords.erase(it);
+						}
+
+						return true;
 					}
 				}
 
-				eflags.m_unTF = 0;
-
-				return true;
+				return false;
 			}
 
 			if ((Exception.ExceptionCode != EXCEPTION_ACCESS_VIOLATION) || (Exception.NumberParameters != 2)) {
