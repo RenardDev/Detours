@@ -1614,7 +1614,7 @@ TEST_SUITE("Detours::Hook") {
 		UNREFERENCED_PARAMETER(pHookAddress);
 		UNREFERENCED_PARAMETER(pAccessAddress);
 
-		_tprintf_s(_T("Mem access! TID=%lu\n"), GetCurrentThreadId());
+		//_tprintf_s(_T("Mem access! TID=%lu\n"), GetCurrentThreadId());
 	}
 
 	void MemoryHookSelfUnHook(const PCONTEXT pCTX, const void* pExceptionAddress, Detours::Hook::MEMORY_HOOK_OPERATION unOperation, const void* pHookAddress, const void* pAccessAddress) {
