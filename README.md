@@ -96,10 +96,12 @@ A set of VS2022/C++14 tools for working with software modifications in two files
 * RdGetOperandRlut - Retrieves the operand register lookup table for the decoded instruction.
 
 # Detours::Hook
+* HookHardware - Hooks the specified debug register (DRx) with the given access type (execute, write, read) and callback.
+* UnHookHardware - Unhooks the specified debug register.
+* HookMemory - Hooks the specified address range for operations (read, write, execute) with the given callback.
+* UnHookMemory - Unhooks the specified address range.
 * HookInterrupt - Hooks the specified interrupt with the given callback.
 * UnHookInterrupt - Unhooks the specified interrupt.
-* VTableFunctionHook - Class for hooking virtual table (VTable) functions.
-* VTableHook - Class for hooking virtual tables (VTables).
 * InlineHook - Class for hooking functions using inline hooking technique. (Has support for checking Return Address to avoid crashes after unhook)
 * InlineWrapperHook - Class for hooking functions using inline hooking with a wrapper function. (Has support for checking Return Address to avoid crashes after unhook)
 * RawHook - Class for raw hooking functions with full control over registers and the stack. (Has support for checking Return Address to avoid crashes after unhook)
