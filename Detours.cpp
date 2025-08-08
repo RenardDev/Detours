@@ -5546,6 +5546,21 @@ namespace Detours {
 		};
 
 		// ----------------------------------------------------------------
+		// __is_range_in_range
+		// ----------------------------------------------------------------
+
+		static bool inline __is_range_in_range(void const* const pOuterRangeStart, const size_t unOuterRangeSize, void const* const pInnerRangeStart, const size_t unInnerRangeSize) {
+			if (!pOuterRangeStart || !pInnerRangeStart) {
+				return false;
+			}
+
+			const char* const pOuterRangeEnd = static_cast<const char* const>(pOuterRangeStart) + unOuterRangeSize;
+			const char* const pInnerRangeEnd = static_cast<const char* const>(pInnerRangeStart) + unInnerRangeSize;
+
+			return (pInnerRangeStart < pOuterRangeEnd) && (pOuterRangeStart < pInnerRangeEnd);
+		}
+
+		// ----------------------------------------------------------------
 		// Shared
 		// ----------------------------------------------------------------
 
@@ -84837,17 +84852,6 @@ namespace Detours {
 				return false;
 			}
 
-			for (auto& pRecord : g_MemoryHookRecords) {
-				if (pRecord->m_bPendingDeletion) {
-					continue;
-				}
-
-				if (pRecord->m_pCallBack == pCallBack) {
-					g_Suspender.Resume();
-					return false;
-				}
-			}
-
 			auto vecPages = __get_pages_info(pAddress, unSize, true);
 			if (vecPages.empty()) {
 				g_Suspender.Resume();
@@ -84869,6 +84873,36 @@ namespace Detours {
 			if (bIsVirtualAddress) {
 				g_Suspender.Resume();
 				return false;
+			}
+
+			for (auto& pRecord : g_MemoryHookRecords) {
+				if (pRecord->m_bPendingDeletion) {
+					continue;
+				}
+
+				if (pRecord->m_pCallBack == pCallBack) {
+					g_Suspender.Resume();
+					return false;
+				}
+
+				if (__is_range_in_range(pRecord->m_pAddress, pRecord->m_unSize, pAddress, unSize)) {
+					g_Suspender.Resume();
+					return false;
+				}
+
+				auto vecRecordPages = __get_pages_info(pRecord->m_pAddress, pRecord->m_unSize, true);
+				if (vecRecordPages.empty()) {
+					continue;
+				}
+
+				for (const auto& pPage : vecPages) {
+					for (const auto& pRecordPage : vecRecordPages) {
+						if (__is_range_in_range(pRecordPage.m_pBaseAddress, pRecordPage.m_unSize, pPage.m_pBaseAddress, pPage.m_unSize)) {
+							g_Suspender.Resume();
+							return false;
+						}
+					}
+				}
 			}
 
 			auto pRecord = std::make_unique<MEMORY_HOOK_RECORD>();

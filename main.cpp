@@ -1558,7 +1558,7 @@ TEST_SUITE("Detours::Hook") {
 	void HardwareHook(const PCONTEXT pCTX) {
 		UNREFERENCED_PARAMETER(pCTX);
 
-		_tprintf_s(_T("Mem access! TID=%lu\n"), GetCurrentThreadId());
+		//_tprintf_s(_T("Mem access! TID=%lu\n"), GetCurrentThreadId());
 	}
 
 	void HardwareSelfUnHook(const PCONTEXT pCTX) {
@@ -1899,6 +1899,7 @@ TEST_SUITE("Detours::Hook") {
 		CHECK(hThread != INVALID_HANDLE_VALUE);
 
 		CHECK(Detours::Hook::HookMemory(MemoryHook, pArray, sizeof(int) * 3) == true);
+		CHECK(Detours::Hook::HookMemory(MemoryHook, pArray, sizeof(int) * 3) == false);
 
 		pArray[0] = 0xDEEDBEEF;
 		pArray[1] = 0xDEEDFACE;
@@ -1932,6 +1933,7 @@ TEST_SUITE("Detours::Hook") {
 		CHECK(hThread2 != INVALID_HANDLE_VALUE);
 
 		CHECK(Detours::Hook::HookMemory(MemoryHook, pArray, sizeof(int) * 3) == true);
+		CHECK(Detours::Hook::HookMemory(MemoryHook, pArray, sizeof(int) * 3) == false);
 
 		pArray[0] = 0xDEEDBEEF;
 		pArray[1] = 0xDEEDFACE;
@@ -1965,6 +1967,7 @@ TEST_SUITE("Detours::Hook") {
 		printf("pArray[4] = %i\n", pArray[4]);
 
 		CHECK(Detours::Hook::HookMemory(MemoryHookSelfUnHook, pArray, sizeof(int) * 3) == true);
+		CHECK(Detours::Hook::HookMemory(MemoryHookSelfUnHook, pArray, sizeof(int) * 3) == false);
 
 		printf("pArray[2] = %i\n", pArray[2]);
 		printf("pArray[3] = %i\n", pArray[3]);
