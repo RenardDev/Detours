@@ -5577,7 +5577,6 @@ namespace Detours {
 		typedef enum _HARDWARE_HOOK_TYPE : unsigned char {
 			TYPE_EXECUTE = 0,
 			TYPE_WRITE   = 1,
-			TYPE_IO      = 2,
 			TYPE_ACCESS  = 3
 		} HARDWARE_HOOK_TYPE, *PHARDWARE_HOOK_TYPE;
 

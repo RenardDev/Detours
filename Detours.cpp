@@ -7163,102 +7163,104 @@ namespace Detours {
 
 					if (!(*it)->m_bPendingDeletion) {
 						switch ((*it)->m_unRegister) {
-						case HARDWARE_HOOK_REGISTER::REGISTER_DR0:
-							dr6.m_unB0 = 0;
-							break;
+							case HARDWARE_HOOK_REGISTER::REGISTER_DR0:
+								dr6.m_unB0 = 0;
+								break;
 
-						case HARDWARE_HOOK_REGISTER::REGISTER_DR1:
-							dr6.m_unB1 = 0;
-							break;
+							case HARDWARE_HOOK_REGISTER::REGISTER_DR1:
+								dr6.m_unB1 = 0;
+								break;
 
-						case HARDWARE_HOOK_REGISTER::REGISTER_DR2:
-							dr6.m_unB2 = 0;
-							break;
+							case HARDWARE_HOOK_REGISTER::REGISTER_DR2:
+								dr6.m_unB2 = 0;
+								break;
 
-						case HARDWARE_HOOK_REGISTER::REGISTER_DR3:
-							dr6.m_unB3 = 0;
-							break;
+							case HARDWARE_HOOK_REGISTER::REGISTER_DR3:
+								dr6.m_unB3 = 0;
+								break;
 						}
 
 						unsigned char unTypeValue = 0;
 						switch ((*it)->m_unType) {
-						case HARDWARE_HOOK_TYPE::TYPE_EXECUTE:
-							unTypeValue = 0;
-							break;
+							case HARDWARE_HOOK_TYPE::TYPE_EXECUTE:
+								unTypeValue = 0;
+								break;
 
-						case HARDWARE_HOOK_TYPE::TYPE_WRITE:
-							unTypeValue = 1;
-							break;
+							case HARDWARE_HOOK_TYPE::TYPE_WRITE:
+								unTypeValue = 1;
+								break;
 
-						case HARDWARE_HOOK_TYPE::TYPE_IO:
-							unTypeValue = 2;
-							break;
-
-						case HARDWARE_HOOK_TYPE::TYPE_ACCESS:
-							unTypeValue = 3;
-							break;
+							case HARDWARE_HOOK_TYPE::TYPE_ACCESS:
+								unTypeValue = 3;
+								break;
 						}
 
 						unsigned char unSizeValue = 0;
 						switch ((*it)->m_unSize) {
-						case 1:
-							unSizeValue = 0;
-							break;
+							case 1:
+								unSizeValue = 0;
+								break;
 
-						case 2:
-							unSizeValue = 1;
-							break;
+							case 2:
+								unSizeValue = 1;
+								break;
 
-						case 4:
-							unSizeValue = 3;
-							break;
+							case 4:
+								unSizeValue = 3;
+								break;
+
+#ifdef _M_X64
+							case 8:
+								unSizeValue = 2;
+								break;
+#endif
 						}
 
 						switch ((*it)->m_unRegister) {
-						case HARDWARE_HOOK_REGISTER::REGISTER_DR0:
+							case HARDWARE_HOOK_REGISTER::REGISTER_DR0:
 #ifdef _M_X64
-							pCTX->Dr0 = reinterpret_cast<DWORD64>((*it)->m_pAddress);
+								pCTX->Dr0 = reinterpret_cast<DWORD64>((*it)->m_pAddress);
 #elif _M_IX86
-							pCTX->Dr0 = reinterpret_cast<DWORD>((*it)->m_pAddress);
+								pCTX->Dr0 = reinterpret_cast<DWORD>((*it)->m_pAddress);
 #endif
-							dr7.m_unL0 = 1;
-							dr7.m_unRW0 = unTypeValue;
-							dr7.m_unLEN0 = unSizeValue;
-							break;
+								dr7.m_unL0 = 1;
+								dr7.m_unRW0 = unTypeValue;
+								dr7.m_unLEN0 = unSizeValue;
+								break;
 
-						case HARDWARE_HOOK_REGISTER::REGISTER_DR1:
+							case HARDWARE_HOOK_REGISTER::REGISTER_DR1:
 #ifdef _M_X64
-							pCTX->Dr1 = reinterpret_cast<DWORD64>((*it)->m_pAddress);
+								pCTX->Dr1 = reinterpret_cast<DWORD64>((*it)->m_pAddress);
 #elif _M_IX86
-							pCTX->Dr1 = reinterpret_cast<DWORD>((*it)->m_pAddress);
+								pCTX->Dr1 = reinterpret_cast<DWORD>((*it)->m_pAddress);
 #endif
-							dr7.m_unL1 = 1;
-							dr7.m_unRW1 = unTypeValue;
-							dr7.m_unLEN1 = unSizeValue;
-							break;
+								dr7.m_unL1 = 1;
+								dr7.m_unRW1 = unTypeValue;
+								dr7.m_unLEN1 = unSizeValue;
+								break;
 
-						case HARDWARE_HOOK_REGISTER::REGISTER_DR2:
+							case HARDWARE_HOOK_REGISTER::REGISTER_DR2:
 #ifdef _M_X64
-							pCTX->Dr2 = reinterpret_cast<DWORD64>((*it)->m_pAddress);
+								pCTX->Dr2 = reinterpret_cast<DWORD64>((*it)->m_pAddress);
 #elif _M_IX86
-							pCTX->Dr2 = reinterpret_cast<DWORD>((*it)->m_pAddress);
+								pCTX->Dr2 = reinterpret_cast<DWORD>((*it)->m_pAddress);
 #endif
-							dr7.m_unL2 = 1;
-							dr7.m_unRW2 = unTypeValue;
-							dr7.m_unLEN2 = unSizeValue;
-							break;
+								dr7.m_unL2 = 1;
+								dr7.m_unRW2 = unTypeValue;
+								dr7.m_unLEN2 = unSizeValue;
+								break;
 
-						case HARDWARE_HOOK_REGISTER::REGISTER_DR3:
+							case HARDWARE_HOOK_REGISTER::REGISTER_DR3:
 #ifdef _M_X64
-							pCTX->Dr3 = reinterpret_cast<DWORD64>((*it)->m_pAddress);
+								pCTX->Dr3 = reinterpret_cast<DWORD64>((*it)->m_pAddress);
 #elif _M_IX86
-							pCTX->Dr3 = reinterpret_cast<DWORD>((*it)->m_pAddress);
+								pCTX->Dr3 = reinterpret_cast<DWORD>((*it)->m_pAddress);
 #endif
-							dr7.m_unL3 = 1;
-							dr7.m_unRW3 = unTypeValue;
-							dr7.m_unLEN3 = unSizeValue;
-							break;
-						}
+								dr7.m_unL3 = 1;
+								dr7.m_unRW3 = unTypeValue;
+								dr7.m_unLEN3 = unSizeValue;
+								break;
+							}
 					}
 
 					(*it)->m_bPendingRestore = false;
@@ -7410,7 +7412,7 @@ namespace Detours {
 				return false;
 			}
 
-			if ((Exception.ExceptionCode != EXCEPTION_ACCESS_VIOLATION) || (Exception.NumberParameters != 2)) {
+			if ((Exception.ExceptionCode != EXCEPTION_ACCESS_VIOLATION) || (Exception.NumberParameters < 2)) {
 				return false;
 			}
 
@@ -7419,17 +7421,18 @@ namespace Detours {
 				return false;
 			}
 
+			const void* pFaultAddress = reinterpret_cast<void*>(Exception.ExceptionInformation[1]);
+			if (!pFaultAddress || (pFaultAddress == reinterpret_cast<void*>(-1))) {
+				return false;
+			}
+
+			const void* pExceptionAddress = reinterpret_cast<void*>(Exception.ExceptionAddress);
+
 			MEMORY_HOOK_OPERATION unOperation = MEMORY_HOOK_OPERATION::MEMORY_READ;
 			if (unAccessType == 1) {
 				unOperation = MEMORY_HOOK_OPERATION::MEMORY_WRITE;
 			} else if (unAccessType == 8) {
 				unOperation = MEMORY_HOOK_OPERATION::MEMORY_EXECUTE;
-			}
-
-			const void* pExceptionAddress = (unAccessType != 8) ? reinterpret_cast<void*>(Exception.ExceptionAddress) : nullptr;
-			const void* pFaultAddress = reinterpret_cast<void*>(Exception.ExceptionInformation[1]);
-			if (!pFaultAddress || (pFaultAddress == reinterpret_cast<void*>(-1))) {
-				return false;
 			}
 
 			PMEMORY_HOOK_RECORD pTargetRecord = nullptr;
@@ -84549,14 +84552,30 @@ namespace Detours {
 				return false;
 			}
 
-			if (!unThreadID || !pAddress || !unSize) {
+			if (!unThreadID || !pAddress || !unSize || !pCallBack) {
 				g_Suspender.Resume();
 				return false;
 			}
 
-			if ((unSize != 1) && (unSize != 2) && (unSize != 4)) {
-				g_Suspender.Resume();
-				return false;
+			if (unType == HARDWARE_HOOK_TYPE::TYPE_EXECUTE) {
+				if (unSize != 1) {
+					g_Suspender.Resume();
+					return false;
+				}
+			} else {
+#ifdef _M_X64
+				if ((unSize != 1) && (unSize != 2) && (unSize != 4) && (unSize != 8)) {
+#elif _M_IX86
+				if ((unSize != 1) && (unSize != 2) && (unSize != 4)) {
+#endif
+					g_Suspender.Resume();
+					return false;
+				}
+
+				if ((reinterpret_cast<size_t>(pAddress) & (unSize - 1)) != 0) {
+					g_Suspender.Resume();
+					return false;
+				}
 			}
 
 			for (auto& pRecord : g_HardwareHookRecords) {
@@ -84648,10 +84667,6 @@ namespace Detours {
 					unTypeValue = 1;
 					break;
 
-				case HARDWARE_HOOK_TYPE::TYPE_IO:
-					unTypeValue = 2;
-					break;
-
 				case HARDWARE_HOOK_TYPE::TYPE_ACCESS:
 					unTypeValue = 3;
 					break;
@@ -84664,13 +84679,18 @@ namespace Detours {
 					break;
 
 				case 2:
-
 					unSizeValue = 1;
 					break;
 
 				case 4:
 					unSizeValue = 3;
 					break;
+
+#ifdef _M_X64
+				case 8:
+					unSizeValue = 2;
+					break;
+#endif
 			}
 
 			auto& dr7 = *reinterpret_cast<REGISTER_DR7*>(&ctx.Dr7);
@@ -84858,19 +84878,15 @@ namespace Detours {
 				return false;
 			}
 
-			bool bIsVirtualAddress = false;
-
-			auto& FrontPageInfo = vecPages.front();
-			if ((FrontPageInfo.m_unState == MEM_FREE) && (FrontPageInfo.m_unProtection == PAGE_NOACCESS) && (FrontPageInfo.m_unType == 0)) {
-				bIsVirtualAddress = true;
+			bool bAllCommitted = true;
+			for (const auto& pi : vecPages) {
+				if (pi.m_unState != MEM_COMMIT) {
+					bAllCommitted = false;
+					break;
+				}
 			}
 
-			auto& BackPageInfo = vecPages.back();
-			if ((BackPageInfo.m_unState == MEM_FREE) && (BackPageInfo.m_unProtection == PAGE_NOACCESS) && (BackPageInfo.m_unType == 0)) {
-				bIsVirtualAddress = true;
-			}
-
-			if (bIsVirtualAddress) {
+			if (!bAllCommitted) {
 				g_Suspender.Resume();
 				return false;
 			}
@@ -84953,13 +84969,17 @@ namespace Detours {
 					}
 
 					for (auto& pPage : (*it)->m_Pages) {
-						if (!pPage->RestoreProtection()) {
+						if (!pPage || !pPage->RestoreProtection()) {
 							g_Suspender.Resume();
 							return false;
 						}
 					}
 
 					(*it)->m_bPendingDeletion = true;
+
+					if ((*it)->m_PendingRestoreThreads.empty()) {
+						g_MemoryHookRecords.erase(it);
+					}
 
 					g_Suspender.Resume();
 					return true;
