@@ -166,6 +166,7 @@ namespace Detours {
 			m_unSize = 0;
 			m_bPendingRestore = false;
 			m_bPendingDeletion = false;
+			m_bCancelRestore = false;
 		}
 
 		DWORD m_unThreadID;
@@ -176,6 +177,7 @@ namespace Detours {
 		unsigned char m_unSize;
 		bool m_bPendingRestore;
 		bool m_bPendingDeletion;
+		bool m_bCancelRestore;
 	} HARDWARE_HOOK_RECORD, *PHARDWARE_HOOK_RECORD;
 
 	// ----------------------------------------------------------------
@@ -7149,58 +7151,27 @@ namespace Detours {
 			}
 
 			const DWORD unCurrentTID = GetCurrentThreadId();
-
 			auto& dr6 = *reinterpret_cast<REGISTER_DR6*>(&pCTX->Dr6);
 			auto& dr7 = *reinterpret_cast<REGISTER_DR7*>(&pCTX->Dr7);
 			auto& eflags = *reinterpret_cast<REGISTER_FLAGS*>(&pCTX->EFlags);
 
 			bool bRestored = false;
 
-			for (auto& pRecord : g_HardwareHookRecords) {
-				if (!pRecord || pRecord->m_bPendingDeletion) {
+			for (auto it = g_HardwareHookRecords.begin(); it != g_HardwareHookRecords.end(); ) {
+				auto& pRecord = *it;
+				if (!pRecord || (pRecord->m_unThreadID != unCurrentTID) || !pRecord->m_bPendingRestore) {
+					++it;
 					continue;
 				}
 
-				if (pRecord->m_unThreadID != unCurrentTID) {
+				if (pRecord->m_bCancelRestore) {
+					pRecord->m_bPendingRestore = false;
+					pRecord->m_bCancelRestore = false;
+					eflags.m_unTF = 0;
+					dr6.m_unBS = 0;
+					it = g_HardwareHookRecords.erase(it);
+					bRestored = true;
 					continue;
-				}
-
-				if (!pRecord->m_bPendingRestore) {
-					continue;
-				}
-
-				switch (pRecord->m_unRegister) {
-					case HARDWARE_HOOK_REGISTER::REGISTER_DR0:
-#ifdef _M_X64
-						pCTX->Dr0 = reinterpret_cast<DWORD64>(pRecord->m_pAddress);
-#elif _M_IX86
-						pCTX->Dr0 = reinterpret_cast<DWORD>(pRecord->m_pAddress);
-#endif
-						break;
-
-					case HARDWARE_HOOK_REGISTER::REGISTER_DR1:
-#ifdef _M_X64
-						pCTX->Dr1 = reinterpret_cast<DWORD64>(pRecord->m_pAddress);
-#elif _M_IX86
-						pCTX->Dr1 = reinterpret_cast<DWORD>(pRecord->m_pAddress);
-#endif
-						break;
-
-					case HARDWARE_HOOK_REGISTER::REGISTER_DR2:
-#ifdef _M_X64
-						pCTX->Dr2 = reinterpret_cast<DWORD64>(pRecord->m_pAddress);
-#elif _M_IX86
-						pCTX->Dr2 = reinterpret_cast<DWORD>(pRecord->m_pAddress);
-#endif
-						break;
-
-					case HARDWARE_HOOK_REGISTER::REGISTER_DR3:
-#ifdef _M_X64
-						pCTX->Dr3 = reinterpret_cast<DWORD64>(pRecord->m_pAddress);
-#elif _M_IX86
-						pCTX->Dr3 = reinterpret_cast<DWORD>(pRecord->m_pAddress);
-#endif
-						break;
 				}
 
 				unsigned char unTypeValue = 0;
@@ -7241,24 +7212,44 @@ namespace Detours {
 
 				switch (pRecord->m_unRegister) {
 					case HARDWARE_HOOK_REGISTER::REGISTER_DR0:
+#ifdef _M_X64
+						pCTX->Dr0 = reinterpret_cast<DWORD64>(pRecord->m_pAddress);
+#else
+						pCTX->Dr0 = reinterpret_cast<DWORD>(pRecord->m_pAddress);
+#endif
 						dr7.m_unL0 = 1;
 						dr7.m_unRW0 = unTypeValue;
 						dr7.m_unLEN0 = unSizeValue;
 						break;
 
 					case HARDWARE_HOOK_REGISTER::REGISTER_DR1:
+#ifdef _M_X64
+						pCTX->Dr1 = reinterpret_cast<DWORD64>(pRecord->m_pAddress);
+#else
+						pCTX->Dr1 = reinterpret_cast<DWORD>(pRecord->m_pAddress);
+#endif
 						dr7.m_unL1 = 1;
 						dr7.m_unRW1 = unTypeValue;
 						dr7.m_unLEN1 = unSizeValue;
 						break;
 
 					case HARDWARE_HOOK_REGISTER::REGISTER_DR2:
+#ifdef _M_X64
+						pCTX->Dr2 = reinterpret_cast<DWORD64>(pRecord->m_pAddress);
+#else
+						pCTX->Dr2 = reinterpret_cast<DWORD>(pRecord->m_pAddress);
+#endif
 						dr7.m_unL2 = 1;
 						dr7.m_unRW2 = unTypeValue;
 						dr7.m_unLEN2 = unSizeValue;
 						break;
 
 					case HARDWARE_HOOK_REGISTER::REGISTER_DR3:
+#ifdef _M_X64
+						pCTX->Dr3 = reinterpret_cast<DWORD64>(pRecord->m_pAddress);
+#else
+						pCTX->Dr3 = reinterpret_cast<DWORD>(pRecord->m_pAddress);
+#endif
 						dr7.m_unL3 = 1;
 						dr7.m_unRW3 = unTypeValue;
 						dr7.m_unLEN3 = unSizeValue;
@@ -7270,22 +7261,18 @@ namespace Detours {
 				dr7.m_unGD = 0;
 
 				pRecord->m_bPendingRestore = false;
-
 				bRestored = true;
+
+				if (pRecord->m_bPendingDeletion) {
+					it = g_HardwareHookRecords.erase(it);
+				} else {
+					++it;
+				}
 			}
 
 			if (bRestored) {
 				dr6.m_unBS = 0;
 				eflags.m_unTF = 0;
-
-				for (auto it = g_HardwareHookRecords.begin(); it != g_HardwareHookRecords.end(); ) {
-					if ((*it)->m_bPendingDeletion && (*it)->m_unThreadID == unCurrentTID && !(*it)->m_bPendingRestore) {
-						it = g_HardwareHookRecords.erase(it);
-						return true;
-					} else {
-						++it;
-					}
-				}
 			}
 
 			HARDWARE_HOOK_REGISTER unRegister = HARDWARE_HOOK_REGISTER::REGISTER_DR0;
@@ -7316,6 +7303,7 @@ namespace Detours {
 				}
 
 				bool bEnabled = false;
+
 				switch (unRegister) {
 					case HARDWARE_HOOK_REGISTER::REGISTER_DR0:
 						bEnabled = (dr7.m_unL0 || dr7.m_unG0);
@@ -7343,42 +7331,27 @@ namespace Detours {
 				switch (unRegister) {
 					case HARDWARE_HOOK_REGISTER::REGISTER_DR0:
 						dr6.m_unB0 = 0;
-						break;
-
-					case HARDWARE_HOOK_REGISTER::REGISTER_DR1:
-						dr6.m_unB1 = 0;
-						break;
-
-					case HARDWARE_HOOK_REGISTER::REGISTER_DR2:
-						dr6.m_unB2 = 0;
-						break;
-
-					case HARDWARE_HOOK_REGISTER::REGISTER_DR3:
-						dr6.m_unB3 = 0;
-						break;
-				}
-
-				switch (unRegister) {
-					case HARDWARE_HOOK_REGISTER::REGISTER_DR0:
 						dr7.m_unL0 = 0;
 						dr7.m_unG0 = 0;
 						break;
 
 					case HARDWARE_HOOK_REGISTER::REGISTER_DR1:
+						dr6.m_unB1 = 0;
 						dr7.m_unL1 = 0;
 						dr7.m_unG1 = 0;
 						break;
 
 					case HARDWARE_HOOK_REGISTER::REGISTER_DR2:
+						dr6.m_unB2 = 0;
 						dr7.m_unL2 = 0;
 						dr7.m_unG2 = 0;
 						break;
 
 					case HARDWARE_HOOK_REGISTER::REGISTER_DR3:
+						dr6.m_unB3 = 0;
 						dr7.m_unL3 = 0;
 						dr7.m_unG3 = 0;
 						break;
-
 				}
 
 				eflags.m_unTF = 1;
@@ -84792,87 +84765,81 @@ namespace Detours {
 			}
 
 			for (auto it = g_HardwareHookRecords.begin(); it != g_HardwareHookRecords.end(); ++it) {
-				if ((*it)->m_bPendingDeletion) {
+				auto& pRecord = *it;
+				if (!pRecord || pRecord->m_bPendingDeletion) {
 					continue;
 				}
 
-				if (((*it)->m_unThreadID == unThreadID) && ((*it)->m_unRegister == unRegister)) {
-					HANDLE hThread = OpenThread(THREAD_GET_CONTEXT | THREAD_SET_CONTEXT, FALSE, unThreadID);
-					if (!hThread) {
-						g_Suspender.Resume();
-						return true;
-					}
+				if (pRecord->m_unThreadID != unThreadID) {
+					continue;
+				}
 
-					if (hThread == INVALID_HANDLE_VALUE) {
-						g_Suspender.Resume();
-						return false;
-					}
+				if (pRecord->m_unRegister != unRegister) {
+					continue;
+				}
 
-					CONTEXT ctx = { 0 };
-					ctx.ContextFlags = CONTEXT_DEBUG_REGISTERS;
-
-					if (GetThreadContext(hThread, &ctx)) {
-						unsigned char unDRIndex = 0;
-						switch ((*it)->m_unRegister) {
-							case HARDWARE_HOOK_REGISTER::REGISTER_DR0:
-								ctx.Dr0 = 0;
-								unDRIndex = 0;
-								break;
-
-							case HARDWARE_HOOK_REGISTER::REGISTER_DR1:
-								ctx.Dr1 = 0;
-								unDRIndex = 1;
-								break;
-
-							case HARDWARE_HOOK_REGISTER::REGISTER_DR2:
-								ctx.Dr2 = 0;
-								unDRIndex = 2;
-								break;
-
-							case HARDWARE_HOOK_REGISTER::REGISTER_DR3:
-								ctx.Dr3 = 0;
-								unDRIndex = 3;
-								break;
-						}
-
-						auto& dr7 = *reinterpret_cast<REGISTER_DR7*>(&ctx.Dr7);
-
-						switch (unDRIndex) {
-							case 0:
-								dr7.m_unL0 = 0;
-								dr7.m_unRW0 = 0;
-								dr7.m_unLEN0 = 0;
-								break;
-
-							case 1:
-								dr7.m_unL1 = 0;
-								dr7.m_unRW1 = 0;
-								dr7.m_unLEN1 = 0;
-								break;
-
-							case 2:
-								dr7.m_unL2 = 0;
-								dr7.m_unRW2 = 0;
-								dr7.m_unLEN2 = 0;
-								break;
-
-							case 3:
-								dr7.m_unL3 = 0;
-								dr7.m_unRW3 = 0;
-								dr7.m_unLEN3 = 0;
-								break;
-						}
-
-						SetThreadContext(hThread, &ctx);
-					}
-
-					CloseHandle(hThread);
-
-					(*it)->m_bPendingDeletion = true;
-
+				if (pRecord->m_bPendingRestore) {
+					pRecord->m_bCancelRestore = true;
+					pRecord->m_bPendingDeletion = true;
 					g_Suspender.Resume();
 					return true;
 				}
+
+				HANDLE hThread = OpenThread(THREAD_GET_CONTEXT | THREAD_SET_CONTEXT, FALSE, unThreadID);
+				if (!hThread || hThread == INVALID_HANDLE_VALUE) {
+					pRecord->m_bPendingDeletion = true;
+					g_HardwareHookRecords.erase(it);
+					g_Suspender.Resume();
+					return true;
+				}
+
+				CONTEXT ctx = {};
+				ctx.ContextFlags = CONTEXT_DEBUG_REGISTERS;
+				if (GetThreadContext(hThread, &ctx)) {
+					auto& dr7 = *reinterpret_cast<REGISTER_DR7*>(&ctx.Dr7);
+					switch (unRegister) {
+						case HARDWARE_HOOK_REGISTER::REGISTER_DR0:
+							ctx.Dr0 = 0;
+							dr7.m_unL0 = 0;
+							dr7.m_unG0 = 0;
+							dr7.m_unRW0 = 0;
+							dr7.m_unLEN0 = 0;
+							break;
+
+						case HARDWARE_HOOK_REGISTER::REGISTER_DR1:
+							ctx.Dr1 = 0;
+							dr7.m_unL1 = 0;
+							dr7.m_unG1 = 0;
+							dr7.m_unRW1 = 0;
+							dr7.m_unLEN1 = 0;
+							break;
+
+						case HARDWARE_HOOK_REGISTER::REGISTER_DR2:
+							ctx.Dr2 = 0;
+							dr7.m_unL2 = 0;
+							dr7.m_unG2 = 0;
+							dr7.m_unRW2 = 0;
+							dr7.m_unLEN2 = 0;
+							break;
+
+						case HARDWARE_HOOK_REGISTER::REGISTER_DR3:
+							ctx.Dr3 = 0;
+							dr7.m_unL3 = 0;
+							dr7.m_unG3 = 0;
+							dr7.m_unRW3 = 0;
+							dr7.m_unLEN3 = 0;
+							break;
+					}
+
+					SetThreadContext(hThread, &ctx);
+				}
+
+				CloseHandle(hThread);
+
+				pRecord->m_bPendingDeletion = true;
+				g_HardwareHookRecords.erase(it);
+				g_Suspender.Resume();
+				return true;
 			}
 
 			g_Suspender.Resume();
