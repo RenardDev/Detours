@@ -123,6 +123,46 @@
   </Detours>
   <Detours>
     <FileName>Detours.cpp</FileName>
+    <ErrorCode>V525</ErrorCode>
+    <Message>The code contains the collection of similar blocks. Check items 'dr_', 'dr_', 'dr_' in lines _, _, _.</Message>
+    <CodePrev>3441387013</CodePrev>
+    <CodeCurrent>328455</CodeCurrent>
+    <CodeNext>329703</CodeNext>
+  </Detours>
+  <Detours>
+    <FileName>Detours.cpp</FileName>
+    <ErrorCode>V525</ErrorCode>
+    <Message>The code contains the collection of similar blocks. Check items 'dr_', 'dr_', 'dr_' in lines _, _, _.</Message>
+    <CodePrev>3441387015</CodePrev>
+    <CodeCurrent>328463</CodeCurrent>
+    <CodeNext>329711</CodeNext>
+  </Detours>
+  <Detours>
+    <FileName>Detours.cpp</FileName>
+    <ErrorCode>V525</ErrorCode>
+    <Message>The code contains the collection of similar blocks. Check items 'dr_', 'dr_', 'dr_' in lines _, _, _.</Message>
+    <CodePrev>3441387009</CodePrev>
+    <CodeCurrent>328471</CodeCurrent>
+    <CodeNext>329719</CodeNext>
+  </Detours>
+  <Detours>
+    <FileName>Detours.cpp</FileName>
+    <ErrorCode>V525</ErrorCode>
+    <Message>The code contains the collection of similar blocks. Check items 'dr_', 'dr_', 'dr_' in lines _, _, _.</Message>
+    <CodePrev>3441387011</CodePrev>
+    <CodeCurrent>328479</CodeCurrent>
+    <CodeNext>329727</CodeNext>
+  </Detours>
+  <Detours>
+    <FileName>Detours.cpp</FileName>
+    <ErrorCode>V547</ErrorCode>
+    <Message>Expression is always false.</Message>
+    <CodePrev>3635870858</CodePrev>
+    <CodeCurrent>1957131926</CodeCurrent>
+    <CodeNext>3472534580</CodeNext>
+  </Detours>
+  <Detours>
+    <FileName>Detours.cpp</FileName>
     <ErrorCode>V616</ErrorCode>
     <Message>The '(RD_OPT_A)' named constant with the value of _ is used in the bitwise operation.</Message>
     <CodePrev>227</CodePrev>
@@ -152,6 +192,22 @@
     <CodePrev>1723405808</CodePrev>
     <CodeCurrent>3752072768</CodeCurrent>
     <CodeNext>17733</CodeNext>
+  </Detours>
+  <Detours>
+    <FileName>Detours.cpp</FileName>
+    <ErrorCode>V773</ErrorCode>
+    <Message>The function was exited without releasing the 'hThread' handle. A resource leak is possible.</Message>
+    <CodePrev>91556817</CodePrev>
+    <CodeCurrent>88117</CodeCurrent>
+    <CodeNext>125</CodeNext>
+  </Detours>
+  <Detours>
+    <FileName>Detours.cpp</FileName>
+    <ErrorCode>V773</ErrorCode>
+    <Message>The function was exited without releasing the 'hThread' handle. A resource leak is possible.</Message>
+    <CodePrev>91556817</CodePrev>
+    <CodeCurrent>176909</CodeCurrent>
+    <CodeNext>125</CodeNext>
   </Detours>
   <Detours>
     <FileName>Detours.cpp</FileName>
@@ -555,6 +611,54 @@
   </Detours>
   <Detours>
     <FileName>main.cpp</FileName>
+    <ErrorCode>V513</ErrorCode>
+    <Message>Use _beginthreadex/_endthreadex functions instead of CreateThread/ExitThread functions.</Message>
+    <CodePrev>0</CodePrev>
+    <CodeCurrent>1587810373</CodeCurrent>
+    <CodeNext>1028499713</CodeNext>
+  </Detours>
+  <Detours>
+    <FileName>main.cpp</FileName>
+    <ErrorCode>V513</ErrorCode>
+    <Message>Use _beginthreadex/_endthreadex functions instead of CreateThread/ExitThread functions.</Message>
+    <CodePrev>922463</CodePrev>
+    <CodeCurrent>1710119960</CodeCurrent>
+    <CodeNext>2056982785</CodeNext>
+  </Detours>
+  <Detours>
+    <FileName>main.cpp</FileName>
+    <ErrorCode>V513</ErrorCode>
+    <Message>Use _beginthreadex/_endthreadex functions instead of CreateThread/ExitThread functions.</Message>
+    <CodePrev>922439</CodePrev>
+    <CodeCurrent>1710644244</CodeCurrent>
+    <CodeNext>922463</CodeNext>
+  </Detours>
+  <Detours>
+    <FileName>main.cpp</FileName>
+    <ErrorCode>V513</ErrorCode>
+    <Message>Use _beginthreadex/_endthreadex functions instead of CreateThread/ExitThread functions.</Message>
+    <CodePrev>461215</CodePrev>
+    <CodeCurrent>2938206971</CodeCurrent>
+    <CodeNext>1028499713</CodeNext>
+  </Detours>
+  <Detours>
+    <FileName>main.cpp</FileName>
+    <ErrorCode>V513</ErrorCode>
+    <Message>Use _beginthreadex/_endthreadex functions instead of CreateThread/ExitThread functions.</Message>
+    <CodePrev>3654459238</CodePrev>
+    <CodeCurrent>3654393702</CodeCurrent>
+    <CodeNext>2056982785</CodeNext>
+  </Detours>
+  <Detours>
+    <FileName>main.cpp</FileName>
+    <ErrorCode>V513</ErrorCode>
+    <Message>Use _beginthreadex/_endthreadex functions instead of CreateThread/ExitThread functions.</Message>
+    <CodePrev>0</CodePrev>
+    <CodeCurrent>3654459238</CodeCurrent>
+    <CodeNext>3654393702</CodeNext>
+  </Detours>
+  <Detours>
+    <FileName>main.cpp</FileName>
     <ErrorCode>V566</ErrorCode>
     <Message>The integer constant is converted to pointer. Possibly an error or a bad coding style: reinterpret_cast&lt; unsigned int * &gt; (_x_)</Message>
     <CodePrev>0</CodePrev>
@@ -648,6 +752,14 @@
     <CodePrev>0</CodePrev>
     <CodeCurrent>271169278</CodeCurrent>
     <CodeNext>0</CodeNext>
+  </Detours>
+  <Detours>
+    <FileName>main.cpp</FileName>
+    <ErrorCode>V760</ErrorCode>
+    <Message>Two identical blocks of text were found. The second block begins from line _.</Message>
+    <CodePrev>0</CodePrev>
+    <CodeCurrent>1262950964</CodeCurrent>
+    <CodeNext>1263475260</CodeNext>
   </Detours>
   <Detours>
     <FileName>main.cpp</FileName>

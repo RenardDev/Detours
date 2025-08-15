@@ -1786,7 +1786,7 @@ TEST_SUITE("Detours::Hook") {
 	}
 
 	TEST_CASE("HardwareHook 1") {
-		static unsigned int pArray[] = {
+		static int pArray[] = {
 			1, 2, 3, 4, 5
 		};
 
@@ -1822,7 +1822,7 @@ TEST_SUITE("Detours::Hook") {
 	}
 
 	TEST_CASE("HardwareHook 2") {
-		static unsigned int pArray[] = {
+		static int pArray[] = {
 			1, 2, 3, 4, 5
 		};
 
@@ -1867,7 +1867,7 @@ TEST_SUITE("Detours::Hook") {
 	}
 
 	TEST_CASE("HardwareHook 3") {
-		static unsigned int pArray[] = {
+		static int pArray[] = {
 			1, 2, 3, 4, 5
 		};
 

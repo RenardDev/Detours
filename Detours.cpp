@@ -84786,7 +84786,7 @@ namespace Detours {
 				}
 
 				HANDLE hThread = OpenThread(THREAD_GET_CONTEXT | THREAD_SET_CONTEXT, FALSE, unThreadID);
-				if (!hThread || hThread == INVALID_HANDLE_VALUE) {
+				if (!hThread || (hThread == INVALID_HANDLE_VALUE)) {
 					pRecord->m_bPendingDeletion = true;
 					g_HardwareHookRecords.erase(it);
 					g_Suspender.Resume();
