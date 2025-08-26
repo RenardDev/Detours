@@ -1525,229 +1525,6 @@ namespace Detours {
 #endif
 
 		// ----------------------------------------------------------------
-		// FindSignature (MMX)
-		// ----------------------------------------------------------------
-
-#ifdef _M_IX86
-		void const* FindSignatureMMX(void const* const pAddress, const size_t unSize, char const* const szSignature, const unsigned char unIgnoredByte, const size_t unOffset) noexcept {
-			if (!pAddress || !unSize || !szSignature) {
-				return nullptr;
-			}
-
-			const size_t unSignatureLength = strnlen_s(szSignature, 0x1000);
-			if (!unSignatureLength || (unSize < unSignatureLength)) {
-				return nullptr;
-			}
-
-			unsigned char const* const pData = static_cast<unsigned char const* const>(pAddress);
-			unsigned char const* const pSignature = reinterpret_cast<unsigned char const* const>(szSignature);
-
-			const size_t unLastStart = unSize - unSignatureLength;
-			if (unLastStart < 7) {
-				return FindSignatureNative(pData, unSize, szSignature, unIgnoredByte, unOffset);
-			}
-
-			const size_t unEnd = unLastStart - 7;
-			const size_t unEndAligned = (unEnd & ~static_cast<size_t>(7));
-			const size_t unDataBytesCycles = (unEndAligned / 8) + 1;
-
-			const unsigned char* pReturn = nullptr;
-
-			for (size_t unCycle = 0; unCycle < unDataBytesCycles; ++unCycle) {
-				const size_t unCycleOffset = unCycle * 8;
-
-				const size_t unPrefetch = unCycleOffset + 32;
-				if (unPrefetch < unSize) {
-					_mm_prefetch(reinterpret_cast<char const* const>(pData + unPrefetch), _MM_HINT_T0);
-				}
-
-				unsigned int unFound = 0xFF;
-
-				for (size_t unSignatureIndex = 0; (unSignatureIndex < unSignatureLength) && (unFound != 0); ++unSignatureIndex) {
-					const unsigned char unSignatureByte = pSignature[unSignatureIndex];
-					if (unSignatureByte == unIgnoredByte) {
-						continue;
-					}
-
-					const __m64 mm0 = *reinterpret_cast<const __m64*>(pData + unCycleOffset + unSignatureIndex);
-					const __m64 mm1 = _mm_set1_pi8(static_cast<char>(unSignatureByte));
-					const __m64 mm2 = _mm_cmpeq_pi8(mm0, mm1);
-
-					unFound &= static_cast<unsigned int>(_mm_movemask_pi8(mm2));
-				}
-
-				if (unFound != 0) {
-					const size_t unBitIndex = static_cast<size_t>(__bit_scan_forward(unFound));
-					const size_t unStartIndex = unCycleOffset + unBitIndex;
-
-					unsigned char const* const pFoundAddress = pData + unStartIndex;
-					pReturn = pFoundAddress + unOffset;
-					break;
-				}
-			}
-
-			_mm_empty();
-
-			if (pReturn) {
-				return pReturn;
-			}
-
-			const size_t unCoveredEnd = unEndAligned + 7;
-			if (unCoveredEnd < unLastStart) {
-				unsigned char const* const pTail = pData + (unCoveredEnd + 1);
-				const size_t unTailSize = unSize - (unCoveredEnd + 1);
-				return FindSignatureNative(pTail, unTailSize, szSignature, unIgnoredByte, unOffset);
-			}
-
-			return nullptr;
-		}
-
-		void const* FindSignatureMMX(const HMODULE hModule, char const* const szSignature, const unsigned char unIgnoredByte, const size_t unOffset) noexcept {
-			if (!hModule || !szSignature) {
-				return nullptr;
-			}
-
-			const auto& pDH = reinterpret_cast<PIMAGE_DOS_HEADER>(hModule);
-			const auto& pNTHs = reinterpret_cast<PIMAGE_NT_HEADERS>(reinterpret_cast<char*>(hModule) + pDH->e_lfanew);
-			const auto& pOH = &(pNTHs->OptionalHeader);
-
-			return FindSignatureMMX(reinterpret_cast<void*>(hModule), static_cast<size_t>(pOH->SizeOfImage) - 1, szSignature, unIgnoredByte, unOffset);
-		}
-
-		void const* FindSignatureMMX(const HMODULE hModule, const std::array<const unsigned char, 8>& SectionName, char const* const szSignature, const unsigned char unIgnoredByte, const size_t unOffset) noexcept {
-			if (!hModule || !szSignature) {
-				return nullptr;
-			}
-
-			void* pAddress = nullptr;
-			size_t unSize = 0;
-			if (!FindSection(hModule, SectionName, &pAddress, &unSize)) {
-				return nullptr;
-			}
-
-			return FindSignatureMMX(pAddress, unSize, szSignature, unIgnoredByte, unOffset);
-		}
-
-		void const* FindSignatureMMX(const HMODULE hModule, char const* const szSectionName, char const* const szSignature, const unsigned char unIgnoredByte, const size_t unOffset) noexcept {
-			if (!hModule || !szSectionName || !szSignature) {
-				return nullptr;
-			}
-
-			void* pAddress = nullptr;
-			size_t unSize = 0;
-			if (!FindSectionPOGO(hModule, szSectionName, &pAddress, &unSize)) {
-				return nullptr;
-			}
-
-			return FindSignatureMMX(pAddress, unSize, szSignature, unIgnoredByte, unOffset);
-		}
-
-		void const* FindSignatureMMXA(char const* const szModuleName, char const* const szSignature, const unsigned char unIgnoredByte, const size_t unOffset) noexcept {
-			if (!szModuleName || !szSignature) {
-				return nullptr;
-			}
-
-			HMODULE hModule = GetModuleHandleA(szModuleName);
-			if (!hModule) {
-				return nullptr;
-			}
-
-			return FindSignatureMMX(hModule, szSignature, unIgnoredByte, unOffset);
-		}
-
-		void const* FindSignatureMMXA(char const* const szModuleName, const std::array<const unsigned char, 8>& SectionName, char const* const szSignature, const unsigned char unIgnoredByte, const size_t unOffset) noexcept {
-			if (!szModuleName || !szSignature) {
-				return nullptr;
-			}
-
-			HMODULE hModule = GetModuleHandleA(szModuleName);
-			if (!hModule) {
-				return nullptr;
-			}
-
-			return FindSignatureMMX(hModule, SectionName, szSignature, unIgnoredByte, unOffset);
-		}
-
-		void const* FindSignatureMMXA(char const* const szModuleName, char const* const szSectionName, char const* const szSignature, const unsigned char unIgnoredByte, const size_t unOffset) noexcept {
-			if (!szModuleName || !szSectionName || !szSignature) {
-				return nullptr;
-			}
-
-			HMODULE hModule = GetModuleHandleA(szModuleName);
-			if (!hModule) {
-				return nullptr;
-			}
-
-			return FindSignatureMMX(hModule, szSectionName, szSignature, unIgnoredByte, unOffset);
-		}
-
-		void const* FindSignatureMMXW(wchar_t const* const szModuleName, char const* const szSignature, const unsigned char unIgnoredByte, const size_t unOffset) noexcept {
-			if (!szModuleName || !szSignature) {
-				return nullptr;
-			}
-
-			HMODULE hModule = GetModuleHandleW(szModuleName);
-			if (!hModule) {
-				return nullptr;
-			}
-
-			return FindSignatureMMX(hModule, szSignature, unIgnoredByte, unOffset);
-		}
-
-		void const* FindSignatureMMXW(wchar_t const* const szModuleName, const std::array<const unsigned char, 8>& SectionName, char const* const szSignature, const unsigned char unIgnoredByte, const size_t unOffset) noexcept {
-			if (!szModuleName || !szSignature) {
-				return nullptr;
-			}
-
-			HMODULE hModule = GetModuleHandleW(szModuleName);
-			if (!hModule) {
-				return nullptr;
-			}
-
-			return FindSignatureMMX(hModule, SectionName, szSignature, unIgnoredByte, unOffset);
-		}
-
-		void const* FindSignatureMMXW(wchar_t const* const szModuleName, char const* const szSectionName, char const* const szSignature, const unsigned char unIgnoredByte, const size_t unOffset) noexcept {
-			if (!szModuleName || !szSectionName || !szSignature) {
-				return nullptr;
-			}
-
-			HMODULE hModule = GetModuleHandleW(szModuleName);
-			if (!hModule) {
-				return nullptr;
-			}
-
-			return FindSignatureMMX(hModule, szSectionName, szSignature, unIgnoredByte, unOffset);
-		}
-
-#ifdef _UNICODE
-		void const* FindSignatureMMX(wchar_t const* const szModuleName, char const* const szSignature, const unsigned char unIgnoredByte, const size_t unOffset) noexcept {
-			return FindSignatureMMXW(szModuleName, szSignature, unIgnoredByte, unOffset);
-		}
-
-		void const* FindSignatureMMX(wchar_t const* const szModuleName, const std::array<const unsigned char, 8>& SectionName, char const* const szSignature, const unsigned char unIgnoredByte, const size_t unOffset) noexcept {
-			return FindSignatureMMXW(szModuleName, SectionName, szSignature, unIgnoredByte, unOffset);
-		}
-
-		void const* FindSignatureMMX(wchar_t const* const szModuleName, char const* const szSectionName, char const* const szSignature, const unsigned char unIgnoredByte, const size_t unOffset) noexcept {
-			return FindSignatureMMXW(szModuleName, szSectionName, szSignature, unIgnoredByte, unOffset);
-		}
-#else
-		void const* FindSignatureMMX(char const* const szModuleName, char const* const szSignature, const unsigned char unIgnoredByte, const size_t unOffset) noexcept {
-			return FindSignatureMMXA(szModuleName, szSignature, unIgnoredByte, unOffset);
-		}
-
-		void const* FindSignatureMMX(char const* const szModuleName, const std::array<const unsigned char, 8>& SectionName, char const* const szSignature, const unsigned char unIgnoredByte, const size_t unOffset) noexcept {
-			return FindSignatureMMXA(szModuleName, SectionName, szSignature, unIgnoredByte, unOffset);
-		}
-
-		void const* FindSignatureMMX(char const* const szModuleName, char const* const szSectionName, char const* const szSignature, const unsigned char unIgnoredByte, const size_t unOffset) noexcept {
-			return FindSignatureMMXA(szModuleName, szSectionName, szSignature, unIgnoredByte, unOffset);
-		}
-#endif
-#endif // _M_IX86
-
-		// ----------------------------------------------------------------
 		// FindSignature (SSE2)
 		// ----------------------------------------------------------------
 
@@ -1766,11 +1543,7 @@ namespace Detours {
 
 			const size_t unLastStart = unSize - unSignatureLength;
 			if (unLastStart < 15) {
-#ifdef _M_IX86
-				return FindSignatureMMX(pData, unSize, szSignature, unIgnoredByte, unOffset);
-#else
 				return FindSignatureNative(pData, unSize, szSignature, unIgnoredByte, unOffset);
-#endif
 			}
 
 			const size_t unEnd = unLastStart - 15;
@@ -1813,11 +1586,7 @@ namespace Detours {
 			if (unCoveredEnd < unLastStart) {
 				unsigned char const* const pTail = pData + (unCoveredEnd + 1);
 				const size_t unTailSize = unSize - (unCoveredEnd + 1);
-#ifdef _M_IX86
-				return FindSignatureMMX(pTail, unTailSize, szSignature, unIgnoredByte, unOffset);
-#else
 				return FindSignatureNative(pTail, unTailSize, szSignature, unIgnoredByte, unOffset);
-#endif
 			}
 
 			return nullptr;
@@ -2395,9 +2164,6 @@ namespace Detours {
 		// ----------------------------------------------------------------
 
 		static bool bOnceInitialization = false;
-#ifdef _M_IX86
-		static bool bFeatureMMX = false;
-#endif // _M_IX86
 		static bool bFeatureSSE2 = false;
 		static bool bFeatureAVX2 = false;
 		static bool bFeatureAVX512BW = false;
@@ -2411,9 +2177,6 @@ namespace Detours {
 				const int nIDs = pIDs[0];
 				if (nIDs >= 1) {
 					__cpuid(pIDs, 0x00000001);
-#ifdef _M_IX86
-					bFeatureMMX = (pIDs[3] & (1 << 23)) != 0;
-#endif // _M_IX86
 					bFeatureSSE2 = (pIDs[3] & (1 << 26)) != 0;
 					if (nIDs >= 7) {
 						__cpuid(pIDs, 0x00000007);
@@ -2429,10 +2192,6 @@ namespace Detours {
 				return FindSignatureAVX2(pAddress, unSize, szSignature, unIgnoredByte, unOffset);
 			} else if (bFeatureSSE2) {
 				return FindSignatureSSE2(pAddress, unSize, szSignature, unIgnoredByte, unOffset);
-#ifdef _M_IX86
-			} else if (bFeatureMMX) {
-				return FindSignatureMMX(pAddress, unSize, szSignature, unIgnoredByte, unOffset);
-#endif // _M_IX86
 			} else {
 				return FindSignatureNative(pAddress, unSize, szSignature, unIgnoredByte, unOffset);
 			}
@@ -2769,218 +2528,6 @@ namespace Detours {
 #endif
 
 		// ----------------------------------------------------------------
-		// FindData (MMX)
-		// ----------------------------------------------------------------
-
-#ifdef _M_IX86
-		void const* FindDataMMX(void const* const pAddress, const size_t unSize, unsigned char const* const pData, const size_t unDataSize) noexcept {
-			if (!pAddress || !unSize || !pData || !unDataSize || (unSize < unDataSize)) {
-				return nullptr;
-			}
-
-			unsigned char const* const pSourceData = reinterpret_cast<unsigned char const* const>(pAddress);
-
-			const size_t unLastStart = unSize - unDataSize;
-			if (unLastStart < 7) {
-				return FindDataNative(pSourceData, unSize, pData, unDataSize);
-			}
-
-			const size_t unEnd = unLastStart - 7;
-			const size_t unEndAligned = (unEnd & ~static_cast<size_t>(7));
-			const size_t unDataBytesCycles = (unEndAligned / 8) + 1;
-
-			const unsigned char* pReturn = nullptr;
-
-			for (size_t unCycle = 0; unCycle < unDataBytesCycles; ++unCycle) {
-				const size_t unCycleOffset = unCycle * 8;
-
-				const size_t unPrefetch = unCycleOffset + 32;
-				if (unPrefetch < unSize) {
-					_mm_prefetch(reinterpret_cast<char const* const>(pSourceData + unPrefetch), _MM_HINT_T0);
-				}
-
-				unsigned int unFound = 0xFF;
-
-				for (size_t unDataIndex = 0; (unDataIndex < unDataSize) && (unFound != 0); ++unDataIndex) {
-					const __m64 mm0 = *reinterpret_cast<const __m64*>(pSourceData + unCycleOffset + unDataIndex);
-					const __m64 mm1 = _mm_set1_pi8(static_cast<char>(pData[unDataIndex]));
-					const __m64 mm2 = _mm_cmpeq_pi8(mm0, mm1);
-
-					unFound &= static_cast<unsigned int>(_mm_movemask_pi8(mm2));
-				}
-
-				if (unFound != 0) {
-					const size_t unBitIndex = static_cast<size_t>(__bit_scan_forward(unFound));
-					const size_t unStartIndex = unCycleOffset + unBitIndex;
-
-					unsigned char const* const pFoundAddress = pSourceData + unStartIndex;
-					pReturn = pFoundAddress;
-					break;
-				}
-			}
-
-			_mm_empty();
-
-			if (pReturn) {
-				return pReturn;
-			}
-
-			const size_t unMmxCoveredEnd = unEndAligned + 7;
-			if (unMmxCoveredEnd < unLastStart) {
-				unsigned char const* const pTail = pSourceData + (unMmxCoveredEnd + 1);
-				const size_t unTailSize = unSize - (unMmxCoveredEnd + 1);
-				return FindDataNative(pTail, unTailSize, pData, unDataSize);
-			}
-
-			return nullptr;
-		}
-
-		void const* FindDataMMX(const HMODULE hModule, unsigned char const* const pData, const size_t unDataSize) noexcept {
-			if (!hModule || !pData || !unDataSize) {
-				return nullptr;
-			}
-
-			const auto& pDH = reinterpret_cast<PIMAGE_DOS_HEADER>(hModule);
-			const auto& pNTHs = reinterpret_cast<PIMAGE_NT_HEADERS>(reinterpret_cast<char*>(hModule) + pDH->e_lfanew);
-			const auto& pOH = &(pNTHs->OptionalHeader);
-
-			return FindDataMMX(reinterpret_cast<void*>(hModule), static_cast<size_t>(pOH->SizeOfImage) - 1, pData, unDataSize);
-		}
-
-		void const* FindDataMMX(const HMODULE hModule, const std::array<const unsigned char, 8>& SectionName, unsigned char const* const pData, const size_t unDataSize) noexcept {
-			if (!hModule || !pData || !unDataSize) {
-				return nullptr;
-			}
-
-			void* pAddress = nullptr;
-			size_t unSize = 0;
-			if (!FindSection(hModule, SectionName, &pAddress, &unSize)) {
-				return nullptr;
-			}
-
-			return FindDataMMX(pAddress, unSize, pData, unDataSize);
-		}
-
-		void const* FindDataMMX(const HMODULE hModule, char const* const szSectionName, unsigned char const* const pData, const size_t unDataSize) noexcept {
-			if (!hModule || !szSectionName || !pData || !unDataSize) {
-				return nullptr;
-			}
-
-			void* pAddress = nullptr;
-			size_t unSize = 0;
-			if (!FindSectionPOGO(hModule, szSectionName, &pAddress, &unSize)) {
-				return nullptr;
-			}
-
-			return FindDataMMX(pAddress, unSize, pData, unDataSize);
-		}
-
-		void const* FindDataMMXA(char const* const szModuleName, unsigned char const* const pData, const size_t unDataSize) noexcept {
-			if (!szModuleName || !pData || !unDataSize) {
-				return nullptr;
-			}
-
-			HMODULE hModule = GetModuleHandleA(szModuleName);
-			if (!hModule) {
-				return nullptr;
-			}
-
-			return FindDataMMX(hModule, pData, unDataSize);
-		}
-
-		void const* FindDataMMXA(char const* const szModuleName, const std::array<const unsigned char, 8>& SectionName, unsigned char const* const pData, const size_t unDataSize) noexcept {
-			if (!szModuleName || !pData || !unDataSize) {
-				return nullptr;
-			}
-
-			HMODULE hModule = GetModuleHandleA(szModuleName);
-			if (!hModule) {
-				return nullptr;
-			}
-
-			return FindDataMMX(hModule, SectionName, pData, unDataSize);
-		}
-
-		void const* FindDataMMXA(char const* const szModuleName, char const* const szSectionName, unsigned char const* const pData, const size_t unDataSize) noexcept {
-			if (!szModuleName || !szSectionName || !pData || !unDataSize) {
-				return nullptr;
-			}
-
-			HMODULE hModule = GetModuleHandleA(szModuleName);
-			if (!hModule) {
-				return nullptr;
-			}
-
-			return FindDataMMX(hModule, szSectionName, pData, unDataSize);
-		}
-
-		void const* FindDataMMXW(wchar_t const* const szModuleName, unsigned char const* const pData, const size_t unDataSize) noexcept {
-			if (!szModuleName || !pData || !unDataSize) {
-				return nullptr;
-			}
-
-			HMODULE hModule = GetModuleHandleW(szModuleName);
-			if (!hModule) {
-				return nullptr;
-			}
-
-			return FindDataMMX(hModule, pData, unDataSize);
-		}
-
-		void const* FindDataMMXW(wchar_t const* const szModuleName, const std::array<const unsigned char, 8>& SectionName, unsigned char const* const pData, const size_t unDataSize) noexcept {
-			if (!szModuleName || !pData || !unDataSize) {
-				return nullptr;
-			}
-
-			HMODULE hModule = GetModuleHandleW(szModuleName);
-			if (!hModule) {
-				return nullptr;
-			}
-
-			return FindDataMMX(hModule, SectionName, pData, unDataSize);
-		}
-
-		void const* FindDataMMXW(wchar_t const* const szModuleName, char const* const szSectionName, unsigned char const* const pData, const size_t unDataSize) noexcept {
-			if (!szModuleName || !szSectionName || !pData || !unDataSize) {
-				return nullptr;
-			}
-
-			HMODULE hModule = GetModuleHandleW(szModuleName);
-			if (!hModule) {
-				return nullptr;
-			}
-
-			return FindDataMMX(hModule, szSectionName, pData, unDataSize);
-		}
-
-#ifdef _UNICODE
-		void const* FindDataMMX(wchar_t const* const szModuleName, unsigned char const* const pData, const size_t unDataSize) noexcept {
-			return FindDataMMXW(szModuleName, pData, unDataSize);
-		}
-
-		void const* FindDataMMX(wchar_t const* const szModuleName, const std::array<const unsigned char, 8>& SectionName, unsigned char const* const pData, const size_t unDataSize) noexcept {
-			return FindDataMMXW(szModuleName, SectionName, pData, unDataSize);
-		}
-
-		void const* FindDataMMX(wchar_t const* const szModuleName, char const* const szSectionName, unsigned char const* const pData, const size_t unDataSize) noexcept {
-			return FindDataMMXW(szModuleName, szSectionName, pData, unDataSize);
-		}
-#else
-		void const* FindDataMMX(char const* const szModuleName, unsigned char const* const pData, const size_t unDataSize) noexcept {
-			return FindDataMMXA(szModuleName, pData, unDataSize);
-		}
-
-		void const* FindDataMMX(char const* const szModuleName, const std::array<const unsigned char, 8>& SectionName, unsigned char const* const pData, const size_t unDataSize) noexcept {
-			return FindDataMMXA(szModuleName, SectionName, pData, unDataSize);
-		}
-
-		void const* FindDataMMX(char const* const szModuleName, char const* const szSectionName, unsigned char const* const pData, const size_t unDataSize) noexcept {
-			return FindDataMMXA(szModuleName, szSectionName, pData, unDataSize);
-		}
-#endif
-#endif // _M_IX86
-
-		// ----------------------------------------------------------------
 		// FindData (SSE2)
 		// ----------------------------------------------------------------
 
@@ -2993,11 +2540,7 @@ namespace Detours {
 
 			const size_t unLastStart = unSize - unDataSize;
 			if (unLastStart < 15) {
-#ifdef _M_IX86
-				return FindDataMMX(pSourceData, unSize, pData, unDataSize);
-#else
 				return FindDataNative(pSourceData, unSize, pData, unDataSize);
-#endif
 			}
 
 			const size_t unEnd = unLastStart - 15;
@@ -3035,11 +2578,7 @@ namespace Detours {
 			if (unCoveredEnd < unLastStart) {
 				unsigned char const* const pTail = pSourceData + (unCoveredEnd + 1);
 				const size_t unTailSize = unSize - (unCoveredEnd + 1);
-#ifdef _M_IX86
-				return FindDataMMX(pTail, unTailSize, pData, unDataSize);
-#else
 				return FindDataNative(pTail, unTailSize, pData, unDataSize);
-#endif
 			}
 
 			return nullptr;
@@ -3604,9 +3143,6 @@ namespace Detours {
 				const int nIDs = pIDs[0];
 				if (nIDs >= 1) {
 					__cpuid(pIDs, 0x00000001);
-#ifdef _M_IX86
-					bFeatureMMX = (pIDs[3] & (1 << 23)) != 0;
-#endif // _M_IX86
 					bFeatureSSE2 = (pIDs[3] & (1 << 26)) != 0;
 					if (nIDs >= 7) {
 						__cpuid(pIDs, 0x00000007);
@@ -3622,10 +3158,6 @@ namespace Detours {
 				return FindDataAVX2(pAddress, unSize, pData, unDataSize);
 			} else if (bFeatureSSE2) {
 				return FindDataSSE2(pAddress, unSize, pData, unDataSize);
-#ifdef _M_IX86
-			} else if (bFeatureMMX) {
-				return FindDataMMX(pAddress, unSize, pData, unDataSize);
-#endif // _M_IX86
 			} else {
 				return FindDataNative(pAddress, unSize, pData, unDataSize);
 			}
