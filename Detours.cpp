@@ -4,6 +4,9 @@
 #include <tchar.h>
 #include <DbgHelp.h>
 
+// C++
+#include <cstring>
+
 // STL
 #include <unordered_map>
 #include <unordered_set>
@@ -1558,7 +1561,7 @@ namespace Detours {
 					_mm_prefetch(reinterpret_cast<char const* const>(pData + unPrefect), _MM_HINT_T0);
 				}
 
-				unsigned __int16 unFound = 0xFFFFui16;
+				unsigned __int16 unFound = 0xFFFF;
 
 				for (size_t unSignatureIndex = 0; (unSignatureIndex < unSignatureLength) && (unFound != 0); ++unSignatureIndex) {
 					const unsigned char unSignatureByte = pSignature[unSignatureIndex];
@@ -1770,7 +1773,7 @@ namespace Detours {
 					_mm_prefetch(reinterpret_cast<char const* const>(pData + unPrefetch), _MM_HINT_T0);
 				}
 
-				unsigned __int32 unFound = 0xFFFFFFFFui32;
+				unsigned __int32 unFound = 0xFFFFFFFF;
 
 				for (size_t unSignatureIndex = 0; (unSignatureIndex < unSignatureLength) && (unFound != 0); ++unSignatureIndex) {
 					const unsigned char unSignatureByte = pSignature[unSignatureIndex];
@@ -1982,7 +1985,7 @@ namespace Detours {
 					_mm_prefetch(reinterpret_cast<char const* const>(pData + unPrefetch), _MM_HINT_T0);
 				}
 
-				unsigned __int64 unFound = 0xFFFFFFFFFFFFFFFFui64;
+				unsigned __int64 unFound = 0xFFFFFFFFFFFFFFFF;
 
 				for (size_t unSignatureIndex = 0; (unSignatureIndex < unSignatureLength) && (unFound != 0); ++unSignatureIndex) {
 					const unsigned char unSignatureByte = pSignature[unSignatureIndex];
@@ -2555,7 +2558,7 @@ namespace Detours {
 					_mm_prefetch(reinterpret_cast<char const* const>(pSourceData + unPrefetch), _MM_HINT_T0);
 				}
 
-				unsigned __int16 unFound = 0xFFFFui16;
+				unsigned __int16 unFound = 0xFFFF;
 
 				for (size_t unDataIndex = 0; (unDataIndex < unDataSize) && (unFound != 0); ++unDataIndex) {
 					const __m128i xmm1 = _mm_loadu_si128(reinterpret_cast<const __m128i*>(pSourceData + unCycleOffset + unDataIndex));
@@ -2756,7 +2759,7 @@ namespace Detours {
 					_mm_prefetch(reinterpret_cast<char const* const>(pSourceData + unPrefetch), _MM_HINT_T0);
 				}
 
-				unsigned __int32 unFound = 0xFFFFFFFFui32;
+				unsigned __int32 unFound = 0xFFFFFFFF;
 
 				for (size_t unDataIndex = 0; (unDataIndex < unDataSize) && (unFound != 0); ++unDataIndex) {
 					const __m256i ymm0 = _mm256_loadu_si256(reinterpret_cast<const __m256i*>(pSourceData + unCycleOffset + unDataIndex));
@@ -2957,7 +2960,7 @@ namespace Detours {
 					_mm_prefetch(reinterpret_cast<char const* const>(pSourceData + unPrefetch), _MM_HINT_T0);
 				}
 
-				unsigned __int64 unFound = 0xFFFFFFFFFFFFFFFFui64;
+				unsigned __int64 unFound = 0xFFFFFFFFFFFFFFFF;
 
 				for (size_t unDataIndex = 0; (unDataIndex < unDataSize) && (unFound != 0); ++unDataIndex) {
 					const __m512i zmm0 = _mm512_loadu_si512(reinterpret_cast<const void*>(pSourceData + unCycleOffset + unDataIndex));

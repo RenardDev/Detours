@@ -1838,7 +1838,7 @@ TEST_SUITE("Detours::Hook") {
 		CHECK(hThread1 != INVALID_HANDLE_VALUE);
 		CHECK(hThread2 != nullptr);
 		CHECK(hThread2 != INVALID_HANDLE_VALUE);
-		CHECK(Detours::Hook::HookHardware(unTID1, Detours::Hook::HARDWARE_HOOK_REGISTER::REGISTER_DR0, HardwareHook , &reinterpret_cast<unsigned int*>(pArray)[3], Detours::Hook::HARDWARE_HOOK_TYPE::TYPE_ACCESS, 4) == true);
+		CHECK(Detours::Hook::HookHardware(unTID1, Detours::Hook::HARDWARE_HOOK_REGISTER::REGISTER_DR0, HardwareHook, &reinterpret_cast<unsigned int*>(pArray)[3], Detours::Hook::HARDWARE_HOOK_TYPE::TYPE_ACCESS, 4) == true);
 		CHECK(Detours::Hook::HookHardware(unTID2, Detours::Hook::HARDWARE_HOOK_REGISTER::REGISTER_DR0, HardwareHook, &reinterpret_cast<unsigned int*>(pArray)[3], Detours::Hook::HARDWARE_HOOK_TYPE::TYPE_ACCESS, 4) == true);
 
 		printf("pArray[2] = %i\n", pArray[2]);
