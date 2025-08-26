@@ -1315,34 +1315,66 @@ namespace Detours {
 			}
 
 			const size_t unSignatureLength = strnlen_s(szSignature, 0x1000);
-			if (!unSignatureLength || (unSize <= unSignatureLength)) {
+			if (unSignatureLength == 0 || unSize < unSignatureLength) {
 				return nullptr;
 			}
 
-			unsigned char const* const pData = static_cast<unsigned char const*>(pAddress);
+			unsigned char const* const pData = static_cast<unsigned char const* const>(pAddress);
 			unsigned char const* const pSignature = reinterpret_cast<unsigned char const* const>(szSignature);
 
-			for (size_t unIndex = 0; unIndex <= unSize - unSignatureLength; ++unIndex) {
-				if ((pData[unIndex] != pSignature[0]) && (pSignature[0] != unIgnoredByte)) {
-					continue;
+			ptrdiff_t unAnchorIndex = -1;
+			unsigned char unAnchorValue = 0;
+
+			for (ptrdiff_t i = static_cast<ptrdiff_t>(unSignatureLength) - 1; i >= 0; --i) {
+				const unsigned char unByte = pSignature[static_cast<size_t>(i)];
+				if (unByte != unIgnoredByte) {
+					unAnchorIndex = i;
+					unAnchorValue = unByte;
+					break;
+				}
+			}
+
+			if (unAnchorIndex < 0) {
+				return pData + unOffset;
+			}
+
+			unsigned char const* pScanBegin = pData + static_cast<size_t>(unAnchorIndex);
+			size_t unScanCount = unSize - unSignatureLength + 1;
+			while (unScanCount) {
+				unsigned char const* const pAnchor = static_cast<unsigned char const*>(memchr(pScanBegin, unAnchorValue, unScanCount));
+				if (!pAnchor) {
+					break;
 				}
 
-				size_t unSignatureIndex = 1;
-				for (; unSignatureIndex < unSignatureLength; ++unSignatureIndex) {
-					const unsigned char unSignatureByte = pSignature[unSignatureIndex];
-					if (unSignatureByte == unIgnoredByte) {
-						continue;
-					}
+				const size_t unBase = static_cast<size_t>(pAnchor - pData) - static_cast<size_t>(unAnchorIndex);
 
-					if (pData[unIndex + unSignatureIndex] != unSignatureByte) {
+				bool bMatched = true;
+
+				for (size_t i = 0; i < static_cast<size_t>(unAnchorIndex); ++i) {
+					const unsigned char unByte = pSignature[i];
+					if ((unByte != unIgnoredByte) && (pData[unBase + i] != unByte)) {
+						bMatched = false;
 						break;
 					}
 				}
 
-				if (unSignatureIndex == unSignatureLength) {
-					unsigned char const* const pFoundAddress = pData + unIndex;
-					return pFoundAddress + unOffset;
+				if (bMatched) {
+					for (size_t i = static_cast<size_t>(unAnchorIndex) + 1; i < unSignatureLength; ++i) {
+						const unsigned char unByte = pSignature[i];
+						if ((unByte != unIgnoredByte) && (pData[unBase + i] != unByte)) {
+							bMatched = false;
+							break;
+						}
+					}
 				}
+
+				if (bMatched) {
+					return pData + unBase + unOffset;
+				}
+
+				const size_t unAdvance = static_cast<size_t>((pAnchor + 1) - pScanBegin);
+				pScanBegin += unAdvance;
+				unScanCount -= unAdvance;
 			}
 
 			return nullptr;
@@ -1493,6 +1525,229 @@ namespace Detours {
 #endif
 
 		// ----------------------------------------------------------------
+		// FindSignature (MMX)
+		// ----------------------------------------------------------------
+
+#ifdef _M_IX86
+		void const* FindSignatureMMX(void const* const pAddress, const size_t unSize, char const* const szSignature, const unsigned char unIgnoredByte, const size_t unOffset) noexcept {
+			if (!pAddress || !unSize || !szSignature) {
+				return nullptr;
+			}
+
+			const size_t unSignatureLength = strnlen_s(szSignature, 0x1000);
+			if (!unSignatureLength || (unSize < unSignatureLength)) {
+				return nullptr;
+			}
+
+			unsigned char const* const pData = static_cast<unsigned char const* const>(pAddress);
+			unsigned char const* const pSignature = reinterpret_cast<unsigned char const* const>(szSignature);
+
+			const size_t unLastStart = unSize - unSignatureLength;
+			if (unLastStart < 7) {
+				return FindSignatureNative(pData, unSize, szSignature, unIgnoredByte, unOffset);
+			}
+
+			const size_t unEnd = unLastStart - 7;
+			const size_t unEndAligned = (unEnd & ~static_cast<size_t>(7));
+			const size_t unDataBytesCycles = (unEndAligned / 8) + 1;
+
+			const unsigned char* pReturn = nullptr;
+
+			for (size_t unCycle = 0; unCycle < unDataBytesCycles; ++unCycle) {
+				const size_t unCycleOffset = unCycle * 8;
+
+				const size_t unPrefetch = unCycleOffset + 32;
+				if (unPrefetch < unSize) {
+					_mm_prefetch(reinterpret_cast<char const* const>(pData + unPrefetch), _MM_HINT_T0);
+				}
+
+				unsigned int unFound = 0xFF;
+
+				for (size_t unSignatureIndex = 0; (unSignatureIndex < unSignatureLength) && (unFound != 0); ++unSignatureIndex) {
+					const unsigned char unSignatureByte = pSignature[unSignatureIndex];
+					if (unSignatureByte == unIgnoredByte) {
+						continue;
+					}
+
+					const __m64 mm0 = *reinterpret_cast<const __m64*>(pData + unCycleOffset + unSignatureIndex);
+					const __m64 mm1 = _mm_set1_pi8(static_cast<char>(unSignatureByte));
+					const __m64 mm2 = _mm_cmpeq_pi8(mm0, mm1);
+
+					unFound &= static_cast<unsigned int>(_mm_movemask_pi8(mm2));
+				}
+
+				if (unFound != 0) {
+					const size_t unBitIndex = static_cast<size_t>(__bit_scan_forward(unFound));
+					const size_t unStartIndex = unCycleOffset + unBitIndex;
+
+					unsigned char const* const pFoundAddress = pData + unStartIndex;
+					pReturn = pFoundAddress + unOffset;
+					break;
+				}
+			}
+
+			_mm_empty();
+
+			if (pReturn) {
+				return pReturn;
+			}
+
+			const size_t unCoveredEnd = unEndAligned + 7;
+			if (unCoveredEnd < unLastStart) {
+				unsigned char const* const pTail = pData + (unCoveredEnd + 1);
+				const size_t unTailSize = unSize - (unCoveredEnd + 1);
+				return FindSignatureNative(pTail, unTailSize, szSignature, unIgnoredByte, unOffset);
+			}
+
+			return nullptr;
+		}
+
+		void const* FindSignatureMMX(const HMODULE hModule, char const* const szSignature, const unsigned char unIgnoredByte, const size_t unOffset) noexcept {
+			if (!hModule || !szSignature) {
+				return nullptr;
+			}
+
+			const auto& pDH = reinterpret_cast<PIMAGE_DOS_HEADER>(hModule);
+			const auto& pNTHs = reinterpret_cast<PIMAGE_NT_HEADERS>(reinterpret_cast<char*>(hModule) + pDH->e_lfanew);
+			const auto& pOH = &(pNTHs->OptionalHeader);
+
+			return FindSignatureMMX(reinterpret_cast<void*>(hModule), static_cast<size_t>(pOH->SizeOfImage) - 1, szSignature, unIgnoredByte, unOffset);
+		}
+
+		void const* FindSignatureMMX(const HMODULE hModule, const std::array<const unsigned char, 8>& SectionName, char const* const szSignature, const unsigned char unIgnoredByte, const size_t unOffset) noexcept {
+			if (!hModule || !szSignature) {
+				return nullptr;
+			}
+
+			void* pAddress = nullptr;
+			size_t unSize = 0;
+			if (!FindSection(hModule, SectionName, &pAddress, &unSize)) {
+				return nullptr;
+			}
+
+			return FindSignatureMMX(pAddress, unSize, szSignature, unIgnoredByte, unOffset);
+		}
+
+		void const* FindSignatureMMX(const HMODULE hModule, char const* const szSectionName, char const* const szSignature, const unsigned char unIgnoredByte, const size_t unOffset) noexcept {
+			if (!hModule || !szSectionName || !szSignature) {
+				return nullptr;
+			}
+
+			void* pAddress = nullptr;
+			size_t unSize = 0;
+			if (!FindSectionPOGO(hModule, szSectionName, &pAddress, &unSize)) {
+				return nullptr;
+			}
+
+			return FindSignatureMMX(pAddress, unSize, szSignature, unIgnoredByte, unOffset);
+		}
+
+		void const* FindSignatureMMXA(char const* const szModuleName, char const* const szSignature, const unsigned char unIgnoredByte, const size_t unOffset) noexcept {
+			if (!szModuleName || !szSignature) {
+				return nullptr;
+			}
+
+			HMODULE hModule = GetModuleHandleA(szModuleName);
+			if (!hModule) {
+				return nullptr;
+			}
+
+			return FindSignatureMMX(hModule, szSignature, unIgnoredByte, unOffset);
+		}
+
+		void const* FindSignatureMMXA(char const* const szModuleName, const std::array<const unsigned char, 8>& SectionName, char const* const szSignature, const unsigned char unIgnoredByte, const size_t unOffset) noexcept {
+			if (!szModuleName || !szSignature) {
+				return nullptr;
+			}
+
+			HMODULE hModule = GetModuleHandleA(szModuleName);
+			if (!hModule) {
+				return nullptr;
+			}
+
+			return FindSignatureMMX(hModule, SectionName, szSignature, unIgnoredByte, unOffset);
+		}
+
+		void const* FindSignatureMMXA(char const* const szModuleName, char const* const szSectionName, char const* const szSignature, const unsigned char unIgnoredByte, const size_t unOffset) noexcept {
+			if (!szModuleName || !szSectionName || !szSignature) {
+				return nullptr;
+			}
+
+			HMODULE hModule = GetModuleHandleA(szModuleName);
+			if (!hModule) {
+				return nullptr;
+			}
+
+			return FindSignatureMMX(hModule, szSectionName, szSignature, unIgnoredByte, unOffset);
+		}
+
+		void const* FindSignatureMMXW(wchar_t const* const szModuleName, char const* const szSignature, const unsigned char unIgnoredByte, const size_t unOffset) noexcept {
+			if (!szModuleName || !szSignature) {
+				return nullptr;
+			}
+
+			HMODULE hModule = GetModuleHandleW(szModuleName);
+			if (!hModule) {
+				return nullptr;
+			}
+
+			return FindSignatureMMX(hModule, szSignature, unIgnoredByte, unOffset);
+		}
+
+		void const* FindSignatureMMXW(wchar_t const* const szModuleName, const std::array<const unsigned char, 8>& SectionName, char const* const szSignature, const unsigned char unIgnoredByte, const size_t unOffset) noexcept {
+			if (!szModuleName || !szSignature) {
+				return nullptr;
+			}
+
+			HMODULE hModule = GetModuleHandleW(szModuleName);
+			if (!hModule) {
+				return nullptr;
+			}
+
+			return FindSignatureMMX(hModule, SectionName, szSignature, unIgnoredByte, unOffset);
+		}
+
+		void const* FindSignatureMMXW(wchar_t const* const szModuleName, char const* const szSectionName, char const* const szSignature, const unsigned char unIgnoredByte, const size_t unOffset) noexcept {
+			if (!szModuleName || !szSectionName || !szSignature) {
+				return nullptr;
+			}
+
+			HMODULE hModule = GetModuleHandleW(szModuleName);
+			if (!hModule) {
+				return nullptr;
+			}
+
+			return FindSignatureMMX(hModule, szSectionName, szSignature, unIgnoredByte, unOffset);
+		}
+
+#ifdef _UNICODE
+		void const* FindSignatureMMX(wchar_t const* const szModuleName, char const* const szSignature, const unsigned char unIgnoredByte, const size_t unOffset) noexcept {
+			return FindSignatureMMXW(szModuleName, szSignature, unIgnoredByte, unOffset);
+		}
+
+		void const* FindSignatureMMX(wchar_t const* const szModuleName, const std::array<const unsigned char, 8>& SectionName, char const* const szSignature, const unsigned char unIgnoredByte, const size_t unOffset) noexcept {
+			return FindSignatureMMXW(szModuleName, SectionName, szSignature, unIgnoredByte, unOffset);
+		}
+
+		void const* FindSignatureMMX(wchar_t const* const szModuleName, char const* const szSectionName, char const* const szSignature, const unsigned char unIgnoredByte, const size_t unOffset) noexcept {
+			return FindSignatureMMXW(szModuleName, szSectionName, szSignature, unIgnoredByte, unOffset);
+		}
+#else
+		void const* FindSignatureMMX(char const* const szModuleName, char const* const szSignature, const unsigned char unIgnoredByte, const size_t unOffset) noexcept {
+			return FindSignatureMMXA(szModuleName, szSignature, unIgnoredByte, unOffset);
+		}
+
+		void const* FindSignatureMMX(char const* const szModuleName, const std::array<const unsigned char, 8>& SectionName, char const* const szSignature, const unsigned char unIgnoredByte, const size_t unOffset) noexcept {
+			return FindSignatureMMXA(szModuleName, SectionName, szSignature, unIgnoredByte, unOffset);
+		}
+
+		void const* FindSignatureMMX(char const* const szModuleName, char const* const szSectionName, char const* const szSignature, const unsigned char unIgnoredByte, const size_t unOffset) noexcept {
+			return FindSignatureMMXA(szModuleName, szSectionName, szSignature, unIgnoredByte, unOffset);
+		}
+#endif
+#endif // _M_IX86
+
+		// ----------------------------------------------------------------
 		// FindSignature (SSE2)
 		// ----------------------------------------------------------------
 
@@ -1509,17 +1764,29 @@ namespace Detours {
 			unsigned char const* const pData = static_cast<unsigned char const* const>(pAddress);
 			unsigned char const* const pSignature = reinterpret_cast<unsigned char const* const>(szSignature);
 
-			const size_t unDataBytesCycles = unSize / 16;
+			const size_t unLastStart = unSize - unSignatureLength;
+			if (unLastStart < 15) {
+#ifdef _M_IX86
+				return FindSignatureMMX(pData, unSize, szSignature, unIgnoredByte, unOffset);
+#else
+				return FindSignatureNative(pData, unSize, szSignature, unIgnoredByte, unOffset);
+#endif
+			}
+
+			const size_t unEnd = unLastStart - 15;
+			const size_t unEndAligned = (unEnd & ~static_cast<size_t>(15));
+			const size_t unDataBytesCycles = (unEndAligned / 16) + 1;
+
 			for (size_t unCycle = 0; unCycle < unDataBytesCycles; ++unCycle) {
 				const size_t unCycleOffset = unCycle * 16;
 
-				if ((unCycle != 0) && ((unCycle + 1) <= unDataBytesCycles)) {
-					_mm_prefetch(reinterpret_cast<char const* const>(pData + unCycleOffset + 16), _MM_HINT_T0);
-				} else {
-					_mm_prefetch(reinterpret_cast<char const* const>(pData + unCycleOffset), _MM_HINT_T0);
+				const size_t unPrefect = unCycleOffset + 64;
+				if (unPrefect < unSize) {
+					_mm_prefetch(reinterpret_cast<char const* const>(pData + unPrefect), _MM_HINT_T0);
 				}
 
 				unsigned __int16 unFound = 0xFFFFui16;
+
 				for (size_t unSignatureIndex = 0; (unSignatureIndex < unSignatureLength) && (unFound != 0); ++unSignatureIndex) {
 					const unsigned char unSignatureByte = pSignature[unSignatureIndex];
 					if (unSignatureByte == unIgnoredByte) {
@@ -1528,25 +1795,29 @@ namespace Detours {
 
 					const __m128i xmm1 = _mm_loadu_si128(reinterpret_cast<const __m128i*>(pData + unCycleOffset + unSignatureIndex));
 					const __m128i xmm2 = _mm_set1_epi8(static_cast<char>(unSignatureByte));
-
 					const __m128i xmm3 = _mm_cmpeq_epi8(xmm1, xmm2);
 
-					unFound &= _mm_movemask_epi8(xmm3);
+					unFound &= static_cast<unsigned __int16>(_mm_movemask_epi8(xmm3));
 				}
 
 				if (unFound != 0) {
-					unsigned char const* const pFoundAddress = pData + unCycleOffset + __bit_scan_forward(unFound);
+					const size_t unBitIndex = static_cast<size_t>(__bit_scan_forward(unFound));
+					const size_t unStartIndex = unCycleOffset + unBitIndex;
+
+					unsigned char const* const pFoundAddress = pData + unStartIndex;
 					return pFoundAddress + unOffset;
 				}
 			}
 
-			const size_t unDataBytesLeft = unSize & 0xF;
-			if (unDataBytesLeft) {
-				if (unDataBytesLeft < unSignatureLength) {
-					return FindSignatureNative(pData + unSize - unDataBytesLeft - unSignatureLength, unDataBytesLeft + unSignatureLength, szSignature, unIgnoredByte, unOffset);
-				}
-
-				return FindSignatureNative(pData + unSize - unDataBytesLeft, unDataBytesLeft, szSignature, unIgnoredByte, unOffset);
+			const size_t unCoveredEnd = unEndAligned + 15;
+			if (unCoveredEnd < unLastStart) {
+				unsigned char const* const pTail = pData + (unCoveredEnd + 1);
+				const size_t unTailSize = unSize - (unCoveredEnd + 1);
+#ifdef _M_IX86
+				return FindSignatureMMX(pTail, unTailSize, szSignature, unIgnoredByte, unOffset);
+#else
+				return FindSignatureNative(pTail, unTailSize, szSignature, unIgnoredByte, unOffset);
+#endif
 			}
 
 			return nullptr;
@@ -1713,17 +1984,25 @@ namespace Detours {
 			unsigned char const* const pData = static_cast<unsigned char const* const>(pAddress);
 			unsigned char const* const pSignature = reinterpret_cast<unsigned char const* const>(szSignature);
 
-			const size_t unDataBytesCycles = unSize / 32;
+			const size_t unLastStart = unSize - unSignatureLength;
+			if (unLastStart < 31) {
+				return FindSignatureSSE2(pData, unSize, szSignature, unIgnoredByte, unOffset);
+			}
+
+			const size_t unEnd = unLastStart - 31;
+			const size_t unEndAligned = (unEnd & ~static_cast<size_t>(31));
+			const size_t unDataBytesCycles = (unEndAligned / 32) + 1;
+
 			for (size_t unCycle = 0; unCycle < unDataBytesCycles; ++unCycle) {
 				const size_t unCycleOffset = unCycle * 32;
 
-				if ((unCycle != 0) && ((unCycle + 1) <= unDataBytesCycles)) {
-					_mm_prefetch(reinterpret_cast<char const* const>(pData + unCycleOffset + 32), _MM_HINT_T0);
-				} else {
-					_mm_prefetch(reinterpret_cast<char const* const>(pData + unCycleOffset), _MM_HINT_T0);
+				const size_t unPrefetch = unCycleOffset + 64;
+				if (unPrefetch < unSize) {
+					_mm_prefetch(reinterpret_cast<char const* const>(pData + unPrefetch), _MM_HINT_T0);
 				}
 
 				unsigned __int32 unFound = 0xFFFFFFFFui32;
+
 				for (size_t unSignatureIndex = 0; (unSignatureIndex < unSignatureLength) && (unFound != 0); ++unSignatureIndex) {
 					const unsigned char unSignatureByte = pSignature[unSignatureIndex];
 					if (unSignatureByte == unIgnoredByte) {
@@ -1732,25 +2011,25 @@ namespace Detours {
 
 					const __m256i ymm0 = _mm256_loadu_si256(reinterpret_cast<const __m256i*>(pData + unCycleOffset + unSignatureIndex));
 					const __m256i ymm1 = _mm256_set1_epi8(static_cast<char>(unSignatureByte));
-
 					const __m256i ymm3 = _mm256_cmpeq_epi8(ymm0, ymm1);
 
-					unFound &= _mm256_movemask_epi8(ymm3);
+					unFound &= static_cast<unsigned __int32>(_mm256_movemask_epi8(ymm3));
 				}
 
 				if (unFound != 0) {
-					unsigned char const* const pFoundAddress = pData + unCycleOffset + __bit_scan_forward(unFound);
+					const size_t unBitIndex = static_cast<size_t>(__bit_scan_forward(unFound));
+					const size_t unStartIndex = unCycleOffset + unBitIndex;
+
+					unsigned char const* const pFoundAddress = pData + unStartIndex;
 					return pFoundAddress + unOffset;
 				}
 			}
 
-			const size_t unDataBytesLeft = unSize & 0x1F;
-			if (unDataBytesLeft) {
-				if (unDataBytesLeft < unSignatureLength) {
-					return FindSignatureSSE2(pData + unSize - unDataBytesLeft - unSignatureLength, unDataBytesLeft + unSignatureLength, szSignature, unIgnoredByte, unOffset);
-				}
-
-				return FindSignatureSSE2(pData + unSize - unDataBytesLeft, unDataBytesLeft, szSignature, unIgnoredByte, unOffset);
+			const size_t unCoveredEnd = unEndAligned + 31;
+			if (unCoveredEnd < unLastStart) {
+				unsigned char const* const pTail = pData + (unCoveredEnd + 1);
+				const size_t unTailSize = unSize - (unCoveredEnd + 1);
+				return FindSignatureSSE2(pTail, unTailSize, szSignature, unIgnoredByte, unOffset);
 			}
 
 			return nullptr;
@@ -1917,42 +2196,51 @@ namespace Detours {
 			unsigned char const* const pData = static_cast<unsigned char const* const>(pAddress);
 			unsigned char const* const pSignature = reinterpret_cast<unsigned char const* const>(szSignature);
 
-			const size_t unDataBytesCycles = unSize / 64;
+			const size_t unLastStart = unSize - unSignatureLength;
+			if (unLastStart < 63) {
+				return FindSignatureAVX2(pData, unSize, szSignature, unIgnoredByte, unOffset);
+			}
+
+			const size_t unEnd = unLastStart - 63;
+			const size_t unEndAligned = (unEnd & ~static_cast<size_t>(63));
+			const size_t unDataBytesCycles = (unEndAligned / 64) + 1;
+
 			for (size_t unCycle = 0; unCycle < unDataBytesCycles; ++unCycle) {
 				const size_t unCycleOffset = unCycle * 64;
 
-				if ((unCycle != 0) && ((unCycle + 1) <= unDataBytesCycles)) {
-					_mm_prefetch(reinterpret_cast<char const* const>(pData + unCycleOffset + 64), _MM_HINT_T0);
-				} else {
-					_mm_prefetch(reinterpret_cast<char const* const>(pData + unCycleOffset), _MM_HINT_T0);
+				const size_t unPrefetch = unCycleOffset + 128;
+				if (unPrefetch < unSize) {
+					_mm_prefetch(reinterpret_cast<char const* const>(pData + unPrefetch), _MM_HINT_T0);
 				}
 
 				unsigned __int64 unFound = 0xFFFFFFFFFFFFFFFFui64;
+
 				for (size_t unSignatureIndex = 0; (unSignatureIndex < unSignatureLength) && (unFound != 0); ++unSignatureIndex) {
 					const unsigned char unSignatureByte = pSignature[unSignatureIndex];
 					if (unSignatureByte == unIgnoredByte) {
 						continue;
 					}
 
-					const __m512i zmm0 = _mm512_loadu_si512(reinterpret_cast<const __m256i*>(pData + unCycleOffset + unSignatureIndex));
+					const __m512i zmm0 = _mm512_loadu_si512(reinterpret_cast<const void*>(pData + unCycleOffset + unSignatureIndex));
 					const __m512i zmm1 = _mm512_set1_epi8(static_cast<char>(unSignatureByte));
 
-					unFound &= _mm512_cmpeq_epi8_mask(zmm0, zmm1);
+					unFound &= static_cast<unsigned __int64>(_mm512_cmpeq_epi8_mask(zmm0, zmm1));
 				}
 
 				if (unFound != 0) {
-					unsigned char const* const pFoundAddress = pData + unCycleOffset + __bit_scan_forward(unFound);
+					const size_t unBitIndex = static_cast<size_t>(__bit_scan_forward(unFound));
+					const size_t unStartIndex = unCycleOffset + unBitIndex;
+
+					unsigned char const* const pFoundAddress = pData + unStartIndex;
 					return pFoundAddress + unOffset;
 				}
 			}
 
-			const size_t unDataBytesLeft = unSize & 0x3F;
-			if (unDataBytesLeft) {
-				if (unDataBytesLeft < unSignatureLength) {
-					return FindSignatureAVX2(pData + unSize - unDataBytesLeft - unSignatureLength, unDataBytesLeft + unSignatureLength, szSignature, unIgnoredByte, unOffset);
-				}
-
-				return FindSignatureAVX2(pData + unSize - unDataBytesLeft, unDataBytesLeft, szSignature, unIgnoredByte, unOffset);
+			const size_t unCoveredEnd = unEndAligned + 63;
+			if (unCoveredEnd < unLastStart) {
+				unsigned char const* const pTail = pData + (unCoveredEnd + 1);
+				const size_t unTailSize = unSize - (unCoveredEnd + 1);
+				return FindSignatureAVX2(pTail, unTailSize, szSignature, unIgnoredByte, unOffset);
 			}
 
 			return nullptr;
@@ -2107,6 +2395,9 @@ namespace Detours {
 		// ----------------------------------------------------------------
 
 		static bool bOnceInitialization = false;
+#ifdef _M_IX86
+		static bool bFeatureMMX = false;
+#endif // _M_IX86
 		static bool bFeatureSSE2 = false;
 		static bool bFeatureAVX2 = false;
 		static bool bFeatureAVX512BW = false;
@@ -2120,6 +2411,9 @@ namespace Detours {
 				const int nIDs = pIDs[0];
 				if (nIDs >= 1) {
 					__cpuid(pIDs, 0x00000001);
+#ifdef _M_IX86
+					bFeatureMMX = (pIDs[3] & (1 << 23)) != 0;
+#endif // _M_IX86
 					bFeatureSSE2 = (pIDs[3] & (1 << 26)) != 0;
 					if (nIDs >= 7) {
 						__cpuid(pIDs, 0x00000007);
@@ -2135,6 +2429,10 @@ namespace Detours {
 				return FindSignatureAVX2(pAddress, unSize, szSignature, unIgnoredByte, unOffset);
 			} else if (bFeatureSSE2) {
 				return FindSignatureSSE2(pAddress, unSize, szSignature, unIgnoredByte, unOffset);
+#ifdef _M_IX86
+			} else if (bFeatureMMX) {
+				return FindSignatureMMX(pAddress, unSize, szSignature, unIgnoredByte, unOffset);
+#endif // _M_IX86
 			} else {
 				return FindSignatureNative(pAddress, unSize, szSignature, unIgnoredByte, unOffset);
 			}
@@ -2289,27 +2587,38 @@ namespace Detours {
 		// ----------------------------------------------------------------
 
 		void const* FindDataNative(void const* const pAddress, const size_t unSize, unsigned char const* const pData, const size_t unDataSize) noexcept {
-			if (!pAddress || !unSize || !pData || !unDataSize || (unSize < unDataSize)) {
+			if (!pAddress || !pData || !unDataSize || (unSize < unDataSize)) {
 				return nullptr;
 			}
 
-			unsigned char const* const pSourceData = reinterpret_cast<unsigned char const* const>(pAddress);
+			unsigned char const* const pSourceData = static_cast<unsigned char const*>(pAddress);
 
-			for (size_t unIndex = 0; unIndex < unSize - unDataSize; ++unIndex) {
-				//if (memcmp(pSourceData + unIndex, pData, unDataSize) == 0) {
-				//	return pSourceData + unIndex;
-				//}
+			if (unDataSize == 1) {
+				return memchr(pSourceData, pData[0], unSize);
+			}
 
-				size_t unDataIndex = 0;
-				for (; unDataIndex < unDataSize; ++unDataIndex) {
-					if (pSourceData[unIndex + unDataIndex] != pData[unDataIndex]) {
-						break;
+			const unsigned char unFirst = pData[0];
+			const unsigned char unAnchorValue = pData[unDataSize - 1];
+
+			unsigned char const* pScanBegin = pSourceData + (unDataSize - 1);
+			size_t unScanCount = unSize - (unDataSize - 1);
+			while (unScanCount) {
+				unsigned char const* const pAnchor = static_cast<unsigned char const*>(memchr(pScanBegin, unAnchorValue, unScanCount));
+				if (!pAnchor) {
+					break;
+				}
+
+				const size_t unBase = static_cast<size_t>(pAnchor - pSourceData) + 1 - unDataSize;
+
+				if (pSourceData[unBase] == unFirst) {
+					if ((unDataSize == 2) || (memcmp(pSourceData + unBase + 1, pData + 1, unDataSize - 2) == 0)) {
+						return pSourceData + unBase;
 					}
 				}
 
-				if (unDataIndex == unDataSize) {
-					return pSourceData + unIndex;
-				}
+				const size_t unAdvance = static_cast<size_t>((pAnchor + 1) - pScanBegin);
+				pScanBegin += unAdvance;
+				unScanCount -= unAdvance;
 			}
 
 			return nullptr;
@@ -2460,6 +2769,218 @@ namespace Detours {
 #endif
 
 		// ----------------------------------------------------------------
+		// FindData (MMX)
+		// ----------------------------------------------------------------
+
+#ifdef _M_IX86
+		void const* FindDataMMX(void const* const pAddress, const size_t unSize, unsigned char const* const pData, const size_t unDataSize) noexcept {
+			if (!pAddress || !unSize || !pData || !unDataSize || (unSize < unDataSize)) {
+				return nullptr;
+			}
+
+			unsigned char const* const pSourceData = reinterpret_cast<unsigned char const* const>(pAddress);
+
+			const size_t unLastStart = unSize - unDataSize;
+			if (unLastStart < 7) {
+				return FindDataNative(pSourceData, unSize, pData, unDataSize);
+			}
+
+			const size_t unEnd = unLastStart - 7;
+			const size_t unEndAligned = (unEnd & ~static_cast<size_t>(7));
+			const size_t unDataBytesCycles = (unEndAligned / 8) + 1;
+
+			const unsigned char* pReturn = nullptr;
+
+			for (size_t unCycle = 0; unCycle < unDataBytesCycles; ++unCycle) {
+				const size_t unCycleOffset = unCycle * 8;
+
+				const size_t unPrefetch = unCycleOffset + 32;
+				if (unPrefetch < unSize) {
+					_mm_prefetch(reinterpret_cast<char const* const>(pSourceData + unPrefetch), _MM_HINT_T0);
+				}
+
+				unsigned int unFound = 0xFF;
+
+				for (size_t unDataIndex = 0; (unDataIndex < unDataSize) && (unFound != 0); ++unDataIndex) {
+					const __m64 mm0 = *reinterpret_cast<const __m64*>(pSourceData + unCycleOffset + unDataIndex);
+					const __m64 mm1 = _mm_set1_pi8(static_cast<char>(pData[unDataIndex]));
+					const __m64 mm2 = _mm_cmpeq_pi8(mm0, mm1);
+
+					unFound &= static_cast<unsigned int>(_mm_movemask_pi8(mm2));
+				}
+
+				if (unFound != 0) {
+					const size_t unBitIndex = static_cast<size_t>(__bit_scan_forward(unFound));
+					const size_t unStartIndex = unCycleOffset + unBitIndex;
+
+					unsigned char const* const pFoundAddress = pSourceData + unStartIndex;
+					pReturn = pFoundAddress;
+					break;
+				}
+			}
+
+			_mm_empty();
+
+			if (pReturn) {
+				return pReturn;
+			}
+
+			const size_t unMmxCoveredEnd = unEndAligned + 7;
+			if (unMmxCoveredEnd < unLastStart) {
+				unsigned char const* const pTail = pSourceData + (unMmxCoveredEnd + 1);
+				const size_t unTailSize = unSize - (unMmxCoveredEnd + 1);
+				return FindDataNative(pTail, unTailSize, pData, unDataSize);
+			}
+
+			return nullptr;
+		}
+
+		void const* FindDataMMX(const HMODULE hModule, unsigned char const* const pData, const size_t unDataSize) noexcept {
+			if (!hModule || !pData || !unDataSize) {
+				return nullptr;
+			}
+
+			const auto& pDH = reinterpret_cast<PIMAGE_DOS_HEADER>(hModule);
+			const auto& pNTHs = reinterpret_cast<PIMAGE_NT_HEADERS>(reinterpret_cast<char*>(hModule) + pDH->e_lfanew);
+			const auto& pOH = &(pNTHs->OptionalHeader);
+
+			return FindDataMMX(reinterpret_cast<void*>(hModule), static_cast<size_t>(pOH->SizeOfImage) - 1, pData, unDataSize);
+		}
+
+		void const* FindDataMMX(const HMODULE hModule, const std::array<const unsigned char, 8>& SectionName, unsigned char const* const pData, const size_t unDataSize) noexcept {
+			if (!hModule || !pData || !unDataSize) {
+				return nullptr;
+			}
+
+			void* pAddress = nullptr;
+			size_t unSize = 0;
+			if (!FindSection(hModule, SectionName, &pAddress, &unSize)) {
+				return nullptr;
+			}
+
+			return FindDataMMX(pAddress, unSize, pData, unDataSize);
+		}
+
+		void const* FindDataMMX(const HMODULE hModule, char const* const szSectionName, unsigned char const* const pData, const size_t unDataSize) noexcept {
+			if (!hModule || !szSectionName || !pData || !unDataSize) {
+				return nullptr;
+			}
+
+			void* pAddress = nullptr;
+			size_t unSize = 0;
+			if (!FindSectionPOGO(hModule, szSectionName, &pAddress, &unSize)) {
+				return nullptr;
+			}
+
+			return FindDataMMX(pAddress, unSize, pData, unDataSize);
+		}
+
+		void const* FindDataMMXA(char const* const szModuleName, unsigned char const* const pData, const size_t unDataSize) noexcept {
+			if (!szModuleName || !pData || !unDataSize) {
+				return nullptr;
+			}
+
+			HMODULE hModule = GetModuleHandleA(szModuleName);
+			if (!hModule) {
+				return nullptr;
+			}
+
+			return FindDataMMX(hModule, pData, unDataSize);
+		}
+
+		void const* FindDataMMXA(char const* const szModuleName, const std::array<const unsigned char, 8>& SectionName, unsigned char const* const pData, const size_t unDataSize) noexcept {
+			if (!szModuleName || !pData || !unDataSize) {
+				return nullptr;
+			}
+
+			HMODULE hModule = GetModuleHandleA(szModuleName);
+			if (!hModule) {
+				return nullptr;
+			}
+
+			return FindDataMMX(hModule, SectionName, pData, unDataSize);
+		}
+
+		void const* FindDataMMXA(char const* const szModuleName, char const* const szSectionName, unsigned char const* const pData, const size_t unDataSize) noexcept {
+			if (!szModuleName || !szSectionName || !pData || !unDataSize) {
+				return nullptr;
+			}
+
+			HMODULE hModule = GetModuleHandleA(szModuleName);
+			if (!hModule) {
+				return nullptr;
+			}
+
+			return FindDataMMX(hModule, szSectionName, pData, unDataSize);
+		}
+
+		void const* FindDataMMXW(wchar_t const* const szModuleName, unsigned char const* const pData, const size_t unDataSize) noexcept {
+			if (!szModuleName || !pData || !unDataSize) {
+				return nullptr;
+			}
+
+			HMODULE hModule = GetModuleHandleW(szModuleName);
+			if (!hModule) {
+				return nullptr;
+			}
+
+			return FindDataMMX(hModule, pData, unDataSize);
+		}
+
+		void const* FindDataMMXW(wchar_t const* const szModuleName, const std::array<const unsigned char, 8>& SectionName, unsigned char const* const pData, const size_t unDataSize) noexcept {
+			if (!szModuleName || !pData || !unDataSize) {
+				return nullptr;
+			}
+
+			HMODULE hModule = GetModuleHandleW(szModuleName);
+			if (!hModule) {
+				return nullptr;
+			}
+
+			return FindDataMMX(hModule, SectionName, pData, unDataSize);
+		}
+
+		void const* FindDataMMXW(wchar_t const* const szModuleName, char const* const szSectionName, unsigned char const* const pData, const size_t unDataSize) noexcept {
+			if (!szModuleName || !szSectionName || !pData || !unDataSize) {
+				return nullptr;
+			}
+
+			HMODULE hModule = GetModuleHandleW(szModuleName);
+			if (!hModule) {
+				return nullptr;
+			}
+
+			return FindDataMMX(hModule, szSectionName, pData, unDataSize);
+		}
+
+#ifdef _UNICODE
+		void const* FindDataMMX(wchar_t const* const szModuleName, unsigned char const* const pData, const size_t unDataSize) noexcept {
+			return FindDataMMXW(szModuleName, pData, unDataSize);
+		}
+
+		void const* FindDataMMX(wchar_t const* const szModuleName, const std::array<const unsigned char, 8>& SectionName, unsigned char const* const pData, const size_t unDataSize) noexcept {
+			return FindDataMMXW(szModuleName, SectionName, pData, unDataSize);
+		}
+
+		void const* FindDataMMX(wchar_t const* const szModuleName, char const* const szSectionName, unsigned char const* const pData, const size_t unDataSize) noexcept {
+			return FindDataMMXW(szModuleName, szSectionName, pData, unDataSize);
+		}
+#else
+		void const* FindDataMMX(char const* const szModuleName, unsigned char const* const pData, const size_t unDataSize) noexcept {
+			return FindDataMMXA(szModuleName, pData, unDataSize);
+		}
+
+		void const* FindDataMMX(char const* const szModuleName, const std::array<const unsigned char, 8>& SectionName, unsigned char const* const pData, const size_t unDataSize) noexcept {
+			return FindDataMMXA(szModuleName, SectionName, pData, unDataSize);
+		}
+
+		void const* FindDataMMX(char const* const szModuleName, char const* const szSectionName, unsigned char const* const pData, const size_t unDataSize) noexcept {
+			return FindDataMMXA(szModuleName, szSectionName, pData, unDataSize);
+		}
+#endif
+#endif // _M_IX86
+
+		// ----------------------------------------------------------------
 		// FindData (SSE2)
 		// ----------------------------------------------------------------
 
@@ -2470,38 +2991,55 @@ namespace Detours {
 
 			unsigned char const* const pSourceData = reinterpret_cast<unsigned char const* const>(pAddress);
 
-			const size_t unDataBytesCycles = unSize / 16;
+			const size_t unLastStart = unSize - unDataSize;
+			if (unLastStart < 15) {
+#ifdef _M_IX86
+				return FindDataMMX(pSourceData, unSize, pData, unDataSize);
+#else
+				return FindDataNative(pSourceData, unSize, pData, unDataSize);
+#endif
+			}
+
+			const size_t unEnd = unLastStart - 15;
+			const size_t unEndAligned = (unEnd & ~static_cast<size_t>(15));
+			const size_t unDataBytesCycles = (unEndAligned / 16) + 1;
+
 			for (size_t unCycle = 0; unCycle < unDataBytesCycles; ++unCycle) {
 				const size_t unCycleOffset = unCycle * 16;
 
-				if ((unCycle != 0) && ((unCycle + 1) <= unDataBytesCycles)) {
-					_mm_prefetch(reinterpret_cast<char const* const>(pData + unCycleOffset + 16), _MM_HINT_T0);
-				} else {
-					_mm_prefetch(reinterpret_cast<char const* const>(pData + unCycleOffset), _MM_HINT_T0);
+				const size_t unPrefetch = unCycleOffset + 64;
+				if (unPrefetch < unSize) {
+					_mm_prefetch(reinterpret_cast<char const* const>(pSourceData + unPrefetch), _MM_HINT_T0);
 				}
 
 				unsigned __int16 unFound = 0xFFFFui16;
+
 				for (size_t unDataIndex = 0; (unDataIndex < unDataSize) && (unFound != 0); ++unDataIndex) {
 					const __m128i xmm1 = _mm_loadu_si128(reinterpret_cast<const __m128i*>(pSourceData + unCycleOffset + unDataIndex));
 					const __m128i xmm2 = _mm_set1_epi8(static_cast<char>(pData[unDataIndex]));
-
 					const __m128i xmm3 = _mm_cmpeq_epi8(xmm1, xmm2);
 
-					unFound &= _mm_movemask_epi8(xmm3);
+					unFound &= static_cast<unsigned __int16>(_mm_movemask_epi8(xmm3));
 				}
 
 				if (unFound != 0) {
-					return pSourceData + unCycleOffset + __bit_scan_forward(unFound);
+					const size_t unBitIndex = static_cast<size_t>(__bit_scan_forward(unFound));
+					const size_t unStartIndex = unCycleOffset + unBitIndex;
+
+					unsigned char const* const pFoundAddress = pSourceData + unStartIndex;
+					return pFoundAddress;
 				}
 			}
 
-			const size_t unDataBytesLeft = unSize & 0xF;
-			if (unDataBytesLeft) {
-				if (unDataBytesLeft < unDataSize) {
-					return FindDataNative(pSourceData + unSize - unDataBytesLeft - unDataSize, unDataBytesLeft + unDataSize, pData, unDataSize);
-				}
-
-				return FindDataNative(pSourceData + unSize - unDataBytesLeft, unDataBytesLeft, pData, unDataSize);
+			const size_t unCoveredEnd = unEndAligned + 15;
+			if (unCoveredEnd < unLastStart) {
+				unsigned char const* const pTail = pSourceData + (unCoveredEnd + 1);
+				const size_t unTailSize = unSize - (unCoveredEnd + 1);
+#ifdef _M_IX86
+				return FindDataMMX(pTail, unTailSize, pData, unDataSize);
+#else
+				return FindDataNative(pTail, unTailSize, pData, unDataSize);
+#endif
 			}
 
 			return nullptr;
@@ -2662,38 +3200,47 @@ namespace Detours {
 
 			unsigned char const* const pSourceData = reinterpret_cast<unsigned char const* const>(pAddress);
 
-			const size_t unDataBytesCycles = unSize / 32;
+			const size_t unLastStart = unSize - unDataSize;
+			if (unLastStart < 31) {
+				return FindDataSSE2(pSourceData, unSize, pData, unDataSize);
+			}
+
+			const size_t unEnd = unLastStart - 31;
+			const size_t unEndAligned = (unEnd & ~static_cast<size_t>(31));
+			const size_t unDataBytesCycles = (unEndAligned / 32) + 1;
+
 			for (size_t unCycle = 0; unCycle < unDataBytesCycles; ++unCycle) {
 				const size_t unCycleOffset = unCycle * 32;
 
-				if ((unCycle != 0) && ((unCycle + 1) <= unDataBytesCycles)) {
-					_mm_prefetch(reinterpret_cast<char const* const>(pData + unCycleOffset + 32), _MM_HINT_T0);
-				} else {
-					_mm_prefetch(reinterpret_cast<char const* const>(pData + unCycleOffset), _MM_HINT_T0);
+				const size_t unPrefetch = unCycleOffset + 64;
+				if (unPrefetch < unSize) {
+					_mm_prefetch(reinterpret_cast<char const* const>(pSourceData + unPrefetch), _MM_HINT_T0);
 				}
 
 				unsigned __int32 unFound = 0xFFFFFFFFui32;
+
 				for (size_t unDataIndex = 0; (unDataIndex < unDataSize) && (unFound != 0); ++unDataIndex) {
 					const __m256i ymm0 = _mm256_loadu_si256(reinterpret_cast<const __m256i*>(pSourceData + unCycleOffset + unDataIndex));
 					const __m256i ymm1 = _mm256_set1_epi8(static_cast<char>(pData[unDataIndex]));
-
 					const __m256i ymm3 = _mm256_cmpeq_epi8(ymm0, ymm1);
 
-					unFound &= _mm256_movemask_epi8(ymm3);
+					unFound &= static_cast<unsigned __int32>(_mm256_movemask_epi8(ymm3));
 				}
 
 				if (unFound != 0) {
-					return pSourceData + unCycleOffset + __bit_scan_forward(unFound);
+					const size_t unBitIndex = static_cast<size_t>(__bit_scan_forward(unFound));
+					const size_t unStartIndex = unCycleOffset + unBitIndex;
+
+					unsigned char const* const pFoundAddress = pSourceData + unStartIndex;
+					return pFoundAddress;
 				}
 			}
 
-			const size_t unDataBytesLeft = unSize & 0x1F;
-			if (unDataBytesLeft) {
-				if (unDataBytesLeft < unDataSize) {
-					return FindDataSSE2(pSourceData + unSize - unDataBytesLeft - unDataSize, unDataBytesLeft + unDataSize, pData, unDataSize);
-				}
-
-				return FindDataSSE2(pSourceData + unSize - unDataBytesLeft, unDataBytesLeft, pData, unDataSize);
+			const size_t unCoveredEnd = unEndAligned + 31;
+			if (unCoveredEnd < unLastStart) {
+				unsigned char const* const pTail = pSourceData + (unCoveredEnd + 1);
+				const size_t unTailSize = unSize - (unCoveredEnd + 1);
+				return FindDataSSE2(pTail, unTailSize, pData, unDataSize);
 			}
 
 			return nullptr;
@@ -2854,36 +3401,47 @@ namespace Detours {
 
 			unsigned char const* const pSourceData = reinterpret_cast<unsigned char const* const>(pAddress);
 
-			const size_t unDataBytesCycles = unSize / 64;
+			const size_t unLastStart = unSize - unDataSize;
+			if (unLastStart < 63) {
+				return FindDataAVX2(pSourceData, unSize, pData, unDataSize);
+			}
+
+			const size_t unEnd = unLastStart - 63;
+			const size_t unEndAligned = (unEnd & ~static_cast<size_t>(63));
+			const size_t unDataBytesCycles = (unEndAligned / 64) + 1;
+
 			for (size_t unCycle = 0; unCycle < unDataBytesCycles; ++unCycle) {
 				const size_t unCycleOffset = unCycle * 64;
 
-				if ((unCycle != 0) && ((unCycle + 1) <= unDataBytesCycles)) {
-					_mm_prefetch(reinterpret_cast<char const* const>(pData + unCycleOffset + 64), _MM_HINT_T0);
-				} else {
-					_mm_prefetch(reinterpret_cast<char const* const>(pData + unCycleOffset), _MM_HINT_T0);
+				const size_t unPrefetch = unCycleOffset + 128;
+				if (unPrefetch < unSize) {
+					_mm_prefetch(reinterpret_cast<char const* const>(pSourceData + unPrefetch), _MM_HINT_T0);
 				}
 
 				unsigned __int64 unFound = 0xFFFFFFFFFFFFFFFFui64;
+
 				for (size_t unDataIndex = 0; (unDataIndex < unDataSize) && (unFound != 0); ++unDataIndex) {
-					const __m512i zmm0 = _mm512_loadu_si512(reinterpret_cast<const __m256i*>(pSourceData + unCycleOffset + unDataIndex));
+					const __m512i zmm0 = _mm512_loadu_si512(reinterpret_cast<const void*>(pSourceData + unCycleOffset + unDataIndex));
 					const __m512i zmm1 = _mm512_set1_epi8(static_cast<char>(pData[unDataIndex]));
 
-					unFound &= _mm512_cmpeq_epi8_mask(zmm0, zmm1);
+					const __mmask64 k = _mm512_cmpeq_epi8_mask(zmm0, zmm1);
+					unFound &= static_cast<unsigned __int64>(k);
 				}
 
 				if (unFound != 0) {
-					return pSourceData + unCycleOffset + __bit_scan_forward(unFound);
+					const size_t unBitIndex = static_cast<size_t>(__bit_scan_forward(unFound));
+					const size_t unStartIndex = unCycleOffset + unBitIndex;
+
+					unsigned char const* const pFoundAddress = pSourceData + unStartIndex;
+					return pFoundAddress;
 				}
 			}
 
-			const size_t unDataBytesLeft = unSize & 0x3F;
-			if (unDataBytesLeft) {
-				if (unDataBytesLeft < unDataSize) {
-					return FindDataAVX2(pSourceData + unSize - unDataBytesLeft - unDataSize, unDataBytesLeft + unDataSize, pData, unDataSize);
-				}
-
-				return FindDataAVX2(pSourceData + unSize - unDataBytesLeft, unDataBytesLeft, pData, unDataSize);
+			const size_t unCoveredEnd = unEndAligned + 63;
+			if (unCoveredEnd < unLastStart) {
+				unsigned char const* const pTail = pSourceData + (unCoveredEnd + 1);
+				const size_t unTailSize = unSize - (unCoveredEnd + 1);
+				return FindDataAVX2(pTail, unTailSize, pData, unDataSize);
 			}
 
 			return nullptr;
@@ -3046,6 +3604,9 @@ namespace Detours {
 				const int nIDs = pIDs[0];
 				if (nIDs >= 1) {
 					__cpuid(pIDs, 0x00000001);
+#ifdef _M_IX86
+					bFeatureMMX = (pIDs[3] & (1 << 23)) != 0;
+#endif // _M_IX86
 					bFeatureSSE2 = (pIDs[3] & (1 << 26)) != 0;
 					if (nIDs >= 7) {
 						__cpuid(pIDs, 0x00000007);
@@ -3061,6 +3622,10 @@ namespace Detours {
 				return FindDataAVX2(pAddress, unSize, pData, unDataSize);
 			} else if (bFeatureSSE2) {
 				return FindDataSSE2(pAddress, unSize, pData, unDataSize);
+#ifdef _M_IX86
+			} else if (bFeatureMMX) {
+				return FindDataMMX(pAddress, unSize, pData, unDataSize);
+#endif // _M_IX86
 			} else {
 				return FindDataNative(pAddress, unSize, pData, unDataSize);
 			}

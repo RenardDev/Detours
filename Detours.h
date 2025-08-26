@@ -1615,6 +1615,32 @@ namespace Detours {
 #endif
 
 		// ----------------------------------------------------------------
+		// FindSignature (MMX)
+		// ----------------------------------------------------------------
+
+#ifdef _M_IX86
+		void const* FindSignatureMMX(void const* const pAddress, const size_t unSize, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const size_t unOffset = 0) noexcept;
+		void const* FindSignatureMMX(const HMODULE hModule, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const size_t unOffset = 0) noexcept;
+		void const* FindSignatureMMX(const HMODULE hModule, const std::array<const unsigned char, 8>& SectionName, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const size_t unOffset = 0) noexcept;
+		void const* FindSignatureMMX(const HMODULE hModule, char const* const szSectionName, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const size_t unOffset = 0) noexcept;
+		void const* FindSignatureMMXA(char const* const szModuleName, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const size_t unOffset = 0) noexcept;
+		void const* FindSignatureMMXA(char const* const szModuleName, const std::array<const unsigned char, 8>& SectionName, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const size_t unOffset = 0) noexcept;
+		void const* FindSignatureMMXA(char const* const szModuleName, char const* const szSectionName, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const size_t unOffset = 0) noexcept;
+		void const* FindSignatureMMXW(wchar_t const* const szModuleName, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const size_t unOffset = 0) noexcept;
+		void const* FindSignatureMMXW(wchar_t const* const szModuleName, const std::array<const unsigned char, 8>& SectionName, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const size_t unOffset = 0) noexcept;
+		void const* FindSignatureMMXW(wchar_t const* const szModuleName, char const* const szSectionName, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const size_t unOffset = 0) noexcept;
+#ifdef _UNICODE
+		void const* FindSignatureMMX(wchar_t const* const szModuleName, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const size_t unOffset = 0) noexcept;
+		void const* FindSignatureMMX(wchar_t const* const szModuleName, const std::array<const unsigned char, 8>& SectionName, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const size_t unOffset = 0) noexcept;
+		void const* FindSignatureMMX(wchar_t const* const szModuleName, char const* const szSectionName, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const size_t unOffset = 0) noexcept;
+#else
+		void const* FindSignatureMMX(char const* const szModuleName, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const size_t unOffset = 0) noexcept;
+		void const* FindSignatureMMX(char const* const szModuleName, const std::array<const unsigned char, 8>& SectionName, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const size_t unOffset = 0) noexcept;
+		void const* FindSignatureMMX(char const* const szModuleName, char const* const szSectionName, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const size_t unOffset = 0) noexcept;
+#endif
+#endif // _M_IX86
+
+		// ----------------------------------------------------------------
 		// FindSignature (SSE2)
 		// ----------------------------------------------------------------
 
@@ -1733,6 +1759,32 @@ namespace Detours {
 		void const* FindDataNative(char const* const szModuleName, const std::array<const unsigned char, 8>& SectionName, unsigned char const* const pData, const size_t unDataSize) noexcept;
 		void const* FindDataNative(char const* const szModuleName, char const* const szSectionName, unsigned char const* const pData, const size_t unDataSize) noexcept;
 #endif
+
+		// ----------------------------------------------------------------
+		// FindData (MMX)
+		// ----------------------------------------------------------------
+
+#ifdef _M_IX86
+		void const* FindDataMMX(void const* const pAddress, const size_t unSize, unsigned char const* const pData, const size_t unDataSize) noexcept;
+		void const* FindDataMMX(const HMODULE hModule, unsigned char const* const pData, const size_t unDataSize) noexcept;
+		void const* FindDataMMX(const HMODULE hModule, const std::array<const unsigned char, 8>& SectionName, unsigned char const* const pData, const size_t unDataSize) noexcept;
+		void const* FindDataMMX(const HMODULE hModule, char const* const szSectionName, unsigned char const* const pData, const size_t unDataSize) noexcept;
+		void const* FindDataMMXA(char const* const szModuleName, unsigned char const* const pData, const size_t unDataSize) noexcept;
+		void const* FindDataMMXA(char const* const szModuleName, const std::array<const unsigned char, 8>& SectionName, unsigned char const* const pData, const size_t unDataSize) noexcept;
+		void const* FindDataMMXA(char const* const szModuleName, char const* const szSectionName, unsigned char const* const pData, const size_t unDataSize) noexcept;
+		void const* FindDataMMXW(wchar_t const* const szModuleName, unsigned char const* const pData, const size_t unDataSize) noexcept;
+		void const* FindDataMMXW(wchar_t const* const szModuleName, const std::array<const unsigned char, 8>& SectionName, unsigned char const* const pData, const size_t unDataSize) noexcept;
+		void const* FindDataMMXW(wchar_t const* const szModuleName, char const* const szSectionName, unsigned char const* const pData, const size_t unDataSize) noexcept;
+#ifdef _UNICODE
+		void const* FindDataMMX(wchar_t const* const szModuleName, unsigned char const* const pData, const size_t unDataSize) noexcept;
+		void const* FindDataMMX(wchar_t const* const szModuleName, const std::array<const unsigned char, 8>& SectionName, unsigned char const* const pData, const size_t unDataSize) noexcept;
+		void const* FindDataMMX(wchar_t const* const szModuleName, char const* const szSectionName, unsigned char const* const pData, const size_t unDataSize) noexcept;
+#else
+		void const* FindDataMMX(char const* const szModuleName, unsigned char const* const pData, const size_t unDataSize) noexcept;
+		void const* FindDataMMX(char const* const szModuleName, const std::array<const unsigned char, 8>& SectionName, unsigned char const* const pData, const size_t unDataSize) noexcept;
+		void const* FindDataMMX(char const* const szModuleName, char const* const szSectionName, unsigned char const* const pData, const size_t unDataSize) noexcept;
+#endif
+#endif // _M_IX86
 
 		// ----------------------------------------------------------------
 		// FindData (SSE2)

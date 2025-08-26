@@ -314,11 +314,13 @@ TEST_SUITE("Detours::Scan") {
 	}
 
 	TEST_CASE("FindSignature") {
-		//CHECK(Detours::Scan::FindSignature(GetModuleHandle(nullptr), { '.', 'r', 'd', 'a', 't', 'a', 0, 0 }, "\xDE\xED\xBE\xEF", '\x2A', 0) != nullptr);
 
 		int cpuinfo[4];
 		__cpuid(cpuinfo, 1);
 
+#ifdef _M_IX86
+		const bool bHaveMMX = (cpuinfo[3] & (1 << 23)) != 0;
+#endif // _M_IX86
 		const bool bHaveSSE2 = (cpuinfo[3] & (1 << 26)) != 0;
 
 		__cpuidex(cpuinfo, 7, 0);
@@ -341,6 +343,18 @@ TEST_SUITE("Detours::Scan") {
 		CHECK(Detours::Scan::FindSignatureNative(pAlignMiddleBeginRightArray, sizeof(pAlignMiddleBeginRightArray), "\xDE\xED\x2A\xEF") == pAlignMiddleBeginRightArray + 32);
 		CHECK(Detours::Scan::FindSignatureNative(pAlignMiddleEndArray, sizeof(pAlignMiddleEndArray), "\xDE\xED\x2A\xEF") == pAlignMiddleEndArray + 36);
 		CHECK(Detours::Scan::FindSignatureNative(pAlignEndArray, sizeof(pAlignEndArray), "\xDE\xED\x2A\xEF") == pAlignEndArray + 60);
+
+#ifdef _M_IX86
+		if (bHaveMMX) {
+			CHECK(Detours::Scan::FindSignatureMMX(pAlignEmptyArray, sizeof(pAlignEmptyArray), "\xDE\xED\x2A\xEF") == nullptr);
+			CHECK(Detours::Scan::FindSignatureMMX(pAlignBeginArray, sizeof(pAlignBeginArray), "\xDE\xED\x2A\xEF") == pAlignBeginArray);
+			CHECK(Detours::Scan::FindSignatureMMX(pAlignMiddleBeginArray, sizeof(pAlignMiddleBeginArray), "\xDE\xED\x2A\xEF") == pAlignMiddleBeginArray + 24);
+			CHECK(Detours::Scan::FindSignatureMMX(pAlignMiddleBeginLeftArray, sizeof(pAlignMiddleBeginLeftArray), "\xDE\xED\x2A\xEF") == pAlignMiddleBeginLeftArray + 28);
+			CHECK(Detours::Scan::FindSignatureMMX(pAlignMiddleBeginRightArray, sizeof(pAlignMiddleBeginRightArray), "\xDE\xED\x2A\xEF") == pAlignMiddleBeginRightArray + 32);
+			CHECK(Detours::Scan::FindSignatureMMX(pAlignMiddleEndArray, sizeof(pAlignMiddleEndArray), "\xDE\xED\x2A\xEF") == pAlignMiddleEndArray + 36);
+			CHECK(Detours::Scan::FindSignatureMMX(pAlignEndArray, sizeof(pAlignEndArray), "\xDE\xED\x2A\xEF") == pAlignEndArray + 60);
+		}
+#endif // _M_IX86
 
 		if (bHaveSSE2) {
 			CHECK(Detours::Scan::FindSignatureSSE2(pAlignEmptyArray, sizeof(pAlignEmptyArray), "\xDE\xED\x2A\xEF") == nullptr);
@@ -388,6 +402,18 @@ TEST_SUITE("Detours::Scan") {
 		CHECK(Detours::Scan::FindSignatureNative(pMiddleEndArray1, sizeof(pMiddleEndArray1), "\xDE\xED\x2A\xEF") == pMiddleEndArray1 + 37);
 		CHECK(Detours::Scan::FindSignatureNative(pEndArray1, sizeof(pEndArray1), "\xDE\xED\x2A\xEF") == pEndArray1 + 61);
 
+#ifdef _M_IX86
+		if (bHaveMMX) {
+			CHECK(Detours::Scan::FindSignatureMMX(pEmptyArray1, sizeof(pEmptyArray1), "\xDE\xED\x2A\xEF") == nullptr);
+			CHECK(Detours::Scan::FindSignatureMMX(pBeginArray1, sizeof(pBeginArray1), "\xDE\xED\x2A\xEF") == pBeginArray1 + 1);
+			CHECK(Detours::Scan::FindSignatureMMX(pMiddleBeginArray1, sizeof(pMiddleBeginArray1), "\xDE\xED\x2A\xEF") == pMiddleBeginArray1 + 25);
+			CHECK(Detours::Scan::FindSignatureMMX(pMiddleBeginLeftArray1, sizeof(pMiddleBeginLeftArray1), "\xDE\xED\x2A\xEF") == pMiddleBeginLeftArray1 + 29);
+			CHECK(Detours::Scan::FindSignatureMMX(pMiddleBeginRightArray1, sizeof(pMiddleBeginRightArray1), "\xDE\xED\x2A\xEF") == pMiddleBeginRightArray1 + 33);
+			CHECK(Detours::Scan::FindSignatureMMX(pMiddleEndArray1, sizeof(pMiddleEndArray1), "\xDE\xED\x2A\xEF") == pMiddleEndArray1 + 37);
+			CHECK(Detours::Scan::FindSignatureMMX(pEndArray1, sizeof(pEndArray1), "\xDE\xED\x2A\xEF") == pEndArray1 + 61);
+		}
+#endif // _M_IX86
+
 		if (bHaveSSE2) {
 			CHECK(Detours::Scan::FindSignatureSSE2(pEmptyArray1, sizeof(pEmptyArray1), "\xDE\xED\x2A\xEF") == nullptr);
 			CHECK(Detours::Scan::FindSignatureSSE2(pBeginArray1, sizeof(pBeginArray1), "\xDE\xED\x2A\xEF") == pBeginArray1 + 1);
@@ -433,6 +459,18 @@ TEST_SUITE("Detours::Scan") {
 		CHECK(Detours::Scan::FindSignatureNative(pMiddleBeginRightArray2, sizeof(pMiddleBeginRightArray2), "\xDE\xED\x2A\xEF") == pMiddleBeginRightArray2 + 32);
 		CHECK(Detours::Scan::FindSignatureNative(pMiddleEndArray2, sizeof(pMiddleEndArray2), "\xDE\xED\x2A\xEF") == pMiddleEndArray2 + 36);
 		CHECK(Detours::Scan::FindSignatureNative(pEndArray2, sizeof(pEndArray2), "\xDE\xED\x2A\xEF") == pEndArray2 + 60);
+
+#ifdef _M_IX86
+		if (bHaveMMX) {
+			CHECK(Detours::Scan::FindSignatureMMX(pEmptyArray2, sizeof(pEmptyArray2), "\xDE\xED\x2A\xEF") == nullptr);
+			CHECK(Detours::Scan::FindSignatureMMX(pBeginArray2, sizeof(pBeginArray2), "\xDE\xED\x2A\xEF") == pBeginArray2);
+			CHECK(Detours::Scan::FindSignatureMMX(pMiddleBeginArray2, sizeof(pMiddleBeginArray2), "\xDE\xED\x2A\xEF") == pMiddleBeginArray2 + 24);
+			CHECK(Detours::Scan::FindSignatureMMX(pMiddleBeginLeftArray2, sizeof(pMiddleBeginLeftArray2), "\xDE\xED\x2A\xEF") == pMiddleBeginLeftArray2 + 28);
+			CHECK(Detours::Scan::FindSignatureMMX(pMiddleBeginRightArray2, sizeof(pMiddleBeginRightArray2), "\xDE\xED\x2A\xEF") == pMiddleBeginRightArray2 + 32);
+			CHECK(Detours::Scan::FindSignatureMMX(pMiddleEndArray2, sizeof(pMiddleEndArray2), "\xDE\xED\x2A\xEF") == pMiddleEndArray2 + 36);
+			CHECK(Detours::Scan::FindSignatureMMX(pEndArray2, sizeof(pEndArray2), "\xDE\xED\x2A\xEF") == pEndArray2 + 60);
+		}
+#endif // _M_IX86
 
 		if (bHaveSSE2) {
 			CHECK(Detours::Scan::FindSignatureSSE2(pEmptyArray2, sizeof(pEmptyArray2), "\xDE\xED\x2A\xEF") == nullptr);
@@ -480,6 +518,18 @@ TEST_SUITE("Detours::Scan") {
 		CHECK(Detours::Scan::FindSignatureNative(pMiddleEndArray3, sizeof(pMiddleEndArray3), "\xDE\xED\x2A\xEF") == pMiddleEndArray3 + 37);
 		CHECK(Detours::Scan::FindSignatureNative(pEndArray3, sizeof(pEndArray3), "\xDE\xED\x2A\xEF") == pEndArray3 + 61);
 
+#ifdef _M_IX86
+		if (bHaveMMX) {
+			CHECK(Detours::Scan::FindSignatureMMX(pEmptyArray3, sizeof(pEmptyArray3), "\xDE\xED\x2A\xEF") == nullptr);
+			CHECK(Detours::Scan::FindSignatureMMX(pBeginArray3, sizeof(pBeginArray3), "\xDE\xED\x2A\xEF") == pBeginArray3 + 1);
+			CHECK(Detours::Scan::FindSignatureMMX(pMiddleBeginArray3, sizeof(pMiddleBeginArray3), "\xDE\xED\x2A\xEF") == pMiddleBeginArray3 + 25);
+			CHECK(Detours::Scan::FindSignatureMMX(pMiddleBeginLeftArray3, sizeof(pMiddleBeginLeftArray3), "\xDE\xED\x2A\xEF") == pMiddleBeginLeftArray3 + 29);
+			CHECK(Detours::Scan::FindSignatureMMX(pMiddleBeginRightArray3, sizeof(pMiddleBeginRightArray3), "\xDE\xED\x2A\xEF") == pMiddleBeginRightArray3 + 33);
+			CHECK(Detours::Scan::FindSignatureMMX(pMiddleEndArray3, sizeof(pMiddleEndArray3), "\xDE\xED\x2A\xEF") == pMiddleEndArray3 + 37);
+			CHECK(Detours::Scan::FindSignatureMMX(pEndArray3, sizeof(pEndArray3), "\xDE\xED\x2A\xEF") == pEndArray3 + 61);
+		}
+#endif // _M_IX86
+
 		if (bHaveSSE2) {
 			CHECK(Detours::Scan::FindSignatureSSE2(pEmptyArray3, sizeof(pEmptyArray3), "\xDE\xED\x2A\xEF") == nullptr);
 			CHECK(Detours::Scan::FindSignatureSSE2(pBeginArray3, sizeof(pBeginArray3), "\xDE\xED\x2A\xEF") == pBeginArray3 + 1);
@@ -511,7 +561,7 @@ TEST_SUITE("Detours::Scan") {
 		}
 	}
 
-	TEST_CASE("FindSignatureNative [benckmark]" * doctest::skip() * doctest::timeout(10)) {
+	TEST_CASE("FindSignatureNative [benckmark]" * doctest::timeout(10)) {
 		auto pRandomData = std::make_unique<unsigned char[]>(0x800000); // 8 MiB
 		CHECK(pRandomData != nullptr);
 
@@ -531,7 +581,36 @@ TEST_SUITE("Detours::Scan") {
 		MESSAGE("Benckmark with 1 000 iterations over 8 MiB memory: ", (Detours::KUserSharedData.SystemTime.LowPart - unBegin) / 10000, " ms");
 	}
 
-	TEST_CASE("FindSignatureSSE2 [benckmark]" * doctest::skip() * doctest::timeout(5)) {
+#ifdef _M_IX86
+	TEST_CASE("FindSignatureMMX [benckmark]" * doctest::timeout(10)) {
+		auto pRandomData = std::make_unique<unsigned char[]>(0x800000); // 8 MiB
+		CHECK(pRandomData != nullptr);
+
+		memset(pRandomData.get(), 0, 0x800000);
+
+		pRandomData[0x800000 - 4] = 0xDE;
+		pRandomData[0x800000 - 3] = 0xED;
+		pRandomData[0x800000 - 2] = 0xBE;
+		pRandomData[0x800000 - 1] = 0xEF;
+
+		int cpuinfo[4];
+		__cpuid(cpuinfo, 1);
+
+		const bool bHaveMMX = (cpuinfo[3] & (1 << 23)) != 0;
+
+		if (bHaveMMX) {
+			ULONG unBegin = Detours::KUserSharedData.SystemTime.LowPart;
+			for (unsigned int i = 0; i < 1'000; ++i) {
+				if (!Detours::Scan::FindSignatureMMX(pRandomData.get(), 0x800000, "\xDE\xED\x2A\xEF")) {
+					FAIL("Fail in benckmark!");
+				}
+			}
+			MESSAGE("Benckmark with 1 000 iterations over 8 MiB memory: ", (Detours::KUserSharedData.SystemTime.LowPart - unBegin) / 10000, " ms");
+		}
+	}
+#endif
+
+	TEST_CASE("FindSignatureSSE2 [benckmark]" * doctest::timeout(10)) {
 		auto pRandomData = std::make_unique<unsigned char[]>(0x800000); // 8 MiB
 		CHECK(pRandomData != nullptr);
 
@@ -558,7 +637,7 @@ TEST_SUITE("Detours::Scan") {
 		}
 	}
 
-	TEST_CASE("FindSignatureAVX2 [benckmark]" * doctest::skip() * doctest::timeout(5)) {
+	TEST_CASE("FindSignatureAVX2 [benckmark]" * doctest::timeout(10)) {
 		auto pRandomData = std::make_unique<unsigned char[]>(0x800000); // 8 MiB
 		CHECK(pRandomData != nullptr);
 
@@ -622,6 +701,9 @@ TEST_SUITE("Detours::Scan") {
 		int cpuinfo[4];
 		__cpuid(cpuinfo, 1);
 
+#ifdef _M_IX86
+		const bool bHaveMMX = (cpuinfo[3] & (1 << 23)) != 0;
+#endif // _M_IX86
 		const bool bHaveSSE2 = (cpuinfo[3] & (1 << 26)) != 0;
 
 		__cpuidex(cpuinfo, 7, 0);
@@ -644,6 +726,18 @@ TEST_SUITE("Detours::Scan") {
 		CHECK(Detours::Scan::FindDataNative(pAlignMiddleBeginRightArray, sizeof(pAlignMiddleBeginRightArray), reinterpret_cast<unsigned char const*>("\xDE\xED"), 2) == pAlignMiddleBeginRightArray + 32);
 		CHECK(Detours::Scan::FindDataNative(pAlignMiddleEndArray, sizeof(pAlignMiddleEndArray), reinterpret_cast<unsigned char const*>("\xDE\xED"), 2) == pAlignMiddleEndArray + 36);
 		CHECK(Detours::Scan::FindDataNative(pAlignEndArray, sizeof(pAlignEndArray), reinterpret_cast<unsigned char const*>("\xDE\xED"), 2) == pAlignEndArray + 60);
+
+#ifdef _M_IX86
+		if (bHaveMMX) {
+			CHECK(Detours::Scan::FindDataMMX(pAlignEmptyArray, sizeof(pAlignEmptyArray), reinterpret_cast<unsigned char const*>("\xDE\xED"), 2) == nullptr);
+			CHECK(Detours::Scan::FindDataMMX(pAlignBeginArray, sizeof(pAlignBeginArray), reinterpret_cast<unsigned char const*>("\xDE\xED"), 2) == pAlignBeginArray);
+			CHECK(Detours::Scan::FindDataMMX(pAlignMiddleBeginArray, sizeof(pAlignMiddleBeginArray), reinterpret_cast<unsigned char const*>("\xDE\xED"), 2) == pAlignMiddleBeginArray + 24);
+			CHECK(Detours::Scan::FindDataMMX(pAlignMiddleBeginLeftArray, sizeof(pAlignMiddleBeginLeftArray), reinterpret_cast<unsigned char const*>("\xDE\xED"), 2) == pAlignMiddleBeginLeftArray + 28);
+			CHECK(Detours::Scan::FindDataMMX(pAlignMiddleBeginRightArray, sizeof(pAlignMiddleBeginRightArray), reinterpret_cast<unsigned char const*>("\xDE\xED"), 2) == pAlignMiddleBeginRightArray + 32);
+			CHECK(Detours::Scan::FindDataMMX(pAlignMiddleEndArray, sizeof(pAlignMiddleEndArray), reinterpret_cast<unsigned char const*>("\xDE\xED"), 2) == pAlignMiddleEndArray + 36);
+			CHECK(Detours::Scan::FindDataMMX(pAlignEndArray, sizeof(pAlignEndArray), reinterpret_cast<unsigned char const*>("\xDE\xED"), 2) == pAlignEndArray + 60);
+		}
+#endif // _M_IX86
 
 		if (bHaveSSE2) {
 			CHECK(Detours::Scan::FindDataSSE2(pAlignEmptyArray, sizeof(pAlignEmptyArray), reinterpret_cast<unsigned char const*>("\xDE\xED"), 2) == nullptr);
@@ -691,6 +785,18 @@ TEST_SUITE("Detours::Scan") {
 		CHECK(Detours::Scan::FindDataNative(pMiddleEndArray1, sizeof(pMiddleEndArray1), reinterpret_cast<unsigned char const*>("\xDE\xED"), 2) == pMiddleEndArray1 + 37);
 		CHECK(Detours::Scan::FindDataNative(pEndArray1, sizeof(pEndArray1), reinterpret_cast<unsigned char const*>("\xDE\xED"), 2) == pEndArray1 + 61);
 
+#ifdef _M_IX86
+		if (bHaveMMX) {
+			CHECK(Detours::Scan::FindDataMMX(pEmptyArray1, sizeof(pEmptyArray1), reinterpret_cast<unsigned char const*>("\xDE\xED"), 2) == nullptr);
+			CHECK(Detours::Scan::FindDataMMX(pBeginArray1, sizeof(pBeginArray1), reinterpret_cast<unsigned char const*>("\xDE\xED"), 2) == pBeginArray1 + 1);
+			CHECK(Detours::Scan::FindDataMMX(pMiddleBeginArray1, sizeof(pMiddleBeginArray1), reinterpret_cast<unsigned char const*>("\xDE\xED"), 2) == pMiddleBeginArray1 + 25);
+			CHECK(Detours::Scan::FindDataMMX(pMiddleBeginLeftArray1, sizeof(pMiddleBeginLeftArray1), reinterpret_cast<unsigned char const*>("\xDE\xED"), 2) == pMiddleBeginLeftArray1 + 29);
+			CHECK(Detours::Scan::FindDataMMX(pMiddleBeginRightArray1, sizeof(pMiddleBeginRightArray1), reinterpret_cast<unsigned char const*>("\xDE\xED"), 2) == pMiddleBeginRightArray1 + 33);
+			CHECK(Detours::Scan::FindDataMMX(pMiddleEndArray1, sizeof(pMiddleEndArray1), reinterpret_cast<unsigned char const*>("\xDE\xED"), 2) == pMiddleEndArray1 + 37);
+			CHECK(Detours::Scan::FindDataMMX(pEndArray1, sizeof(pEndArray1), reinterpret_cast<unsigned char const*>("\xDE\xED"), 2) == pEndArray1 + 61);
+		}
+#endif // _M_IX86
+
 		if (bHaveSSE2) {
 			CHECK(Detours::Scan::FindDataSSE2(pEmptyArray1, sizeof(pEmptyArray1), reinterpret_cast<unsigned char const*>("\xDE\xED"), 2) == nullptr);
 			CHECK(Detours::Scan::FindDataSSE2(pBeginArray1, sizeof(pBeginArray1), reinterpret_cast<unsigned char const*>("\xDE\xED"), 2) == pBeginArray1 + 1);
@@ -736,6 +842,18 @@ TEST_SUITE("Detours::Scan") {
 		CHECK(Detours::Scan::FindDataNative(pMiddleBeginRightArray2, sizeof(pMiddleBeginRightArray2), reinterpret_cast<unsigned char const*>("\xDE\xED"), 2) == pMiddleBeginRightArray2 + 32);
 		CHECK(Detours::Scan::FindDataNative(pMiddleEndArray2, sizeof(pMiddleEndArray2), reinterpret_cast<unsigned char const*>("\xDE\xED"), 2) == pMiddleEndArray2 + 36);
 		CHECK(Detours::Scan::FindDataNative(pEndArray2, sizeof(pEndArray2), reinterpret_cast<unsigned char const*>("\xDE\xED"), 2) == pEndArray2 + 60);
+
+#ifdef _M_IX86
+		if (bHaveMMX) {
+			CHECK(Detours::Scan::FindDataMMX(pEmptyArray2, sizeof(pEmptyArray2), reinterpret_cast<unsigned char const*>("\xDE\xED"), 2) == nullptr);
+			CHECK(Detours::Scan::FindDataMMX(pBeginArray2, sizeof(pBeginArray2), reinterpret_cast<unsigned char const*>("\xDE\xED"), 2) == pBeginArray2);
+			CHECK(Detours::Scan::FindDataMMX(pMiddleBeginArray2, sizeof(pMiddleBeginArray2), reinterpret_cast<unsigned char const*>("\xDE\xED"), 2) == pMiddleBeginArray2 + 24);
+			CHECK(Detours::Scan::FindDataMMX(pMiddleBeginLeftArray2, sizeof(pMiddleBeginLeftArray2), reinterpret_cast<unsigned char const*>("\xDE\xED"), 2) == pMiddleBeginLeftArray2 + 28);
+			CHECK(Detours::Scan::FindDataMMX(pMiddleBeginRightArray2, sizeof(pMiddleBeginRightArray2), reinterpret_cast<unsigned char const*>("\xDE\xED"), 2) == pMiddleBeginRightArray2 + 32);
+			CHECK(Detours::Scan::FindDataMMX(pMiddleEndArray2, sizeof(pMiddleEndArray2), reinterpret_cast<unsigned char const*>("\xDE\xED"), 2) == pMiddleEndArray2 + 36);
+			CHECK(Detours::Scan::FindDataMMX(pEndArray2, sizeof(pEndArray2), reinterpret_cast<unsigned char const*>("\xDE\xED"), 2) == pEndArray2 + 60);
+		}
+#endif // _M_IX86
 
 		if (bHaveSSE2) {
 			CHECK(Detours::Scan::FindDataSSE2(pEmptyArray2, sizeof(pEmptyArray2), reinterpret_cast<unsigned char const*>("\xDE\xED"), 2) == nullptr);
@@ -783,6 +901,18 @@ TEST_SUITE("Detours::Scan") {
 		CHECK(Detours::Scan::FindDataNative(pMiddleEndArray3, sizeof(pMiddleEndArray3), reinterpret_cast<unsigned char const*>("\xDE\xED"), 2) == pMiddleEndArray3 + 37);
 		CHECK(Detours::Scan::FindDataNative(pEndArray3, sizeof(pEndArray3), reinterpret_cast<unsigned char const*>("\xDE\xED"), 2) == pEndArray3 + 61);
 
+#ifdef _M_IX86
+		if (bHaveMMX) {
+			CHECK(Detours::Scan::FindDataMMX(pEmptyArray3, sizeof(pEmptyArray3), reinterpret_cast<unsigned char const*>("\xDE\xED"), 2) == nullptr);
+			CHECK(Detours::Scan::FindDataMMX(pBeginArray3, sizeof(pBeginArray3), reinterpret_cast<unsigned char const*>("\xDE\xED"), 2) == pBeginArray3 + 1);
+			CHECK(Detours::Scan::FindDataMMX(pMiddleBeginArray3, sizeof(pMiddleBeginArray3), reinterpret_cast<unsigned char const*>("\xDE\xED"), 2) == pMiddleBeginArray3 + 25);
+			CHECK(Detours::Scan::FindDataMMX(pMiddleBeginLeftArray3, sizeof(pMiddleBeginLeftArray3), reinterpret_cast<unsigned char const*>("\xDE\xED"), 2) == pMiddleBeginLeftArray3 + 29);
+			CHECK(Detours::Scan::FindDataMMX(pMiddleBeginRightArray3, sizeof(pMiddleBeginRightArray3), reinterpret_cast<unsigned char const*>("\xDE\xED"), 2) == pMiddleBeginRightArray3 + 33);
+			CHECK(Detours::Scan::FindDataMMX(pMiddleEndArray3, sizeof(pMiddleEndArray3), reinterpret_cast<unsigned char const*>("\xDE\xED"), 2) == pMiddleEndArray3 + 37);
+			CHECK(Detours::Scan::FindDataMMX(pEndArray3, sizeof(pEndArray3), reinterpret_cast<unsigned char const*>("\xDE\xED"), 2) == pEndArray3 + 61);
+		}
+#endif // _M_IX86
+
 		if (bHaveSSE2) {
 			CHECK(Detours::Scan::FindDataSSE2(pEmptyArray3, sizeof(pEmptyArray3), reinterpret_cast<unsigned char const*>("\xDE\xED"), 2) == nullptr);
 			CHECK(Detours::Scan::FindDataSSE2(pBeginArray3, sizeof(pBeginArray3), reinterpret_cast<unsigned char const*>("\xDE\xED"), 2) == pBeginArray3 + 1);
@@ -814,9 +944,7 @@ TEST_SUITE("Detours::Scan") {
 		}
 	}
 
-
-
-	TEST_CASE("FindDataNative [benckmark]" * doctest::skip() * doctest::timeout(10)) {
+	TEST_CASE("FindDataNative [benckmark]" * doctest::timeout(10)) {
 		auto pRandomData = std::make_unique<unsigned char[]>(0x800000); // 8 MiB
 		CHECK(pRandomData != nullptr);
 
@@ -836,7 +964,36 @@ TEST_SUITE("Detours::Scan") {
 		MESSAGE("Benckmark with 1 000 iterations over 8 MiB memory: ", (Detours::KUserSharedData.SystemTime.LowPart - unBegin) / 10000, " ms");
 	}
 
-	TEST_CASE("FindDataSSE2 [benckmark]" * doctest::skip() * doctest::timeout(5)) {
+#ifdef _M_IX86
+	TEST_CASE("FindDataMMX [benckmark]" * doctest::timeout(10)) {
+		auto pRandomData = std::make_unique<unsigned char[]>(0x800000); // 8 MiB
+		CHECK(pRandomData != nullptr);
+
+		memset(pRandomData.get(), 0, 0x800000);
+
+		pRandomData[0x800000 - 4] = 0xDE;
+		pRandomData[0x800000 - 3] = 0xED;
+		pRandomData[0x800000 - 2] = 0xBE;
+		pRandomData[0x800000 - 1] = 0xEF;
+
+		int cpuinfo[4];
+		__cpuid(cpuinfo, 1);
+
+		const bool bHaveMMX = (cpuinfo[3] & (1 << 23)) != 0;
+
+		if (bHaveMMX) {
+			ULONG unBegin = Detours::KUserSharedData.SystemTime.LowPart;
+			for (unsigned int i = 0; i < 1'000; ++i) {
+				if (!Detours::Scan::FindDataMMX(pRandomData.get(), 0x800000, reinterpret_cast<unsigned char const*>("\xDE\xED"), 2)) {
+					FAIL("Fail in benckmark!");
+				}
+			}
+			MESSAGE("Benckmark with 1 000 iterations over 8 MiB memory: ", (Detours::KUserSharedData.SystemTime.LowPart - unBegin) / 10000, " ms");
+		}
+	}
+#endif
+
+	TEST_CASE("FindDataSSE2 [benckmark]" * doctest::timeout(10)) {
 		auto pRandomData = std::make_unique<unsigned char[]>(0x800000); // 8 MiB
 		CHECK(pRandomData != nullptr);
 
@@ -863,7 +1020,7 @@ TEST_SUITE("Detours::Scan") {
 		}
 	}
 
-	TEST_CASE("FindDataAVX2 [benckmark]" * doctest::skip() * doctest::timeout(5)) {
+	TEST_CASE("FindDataAVX2 [benckmark]" * doctest::timeout(10)) {
 		auto pRandomData = std::make_unique<unsigned char[]>(0x800000); // 8 MiB
 		CHECK(pRandomData != nullptr);
 
@@ -892,7 +1049,7 @@ TEST_SUITE("Detours::Scan") {
 		}
 	}
 
-	TEST_CASE("FindDataAVX512 [benckmark]" * doctest::skip() * doctest::timeout(5)) {
+	TEST_CASE("FindDataAVX512 [benckmark]" * doctest::skip() * doctest::timeout(10)) {
 		auto pRandomData = std::make_unique<unsigned char[]>(0x800000); // 8 MiB
 		CHECK(pRandomData != nullptr);
 
