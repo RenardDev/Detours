@@ -2427,12 +2427,6 @@ namespace Detours {
 			bool RestoreProtection();
 
 		public:
-			bool CloneFrom(Page* pSourcePage);
-			bool CloneTo(Page* pDestinationPage);
-			bool CloneFrom(void* pSourceBaseAddress, size_t unSize = 0);
-			bool CloneTo(void* pDestinationBaseAddress, size_t unSize = 0);
-
-		public:
 			void* Alloc(size_t unSize, size_t unSizeAlign = 1, size_t unAddressAlign = alignof(void*));
 			void* ZeroAlloc(size_t unSize, size_t unSizeAlign = 1, size_t unAddressAlign = alignof(void*));
 			bool DeAlloc(void* pAddress);
