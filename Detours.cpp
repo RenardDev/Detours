@@ -192,17 +192,20 @@ namespace Detours {
 			m_pCallBack = nullptr;
 			m_pAddress = nullptr;
 			m_unSize = 0;
+			m_unActiveThreads = 0;
 			m_bPendingDeletion = false;
+			InitializeSRWLock(&m_Lock);
 		}
 
 		fnMemoryHookCallBack m_pCallBack;
 		void* m_pAddress;
 		size_t m_unSize;
 		std::deque<std::unique_ptr<Page>> m_Pages;
+		std::atomic<DWORD> m_unActiveThreads;
 		bool m_bPendingDeletion;
-		std::unordered_set<DWORD> m_PendingRestoreThreads;
+		SRWLOCK m_Lock;
 	} MEMORY_HOOK_RECORD, *PMEMORY_HOOK_RECORD;
-	
+
 	// ----------------------------------------------------------------
 	// INTERRUPT_HOOK_RECORD
 	// ----------------------------------------------------------------
@@ -218,8 +221,17 @@ namespace Detours {
 	} INTERRUPT_HOOK_RECORD, *PINTERRUPT_HOOK_RECORD;
 
 	// ----------------------------------------------------------------
+	// Locks
+	// ----------------------------------------------------------------
+
+	static SRWLOCK g_MemoryHookRecordsLock = SRWLOCK_INIT;
+	static SRWLOCK g_MemoryHookStacksLock = SRWLOCK_INIT;
+
+	// ----------------------------------------------------------------
 	// Storage
 	// ----------------------------------------------------------------
+
+	static std::unordered_map<DWORD, std::vector<PMEMORY_HOOK_RECORD>> g_MemoryHookOpenedStacks;
 
 	static std::deque<std::unique_ptr<HARDWARE_HOOK_RECORD>> g_HardwareHookRecords;
 	static std::deque<std::unique_ptr<MEMORY_HOOK_RECORD>> g_MemoryHookRecords;
@@ -7357,39 +7369,69 @@ namespace Detours {
 				return false;
 			}
 
-			const DWORD unCurrentTID = GetCurrentThreadId();
 			auto& eflags = *reinterpret_cast<REGISTER_FLAGS*>(&pCTX->EFlags);
+			const DWORD unCurrentTID = GetCurrentThreadId();
 
 			if (Exception.ExceptionCode == EXCEPTION_SINGLE_STEP) {
-				for (auto it = g_MemoryHookRecords.begin(); it != g_MemoryHookRecords.end(); ++it) {
-					const auto& pRecord = *it;
-					if (!pRecord) {
-						continue;
-					}
+				eflags.m_unTF = 0;
 
-					auto pit = pRecord->m_PendingRestoreThreads.find(unCurrentTID);
-					if (pit != pRecord->m_PendingRestoreThreads.end()) {
-						eflags.m_unTF = 0;
+				PMEMORY_HOOK_RECORD pRecord = nullptr;
 
-						if (!pRecord->m_bPendingDeletion) {
-							for (const auto& pPage : pRecord->m_Pages) {
-								if (!pPage || !pPage->ChangeProtection(PAGE_NOACCESS)) {
-									return false;
-								}
-							}
+				AcquireSRWLockExclusive(&g_MemoryHookStacksLock);
+
+				{
+					auto it = g_MemoryHookOpenedStacks.find(unCurrentTID);
+					if (it != g_MemoryHookOpenedStacks.end() && !it->second.empty()) {
+						pRecord = it->second.back();
+						it->second.pop_back();
+						if (it->second.empty()) {
+							g_MemoryHookOpenedStacks.erase(it);
 						}
-
-						pRecord->m_PendingRestoreThreads.erase(pit);
-
-						if (pRecord->m_bPendingDeletion && pRecord->m_PendingRestoreThreads.empty()) {
-							g_MemoryHookRecords.erase(it);
-						}
-
-						return true;
 					}
 				}
 
-				return false;
+				ReleaseSRWLockExclusive(&g_MemoryHookStacksLock);
+
+				if (!pRecord) {
+					return false;
+				}
+
+				bool bNeedErase = false;
+
+				AcquireSRWLockExclusive(&pRecord->m_Lock);
+
+				{
+					const uint32_t unPrev = pRecord->m_unActiveThreads.fetch_sub(1, std::memory_order_acq_rel);
+					if (unPrev == 1) {
+						if (!pRecord->m_bPendingDeletion) {
+							for (const auto& pPage : pRecord->m_Pages) {
+								if (!pPage || !pPage->ChangeProtection(PAGE_NOACCESS)) {
+									ReleaseSRWLockExclusive(&pRecord->m_Lock);
+									return false;
+								}
+							}
+						} else {
+							bNeedErase = true;
+						}
+					}
+				}
+
+				ReleaseSRWLockExclusive(&pRecord->m_Lock);
+
+				if (bNeedErase) {
+					AcquireSRWLockExclusive(&g_MemoryHookRecordsLock);
+
+					for (auto it = g_MemoryHookRecords.begin(); it != g_MemoryHookRecords.end(); ++it) {
+						if (it->get() == pRecord) {
+							g_MemoryHookRecords.erase(it);
+							break;
+						}
+					}
+
+					ReleaseSRWLockExclusive(&g_MemoryHookRecordsLock);
+				}
+
+				return true;
 			}
 
 			if ((Exception.ExceptionCode != EXCEPTION_ACCESS_VIOLATION) || (Exception.NumberParameters < 2)) {
@@ -7401,12 +7443,12 @@ namespace Detours {
 				return false;
 			}
 
-			const void* pFaultAddress = reinterpret_cast<void*>(Exception.ExceptionInformation[1]);
+			void* pFaultAddress = reinterpret_cast<void*>(Exception.ExceptionInformation[1]);
 			if (!pFaultAddress || (pFaultAddress == reinterpret_cast<void*>(-1))) {
 				return false;
 			}
 
-			const void* pExceptionAddress = reinterpret_cast<void*>(Exception.ExceptionAddress);
+			void* pExceptionAddress = reinterpret_cast<void*>(Exception.ExceptionAddress);
 
 			MEMORY_HOOK_OPERATION unOperation = MEMORY_HOOK_OPERATION::MEMORY_READ;
 			if (unAccessType == 1) {
@@ -7416,35 +7458,54 @@ namespace Detours {
 			}
 
 			PMEMORY_HOOK_RECORD pTargetRecord = nullptr;
-			for (const auto& pRecord : g_MemoryHookRecords) {
-				if (!pRecord) {
-					continue;
-				}
 
-				for (const auto& pPage : pRecord->m_Pages) {
-					if (pPage && __is_in_range(pPage->GetPageAddress(), pPage->GetPageCapacity(), pFaultAddress)) {
-						pTargetRecord = pRecord.get();
+			AcquireSRWLockShared(&g_MemoryHookRecordsLock);
+
+			{
+				for (const auto& pRecord : g_MemoryHookRecords) {
+					if (!pRecord) {
+						continue;
+					}
+
+					for (const auto& pPage : pRecord->m_Pages) {
+						if (pPage && __is_in_range(pPage->GetPageAddress(), pPage->GetPageCapacity(), pFaultAddress)) {
+							pTargetRecord = pRecord.get();
+							break;
+						}
+					}
+
+					if (pTargetRecord) {
 						break;
 					}
 				}
-
-				if (pTargetRecord) {
-					break;
-				}
 			}
+
+			ReleaseSRWLockShared(&g_MemoryHookRecordsLock);
 
 			if (!pTargetRecord) {
 				return false;
 			}
 
-			pTargetRecord->m_PendingRestoreThreads.insert(unCurrentTID);
+			AcquireSRWLockExclusive(&pTargetRecord->m_Lock);
 
-			for (const auto& pPage : pTargetRecord->m_Pages) {
-				if (!pPage || !pPage->RestoreProtection()) {
-					pTargetRecord->m_PendingRestoreThreads.erase(unCurrentTID);
-					return false;
+			{
+				const uint32_t unPrev = pTargetRecord->m_unActiveThreads.load(std::memory_order_acquire);
+				if (unPrev == 0) {
+					for (const auto& pPage : pTargetRecord->m_Pages) {
+						if (!pPage || !pPage->RestoreProtection()) {
+							ReleaseSRWLockExclusive(&pTargetRecord->m_Lock);
+							return false;
+						}
+					}
 				}
+				pTargetRecord->m_unActiveThreads.fetch_add(1, std::memory_order_acq_rel);
 			}
+
+			ReleaseSRWLockExclusive(&pTargetRecord->m_Lock);
+
+			AcquireSRWLockExclusive(&g_MemoryHookStacksLock);
+			g_MemoryHookOpenedStacks[unCurrentTID].push_back(pTargetRecord);
+			ReleaseSRWLockExclusive(&g_MemoryHookStacksLock);
 
 			eflags.m_unTF = 1;
 
@@ -84865,62 +84926,74 @@ namespace Detours {
 				return false;
 			}
 
-			for (auto& pRecord : g_MemoryHookRecords) {
-				if (pRecord->m_bPendingDeletion) {
-					continue;
-				}
+			AcquireSRWLockExclusive(&g_MemoryHookRecordsLock);
 
-				if (pRecord->m_pCallBack == pCallBack) {
-					g_Suspender.Resume();
-					return false;
-				}
+			{
+				for (auto& pRecord : g_MemoryHookRecords) {
+					if (pRecord->m_bPendingDeletion) {
+						continue;
+					}
 
-				if (__is_range_in_range(pRecord->m_pAddress, pRecord->m_unSize, pAddress, unSize)) {
-					g_Suspender.Resume();
-					return false;
-				}
+					if (pRecord->m_pCallBack == pCallBack) {
+						ReleaseSRWLockExclusive(&g_MemoryHookRecordsLock);
+						g_Suspender.Resume();
+						return false;
+					}
 
-				auto vecRecordPages = __get_pages_info(pRecord->m_pAddress, pRecord->m_unSize, true);
-				if (vecRecordPages.empty()) {
-					continue;
-				}
+					if (__is_range_in_range(pRecord->m_pAddress, pRecord->m_unSize, pAddress, unSize)) {
+						ReleaseSRWLockExclusive(&g_MemoryHookRecordsLock);
+						g_Suspender.Resume();
+						return false;
+					}
 
-				for (const auto& pPage : vecPages) {
-					for (const auto& pRecordPage : vecRecordPages) {
-						if (__is_range_in_range(pRecordPage.m_pBaseAddress, pRecordPage.m_unSize, pPage.m_pBaseAddress, pPage.m_unSize)) {
-							g_Suspender.Resume();
-							return false;
+					auto vecRecordPages = __get_pages_info(pRecord->m_pAddress, pRecord->m_unSize, true);
+					if (vecRecordPages.empty()) {
+						continue;
+					}
+
+					for (const auto& pPage : vecPages) {
+						for (const auto& pRecordPage : vecRecordPages) {
+							if (__is_range_in_range(pRecordPage.m_pBaseAddress, pRecordPage.m_unSize, pPage.m_pBaseAddress, pPage.m_unSize)) {
+								ReleaseSRWLockExclusive(&g_MemoryHookRecordsLock);
+								g_Suspender.Resume();
+								return false;
+							}
 						}
 					}
 				}
-			}
 
-			auto pRecord = std::make_unique<MEMORY_HOOK_RECORD>();
-			if (!pRecord) {
-				g_Suspender.Resume();
-				return false;
-			}
-
-			pRecord->m_pCallBack = pCallBack;
-			pRecord->m_pAddress = pAddress;
-			pRecord->m_unSize = unSize;
-
-			for (auto& pi : vecPages) {
-				auto pPage = std::make_unique<Page>(pi.m_pBaseAddress, false);
-				if (!pPage) {
+				auto pRecord = std::make_unique<MEMORY_HOOK_RECORD>();
+				if (!pRecord) {
+					ReleaseSRWLockExclusive(&g_MemoryHookRecordsLock);
 					g_Suspender.Resume();
 					return false;
 				}
 
-				if (!pPage->ChangeProtection(PAGE_NOACCESS)) {
-					g_Suspender.Resume();
-					return false;
+				pRecord->m_pCallBack = pCallBack;
+				pRecord->m_pAddress = pAddress;
+				pRecord->m_unSize = unSize;
+
+				for (auto& pi : vecPages) {
+					auto pPage = std::make_unique<Page>(pi.m_pBaseAddress, false);
+					if (!pPage) {
+						ReleaseSRWLockExclusive(&g_MemoryHookRecordsLock);
+						g_Suspender.Resume();
+						return false;
+					}
+
+					if (!pPage->ChangeProtection(PAGE_NOACCESS)) {
+						ReleaseSRWLockExclusive(&g_MemoryHookRecordsLock);
+						g_Suspender.Resume();
+						return false;
+					}
+
+					pRecord->m_Pages.emplace_back(std::move(pPage));
 				}
 
-				pRecord->m_Pages.emplace_back(std::move(pPage));
+				g_MemoryHookRecords.emplace_back(std::move(pRecord));
 			}
 
-			g_MemoryHookRecords.emplace_back(std::move(pRecord));
+			ReleaseSRWLockExclusive(&g_MemoryHookRecordsLock);
 
 			g_Suspender.Resume();
 			return true;
@@ -84936,33 +85009,51 @@ namespace Detours {
 				return false;
 			}
 
+			AcquireSRWLockExclusive(&g_MemoryHookRecordsLock);
+
 			for (auto it = g_MemoryHookRecords.begin(); it != g_MemoryHookRecords.end(); ++it) {
-				if ((*it)->m_pCallBack == pCallBack) {
-					if ((*it)->m_bPendingDeletion) {
-						continue;
+				auto& pRecord = *it;
+				if (pRecord && pRecord->m_pCallBack == pCallBack) {
+
+					AcquireSRWLockExclusive(&pRecord->m_Lock);
+
+					if (pRecord->m_bPendingDeletion) {
+						ReleaseSRWLockExclusive(&pRecord->m_Lock);
+						ReleaseSRWLockExclusive(&g_MemoryHookRecordsLock);
+						g_Suspender.Resume();
+						return true;
 					}
 
-					for (auto& pPage : (*it)->m_Pages) {
+					for (auto& pPage : pRecord->m_Pages) {
 						if (!pPage || !pPage->RestoreProtection()) {
+							ReleaseSRWLockExclusive(&pRecord->m_Lock);
+							ReleaseSRWLockExclusive(&g_MemoryHookRecordsLock);
 							g_Suspender.Resume();
 							return false;
 						}
 					}
 
-					(*it)->m_bPendingDeletion = true;
+					pRecord->m_bPendingDeletion = true;
 
-					if ((*it)->m_PendingRestoreThreads.empty()) {
+					if (pRecord->m_unActiveThreads.load(std::memory_order_acquire) == 0) {
+						ReleaseSRWLockExclusive(&pRecord->m_Lock);
 						g_MemoryHookRecords.erase(it);
+					} else {
+						ReleaseSRWLockExclusive(&pRecord->m_Lock);
 					}
 
+					ReleaseSRWLockExclusive(&g_MemoryHookRecordsLock);
 					g_Suspender.Resume();
 					return true;
 				}
 			}
 
+			ReleaseSRWLockExclusive(&g_MemoryHookRecordsLock);
+
 			g_Suspender.Resume();
 			return false;
 		}
+
 
 		// ----------------------------------------------------------------
 		// Interrupt Hook
