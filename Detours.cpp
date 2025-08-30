@@ -167,9 +167,9 @@ namespace Detours {
 			m_pAddress = nullptr;
 			m_unType = HARDWARE_HOOK_TYPE::TYPE_EXECUTE;
 			m_unSize = 0;
-			m_bPendingRestore = false;
-			m_bPendingDeletion = false;
-			m_bCancelRestore = false;
+			m_bPendingRestore.store(false, std::memory_order_relaxed);
+			m_bPendingDeletion.store(false, std::memory_order_relaxed);
+			m_bCancelRestore.store(false, std::memory_order_relaxed);
 		}
 
 		DWORD m_unThreadID;
@@ -178,9 +178,9 @@ namespace Detours {
 		void* m_pAddress;
 		HARDWARE_HOOK_TYPE m_unType;
 		unsigned char m_unSize;
-		bool m_bPendingRestore;
-		bool m_bPendingDeletion;
-		bool m_bCancelRestore;
+		std::atomic<bool> m_bPendingRestore;
+		std::atomic<bool> m_bPendingDeletion;
+		std::atomic<bool> m_bCancelRestore;
 	} HARDWARE_HOOK_RECORD, *PHARDWARE_HOOK_RECORD;
 
 	// ----------------------------------------------------------------
@@ -192,7 +192,7 @@ namespace Detours {
 			m_pCallBack = nullptr;
 			m_pAddress = nullptr;
 			m_unSize = 0;
-			m_unActiveThreads = 0;
+			m_unActiveThreads.store(0, std::memory_order_relaxed);
 			m_bPendingDeletion = false;
 			InitializeSRWLock(&m_Lock);
 		}
@@ -224,8 +224,9 @@ namespace Detours {
 	// Locks
 	// ----------------------------------------------------------------
 
-	static SRWLOCK g_MemoryHookRecordsLock = SRWLOCK_INIT;
+	static SRWLOCK g_HardwareHookRecordsLock = SRWLOCK_INIT;
 	static SRWLOCK g_MemoryHookStacksLock = SRWLOCK_INIT;
+	static SRWLOCK g_MemoryHookRecordsLock = SRWLOCK_INIT;
 
 	// ----------------------------------------------------------------
 	// Storage
@@ -7155,16 +7156,18 @@ namespace Detours {
 
 			bool bRestored = false;
 
+			AcquireSRWLockExclusive(&g_HardwareHookRecordsLock);
+
 			for (auto it = g_HardwareHookRecords.begin(); it != g_HardwareHookRecords.end(); ) {
 				auto& pRecord = *it;
-				if (!pRecord || (pRecord->m_unThreadID != unCurrentTID) || !pRecord->m_bPendingRestore) {
+				if (!pRecord || (pRecord->m_unThreadID != unCurrentTID) || !pRecord->m_bPendingRestore.load(std::memory_order_acquire)) {
 					++it;
 					continue;
 				}
 
-				if (pRecord->m_bCancelRestore) {
-					pRecord->m_bPendingRestore = false;
-					pRecord->m_bCancelRestore = false;
+				if (pRecord->m_bCancelRestore.load(std::memory_order_acquire)) {
+					pRecord->m_bPendingRestore.store(false, std::memory_order_release);
+					pRecord->m_bCancelRestore.store(false, std::memory_order_release);
 					eflags.m_unTF = 0;
 					dr6.m_unBS = 0;
 					it = g_HardwareHookRecords.erase(it);
@@ -7213,60 +7216,62 @@ namespace Detours {
 #ifdef _M_X64
 						pCTX->Dr0 = reinterpret_cast<DWORD64>(pRecord->m_pAddress);
 #else
-						pCTX->Dr0 = reinterpret_cast<DWORD>(pRecord->m_pAddress);
+							pCTX->Dr0 = reinterpret_cast<DWORD>(pRecord->m_pAddress);
 #endif
-						dr7.m_unL0 = 1;
-						dr7.m_unRW0 = unTypeValue;
-						dr7.m_unLEN0 = unSizeValue;
-						break;
+							dr7.m_unL0 = 1;
+							dr7.m_unRW0 = unTypeValue;
+							dr7.m_unLEN0 = unSizeValue;
+							break;
 
-					case HARDWARE_HOOK_REGISTER::REGISTER_DR1:
+						case HARDWARE_HOOK_REGISTER::REGISTER_DR1:
 #ifdef _M_X64
-						pCTX->Dr1 = reinterpret_cast<DWORD64>(pRecord->m_pAddress);
+							pCTX->Dr1 = reinterpret_cast<DWORD64>(pRecord->m_pAddress);
 #else
-						pCTX->Dr1 = reinterpret_cast<DWORD>(pRecord->m_pAddress);
+							pCTX->Dr1 = reinterpret_cast<DWORD>(pRecord->m_pAddress);
 #endif
-						dr7.m_unL1 = 1;
-						dr7.m_unRW1 = unTypeValue;
-						dr7.m_unLEN1 = unSizeValue;
-						break;
+							dr7.m_unL1 = 1;
+							dr7.m_unRW1 = unTypeValue;
+							dr7.m_unLEN1 = unSizeValue;
+							break;
 
-					case HARDWARE_HOOK_REGISTER::REGISTER_DR2:
+						case HARDWARE_HOOK_REGISTER::REGISTER_DR2:
 #ifdef _M_X64
-						pCTX->Dr2 = reinterpret_cast<DWORD64>(pRecord->m_pAddress);
+							pCTX->Dr2 = reinterpret_cast<DWORD64>(pRecord->m_pAddress);
 #else
-						pCTX->Dr2 = reinterpret_cast<DWORD>(pRecord->m_pAddress);
+							pCTX->Dr2 = reinterpret_cast<DWORD>(pRecord->m_pAddress);
 #endif
-						dr7.m_unL2 = 1;
-						dr7.m_unRW2 = unTypeValue;
-						dr7.m_unLEN2 = unSizeValue;
-						break;
+							dr7.m_unL2 = 1;
+							dr7.m_unRW2 = unTypeValue;
+							dr7.m_unLEN2 = unSizeValue;
+							break;
 
-					case HARDWARE_HOOK_REGISTER::REGISTER_DR3:
+						case HARDWARE_HOOK_REGISTER::REGISTER_DR3:
 #ifdef _M_X64
-						pCTX->Dr3 = reinterpret_cast<DWORD64>(pRecord->m_pAddress);
+							pCTX->Dr3 = reinterpret_cast<DWORD64>(pRecord->m_pAddress);
 #else
-						pCTX->Dr3 = reinterpret_cast<DWORD>(pRecord->m_pAddress);
+							pCTX->Dr3 = reinterpret_cast<DWORD>(pRecord->m_pAddress);
 #endif
-						dr7.m_unL3 = 1;
-						dr7.m_unRW3 = unTypeValue;
-						dr7.m_unLEN3 = unSizeValue;
-						break;
+							dr7.m_unL3 = 1;
+							dr7.m_unRW3 = unTypeValue;
+							dr7.m_unLEN3 = unSizeValue;
+							break;
 				}
 
 				dr7.m_unLE = 0;
 				dr7.m_unGE = 0;
 				dr7.m_unGD = 0;
 
-				pRecord->m_bPendingRestore = false;
+				pRecord->m_bPendingRestore.store(false, std::memory_order_release);
 				bRestored = true;
 
-				if (pRecord->m_bPendingDeletion) {
+				if (pRecord->m_bPendingDeletion.load(std::memory_order_acquire)) {
 					it = g_HardwareHookRecords.erase(it);
 				} else {
 					++it;
 				}
 			}
+
+			ReleaseSRWLockExclusive(&g_HardwareHookRecordsLock);
 
 			if (bRestored) {
 				dr6.m_unBS = 0;
@@ -7287,16 +7292,12 @@ namespace Detours {
 				return bRestored;
 			}
 
+			fnHardwareHookCallBack pCallBack = nullptr;
+
+			AcquireSRWLockShared(&g_HardwareHookRecordsLock);
+
 			for (auto& pRecord : g_HardwareHookRecords) {
-				if (!pRecord || pRecord->m_bPendingDeletion) {
-					continue;
-				}
-
-				if (pRecord->m_unThreadID != unCurrentTID) {
-					continue;
-				}
-
-				if (pRecord->m_unRegister != unRegister) {
+				if (!pRecord || pRecord->m_bPendingDeletion.load(std::memory_order_acquire) || (pRecord->m_unThreadID != unCurrentTID) || (pRecord->m_unRegister != unRegister)) {
 					continue;
 				}
 
@@ -7324,7 +7325,7 @@ namespace Detours {
 					continue;
 				}
 
-				pRecord->m_bPendingRestore = true;
+				pRecord->m_bPendingRestore.store(true, std::memory_order_release);
 
 				switch (unRegister) {
 					case HARDWARE_HOOK_REGISTER::REGISTER_DR0:
@@ -7353,11 +7354,18 @@ namespace Detours {
 				}
 
 				eflags.m_unTF = 1;
-				pRecord->m_pCallBack(pCTX);
+				pCallBack = pRecord->m_pCallBack;
+				break;
+			}
+
+			ReleaseSRWLockShared(&g_HardwareHookRecordsLock);
+
+			if (pCallBack) {
+				pCallBack(pCTX);
 				return true;
 			}
 
-			return false;
+			return bRestored;
 		}
 
 		// ----------------------------------------------------------------
@@ -84612,38 +84620,25 @@ namespace Detours {
 					g_Suspender.Resume();
 					return false;
 				}
-
 				if ((reinterpret_cast<size_t>(pAddress) & (unSize - 1)) != 0) {
 					g_Suspender.Resume();
 					return false;
 				}
 			}
 
+			AcquireSRWLockExclusive(&g_HardwareHookRecordsLock);
+
 			for (auto& pRecord : g_HardwareHookRecords) {
-				if (pRecord->m_bPendingDeletion) {
-					continue;
-				}
-
-				if ((pRecord->m_unThreadID == unThreadID) && (pRecord->m_unRegister == unRegister)) {
-					g_Suspender.Resume();
-					return false;
+				if (pRecord && !pRecord->m_bPendingDeletion.load(std::memory_order_acquire)) {
+					if (pRecord->m_unThreadID == unThreadID && pRecord->m_unRegister == unRegister) {
+						ReleaseSRWLockExclusive(&g_HardwareHookRecordsLock);
+						g_Suspender.Resume();
+						return false;
+					}
 				}
 			}
 
-			auto pRecord = std::make_unique<HARDWARE_HOOK_RECORD>();
-			if (!pRecord) {
-				g_Suspender.Resume();
-				return false;
-			}
-
-			pRecord->m_unThreadID = unThreadID;
-			pRecord->m_unRegister = unRegister;
-			pRecord->m_pCallBack = pCallBack;
-			pRecord->m_pAddress = pAddress;
-			pRecord->m_unType = unType;
-			pRecord->m_unSize = unSize;
-			pRecord->m_bPendingRestore = false;
-			pRecord->m_bPendingDeletion = false;
+			ReleaseSRWLockExclusive(&g_HardwareHookRecordsLock);
 
 			HANDLE hThread = OpenThread(THREAD_GET_CONTEXT | THREAD_SET_CONTEXT, FALSE, unThreadID);
 			if (!hThread || (hThread == INVALID_HANDLE_VALUE)) {
@@ -84663,39 +84658,39 @@ namespace Detours {
 			switch (unRegister) {
 				case HARDWARE_HOOK_REGISTER::REGISTER_DR0:
 #ifdef _M_X64
-					ctx.Dr0 = reinterpret_cast<DWORD64>(pAddress);
+						ctx.Dr0 = reinterpret_cast<DWORD64>(pAddress);
 #elif _M_IX86
-					ctx.Dr0 = reinterpret_cast<DWORD>(pAddress);
+						ctx.Dr0 = reinterpret_cast<DWORD>(pAddress);
 #endif
-					unDRIndex = 0;
-					break;
+						unDRIndex = 0;
+						break;
 
-				case HARDWARE_HOOK_REGISTER::REGISTER_DR1:
+					case HARDWARE_HOOK_REGISTER::REGISTER_DR1:
 #ifdef _M_X64
-					ctx.Dr1 = reinterpret_cast<DWORD64>(pAddress);
+						ctx.Dr1 = reinterpret_cast<DWORD64>(pAddress);
 #elif _M_IX86
-					ctx.Dr1 = reinterpret_cast<DWORD>(pAddress);
+						ctx.Dr1 = reinterpret_cast<DWORD>(pAddress);
 #endif
-					unDRIndex = 1;
-					break;
+						unDRIndex = 1;
+						break;
 
-				case HARDWARE_HOOK_REGISTER::REGISTER_DR2:
+					case HARDWARE_HOOK_REGISTER::REGISTER_DR2:
 #ifdef _M_X64
-					ctx.Dr2 = reinterpret_cast<DWORD64>(pAddress);
+						ctx.Dr2 = reinterpret_cast<DWORD64>(pAddress);
 #elif _M_IX86
-					ctx.Dr2 = reinterpret_cast<DWORD>(pAddress);
+						ctx.Dr2 = reinterpret_cast<DWORD>(pAddress);
 #endif
-					unDRIndex = 2;
-					break;
+						unDRIndex = 2;
+						break;
 
-				case HARDWARE_HOOK_REGISTER::REGISTER_DR3:
+					case HARDWARE_HOOK_REGISTER::REGISTER_DR3:
 #ifdef _M_X64
-					ctx.Dr3 = reinterpret_cast<DWORD64>(pAddress);
+						ctx.Dr3 = reinterpret_cast<DWORD64>(pAddress);
 #elif _M_IX86
-					ctx.Dr3 = reinterpret_cast<DWORD>(pAddress);
+						ctx.Dr3 = reinterpret_cast<DWORD>(pAddress);
 #endif
-					unDRIndex = 3;
-					break;
+						unDRIndex = 3;
+						break;
 			}
 
 			unsigned char unTypeValue = 0;
@@ -84794,7 +84789,26 @@ namespace Detours {
 				return false;
 			}
 
+			auto pRecord = std::make_unique<HARDWARE_HOOK_RECORD>();
+			if (!pRecord) {
+				CloseHandle(hThread);
+				g_Suspender.Resume();
+				return false;
+			}
+
+			pRecord->m_unThreadID = unThreadID;
+			pRecord->m_unRegister = unRegister;
+			pRecord->m_pCallBack = pCallBack;
+			pRecord->m_pAddress = pAddress;
+			pRecord->m_unType = unType;
+			pRecord->m_unSize = unSize;
+			pRecord->m_bPendingRestore.store(false, std::memory_order_relaxed);
+			pRecord->m_bPendingDeletion.store(false, std::memory_order_relaxed);
+			pRecord->m_bCancelRestore.store(false, std::memory_order_relaxed);
+
+			AcquireSRWLockExclusive(&g_HardwareHookRecordsLock);
 			g_HardwareHookRecords.emplace_back(std::move(pRecord));
+			ReleaseSRWLockExclusive(&g_HardwareHookRecordsLock);
 
 			CloseHandle(hThread);
 			g_Suspender.Resume();
@@ -84811,40 +84825,35 @@ namespace Detours {
 				return false;
 			}
 
+			AcquireSRWLockExclusive(&g_HardwareHookRecordsLock);
+
 			for (auto it = g_HardwareHookRecords.begin(); it != g_HardwareHookRecords.end(); ++it) {
 				auto& pRecord = *it;
-				if (!pRecord || pRecord->m_bPendingDeletion) {
+				if (!pRecord || pRecord->m_bPendingDeletion.load(std::memory_order_acquire)) {
 					continue;
 				}
 
-				if (pRecord->m_unThreadID != unThreadID) {
+				if (pRecord->m_unThreadID != unThreadID || pRecord->m_unRegister != unRegister) {
 					continue;
 				}
 
-				if (pRecord->m_unRegister != unRegister) {
-					continue;
-				}
-
-				if (pRecord->m_bPendingRestore) {
-					pRecord->m_bCancelRestore = true;
-					pRecord->m_bPendingDeletion = true;
+				if (pRecord->m_bPendingRestore.load(std::memory_order_acquire)) {
+					pRecord->m_bCancelRestore.store(true, std::memory_order_release);
+					pRecord->m_bPendingDeletion.store(true, std::memory_order_release);
+					ReleaseSRWLockExclusive(&g_HardwareHookRecordsLock);
 					g_Suspender.Resume();
 					return true;
 				}
+
+				ReleaseSRWLockExclusive(&g_HardwareHookRecordsLock);
 
 				HANDLE hThread = OpenThread(THREAD_GET_CONTEXT | THREAD_SET_CONTEXT, FALSE, unThreadID);
-				if (!hThread || (hThread == INVALID_HANDLE_VALUE)) {
-					pRecord->m_bPendingDeletion = true;
-					g_HardwareHookRecords.erase(it);
-					g_Suspender.Resume();
-					return true;
-				}
-
-				CONTEXT ctx = {};
-				ctx.ContextFlags = CONTEXT_DEBUG_REGISTERS;
-				if (GetThreadContext(hThread, &ctx)) {
-					auto& dr7 = *reinterpret_cast<REGISTER_DR7*>(&ctx.Dr7);
-					switch (unRegister) {
+				if (hThread && (hThread != INVALID_HANDLE_VALUE)) {
+					CONTEXT ctx = {};
+					ctx.ContextFlags = CONTEXT_DEBUG_REGISTERS;
+					if (GetThreadContext(hThread, &ctx)) {
+						auto& dr7 = *reinterpret_cast<REGISTER_DR7*>(&ctx.Dr7);
+						switch (unRegister) {
 						case HARDWARE_HOOK_REGISTER::REGISTER_DR0:
 							ctx.Dr0 = 0;
 							dr7.m_unL0 = 0;
@@ -84878,16 +84887,21 @@ namespace Detours {
 							break;
 					}
 
-					SetThreadContext(hThread, &ctx);
+						SetThreadContext(hThread, &ctx);
+					}
+					CloseHandle(hThread);
 				}
 
-				CloseHandle(hThread);
-
-				pRecord->m_bPendingDeletion = true;
+				AcquireSRWLockExclusive(&g_HardwareHookRecordsLock);
+				pRecord->m_bPendingDeletion.store(true, std::memory_order_release);
 				g_HardwareHookRecords.erase(it);
+				ReleaseSRWLockExclusive(&g_HardwareHookRecordsLock);
+
 				g_Suspender.Resume();
 				return true;
 			}
+
+			ReleaseSRWLockExclusive(&g_HardwareHookRecordsLock);
 
 			g_Suspender.Resume();
 			return false;
