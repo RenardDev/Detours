@@ -1572,10 +1572,10 @@ TEST_SUITE("Detours::Hook") {
 	}
 
 	DWORD WINAPI ThreadAccesserLoop(LPVOID lpParameter) {
-		while ((rand() % 10000) != 9999) {
-			//for (unsigned int i = 0; i < 1'000'000; ++i) {
-			//	_mm_pause();
-			//}
+		while ((rand() % 100) != 99) {
+			for (unsigned int i = 0; i < 1'000'000; ++i) {
+				_mm_pause();
+			}
 
 			reinterpret_cast<unsigned int*>(lpParameter)[0] = 4;
 		}
