@@ -1776,7 +1776,10 @@ TEST_SUITE("Detours::Hook") {
 	bool __cdecl CPUID_RawHook(Detours::Hook::PRAW_CONTEXT pCTX) {
 #endif
 
+		pCTX->m_unEAX = 0x00000001;
 		pCTX->m_unEBX = 0x11223344;
+		pCTX->m_unECX = 0x00000002;
+		pCTX->m_unEDX = 0x00000003;
 		pCTX->Stack.push(reinterpret_cast<char*>(RawCPUIDHook.GetTrampoline()) + RawCPUIDHook.GetFirstInstructionSize());
 
 		return true;
