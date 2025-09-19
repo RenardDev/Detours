@@ -1224,8 +1224,14 @@ namespace Detours {
 			char m_pName[1];
 		} IMAGE_POGO_BLOCK, *PIMAGE_POGO_BLOCK;
 
+		// 0x4C544347 - 'LTCG'
+		// 0x50474900 - 'PGI\x00'
+		// 0x50474F00 - 'PGO\x00'
+		// 0x50475500 - 'PGU\x00'
+		// 0x5350474F - 'SPGO'
+
 		typedef struct _IMAGE_POGO_INFO {
-			DWORD m_unSignature; // 0x4C544347 = 'LTCG'; 0x50475500 = 'PGO\x00', 0x5350474F = 'SPGO'
+			DWORD m_unSignature;
 			IMAGE_POGO_BLOCK m_pBlocks[1];
 		} IMAGE_POGO_INFO, *PIMAGE_POGO_INFO;
 
@@ -1250,7 +1256,7 @@ namespace Detours {
 				}
 
 				const auto& pPI = reinterpret_cast<PIMAGE_POGO_INFO>(reinterpret_cast<char*>(hModule) + pDebugDirectory[i].AddressOfRawData);
-				if ((pPI->m_unSignature != 0x4C544347) && (pPI->m_unSignature != 0x50475500) && (pPI->m_unSignature != 0x5350474F)) {
+				if ((pPI->m_unSignature != 0x4C544347) && (pPI->m_unSignature != 0x50474900) && (pPI->m_unSignature != 0x50474F00) && (pPI->m_unSignature != 0x50475500) && (pPI->m_unSignature != 0x5350474F)) {
 					continue;
 				}
 
