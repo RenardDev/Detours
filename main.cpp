@@ -1523,9 +1523,11 @@ TEST_SUITE("Detours::Exception") {
 	TEST_CASE("g_ExceptionListener") { // TODO: Incorrect return from CallInterrupt on 64 bit.
 		CHECK(Detours::Exception::g_ExceptionListener.AddCallBack(OnException) == true);
 #ifdef _M_X64
-		CHECK(CallInterrupt(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15));
+		CHECK(CallInterrupt(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15) == 0xDEEDBEEF);
+		CHECK(CallInterrupt(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15) == 0xDEEDBEEF);
 #elif _M_IX86
-		CHECK(CallInterrupt(1, 2, 3, 4, 5, 6, 7));
+		CHECK(CallInterrupt(1, 2, 3, 4, 5, 6, 7) == 0xDEEDBEEF);
+		CHECK(CallInterrupt(1, 2, 3, 4, 5, 6, 7) == 0xDEEDBEEF);
 #endif
 		CHECK(Detours::Exception::g_ExceptionListener.RemoveCallBack(OnException) == true);
 
@@ -1555,13 +1557,13 @@ TEST_SUITE("Detours::Hook") {
 	void HardwareHook(const PCONTEXT pCTX) {
 		UNREFERENCED_PARAMETER(pCTX);
 
-		_tprintf_s(_T("Mem access! TID=%lu\n"), GetCurrentThreadId());
+		_tprintf_s(_T("[HardwareHook] Mem access! TID=%lu\n"), GetCurrentThreadId());
 	}
 
 	void HardwareSelfUnHook(const PCONTEXT pCTX) {
 		UNREFERENCED_PARAMETER(pCTX);
 
-		_tprintf_s(_T("Mem access! TID=%lu\n"), GetCurrentThreadId());
+		_tprintf_s(_T("[HardwareSelfUnHook] Mem access! TID=%lu\n"), GetCurrentThreadId());
 
 		Detours::Hook::UnHookHardware(GetCurrentThreadId(), Detours::Hook::HARDWARE_HOOK_REGISTER::REGISTER_DR0);
 	}
@@ -1611,7 +1613,17 @@ TEST_SUITE("Detours::Hook") {
 		UNREFERENCED_PARAMETER(pHookAddress);
 		UNREFERENCED_PARAMETER(pAccessAddress);
 
-		_tprintf_s(_T("Mem access! TID=%lu\n"), GetCurrentThreadId());
+		_tprintf_s(_T("[MemoryHook] Mem access! TID=%lu Addr=%p\n"), GetCurrentThreadId(), pAccessAddress);
+	}
+
+	void PostMemoryHook(const PCONTEXT pCTX, const void* pExceptionAddress, Detours::Hook::MEMORY_HOOK_OPERATION unOperation, const void* pHookAddress, const void* pAccessAddress) {
+		UNREFERENCED_PARAMETER(pCTX);
+		UNREFERENCED_PARAMETER(pExceptionAddress);
+		UNREFERENCED_PARAMETER(unOperation);
+		UNREFERENCED_PARAMETER(pHookAddress);
+		UNREFERENCED_PARAMETER(pAccessAddress);
+
+		_tprintf_s(_T("[PostMemoryHook] Mem access! TID=%lu Addr=%p\n"), GetCurrentThreadId(), pAccessAddress);
 	}
 
 	void MemoryHookSelfUnHook(const PCONTEXT pCTX, const void* pExceptionAddress, Detours::Hook::MEMORY_HOOK_OPERATION unOperation, const void* pHookAddress, const void* pAccessAddress) {
@@ -1621,7 +1633,7 @@ TEST_SUITE("Detours::Hook") {
 		UNREFERENCED_PARAMETER(pHookAddress);
 		UNREFERENCED_PARAMETER(pAccessAddress);
 
-		_tprintf_s(_T("Mem access! TID=%lu\n"), GetCurrentThreadId());
+		_tprintf_s(_T("[MemoryHookSelfUnHook] Mem access! TID=%lu\n"), GetCurrentThreadId());
 
 		Detours::Hook::UnHookMemory(MemoryHookSelfUnHook);
 	}
@@ -1778,8 +1790,8 @@ TEST_SUITE("Detours::Hook") {
 
 		pCTX->m_unEAX = 0x00000001;
 		pCTX->m_unEBX = 0x11223344;
-		pCTX->m_unECX = 0x00000002;
-		pCTX->m_unEDX = 0x00000003;
+		pCTX->m_unECX = 0x00000003;
+		pCTX->m_unEDX = 0x00000004;
 		pCTX->Stack.push(reinterpret_cast<char*>(RawCPUIDHook.GetTrampoline()) + RawCPUIDHook.GetFirstInstructionSize());
 
 		return true;
@@ -1898,7 +1910,7 @@ TEST_SUITE("Detours::Hook") {
 		CHECK(hThread != nullptr);
 		CHECK(hThread != INVALID_HANDLE_VALUE);
 
-		CHECK(Detours::Hook::HookMemory(MemoryHook, pArray, sizeof(int) * 3) == true);
+		CHECK(Detours::Hook::HookMemory(MemoryHook, pArray, sizeof(int) * 3, PostMemoryHook) == true);
 		CHECK(Detours::Hook::HookMemory(MemoryHook, pArray, sizeof(int) * 3) == false);
 
 		pArray[0] = 0xDEEDBEEF;
@@ -1932,7 +1944,7 @@ TEST_SUITE("Detours::Hook") {
 		CHECK(hThread2 != nullptr);
 		CHECK(hThread2 != INVALID_HANDLE_VALUE);
 
-		CHECK(Detours::Hook::HookMemory(MemoryHook, pArray, sizeof(int) * 3) == true);
+		CHECK(Detours::Hook::HookMemory(MemoryHook, pArray, sizeof(int) * 3, PostMemoryHook) == true);
 		CHECK(Detours::Hook::HookMemory(MemoryHook, pArray, sizeof(int) * 3) == false);
 
 		pArray[0] = 0xDEEDBEEF;
@@ -1989,7 +2001,7 @@ TEST_SUITE("Detours::Hook") {
 			reinterpret_cast<unsigned char*>(pAddress)[0] = 1;
 		}
 		MESSAGE("Benckmark with 1 000 000 iterations (without hook): ", (Detours::KUserSharedData.SystemTime.LowPart - unBegin) / 10000, " ms");
-		CHECK(Detours::Hook::HookMemory(MemoryHook, Region.GetRegionAddress(), Region.GetRegionCapacity()) == true);
+		CHECK(Detours::Hook::HookMemory(MemoryHook, Region.GetRegionAddress(), Region.GetRegionCapacity(), PostMemoryHook) == true);
 		unBegin = Detours::KUserSharedData.SystemTime.LowPart;
 		for (size_t i = 0; i < 1'000'000; ++i) {
 			reinterpret_cast<unsigned char*>(pAddress)[0] = 2;
@@ -1998,12 +2010,14 @@ TEST_SUITE("Detours::Hook") {
 		CHECK(Detours::Hook::UnHookMemory(MemoryHook) == true);
 	}
 
-	TEST_CASE("InterruptHook") { // TODO: Incorrect return from CallInterrupt on 64 bit.
+	TEST_CASE("InterruptHook") {
 		CHECK(Detours::Hook::HookInterrupt(InterruptHook, 0x7E) == true);
 #ifdef _M_X64
-		CallInterrupt(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15);
+		unsigned long long unRAX = CallInterrupt(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15);
+		CallInterrupt(unRAX, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15);
 #elif _M_IX86
-		CallInterrupt(1, 2, 3, 4, 5, 6, 7);
+		unsigned int unEAX = CallInterrupt(1, 2, 3, 4, 5, 6, 7);
+		CallInterrupt(unEAX, 2, 3, 4, 5, 6, 7);
 #endif
 		CHECK(Detours::Hook::UnHookInterrupt(InterruptHook) == true);
 	}

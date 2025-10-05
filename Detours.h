@@ -5570,8 +5570,8 @@ namespace Detours {
 
 		typedef enum _HARDWARE_HOOK_TYPE : unsigned char {
 			TYPE_EXECUTE = 0,
-			TYPE_WRITE   = 1,
-			TYPE_ACCESS  = 3
+			TYPE_WRITE = 1,
+			TYPE_ACCESS = 3
 		} HARDWARE_HOOK_TYPE, *PHARDWARE_HOOK_TYPE;
 
 		// ----------------------------------------------------------------
@@ -5592,8 +5592,8 @@ namespace Detours {
 		// ----------------------------------------------------------------
 
 		typedef enum _MEMORY_HOOK_OPERATION : unsigned char {
-			MEMORY_READ    = 0,
-			MEMORY_WRITE   = 1,
+			MEMORY_READ = 0,
+			MEMORY_WRITE = 1,
 			MEMORY_EXECUTE = 2
 		} MEMORY_HOOK_OPERATION, *PMEMORY_HOOK_OPERATION;
 
@@ -5607,7 +5607,7 @@ namespace Detours {
 		// Memory Hook
 		// ----------------------------------------------------------------
 
-		bool HookMemory(const fnMemoryHookCallBack pCallBack, void* pAddress, size_t unSize);
+		bool HookMemory(const fnMemoryHookCallBack pCallBack, void* pAddress, size_t unSize, const fnMemoryHookCallBack pPostCallBack = nullptr);
 		bool UnHookMemory(const fnMemoryHookCallBack pCallBack);
 
 		// ----------------------------------------------------------------
@@ -5873,30 +5873,30 @@ namespace Detours {
 				unsigned int m_unEFLAGS;
 				unsigned short m_unFLAGS;
 				struct {
-					unsigned int m_unCF : 1;    // Bit 0: Carry Flag
-					unsigned int : 1;           // Bit 1: Reserved
-					unsigned int m_unPF : 1;    // Bit 2: Parity Flag
-					unsigned int : 1;           // Bit 3: Reserved
-					unsigned int m_unAF : 1;    // Bit 4: Auxiliary Carry Flag
-					unsigned int : 1;           // Bit 5: Reserved
-					unsigned int m_unZF : 1;    // Bit 6: Zero Flag
-					unsigned int m_unSF : 1;    // Bit 7: Sign Flag
-					unsigned int m_unTF : 1;    // Bit 8: Trap Flag
-					unsigned int m_unIF : 1;    // Bit 9: Interrupt Enable Flag
-					unsigned int m_unDF : 1;    // Bit 10: Direction Flag
-					unsigned int m_unOF : 1;    // Bit 11: Overflow Flag
-					unsigned int m_unIOPL : 2;  // Bit 12-13: I/O Privilege Level
-					unsigned int m_unNT : 1;    // Bit 14: Nested Task
-					unsigned int m_unMD : 1;    // Bit 15: Mode Flag
-					unsigned int m_unRF : 1;    // Bit 16: Resume Flag
-					unsigned int m_unVM : 1;    // Bit 17: Virtual 8086 Mode Flag
-					unsigned int m_unAC : 1;    // Bit 18: Alignment Check
-					unsigned int m_unVIF : 1;   // Bit 19: Virtual Interrupt Flag
-					unsigned int m_unVIP : 1;   // Bit 20: Virtual Interrupt Pending
-					unsigned int m_unID : 1;    // Bit 21: ID Flag
-					unsigned int : 8;           // Bit 22-29: Reserved
-					unsigned int : 1;           // Bit 30: Reserved
-					unsigned int m_unAI : 1;    // Bit 31: Alignment Indicator
+					unsigned int m_unCF : 1;   // Bit 0: Carry Flag
+					unsigned int : 1;          // Bit 1: Reserved
+					unsigned int m_unPF : 1;   // Bit 2: Parity Flag
+					unsigned int : 1;          // Bit 3: Reserved
+					unsigned int m_unAF : 1;   // Bit 4: Auxiliary Carry Flag
+					unsigned int : 1;          // Bit 5: Reserved
+					unsigned int m_unZF : 1;   // Bit 6: Zero Flag
+					unsigned int m_unSF : 1;   // Bit 7: Sign Flag
+					unsigned int m_unTF : 1;   // Bit 8: Trap Flag
+					unsigned int m_unIF : 1;   // Bit 9: Interrupt Enable Flag
+					unsigned int m_unDF : 1;   // Bit 10: Direction Flag
+					unsigned int m_unOF : 1;   // Bit 11: Overflow Flag
+					unsigned int m_unIOPL : 2; // Bit 12-13: I/O Privilege Level
+					unsigned int m_unNT : 1;   // Bit 14: Nested Task
+					unsigned int m_unMD : 1;   // Bit 15: Mode Flag
+					unsigned int m_unRF : 1;   // Bit 16: Resume Flag
+					unsigned int m_unVM : 1;   // Bit 17: Virtual 8086 Mode Flag
+					unsigned int m_unAC : 1;   // Bit 18: Alignment Check
+					unsigned int m_unVIF : 1;  // Bit 19: Virtual Interrupt Flag
+					unsigned int m_unVIP : 1;  // Bit 20: Virtual Interrupt Pending
+					unsigned int m_unID : 1;   // Bit 21: ID Flag
+					unsigned int : 8;          // Bit 22-29: Reserved
+					unsigned int : 1;          // Bit 30: Reserved
+					unsigned int m_unAI : 1;   // Bit 31: Alignment Indicator
 				};
 			};
 
@@ -6068,31 +6068,31 @@ namespace Detours {
 				unsigned int m_unEFLAGS;
 				unsigned short m_unFLAGS;
 				struct {
-					unsigned int m_unCF : 1;    // Bit 0: Carry Flag
-					unsigned int : 1;           // Bit 1: Reserved
-					unsigned int m_unPF : 1;    // Bit 2: Parity Flag
-					unsigned int : 1;           // Bit 3: Reserved
-					unsigned int m_unAF : 1;    // Bit 4: Auxiliary Carry Flag
-					unsigned int : 1;           // Bit 5: Reserved
-					unsigned int m_unZF : 1;    // Bit 6: Zero Flag
-					unsigned int m_unSF : 1;    // Bit 7: Sign Flag
-					unsigned int m_unTF : 1;    // Bit 8: Trap Flag
-					unsigned int m_unIF : 1;    // Bit 9: Interrupt Enable Flag
-					unsigned int m_unDF : 1;    // Bit 10: Direction Flag
-					unsigned int m_unOF : 1;    // Bit 11: Overflow Flag
-					unsigned int m_unIOPL : 2;  // Bit 12-13: I/O Privilege Level
-					unsigned int m_unNT : 1;    // Bit 14: Nested Task
-					unsigned int m_unMD : 1;    // Bit 15: Mode Flag
-					unsigned int m_unRF : 1;    // Bit 16: Resume Flag
-					unsigned int m_unVM : 1;    // Bit 17: Virtual 8086 Mode Flag
-					unsigned int m_unAC : 1;    // Bit 18: Alignment Check
-					unsigned int m_unVIF : 1;   // Bit 19: Virtual Interrupt Flag
-					unsigned int m_unVIP : 1;   // Bit 20: Virtual Interrupt Pending
-					unsigned int m_unID : 1;    // Bit 21: ID Flag
-					unsigned int : 8;           // Bit 22-29: Reserved
-					unsigned int : 1;           // Bit 30: Reserved
-					unsigned int m_unAI : 1;    // Bit 31: Alignment Indicator
-					unsigned int : 32;          // Bit 32-63: Reserved
+					unsigned int m_unCF : 1;   // Bit 0: Carry Flag
+					unsigned int : 1;          // Bit 1: Reserved
+					unsigned int m_unPF : 1;   // Bit 2: Parity Flag
+					unsigned int : 1;          // Bit 3: Reserved
+					unsigned int m_unAF : 1;   // Bit 4: Auxiliary Carry Flag
+					unsigned int : 1;          // Bit 5: Reserved
+					unsigned int m_unZF : 1;   // Bit 6: Zero Flag
+					unsigned int m_unSF : 1;   // Bit 7: Sign Flag
+					unsigned int m_unTF : 1;   // Bit 8: Trap Flag
+					unsigned int m_unIF : 1;   // Bit 9: Interrupt Enable Flag
+					unsigned int m_unDF : 1;   // Bit 10: Direction Flag
+					unsigned int m_unOF : 1;   // Bit 11: Overflow Flag
+					unsigned int m_unIOPL : 2; // Bit 12-13: I/O Privilege Level
+					unsigned int m_unNT : 1;   // Bit 14: Nested Task
+					unsigned int m_unMD : 1;   // Bit 15: Mode Flag
+					unsigned int m_unRF : 1;   // Bit 16: Resume Flag
+					unsigned int m_unVM : 1;   // Bit 17: Virtual 8086 Mode Flag
+					unsigned int m_unAC : 1;   // Bit 18: Alignment Check
+					unsigned int m_unVIF : 1;  // Bit 19: Virtual Interrupt Flag
+					unsigned int m_unVIP : 1;  // Bit 20: Virtual Interrupt Pending
+					unsigned int m_unID : 1;   // Bit 21: ID Flag
+					unsigned int : 8;          // Bit 22-29: Reserved
+					unsigned int : 1;          // Bit 30: Reserved
+					unsigned int m_unAI : 1;   // Bit 31: Alignment Indicator
+					unsigned int : 32;         // Bit 32-63: Reserved
 				};
 			};
 

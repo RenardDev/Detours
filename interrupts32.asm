@@ -39,7 +39,8 @@
 		pop ebx
 		pop edx
 		pop ecx
-		pop eax
+		; pop eax
+		add esp, 4
 		ret
 	CallInterrupt endp
 

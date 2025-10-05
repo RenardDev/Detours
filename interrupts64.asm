@@ -57,7 +57,8 @@
 		pop rbx
 		pop rdx
 		pop rcx
-		pop rax
+		; pop rax
+		add rsp, 8
 		ret
 	CallInterrupt endp
 

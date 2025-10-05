@@ -190,6 +190,7 @@ namespace Detours {
 	typedef struct _MEMORY_HOOK_RECORD {
 		_MEMORY_HOOK_RECORD() {
 			m_pCallBack = nullptr;
+			m_pPostCallBack = nullptr;
 			m_pAddress = nullptr;
 			m_unSize = 0;
 			m_unActiveThreads.store(0, std::memory_order_relaxed);
@@ -198,6 +199,7 @@ namespace Detours {
 		}
 
 		fnMemoryHookCallBack m_pCallBack;
+		fnMemoryHookCallBack m_pPostCallBack;
 		void* m_pAddress;
 		size_t m_unSize;
 		std::deque<std::unique_ptr<Page>> m_Pages;
@@ -205,6 +207,24 @@ namespace Detours {
 		bool m_bPendingDeletion;
 		SRWLOCK m_Lock;
 	} MEMORY_HOOK_RECORD, *PMEMORY_HOOK_RECORD;
+
+	// ----------------------------------------------------------------
+	// MEMORY_HOOK_POST_CTX
+	// ----------------------------------------------------------------
+
+	typedef struct _MEMORY_HOOK_POST_CTX {
+		_MEMORY_HOOK_POST_CTX() {
+			m_pRecord = nullptr;
+			m_pExceptionAddress = nullptr;
+			m_pFaultAddress = nullptr;
+			m_unOperation = MEMORY_HOOK_OPERATION::MEMORY_READ;
+		}
+
+		PMEMORY_HOOK_RECORD m_pRecord;
+		void* m_pExceptionAddress;
+		void* m_pFaultAddress;
+		MEMORY_HOOK_OPERATION m_unOperation;
+	} MEMORY_HOOK_POST_CTX, *PMEMORY_HOOK_POST_CTX;
 
 	// ----------------------------------------------------------------
 	// INTERRUPT_HOOK_RECORD
@@ -233,6 +253,7 @@ namespace Detours {
 	// ----------------------------------------------------------------
 
 	static std::unordered_map<DWORD, std::vector<PMEMORY_HOOK_RECORD>> g_MemoryHookOpenedStacks;
+	static std::unordered_map<DWORD, std::vector<MEMORY_HOOK_POST_CTX>> g_MemoryHookPostStacks;
 
 	static std::deque<std::unique_ptr<HARDWARE_HOOK_RECORD>> g_HardwareHookRecords;
 	static std::deque<std::unique_ptr<MEMORY_HOOK_RECORD>> g_MemoryHookRecords;
@@ -7390,9 +7411,9 @@ namespace Detours {
 				eflags.m_unTF = 0;
 
 				PMEMORY_HOOK_RECORD pRecord = nullptr;
+				MEMORY_HOOK_POST_CTX PostCTX = {};
 
 				AcquireSRWLockExclusive(&g_MemoryHookStacksLock);
-
 				{
 					auto it = g_MemoryHookOpenedStacks.find(unCurrentTID);
 					if (it != g_MemoryHookOpenedStacks.end() && !it->second.empty()) {
@@ -7402,18 +7423,44 @@ namespace Detours {
 							g_MemoryHookOpenedStacks.erase(it);
 						}
 					}
-				}
 
+					auto jt = g_MemoryHookPostStacks.find(unCurrentTID);
+					if (jt != g_MemoryHookPostStacks.end() && !jt->second.empty()) {
+						auto& vecStacks = jt->second;
+
+						if (!vecStacks.empty() && vecStacks.back().m_pRecord == pRecord) {
+							PostCTX = vecStacks.back();
+							vecStacks.pop_back();
+						} else {
+							for (size_t k = vecStacks.size(); k > 0; --k) {
+								if (vecStacks[k - 1].m_pRecord == pRecord) {
+									PostCTX = vecStacks[k - 1];
+									vecStacks.erase(vecStacks.begin() + (k - 1));
+									break;
+								}
+							}
+						}
+
+						if (vecStacks.empty()) {
+							g_MemoryHookPostStacks.erase(jt);
+						}
+					}
+				}
 				ReleaseSRWLockExclusive(&g_MemoryHookStacksLock);
 
 				if (!pRecord) {
 					return false;
 				}
 
+				if (pRecord->m_pPostCallBack) {
+					if (PostCTX.m_pFaultAddress && __is_in_range(pRecord->m_pAddress, pRecord->m_unSize, PostCTX.m_pFaultAddress)) {
+						pRecord->m_pPostCallBack(pCTX, PostCTX.m_pExceptionAddress ? PostCTX.m_pExceptionAddress : reinterpret_cast<void*>(Exception.ExceptionAddress), PostCTX.m_unOperation, pRecord->m_pAddress, PostCTX.m_pFaultAddress);
+					}
+				}
+
 				bool bNeedErase = false;
 
 				AcquireSRWLockExclusive(&pRecord->m_Lock);
-
 				{
 					const uint32_t unPrev = pRecord->m_unActiveThreads.fetch_sub(1, std::memory_order_acq_rel);
 					if (unPrev == 1) {
@@ -7429,19 +7476,15 @@ namespace Detours {
 						}
 					}
 				}
-
 				ReleaseSRWLockExclusive(&pRecord->m_Lock);
 
 				if (bNeedErase) {
 					AcquireSRWLockExclusive(&g_MemoryHookRecordsLock);
-
-					for (auto it = g_MemoryHookRecords.begin(); it != g_MemoryHookRecords.end(); ++it) {
-						if (it->get() == pRecord) {
-							g_MemoryHookRecords.erase(it);
-							break;
+					{
+						for (auto it = g_MemoryHookRecords.begin(); it != g_MemoryHookRecords.end(); ++it) {
+							if (it->get() == pRecord) { g_MemoryHookRecords.erase(it); break; }
 						}
 					}
-
 					ReleaseSRWLockExclusive(&g_MemoryHookRecordsLock);
 				}
 
@@ -7474,7 +7517,6 @@ namespace Detours {
 			PMEMORY_HOOK_RECORD pTargetRecord = nullptr;
 
 			AcquireSRWLockShared(&g_MemoryHookRecordsLock);
-
 			{
 				for (const auto& pRecord : g_MemoryHookRecords) {
 					if (!pRecord) {
@@ -7493,7 +7535,6 @@ namespace Detours {
 					}
 				}
 			}
-
 			ReleaseSRWLockShared(&g_MemoryHookRecordsLock);
 
 			if (!pTargetRecord) {
@@ -7501,7 +7542,6 @@ namespace Detours {
 			}
 
 			AcquireSRWLockExclusive(&pTargetRecord->m_Lock);
-
 			{
 				const uint32_t unPrev = pTargetRecord->m_unActiveThreads.load(std::memory_order_acquire);
 				if (unPrev == 0) {
@@ -7512,13 +7552,24 @@ namespace Detours {
 						}
 					}
 				}
+
 				pTargetRecord->m_unActiveThreads.fetch_add(1, std::memory_order_acq_rel);
 			}
-
 			ReleaseSRWLockExclusive(&pTargetRecord->m_Lock);
 
 			AcquireSRWLockExclusive(&g_MemoryHookStacksLock);
-			g_MemoryHookOpenedStacks[unCurrentTID].push_back(pTargetRecord);
+			{
+				g_MemoryHookOpenedStacks[unCurrentTID].push_back(pTargetRecord);
+
+				MEMORY_HOOK_POST_CTX PostCTX = {};
+
+				PostCTX.m_pRecord = pTargetRecord;
+				PostCTX.m_pExceptionAddress = pExceptionAddress;
+				PostCTX.m_pFaultAddress = pFaultAddress;
+				PostCTX.m_unOperation = unOperation;
+
+				g_MemoryHookPostStacks[unCurrentTID].push_back(PostCTX);
+			}
 			ReleaseSRWLockExclusive(&g_MemoryHookStacksLock);
 
 			eflags.m_unTF = 1;
@@ -84917,7 +84968,7 @@ namespace Detours {
 		// Memory Hook
 		// ----------------------------------------------------------------
 
-		bool HookMemory(const fnMemoryHookCallBack pCallBack, void* pAddress, size_t unSize) {
+		bool HookMemory(const fnMemoryHookCallBack pCallBack, void* pAddress, size_t unSize, const fnMemoryHookCallBack pPostCallBack) {
 			if (!g_Suspender.Suspend()) {
 				return false;
 			}
@@ -84990,6 +85041,7 @@ namespace Detours {
 				}
 
 				pRecord->m_pCallBack = pCallBack;
+				pRecord->m_pPostCallBack = pPostCallBack;
 				pRecord->m_pAddress = pAddress;
 				pRecord->m_unSize = unSize;
 
