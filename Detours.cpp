@@ -212,7 +212,7 @@ namespace Detours {
 	// MEMORY_HOOK_POST_CONTEXT
 	// ----------------------------------------------------------------
 
-	typedef struct MEMORY_HOOK_POST_CONTEXT {
+	typedef struct _MEMORY_HOOK_POST_CONTEXT {
 		_MEMORY_HOOK_POST_CONTEXT() {
 			m_pRecord = nullptr;
 			m_pExceptionAddress = nullptr;
