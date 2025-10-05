@@ -209,11 +209,11 @@ namespace Detours {
 	} MEMORY_HOOK_RECORD, *PMEMORY_HOOK_RECORD;
 
 	// ----------------------------------------------------------------
-	// MEMORY_HOOK_POST_CTX
+	// MEMORY_HOOK_POST_CONTEXT
 	// ----------------------------------------------------------------
 
-	typedef struct _MEMORY_HOOK_POST_CTX {
-		_MEMORY_HOOK_POST_CTX() {
+	typedef struct MEMORY_HOOK_POST_CONTEXT {
+		_MEMORY_HOOK_POST_CONTEXT() {
 			m_pRecord = nullptr;
 			m_pExceptionAddress = nullptr;
 			m_pFaultAddress = nullptr;
@@ -224,7 +224,7 @@ namespace Detours {
 		void* m_pExceptionAddress;
 		void* m_pFaultAddress;
 		MEMORY_HOOK_OPERATION m_unOperation;
-	} MEMORY_HOOK_POST_CTX, *PMEMORY_HOOK_POST_CTX;
+	} MEMORY_HOOK_POST_CONTEXT, *PMEMORY_HOOK_POST_CONTEXT;
 
 	// ----------------------------------------------------------------
 	// INTERRUPT_HOOK_RECORD
@@ -253,7 +253,7 @@ namespace Detours {
 	// ----------------------------------------------------------------
 
 	static std::unordered_map<DWORD, std::vector<PMEMORY_HOOK_RECORD>> g_MemoryHookOpenedStacks;
-	static std::unordered_map<DWORD, std::vector<MEMORY_HOOK_POST_CTX>> g_MemoryHookPostStacks;
+	static std::unordered_map<DWORD, std::vector<MEMORY_HOOK_POST_CONTEXT>> g_MemoryHookPostStacks;
 
 	static std::deque<std::unique_ptr<HARDWARE_HOOK_RECORD>> g_HardwareHookRecords;
 	static std::deque<std::unique_ptr<MEMORY_HOOK_RECORD>> g_MemoryHookRecords;
@@ -7411,7 +7411,7 @@ namespace Detours {
 				eflags.m_unTF = 0;
 
 				PMEMORY_HOOK_RECORD pRecord = nullptr;
-				MEMORY_HOOK_POST_CTX PostCTX = {};
+				MEMORY_HOOK_POST_CONTEXT PostCTX = {};
 
 				AcquireSRWLockExclusive(&g_MemoryHookStacksLock);
 				{
@@ -7482,7 +7482,10 @@ namespace Detours {
 					AcquireSRWLockExclusive(&g_MemoryHookRecordsLock);
 					{
 						for (auto it = g_MemoryHookRecords.begin(); it != g_MemoryHookRecords.end(); ++it) {
-							if (it->get() == pRecord) { g_MemoryHookRecords.erase(it); break; }
+							if (it->get() == pRecord) {
+								g_MemoryHookRecords.erase(it);
+								break;
+							}
 						}
 					}
 					ReleaseSRWLockExclusive(&g_MemoryHookRecordsLock);
@@ -7561,7 +7564,7 @@ namespace Detours {
 			{
 				g_MemoryHookOpenedStacks[unCurrentTID].push_back(pTargetRecord);
 
-				MEMORY_HOOK_POST_CTX PostCTX = {};
+				MEMORY_HOOK_POST_CONTEXT PostCTX = {};
 
 				PostCTX.m_pRecord = pTargetRecord;
 				PostCTX.m_pExceptionAddress = pExceptionAddress;
