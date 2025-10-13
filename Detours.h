@@ -1907,6 +1907,24 @@ namespace Detours {
 #pragma pack(pop)
 
 		// ----------------------------------------------------------------
+		// RT functions
+		// ----------------------------------------------------------------
+
+#ifdef _M_X64
+		void* const RTDynamicCast(void const* const pBaseAddress, void* const pAddress, const LONG nVfDelta, const PRTTI_TYPE_DESCRIPTOR pSourceTypeDescriptor, const PRTTI_TYPE_DESCRIPTOR pTargetTypeDescriptor, const BOOL bIsReference);
+#elif _M_IX86
+		void* const RTDynamicCast(void* const pAddress, const LONG nVfDelta, const PRTTI_TYPE_DESCRIPTOR pSourceTypeDescriptor, const PRTTI_TYPE_DESCRIPTOR pTargetTypeDescriptor, const BOOL bIsReference);
+#endif
+
+		void* const RTCastToVoid(void* const pAddress);
+
+#ifdef _M_X64
+		const PRTTI_TYPE_DESCRIPTOR RTtypeid(void const* const pBaseAddress, void* const pAddress);
+#elif _M_IX86
+		const PRTTI_TYPE_DESCRIPTOR RTtypeid(void* const pAddress);
+#endif
+
+		// ----------------------------------------------------------------
 		// Object
 		// ----------------------------------------------------------------
 
