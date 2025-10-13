@@ -3357,6 +3357,10 @@ namespace Detours {
 
 	namespace RTTI {
 
+		// ----------------------------------------------------------------
+		// IsValidCompleteObjectLocator
+		// ----------------------------------------------------------------
+
 		static inline bool IsValidCompleteObjectLocator(PRTTI_COMPLETE_OBJECT_LOCATOR pCompleteObjectLocator) {
 			if (!pCompleteObjectLocator) {
 				return false;
@@ -3494,6 +3498,10 @@ namespace Detours {
 			}
 		}
 
+		// ----------------------------------------------------------------
+		// GetCompleteObjectLocatorFromObjectAt
+		// ----------------------------------------------------------------
+
 		static inline const PRTTI_COMPLETE_OBJECT_LOCATOR GetCompleteObjectLocatorFromObjectAt(void* const pThisWithVfAt0) {
 			if (!pThisWithVfAt0) {
 				return nullptr;
@@ -3502,6 +3510,10 @@ namespace Detours {
 			return reinterpret_cast<PRTTI_COMPLETE_OBJECT_LOCATOR>((reinterpret_cast<void***>(pThisWithVfAt0)[0])[-1]);
 		}
 
+		// ----------------------------------------------------------------
+		// GetCompleteObjectLocatorFromObject
+		// ----------------------------------------------------------------
+
 		static inline const PRTTI_COMPLETE_OBJECT_LOCATOR GetCompleteObjectLocatorFromObject(void* const pAddress, const LONG nVfDelta) {
 			if (!pAddress) {
 				return nullptr;
@@ -3509,6 +3521,10 @@ namespace Detours {
 
 			return GetCompleteObjectLocatorFromObjectAt(reinterpret_cast<char*>(pAddress) + nVfDelta);
 		}
+
+		// ----------------------------------------------------------------
+		// FindCompleteObject
+		// ----------------------------------------------------------------
 
 		static inline void* const FindCompleteObject(void* const pAddress, const LONG nVfDelta) {
 			if (!pAddress) {
@@ -3526,6 +3542,10 @@ namespace Detours {
 
 			return pCompleteObject;
 		}
+
+		// ----------------------------------------------------------------
+		// GuessVfDelta
+		// ----------------------------------------------------------------
 
 		static LONG GuessVfDelta(void* const pAddress) {
 			if (!pAddress) {
@@ -3550,6 +3570,10 @@ namespace Detours {
 			return 0;
 		}
 
+		// ----------------------------------------------------------------
+		// __GetBaseClassDescriptor
+		// ----------------------------------------------------------------
+
 #ifdef _M_X64
 		static inline const PRTTI_BASE_CLASS_DESCRIPTOR __GetBaseClassDescriptor(void const* const pBaseAddress, const PRTTI_BASE_CLASS_ARRAY pBaseClassArray, const size_t unIndex) {
 #elif _M_IX86
@@ -3573,6 +3597,10 @@ namespace Detours {
 #endif
 		}
 
+		// ----------------------------------------------------------------
+		// __GetBaseClassArray
+		// ----------------------------------------------------------------
+
 #ifdef _M_X64
 		static inline const PRTTI_BASE_CLASS_ARRAY __GetBaseClassArray(void const* const pBaseAddress, const PRTTI_CLASS_HIERARCHY_DESCRIPTOR pClassHierarchyDescriptor) {
 #elif _M_IX86
@@ -3595,6 +3623,10 @@ namespace Detours {
 			return pClassHierarchyDescriptor->m_pBaseClassArray;
 #endif
 		}
+
+		// ----------------------------------------------------------------
+		// __GetTypeDescriptor
+		// ----------------------------------------------------------------
 
 #ifdef _M_X64
 		static inline const PRTTI_TYPE_DESCRIPTOR __GetTypeDescriptor(void const* const pBaseAddress, const PRTTI_BASE_CLASS_DESCRIPTOR pBaseClassDescriptor) {
@@ -3642,6 +3674,10 @@ namespace Detours {
 #endif
 		}
 
+		// ----------------------------------------------------------------
+		// __GetClassHierarchyDescriptor
+		// ----------------------------------------------------------------
+
 #ifdef _M_X64
 		static inline const PRTTI_CLASS_HIERARCHY_DESCRIPTOR __GetClassHierarchyDescriptor(void const* const pBaseAddress, const PRTTI_BASE_CLASS_DESCRIPTOR pBaseClassDescriptor) {
 #elif _M_IX86
@@ -3688,6 +3724,10 @@ namespace Detours {
 #endif
 		}
 
+		// ----------------------------------------------------------------
+		// IsTypeDescriptorEqual
+		// ----------------------------------------------------------------
+
 		static bool IsTypeDescriptorEqual(const PRTTI_TYPE_DESCRIPTOR pLeft, const PRTTI_TYPE_DESCRIPTOR pRight) {
 			if (!pLeft || !pRight) {
 				return false;
@@ -3695,6 +3735,10 @@ namespace Detours {
 
 			return (pLeft == pRight) || (strncmp(pLeft->m_szName, pRight->m_szName, 0x1000) == 0);
 		}
+
+		// ----------------------------------------------------------------
+		// PMDtoOffset
+		// ----------------------------------------------------------------
 
 		static inline ptrdiff_t PMDtoOffset(void* const pCompleteObject, const RTTI_PMD& pmd) {
 			if (!pCompleteObject) {
@@ -3713,29 +3757,9 @@ namespace Detours {
 			return nOffset;
 		}
 
-		static inline const PRTTI_COMPLETE_OBJECT_LOCATOR GetCompleteObjectLocatorFromObject(void* const pAddress) {
-			if (!pAddress) {
-				return nullptr;
-			}
-
-			return reinterpret_cast<PRTTI_COMPLETE_OBJECT_LOCATOR>((reinterpret_cast<void***>(pAddress)[0])[-1]);
-		}
-
-		static inline void* const FindCompleteObject(void* const pAddress) {
-			if (!pAddress) {
-				return nullptr;
-			}
-
-			const auto& pCompleteObjectLocator = GetCompleteObjectLocatorFromObject(pAddress);
-
-			char* pCompleteObject = reinterpret_cast<char*>(pAddress) - pCompleteObjectLocator->m_unOffset;
-
-			if (pCompleteObjectLocator->m_unConstructorOffset) {
-				pCompleteObject -= *reinterpret_cast<int*>((char*)pAddress - pCompleteObjectLocator->m_unConstructorOffset);
-			}
-
-			return pCompleteObject;
-		}
+		// ----------------------------------------------------------------
+		// FindSITargetTypeInstance
+		// ----------------------------------------------------------------
 
 #ifdef _M_X64
 		static PRTTI_BASE_CLASS_DESCRIPTOR FindSITargetTypeInstance(void const* const pBaseAddress, const PRTTI_COMPLETE_OBJECT_LOCATOR pCompleteObjectLocator, const PRTTI_TYPE_DESCRIPTOR pSourceTypeDescriptor, const PRTTI_TYPE_DESCRIPTOR pTargetTypeDescriptor) {
@@ -3815,6 +3839,10 @@ namespace Detours {
 
 			return pDestinationBCD;
 		}
+
+		// ----------------------------------------------------------------
+		// FindMITargetTypeInstance
+		// ----------------------------------------------------------------
 
 #ifdef _M_X64
 		static PRTTI_BASE_CLASS_DESCRIPTOR FindMITargetTypeInstance(void const* const pBaseAddress, void* const pCompleteObject, const PRTTI_COMPLETE_OBJECT_LOCATOR pCompleteObjectLocator, const PRTTI_TYPE_DESCRIPTOR pSourceTypeDescriptor, const ptrdiff_t nSourceOffset, const PRTTI_TYPE_DESCRIPTOR pTargetTypeDescriptor) {
@@ -3946,6 +3974,10 @@ namespace Detours {
 
 			return nullptr;
 		}
+
+		// ----------------------------------------------------------------
+		// FindVITargetTypeInstance
+		// ----------------------------------------------------------------
 
 #ifdef _M_X64
 		static PRTTI_BASE_CLASS_DESCRIPTOR FindVITargetTypeInstance(void const* const pBaseAddress, void* const pCompleteObject, const PRTTI_COMPLETE_OBJECT_LOCATOR pCompleteObjectLocator, const PRTTI_TYPE_DESCRIPTOR pSourceTypeDescriptor, const ptrdiff_t nSourceOffset, const PRTTI_TYPE_DESCRIPTOR pTargetTypeDescriptor) {
@@ -4094,6 +4126,10 @@ namespace Detours {
 
 			return nullptr;
 		}
+
+		// ----------------------------------------------------------------
+		// RT functions
+		// ----------------------------------------------------------------
 
 #ifdef _M_X64
 		void* const RTDynamicCast(void const* const pBaseAddress, void* const pAddress, const LONG nVfDelta, const PRTTI_TYPE_DESCRIPTOR pSourceTypeDescriptor, const PRTTI_TYPE_DESCRIPTOR pTargetTypeDescriptor, const BOOL bIsReference) {
@@ -4347,7 +4383,7 @@ namespace Detours {
 			return m_pVTable;
 		}
 
-		std::deque<std::unique_ptr<Object>>& Object::GetBaseObjects() {
+		std::vector<std::unique_ptr<Object>>& Object::GetBaseObjects() {
 			return m_vecBaseClasses;
 		}
 
@@ -4616,7 +4652,7 @@ namespace Detours {
 #endif
 
 		// ----------------------------------------------------------------
-		// DumpRTTI
+		// FindTypeInfo
 		// ----------------------------------------------------------------
 
 		static inline char* FindTypeInfo(void const* const pBegin, void const* const pEnd) {
@@ -4629,7 +4665,11 @@ namespace Detours {
 			return reinterpret_cast<char*>(const_cast<void*>(FindData(const_cast<void*>(pBegin), reinterpret_cast<size_t>(const_cast<char*>(reinterpret_cast<const char*>(pEnd))) - reinterpret_cast<size_t>(const_cast<void*>(pBegin)), reinterpret_cast<const unsigned char* const>(pPattern), strnlen(pPattern, 16))));
 		}
 
-		static inline void TryEmplaceUniqueByTD(std::deque<std::unique_ptr<Object>>& out, std::unordered_set<const void*>& seenTD, std::unique_ptr<Object> candidate) {
+		// ----------------------------------------------------------------
+		// TryEmplaceUniqueByTD
+		// ----------------------------------------------------------------
+
+		static inline void TryEmplaceUniqueByTD(std::vector<std::unique_ptr<Object>>& out, std::unordered_set<const void*>& seenTD, std::unique_ptr<Object> candidate) {
 			if (!candidate) {
 				return;
 			}
@@ -4643,6 +4683,10 @@ namespace Detours {
 				out.emplace_back(std::move(candidate));
 			}
 		}
+
+		// ----------------------------------------------------------------
+		// BuildObjectFromCOL
+		// ----------------------------------------------------------------
 
 		static std::unique_ptr<Object> BuildObjectFromCOL(void const* const pBaseAddress, void const* const pBegin, void const* const pEnd, const PRTTI_TYPE_DESCRIPTOR pTD) {
 			if (!pBaseAddress || !pBegin || !pEnd || !pTD) {
@@ -4730,6 +4774,10 @@ namespace Detours {
 			return nullptr;
 		}
 
+		// ----------------------------------------------------------------
+		// BuildObjectFromBCD
+		// ----------------------------------------------------------------
+
 		static std::unique_ptr<Object> BuildObjectFromBCD(void const* const pBaseAddress, void const* const pBegin, void const* const pEnd, const PRTTI_TYPE_DESCRIPTOR pTD) {
 			if (!pBaseAddress || !pBegin || !pEnd || !pTD) {
 				return nullptr;
@@ -4749,9 +4797,9 @@ namespace Detours {
 				}
 
 #ifdef _M_X64
-				auto pBCD = reinterpret_cast<PRTTI_BASE_CLASS_DESCRIPTOR>(reinterpret_cast<char*>(pReference) - offsetof(RTTI_BASE_CLASS_DESCRIPTOR, m_unTypeDescriptor));
+				const auto& pBCD = reinterpret_cast<PRTTI_BASE_CLASS_DESCRIPTOR>(reinterpret_cast<char*>(pReference) - offsetof(RTTI_BASE_CLASS_DESCRIPTOR, m_unTypeDescriptor));
 #else
-				auto pBCD = reinterpret_cast<PRTTI_BASE_CLASS_DESCRIPTOR>(reinterpret_cast<char*>(pReference) - offsetof(RTTI_BASE_CLASS_DESCRIPTOR, m_pTypeDescriptor));
+				const auto& pBCD = reinterpret_cast<PRTTI_BASE_CLASS_DESCRIPTOR>(reinterpret_cast<char*>(pReference) - offsetof(RTTI_BASE_CLASS_DESCRIPTOR, m_pTypeDescriptor));
 #endif
 				if ((reinterpret_cast<const char*>(pBCD) < reinterpret_cast<const char*>(pBegin)) || (reinterpret_cast<const char*>(pBCD) >= reinterpret_cast<const char*>(pEnd))) {
 					pReference = reinterpret_cast<void*>(reinterpret_cast<char*>(pReference) + 1);
@@ -4785,8 +4833,7 @@ namespace Detours {
 				}
 #endif
 
-				if ((reinterpret_cast<const char*>(pCHD) < reinterpret_cast<const char*>(pBegin)) || (reinterpret_cast<const char*>(pCHD) >= reinterpret_cast<const char*>(pEnd)))
-				{
+				if ((reinterpret_cast<const char*>(pCHD) < reinterpret_cast<const char*>(pBegin)) || (reinterpret_cast<const char*>(pCHD) >= reinterpret_cast<const char*>(pEnd))) {
 					pReference = reinterpret_cast<void*>(reinterpret_cast<char*>(pReference) + 1);
 					continue;
 				}
@@ -4817,7 +4864,11 @@ namespace Detours {
 			return nullptr;
 		}
 
-		static void EnumerateAllTypeDescriptors(void const* const pBaseAddress, void const* const pBegin, void const* const pEnd, std::deque<const RTTI_TYPE_DESCRIPTOR*>& out) {
+		// ----------------------------------------------------------------
+		// EnumerateAllTypeDescriptors
+		// ----------------------------------------------------------------
+
+		static void EnumerateAllTypeDescriptors(void const* const pBaseAddress, void const* const pBegin, void const* const pEnd, std::vector<const RTTI_TYPE_DESCRIPTOR*>& out) {
 			if (!pBaseAddress || !pBegin || !pEnd) return;
 
 			char* pTypeInfoName = FindTypeInfo(pBegin, pEnd);
@@ -4825,8 +4876,7 @@ namespace Detours {
 				return;
 			}
 
-			auto pTypeInfoTD = reinterpret_cast<PRTTI_TYPE_DESCRIPTOR>(reinterpret_cast<char*>(pTypeInfoName) - sizeof(void*) * 2);
-
+			const auto& pTypeInfoTD = reinterpret_cast<PRTTI_TYPE_DESCRIPTOR>(reinterpret_cast<char*>(pTypeInfoName) - sizeof(void*) * 2);
 			if ((reinterpret_cast<const char*>(pTypeInfoTD) < reinterpret_cast<const char*>(pBegin)) || (reinterpret_cast<const char*>(pTypeInfoTD) >= reinterpret_cast<const char*>(pEnd)) || (reinterpret_cast<const char*>(pTypeInfoTD->m_pVFTable) < reinterpret_cast<const char*>(pBegin)) || (reinterpret_cast<const char*>(pTypeInfoTD->m_pVFTable) >= reinterpret_cast<const char*>(pEnd))) {
 				return;
 			}
@@ -4843,7 +4893,7 @@ namespace Detours {
 					break;
 				}
 
-				auto pTD = reinterpret_cast<PRTTI_TYPE_DESCRIPTOR>(pScan);
+				const auto& pTD = reinterpret_cast<PRTTI_TYPE_DESCRIPTOR>(pScan);
 				const char* szName = pTD->m_szName;
 				if ((reinterpret_cast<const char*>(szName) >= reinterpret_cast<const char*>(pBegin)) && (reinterpret_cast<const char*>(szName) < reinterpret_cast<const char*>(pEnd))) {
 					out.push_back(pTD);
@@ -4853,19 +4903,22 @@ namespace Detours {
 			}
 		}
 
-		std::deque<std::unique_ptr<Object>> DumpRTTI(void const* const pBaseAddress, void const* const pAddress, const size_t unSize) {
-			std::deque<std::unique_ptr<Object>> result;
+		// ----------------------------------------------------------------
+		// DumpRTTI
+		// ----------------------------------------------------------------
 
+		std::vector<std::unique_ptr<Object>> DumpRTTI(void const* const pBaseAddress, void const* const pAddress, const size_t unSize) {
 			if (!pBaseAddress || !pAddress || !unSize) {
-				return result;
+				return {};
 			}
 
 			const void* pBegin = pAddress;
 			const void* pEnd = reinterpret_cast<const void*>(reinterpret_cast<const char*>(pAddress) + unSize);
 
-			std::deque<const RTTI_TYPE_DESCRIPTOR*> TDs;
+			std::vector<const RTTI_TYPE_DESCRIPTOR*> TDs;
 			EnumerateAllTypeDescriptors(pBaseAddress, pBegin, pEnd, TDs);
 
+			std::vector<std::unique_ptr<Object>> vecResult;
 			std::unordered_set<const void*> seenTD;
 
 			for (const auto& pTD : TDs) {
@@ -4875,18 +4928,18 @@ namespace Detours {
 
 				auto ObjFull = BuildObjectFromCOL(pBaseAddress, pBegin, pEnd, const_cast<PRTTI_TYPE_DESCRIPTOR>(pTD));
 				if (ObjFull) {
-					TryEmplaceUniqueByTD(result, seenTD, std::move(ObjFull));
+					TryEmplaceUniqueByTD(vecResult, seenTD, std::move(ObjFull));
 					continue;
 				}
 
 				auto ObjPartial = BuildObjectFromBCD(pBaseAddress, pBegin, pEnd, const_cast<PRTTI_TYPE_DESCRIPTOR>(pTD));
-				TryEmplaceUniqueByTD(result, seenTD, std::move(ObjPartial));
+				TryEmplaceUniqueByTD(vecResult, seenTD, std::move(ObjPartial));
 			}
 
-			return result;
+			return vecResult;
 		}
 
-		std::deque<std::unique_ptr<Object>> DumpRTTI(HMODULE hModule) {
+		std::vector<std::unique_ptr<Object>> DumpRTTI(HMODULE hModule) {
 			if (!hModule) {
 				return {};
 			}
@@ -4898,7 +4951,7 @@ namespace Detours {
 			return DumpRTTI(reinterpret_cast<void*>(hModule), reinterpret_cast<void*>(hModule), static_cast<size_t>(pOH->SizeOfImage) - 1);
 		}
 
-		std::deque<std::unique_ptr<Object>> DumpRTTIA(char const* const szModulePath) {
+		std::vector<std::unique_ptr<Object>> DumpRTTIA(char const* const szModulePath) {
 			if (!szModulePath) {
 				return {};
 			}
@@ -4911,7 +4964,7 @@ namespace Detours {
 			return DumpRTTI(hModule);
 		}
 
-		std::deque<std::unique_ptr<Object>> DumpRTTIW(wchar_t const* const szModulePath) {
+		std::vector<std::unique_ptr<Object>> DumpRTTIW(wchar_t const* const szModulePath) {
 			if (!szModulePath) {
 				return {};
 			}
@@ -4925,11 +4978,11 @@ namespace Detours {
 		}
 
 #ifdef _UNICODE
-		std::deque<std::unique_ptr<Object>> DumpRTTI(wchar_t const* const szModulePath) {
+		std::vector<std::unique_ptr<Object>> DumpRTTI(wchar_t const* const szModulePath) {
 			return DumpRTTIW(szModulePath);
 		}
 #else
-		std::deque<std::unique_ptr<Object>> DumpRTTI(char const* const szModulePath) {
+		std::vector<std::unique_ptr<Object>> DumpRTTI(char const* const szModulePath) {
 			return DumpRTTIA(szModulePath);
 		}
 #endif

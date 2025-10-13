@@ -1125,7 +1125,7 @@ TEST_SUITE("Detours::RTTI") {
 
 	TEST_CASE("DynamicCast_CrossCast_MI") {
 		// Cross-cast across branches in an MI diamond:
-		//   D : A, B   � casting A* -> B* and B* -> A* should succeed via D.
+		//   D : A, B - casting A* -> B* and B* -> A* should succeed via D.
 		auto* d = new MI_D();
 		REQUIRE(d != nullptr);
 
