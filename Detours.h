@@ -1941,7 +1941,7 @@ namespace Detours {
 			const PRTTI_CLASS_HIERARCHY_DESCRIPTOR GetClassHierarchyDescriptor() const;
 			const PRTTI_COMPLETE_OBJECT_LOCATOR GetCompleteObject() const;
 			void** GetVTable() const;
-			std::vector<std::unique_ptr<Object>>& GetBaseObjects();
+			std::deque<std::unique_ptr<Object>>& GetBaseObjects();
 
 		private:
 			void const* const m_pBaseAddress;
@@ -1952,7 +1952,7 @@ namespace Detours {
 			const PRTTI_BASE_CLASS_ARRAY m_pBaseClassArray;
 			const PRTTI_COMPLETE_OBJECT_LOCATOR m_pCompleteObject;
 			void** m_pVTable;
-			std::vector<std::unique_ptr<Object>> m_vecBaseClasses;
+			std::deque<std::unique_ptr<Object>> m_vecBaseClasses;
 		};
 
 		// ----------------------------------------------------------------
@@ -1968,6 +1968,20 @@ namespace Detours {
 		std::unique_ptr<Object> FindObject(wchar_t const* const szModuleName, char const* const szName, const char* szParentName = nullptr, bool bCompleteObject = true, unsigned int unOffset = 0);
 #else
 		std::unique_ptr<Object> FindObject(char const* const szModuleName, char const* const szName, const char* szParentName = nullptr, bool bCompleteObject = true, unsigned int unOffset = 0);
+#endif
+
+		// ----------------------------------------------------------------
+		// DumpRTTI
+		// ----------------------------------------------------------------
+
+		std::deque<std::unique_ptr<Object>> DumpRTTI(void const* const pBaseAddress, void const* const pAddress, const size_t unSize);
+		std::deque<std::unique_ptr<Object>> DumpRTTI(HMODULE hModule);
+		std::deque<std::unique_ptr<Object>> DumpRTTIA(char const* const szModulePath);
+		std::deque<std::unique_ptr<Object>> DumpRTTIW(wchar_t const* const szModulePath);
+#ifdef _UNICODE
+		std::deque<std::unique_ptr<Object>> DumpRTTI(wchar_t const* const szModulePath);
+#else
+		std::deque<std::unique_ptr<Object>> DumpRTTI(char const* const szModulePath);
 #endif
 	}
 

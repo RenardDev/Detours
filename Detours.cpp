@@ -3865,9 +3865,9 @@ namespace Detours {
 				}
 
 #ifdef _M_X64
-				const auto pTargetTD = __GetTypeDescriptor(pBaseAddress, pBCD);
+				const auto& pTargetTD = __GetTypeDescriptor(pBaseAddress, pBCD);
 #elif _M_IX86
-				const auto pTargetTD = __GetTypeDescriptor(pBCD);
+				const auto& pTargetTD = __GetTypeDescriptor(pBCD);
 #endif
 				if (((i - unTargetIndex) > unTargetBases) && pTargetTD && IsTypeDescriptorEqual(pTargetTD, pTargetTypeDescriptor)) {
 					if (pSourceBCD) {
@@ -3884,9 +3884,9 @@ namespace Detours {
 				}
 
 #ifdef _M_X64
-				const auto pSourceTD = pTargetTD ? pTargetTD : __GetTypeDescriptor(pBaseAddress, pBCD);
+				const auto& pSourceTD = pTargetTD ? pTargetTD : __GetTypeDescriptor(pBaseAddress, pBCD);
 #elif _M_IX86
-				const auto pSourceTD = pTargetTD ? pTargetTD : __GetTypeDescriptor(pBCD);
+				const auto& pSourceTD = pTargetTD ? pTargetTD : __GetTypeDescriptor(pBCD);
 #endif
 				if (pSourceTD && IsTypeDescriptorEqual(pSourceTD, pSourceTypeDescriptor) && (PMDtoOffset(pCompleteObject, pBCD->m_Where) == nSourceOffset)) {
 					if (pTargetBCD) {
@@ -4003,9 +4003,9 @@ namespace Detours {
 				}
 
 #ifdef _M_X64
-				const auto pTD = __GetTypeDescriptor(pBaseAddress, pBCD);
+				const auto& pTD = __GetTypeDescriptor(pBaseAddress, pBCD);
 #elif _M_IX86
-				const auto pTD = __GetTypeDescriptor(pBCD);
+				const auto& pTD = __GetTypeDescriptor(pBCD);
 #endif
 
 				if (((i - unTargetIndex) > unTargetBases) && pTD && IsTypeDescriptorEqual(pTD, pTargetTypeDescriptor)) {
@@ -4265,18 +4265,18 @@ namespace Detours {
 
 			for (unsigned int i = 0; i < unNumberOfBaseClasses; ++i) {
 #ifdef _M_X64
-				const auto pBaseClassDescriptor = __GetBaseClassDescriptor(pBaseAddress, pBaseClassArray, i);
+				const auto& pBaseClassDescriptor = __GetBaseClassDescriptor(pBaseAddress, pBaseClassArray, i);
 #elif _M_IX86
-				const auto pBaseClassDescriptor = __GetBaseClassDescriptor(pBaseClassArray, i);
+				const auto& pBaseClassDescriptor = __GetBaseClassDescriptor(pBaseClassArray, i);
 #endif
 				if (!pBaseClassDescriptor) {
 					break;
 				}
 
 #ifdef _M_X64
-				const auto pCurrentTypeDescriptor = __GetTypeDescriptor(pBaseAddress, pBaseClassDescriptor);
+				const auto& pCurrentTypeDescriptor = __GetTypeDescriptor(pBaseAddress, pBaseClassDescriptor);
 #elif _M_IX86
-				const auto pCurrentTypeDescriptor = __GetTypeDescriptor(pBaseClassDescriptor);
+				const auto& pCurrentTypeDescriptor = __GetTypeDescriptor(pBaseClassDescriptor);
 #endif
 				if (!pCurrentTypeDescriptor) {
 					continue;
@@ -4347,7 +4347,7 @@ namespace Detours {
 			return m_pVTable;
 		}
 
-		std::vector<std::unique_ptr<Object>>& Object::GetBaseObjects() {
+		std::deque<std::unique_ptr<Object>>& Object::GetBaseObjects() {
 			return m_vecBaseClasses;
 		}
 
@@ -4491,9 +4491,9 @@ namespace Detours {
 						}
 					} else {
 #ifdef _M_X64
-						auto pBaseClassDescriptor = reinterpret_cast<PRTTI_BASE_CLASS_DESCRIPTOR>(reinterpret_cast<char*>(pTypeDescriptorReference) - offsetof(RTTI_BASE_CLASS_DESCRIPTOR, m_unTypeDescriptor));
+						const auto& pBaseClassDescriptor = reinterpret_cast<PRTTI_BASE_CLASS_DESCRIPTOR>(reinterpret_cast<char*>(pTypeDescriptorReference) - offsetof(RTTI_BASE_CLASS_DESCRIPTOR, m_unTypeDescriptor));
 #elif _M_IX86
-						auto pBaseClassDescriptor = reinterpret_cast<PRTTI_BASE_CLASS_DESCRIPTOR>(reinterpret_cast<char*>(pTypeDescriptorReference) - offsetof(RTTI_BASE_CLASS_DESCRIPTOR, m_pTypeDescriptor));
+						const auto& pBaseClassDescriptor = reinterpret_cast<PRTTI_BASE_CLASS_DESCRIPTOR>(reinterpret_cast<char*>(pTypeDescriptorReference) - offsetof(RTTI_BASE_CLASS_DESCRIPTOR, m_pTypeDescriptor));
 #endif
 						if ((pBaseClassDescriptor < pBaseAddress) || (pBaseClassDescriptor >= pEndAddress)) {
 							pTypeDescriptorReference = reinterpret_cast<void*>(reinterpret_cast<char*>(pTypeDescriptorReference) + 1);
@@ -4612,6 +4612,325 @@ namespace Detours {
 #else
 		std::unique_ptr<Object> FindObject(char const* const szModuleName, char const* const szName, const char* szParentName, bool bCompleteObject, unsigned int unOffset) {
 			return FindObjectA(szModuleName, szName, szParentName, bCompleteObject, unOffset);
+		}
+#endif
+
+		// ----------------------------------------------------------------
+		// DumpRTTI
+		// ----------------------------------------------------------------
+
+		static inline char* FindTypeInfo(void const* const pBegin, void const* const pEnd) {
+			char pEncoded[] = { '\xD1', '\xC0', '\xBE', '\xA9', '\x8B', '\x86', '\x8F', '\x9A', '\xA0', '\x96', '\x91', '\x99', '\x90', '\xBF', '\xBF' }; // Encoded ".?AVtype_info@@" to prevent self-scan
+			char pPattern[sizeof(pEncoded) + 1] = {};
+			for (unsigned i = 0; i < sizeof(pEncoded); ++i) {
+				pPattern[i] = pEncoded[i] ^ 0xFF;
+			}
+
+			return reinterpret_cast<char*>(const_cast<void*>(FindData(const_cast<void*>(pBegin), reinterpret_cast<size_t>(const_cast<char*>(reinterpret_cast<const char*>(pEnd))) - reinterpret_cast<size_t>(const_cast<void*>(pBegin)), reinterpret_cast<const unsigned char* const>(pPattern), strnlen(pPattern, 16))));
+		}
+
+		static inline void TryEmplaceUniqueByTD(std::deque<std::unique_ptr<Object>>& out, std::unordered_set<const void*>& seenTD, std::unique_ptr<Object> candidate) {
+			if (!candidate) {
+				return;
+			}
+
+			const void* pTD = candidate->GetTypeDescriptor();
+			if (!pTD) {
+				return;
+			}
+
+			if (seenTD.insert(pTD).second) {
+				out.emplace_back(std::move(candidate));
+			}
+		}
+
+		static std::unique_ptr<Object> BuildObjectFromCOL(void const* const pBaseAddress, void const* const pBegin, void const* const pEnd, const PRTTI_TYPE_DESCRIPTOR pTD) {
+			if (!pBaseAddress || !pBegin || !pEnd || !pTD) {
+				return nullptr;
+			}
+
+			void* pReference = const_cast<void*>(pBegin);
+			while (pReference && (reinterpret_cast<const char*>(pReference) < reinterpret_cast<const char*>(pEnd))) {
+#ifdef _M_X64
+				size_t unTypeDescriptorOffsetTemp = reinterpret_cast<size_t>(pTD) - reinterpret_cast<size_t>(pBaseAddress);
+				unsigned int unTypeDescriptorOffset = *(reinterpret_cast<unsigned int*>(&unTypeDescriptorOffsetTemp));
+				pReference = const_cast<void*>(FindData(pReference, static_cast<size_t>(reinterpret_cast<const char*>(pEnd) - reinterpret_cast<const char*>(pReference)), reinterpret_cast<const unsigned char*>(&unTypeDescriptorOffset), sizeof(int)));
+#elif _M_IX86
+				pReference = const_cast<void*>(FindData(pReference, static_cast<size_t>(reinterpret_cast<const char*>(pEnd) - reinterpret_cast<const char*>(pReference)), reinterpret_cast<const unsigned char*>(&pTD), sizeof(void*)));
+#endif
+				if (!pReference) {
+					break;
+				}
+
+				const auto& pCOL = reinterpret_cast<PRTTI_COMPLETE_OBJECT_LOCATOR>(reinterpret_cast<char*>(pReference) - static_cast<ptrdiff_t>(sizeof(int) * 3));
+				if (IsValidCompleteObjectLocator(pCOL)) {
+#ifdef _M_X64
+					const auto& pCheckTD = __GetTypeDescriptor(pBaseAddress, pCOL);
+					if (!pCheckTD) {
+						pReference = reinterpret_cast<void*>(reinterpret_cast<char*>(pReference) + 1);
+						continue;
+					}
+
+					const auto& pCHD = __GetClassHierarchyDescriptor(pBaseAddress, pCOL);
+					if (!pCHD) {
+						pReference = reinterpret_cast<void*>(reinterpret_cast<char*>(pReference) + 1);
+						continue;
+					}
+
+					const auto& pBCA = __GetBaseClassArray(pBaseAddress, pCHD);
+					if (!pBCA) {
+						pReference = reinterpret_cast<void*>(reinterpret_cast<char*>(pReference) + 1);
+						continue;
+					}
+#elif _M_IX86
+					const auto& pCheckTD = __GetTypeDescriptor(pCOL);
+					if (!pCheckTD) {
+						pReference = reinterpret_cast<void*>(reinterpret_cast<char*>(pReference) + 1);
+						continue;
+					}
+
+					const auto& pCHD = __GetClassHierarchyDescriptor(pCOL);
+					if (!pCHD) {
+						pReference = reinterpret_cast<void*>(reinterpret_cast<char*>(pReference) + 1);
+						continue;
+					}
+
+					const auto& pBCA = __GetBaseClassArray(pCHD);
+					if (!pBCA) {
+						pReference = reinterpret_cast<void*>(reinterpret_cast<char*>(pReference) + 1);
+						continue;
+					}
+#endif
+
+					if ((pCheckTD == pTD) && pCHD && pBCA) {
+						void** pVTable = nullptr;
+						void* pMetaReference = const_cast<void*>(pBegin);
+						while (pMetaReference && (reinterpret_cast<const char*>(pMetaReference) < reinterpret_cast<const char*>(pEnd))) {
+							pMetaReference = const_cast<void*>(FindData(pMetaReference, static_cast<size_t>(reinterpret_cast<const char*>(pEnd) - reinterpret_cast<const char*>(pMetaReference)), reinterpret_cast<const unsigned char*>(&pCOL), sizeof(void*)));
+							if (!pMetaReference) {
+								break;
+							}
+
+							void** pVT = reinterpret_cast<void**>(reinterpret_cast<char*>(pMetaReference) + sizeof(void*));
+							if ((reinterpret_cast<const char*>(pVT) >= reinterpret_cast<const char*>(pBegin)) && (reinterpret_cast<const char*>(pVT) < reinterpret_cast<const char*>(pEnd))) {
+								pVTable = pVT;
+								break;
+							}
+
+							pMetaReference = reinterpret_cast<void*>(reinterpret_cast<char*>(pMetaReference) + 1);
+						}
+
+						return std::make_unique<Object>(pBaseAddress, pBegin, static_cast<size_t>(reinterpret_cast<const char*>(pEnd) - reinterpret_cast<const char*>(pBegin)), pTD, pCHD, pBCA, pCOL, pVTable);
+					}
+				}
+
+				pReference = reinterpret_cast<void*>(reinterpret_cast<char*>(pReference) + 1);
+			}
+
+			return nullptr;
+		}
+
+		static std::unique_ptr<Object> BuildObjectFromBCD(void const* const pBaseAddress, void const* const pBegin, void const* const pEnd, const PRTTI_TYPE_DESCRIPTOR pTD) {
+			if (!pBaseAddress || !pBegin || !pEnd || !pTD) {
+				return nullptr;
+			}
+
+			void* pReference = const_cast<void*>(pBegin);
+			while (pReference && (reinterpret_cast<const char*>(pReference) < reinterpret_cast<const char*>(pEnd))) {
+#ifdef _M_X64
+				size_t unTypeDescriptorOffsetTemp = reinterpret_cast<size_t>(pTD) - reinterpret_cast<size_t>(pBaseAddress);
+				unsigned int unTypeDescriptorOffset = *(reinterpret_cast<unsigned int*>(&unTypeDescriptorOffsetTemp));
+				pReference = const_cast<void*>(FindData(pReference, static_cast<size_t>(reinterpret_cast<const char*>(pEnd) - reinterpret_cast<const char*>(pReference)), reinterpret_cast<const unsigned char*>(&unTypeDescriptorOffset), sizeof(unsigned int)));
+#elif _M_IX86
+				pReference = const_cast<void*>(FindData(pReference, static_cast<size_t>(reinterpret_cast<const char*>(pEnd) - reinterpret_cast<const char*>(pReference)), reinterpret_cast<const unsigned char*>(&pTD), sizeof(void*)));
+#endif
+				if (!pReference) {
+					break;
+				}
+
+#ifdef _M_X64
+				auto pBCD = reinterpret_cast<PRTTI_BASE_CLASS_DESCRIPTOR>(reinterpret_cast<char*>(pReference) - offsetof(RTTI_BASE_CLASS_DESCRIPTOR, m_unTypeDescriptor));
+#else
+				auto pBCD = reinterpret_cast<PRTTI_BASE_CLASS_DESCRIPTOR>(reinterpret_cast<char*>(pReference) - offsetof(RTTI_BASE_CLASS_DESCRIPTOR, m_pTypeDescriptor));
+#endif
+				if ((reinterpret_cast<const char*>(pBCD) < reinterpret_cast<const char*>(pBegin)) || (reinterpret_cast<const char*>(pBCD) >= reinterpret_cast<const char*>(pEnd))) {
+					pReference = reinterpret_cast<void*>(reinterpret_cast<char*>(pReference) + 1);
+					continue;
+				}
+
+#ifdef _M_X64
+				if (reinterpret_cast<void*>(reinterpret_cast<size_t>(pBaseAddress) + pBCD->m_unTypeDescriptor) != pTD) {
+					pReference = reinterpret_cast<void*>(reinterpret_cast<char*>(pReference) + 1);
+					continue;
+				}
+#else
+				if (pBCD->m_pTypeDescriptor != pTD) {
+					pReference = reinterpret_cast<void*>(reinterpret_cast<char*>(pReference) + 1);
+					continue;
+				}
+#endif
+
+				if ((pBCD->m_unAttributes & BCD_HASPCHD) == 0) {
+					pReference = reinterpret_cast<void*>(reinterpret_cast<char*>(pReference) + 1);
+					continue;
+				}
+
+#ifdef _M_X64
+				const auto& pCHD = reinterpret_cast<PRTTI_CLASS_HIERARCHY_DESCRIPTOR>( reinterpret_cast<size_t>(pBaseAddress) + pBCD->m_unClassHierarchyDescriptor);
+#else
+				const auto& pCHD = pBCD->m_pClassHierarchyDescriptor;
+				if (!pCHD) {
+					pReference = reinterpret_cast<void*>(reinterpret_cast<char*>(pReference) + 1);
+					continue;
+				}
+#endif
+
+				if ((reinterpret_cast<const char*>(pCHD) < reinterpret_cast<const char*>(pBegin)) || (reinterpret_cast<const char*>(pCHD) >= reinterpret_cast<const char*>(pEnd)))
+				{
+					pReference = reinterpret_cast<void*>(reinterpret_cast<char*>(pReference) + 1);
+					continue;
+				}
+
+				if ((pCHD->m_unSignature != COL_SIG_REV0) && (pCHD->m_unSignature != COL_SIG_REV1)) {
+					pReference = reinterpret_cast<void*>(reinterpret_cast<char*>(pReference) + 1);
+					continue;
+				}
+
+#ifdef _M_X64
+				const auto& pBCA = reinterpret_cast<PRTTI_BASE_CLASS_ARRAY>(reinterpret_cast<size_t>(pBaseAddress) + pCHD->m_unBaseClassArray);
+#else
+				const auto& pBCA = pCHD->m_pBaseClassArray;
+				if (!pBCA) {
+					pReference = reinterpret_cast<void*>(reinterpret_cast<char*>(pReference) + 1);
+					continue;
+				}
+#endif
+
+				if ((reinterpret_cast<const char*>(pBCA) < reinterpret_cast<const char*>(pBegin)) || (reinterpret_cast<const char*>(pBCA) >= reinterpret_cast<const char*>(pEnd))) {
+					pReference = reinterpret_cast<void*>(reinterpret_cast<char*>(pReference) + 1);
+					continue;
+				}
+
+				return std::make_unique<Object>(pBaseAddress, pBegin, static_cast<size_t>(reinterpret_cast<const char*>(pEnd) - reinterpret_cast<const char*>(pBegin)), pTD, pCHD, pBCA, nullptr, nullptr);
+			}
+
+			return nullptr;
+		}
+
+		static void EnumerateAllTypeDescriptors(void const* const pBaseAddress, void const* const pBegin, void const* const pEnd, std::deque<const RTTI_TYPE_DESCRIPTOR*>& out) {
+			if (!pBaseAddress || !pBegin || !pEnd) return;
+
+			char* pTypeInfoName = FindTypeInfo(pBegin, pEnd);
+			if (!pTypeInfoName) {
+				return;
+			}
+
+			auto pTypeInfoTD = reinterpret_cast<PRTTI_TYPE_DESCRIPTOR>(reinterpret_cast<char*>(pTypeInfoName) - sizeof(void*) * 2);
+
+			if ((reinterpret_cast<const char*>(pTypeInfoTD) < reinterpret_cast<const char*>(pBegin)) || (reinterpret_cast<const char*>(pTypeInfoTD) >= reinterpret_cast<const char*>(pEnd)) || (reinterpret_cast<const char*>(pTypeInfoTD->m_pVFTable) < reinterpret_cast<const char*>(pBegin)) || (reinterpret_cast<const char*>(pTypeInfoTD->m_pVFTable) >= reinterpret_cast<const char*>(pEnd))) {
+				return;
+			}
+
+			void* pTypeInfoVFTable = pTypeInfoTD->m_pVFTable;
+			if (!pTypeInfoVFTable) {
+				return;
+			}
+
+			void* pScan = const_cast<void*>(pBegin);
+			while (pScan && (reinterpret_cast<const char*>(pScan) < reinterpret_cast<const char*>(pEnd))) {
+				pScan = const_cast<void*>(FindData(pScan, static_cast<size_t>(reinterpret_cast<const char*>(pEnd) - reinterpret_cast<const char*>(pScan)), reinterpret_cast<const unsigned char*>(&pTypeInfoVFTable), sizeof(void*)));
+				if (!pScan) {
+					break;
+				}
+
+				auto pTD = reinterpret_cast<PRTTI_TYPE_DESCRIPTOR>(pScan);
+				const char* szName = pTD->m_szName;
+				if ((reinterpret_cast<const char*>(szName) >= reinterpret_cast<const char*>(pBegin)) && (reinterpret_cast<const char*>(szName) < reinterpret_cast<const char*>(pEnd))) {
+					out.push_back(pTD);
+				}
+
+				pScan = reinterpret_cast<void*>(reinterpret_cast<char*>(pScan) + sizeof(void*));
+			}
+		}
+
+		std::deque<std::unique_ptr<Object>> DumpRTTI(void const* const pBaseAddress, void const* const pAddress, const size_t unSize) {
+			std::deque<std::unique_ptr<Object>> result;
+
+			if (!pBaseAddress || !pAddress || !unSize) {
+				return result;
+			}
+
+			const void* pBegin = pAddress;
+			const void* pEnd = reinterpret_cast<const void*>(reinterpret_cast<const char*>(pAddress) + unSize);
+
+			std::deque<const RTTI_TYPE_DESCRIPTOR*> TDs;
+			EnumerateAllTypeDescriptors(pBaseAddress, pBegin, pEnd, TDs);
+
+			std::unordered_set<const void*> seenTD;
+
+			for (const auto& pTD : TDs) {
+				if (!pTD) {
+					continue;
+				}
+
+				auto ObjFull = BuildObjectFromCOL(pBaseAddress, pBegin, pEnd, const_cast<PRTTI_TYPE_DESCRIPTOR>(pTD));
+				if (ObjFull) {
+					TryEmplaceUniqueByTD(result, seenTD, std::move(ObjFull));
+					continue;
+				}
+
+				auto ObjPartial = BuildObjectFromBCD(pBaseAddress, pBegin, pEnd, const_cast<PRTTI_TYPE_DESCRIPTOR>(pTD));
+				TryEmplaceUniqueByTD(result, seenTD, std::move(ObjPartial));
+			}
+
+			return result;
+		}
+
+		std::deque<std::unique_ptr<Object>> DumpRTTI(HMODULE hModule) {
+			if (!hModule) {
+				return {};
+			}
+
+			const auto& pDH = reinterpret_cast<PIMAGE_DOS_HEADER>(hModule);
+			const auto& pNTHs = reinterpret_cast<PIMAGE_NT_HEADERS>(reinterpret_cast<char*>(hModule) + pDH->e_lfanew);
+			const auto& pOH = &(pNTHs->OptionalHeader);
+
+			return DumpRTTI(reinterpret_cast<void*>(hModule), reinterpret_cast<void*>(hModule), static_cast<size_t>(pOH->SizeOfImage) - 1);
+		}
+
+		std::deque<std::unique_ptr<Object>> DumpRTTIA(char const* const szModulePath) {
+			if (!szModulePath) {
+				return {};
+			}
+
+			HMODULE hModule = GetModuleHandleA(szModulePath);
+			if (!hModule) {
+				return {};
+			}
+
+			return DumpRTTI(hModule);
+		}
+
+		std::deque<std::unique_ptr<Object>> DumpRTTIW(wchar_t const* const szModulePath) {
+			if (!szModulePath) {
+				return {};
+			}
+
+			HMODULE hModule = GetModuleHandleW(szModulePath);
+			if (!hModule) {
+				return {};
+			}
+
+			return DumpRTTI(hModule);
+		}
+
+#ifdef _UNICODE
+		std::deque<std::unique_ptr<Object>> DumpRTTI(wchar_t const* const szModulePath) {
+			return DumpRTTIW(szModulePath);
+		}
+#else
+		std::deque<std::unique_ptr<Object>> DumpRTTI(char const* const szModulePath) {
+			return DumpRTTIA(szModulePath);
 		}
 #endif
 	}

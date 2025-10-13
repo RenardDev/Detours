@@ -990,6 +990,13 @@ TEST_SUITE("Detours::Scan") {
 
 TEST_SUITE("Detours::RTTI") {
 
+	TEST_CASE("DumpRTTI") {
+		auto TDs = Detours::RTTI::DumpRTTI(GetModuleHandle(nullptr));
+		for (auto& pTD : TDs) {
+			printf("Name: `%s`\n", pTD->GetTypeDescriptor()->m_szName);
+		}
+	}
+
 	TEST_CASE("FindRTTI") {
 		// Construct a small hierarchy and verify we can locate RTTI for a derived type
 		// and extract a working vtable to call through.
