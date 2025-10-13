@@ -984,6 +984,10 @@ TEST_SUITE("Detours::Scan") {
 	}
 }
 
+#ifndef _DEBUG
+#pragma optimize("", off)
+#endif
+
 TEST_SUITE("Detours::RTTI") {
 
 	TEST_CASE("FindRTTI") {
@@ -1327,6 +1331,10 @@ TEST_SUITE("Detours::RTTI") {
 #endif
 	}
 }
+
+#ifndef _DEBUG
+#pragma optimize("", on)
+#endif
 
 TEST_SUITE("Detours::Sync") {
 
