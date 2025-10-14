@@ -155,8 +155,8 @@ static inline const char* nameof() {
 	return typeid(T).raw_name();
 }
 
-DEFINE_SECTION(".cdata", SECTION_READWRITE)
-DEFINE_SECTION(".ctext", SECTION_EXECUTE_READ)
+DEFINE_DATA_SECTION(".cdata", SECTION_READWRITE)
+DEFINE_CODE_SECTION(".ctext", SECTION_EXECUTE_READ)
 
 DEFINE_DATA_IN_SECTION(".cdata") __declspec(dllexport) BaseTestingRTTI* g_pBaseTestingRTTI = nullptr;
 DEFINE_DATA_IN_SECTION(".cdata") __declspec(dllexport) TestingRTTI* g_pTestingRTTI = nullptr;
@@ -985,7 +985,7 @@ TEST_SUITE("Detours::Scan") {
 }
 
 #ifndef _DEBUG
-#pragma optimize("", off)
+DISABLE_OPTIMIZATION_BEGIN("") {
 #endif
 
 TEST_SUITE("Detours::RTTI") {
@@ -1340,7 +1340,8 @@ TEST_SUITE("Detours::RTTI") {
 }
 
 #ifndef _DEBUG
-#pragma optimize("", on)
+DISABLE_OPTIMIZATION_END("");
+}
 #endif
 
 TEST_SUITE("Detours::Sync") {
