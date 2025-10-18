@@ -155,8 +155,8 @@ static inline const char* nameof() {
 	return typeid(T).raw_name();
 }
 
-DEFINE_DATA_SECTION(".cdata", SECTION_READWRITE)
-DEFINE_CODE_SECTION(".ctext", SECTION_EXECUTE_READ)
+DEFINE_SECTION(".cdata", SECTION_READWRITE)
+DEFINE_SECTION(".ctext", SECTION_EXECUTE_READ)
 
 DEFINE_DATA_IN_SECTION(".cdata") __declspec(dllexport) BaseTestingRTTI* g_pBaseTestingRTTI = nullptr;
 DEFINE_DATA_IN_SECTION(".cdata") __declspec(dllexport) TestingRTTI* g_pTestingRTTI = nullptr;
@@ -2417,7 +2417,7 @@ TEST_SUITE("Detours::Hook") {
 		CHECK(reinterpret_cast<fnFoo>(pVTable[0])(g_pTestingRTTI, nullptr) == false);
 		CHECK(fooHook.UnHook() == true);
 		CHECK(fooHook.Release() == true);
-		
+
 		CHECK(booHook.Set(pVTable, 1) == true);
 		CHECK(booHook.Hook(boo_Hook) == true);
 		CHECK(reinterpret_cast<fnBoo>(pVTable[1])(g_pTestingRTTI, nullptr) == true);

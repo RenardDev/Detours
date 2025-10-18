@@ -7051,7 +7051,7 @@ namespace Detours {
 
 			m_unRegionCapacity = ri.m_unSize;
 			m_pRegionAddress = pBaseAddress;
-			
+
 			auto vecPages = __get_pages_info(pBaseAddress, ri.m_unSize);
 			for (auto& PageInfo : vecPages) {
 				m_Pages.emplace_back(PageInfo.m_pBaseAddress, false);
