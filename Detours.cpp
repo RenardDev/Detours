@@ -6573,34 +6573,18 @@ namespace Detours {
 			return (pInnerRangeStart < pOuterRangeEnd) && (pOuterRangeStart < pInnerRangeEnd);
 		}
 
-		static inline bool __ranges_overlap(const void* a, size_t asz,
-			const void* b, size_t bsz) {
-			if (asz == 0 || bsz == 0) return false;
-			const uintptr_t a0 = reinterpret_cast<uintptr_t>(a), a1 = a0 + asz;
-			const uintptr_t b0 = reinterpret_cast<uintptr_t>(b), b1 = b0 + bsz;
-			return (a0 < b1) && (b0 < a1);
-		}
+		static inline bool __range_intersection(void const* const pA, size_t unA, void const* const pB, size_t unB, void** pStart, size_t* pSize) {
+			const uintptr_t unA0 = reinterpret_cast<uintptr_t>(pA), unA1 = unA0 + unA;
+			const uintptr_t unB0 = reinterpret_cast<uintptr_t>(pB), unB1 = unB0 + unB;
+			const uintptr_t unS = ((unA0 > unB0) ? unA0 : unB0);
+			const uintptr_t unE = ((unA1 < unB1) ? unA1 : unB1);
 
-		static inline bool __address_in_range(const void* base, size_t size, const void* addr) {
-			const uintptr_t b = reinterpret_cast<uintptr_t>(base);
-			const uintptr_t a = reinterpret_cast<uintptr_t>(addr);
-			return (a - b) < size;
-		}
-
-		static inline bool __range_intersection(const void* a, size_t asz, const void* b, size_t bsz, void** outStart, size_t* outSize) {
-			const uintptr_t a0 = reinterpret_cast<uintptr_t>(a), a1 = a0 + asz;
-			const uintptr_t b0 = reinterpret_cast<uintptr_t>(b), b1 = b0 + bsz;
-			const uintptr_t s = (a0 > b0 ? a0 : b0);
-			const uintptr_t e = (a1 < b1 ? a1 : b1);
-
-			if (e > s) {
-				*outStart = reinterpret_cast<void*>(s);
-				*outSize = static_cast<size_t>(e - s);
+			if (unE > unS) {
+				*pStart = reinterpret_cast<void*>(unS);
+				*pSize = static_cast<size_t>(unE - unS);
 				return true;
 			}
 
-			*outStart = nullptr;
-			*outSize = 0;
 			return false;
 		}
 
@@ -8306,24 +8290,24 @@ namespace Detours {
 			{
 				auto it = g_PageRegistry.find(pBaseAddress);
 				if (it == g_PageRegistry.end()) {
-					MEMORY_HOOK_TRACKED_PAGE tp = {};
+					MEMORY_HOOK_TRACKED_PAGE TrackedPage = {};
 
-					tp.m_pPage = std::make_unique<Page>(pBaseAddress, false, false);
+					TrackedPage.m_pPage = std::make_unique<Page>(pBaseAddress, false, false);
 
-					if (!tp.m_pPage || !tp.m_pPage->GetPageAddress()) {
+					if (!TrackedPage.m_pPage || !TrackedPage.m_pPage->GetPageAddress()) {
 						ReleaseSRWLockExclusive(&g_MemoryHookPageRegistryLock);
 						return false;
 					}
 
-					if (!tp.m_pPage->ChangeProtection(PAGE_NOACCESS)) {
+					if (!TrackedPage.m_pPage->ChangeProtection(PAGE_NOACCESS)) {
 						ReleaseSRWLockExclusive(&g_MemoryHookPageRegistryLock);
 						return false;
 					}
 
-					tp.m_nInstallReferences = 1;
-					tp.m_nOpenReferences = 0;
+					TrackedPage.m_nInstallReferences = 1;
+					TrackedPage.m_nOpenReferences = 0;
 
-					g_PageRegistry.emplace(pBaseAddress, std::move(tp));
+					g_PageRegistry.emplace(pBaseAddress, std::move(TrackedPage));
 				} else {
 					++it->second.m_nInstallReferences;
 				}
@@ -8341,13 +8325,13 @@ namespace Detours {
 					return true;
 				}
 
-				auto& tp = it->second;
-				if (--tp.m_nInstallReferences <= 0) {
-					if (tp.m_nOpenReferences == 0) {
-						tp.m_pPage->RestoreProtection();
+				auto& TrackedPage = it->second;
+				if (--TrackedPage.m_nInstallReferences <= 0) {
+					if (TrackedPage.m_nOpenReferences == 0) {
+						TrackedPage.m_pPage->RestoreProtection();
 						g_PageRegistry.erase(it);
 					} else {
-						tp.m_nInstallReferences = 0;
+						TrackedPage.m_nInstallReferences = 0;
 					}
 				}
 			}
@@ -8364,10 +8348,10 @@ namespace Detours {
 					return false;
 				}
 
-				auto& tp = it->second;
-				if (++tp.m_nOpenReferences == 1) {
-					if (!tp.m_pPage->RestoreProtection()) {
-						tp.m_nOpenReferences--;
+				auto& TrackedPage = it->second;
+				if (++TrackedPage.m_nOpenReferences == 1) {
+					if (!TrackedPage.m_pPage->RestoreProtection()) {
+						TrackedPage.m_nOpenReferences--;
 						ReleaseSRWLockExclusive(&g_MemoryHookPageRegistryLock);
 						return false;
 					}
@@ -8386,12 +8370,12 @@ namespace Detours {
 					return true;
 				}
 
-				auto& tp = it->second;
-				if (--tp.m_nOpenReferences == 0) {
-					if (tp.m_nInstallReferences > 0) {
-						tp.m_pPage->ChangeProtection(PAGE_NOACCESS);
+				auto& TrackedPage = it->second;
+				if (--TrackedPage.m_nOpenReferences == 0) {
+					if (TrackedPage.m_nInstallReferences > 0) {
+						TrackedPage.m_pPage->ChangeProtection(PAGE_NOACCESS);
 					} else {
-						tp.m_pPage->RestoreProtection();
+						TrackedPage.m_pPage->RestoreProtection();
 						g_PageRegistry.erase(it);
 						ReleaseSRWLockExclusive(&g_MemoryHookPageRegistryLock);
 						return true;
@@ -8413,15 +8397,15 @@ namespace Detours {
 			if (Exception.ExceptionCode == EXCEPTION_SINGLE_STEP) {
 				eflags.m_unTF = 0;
 
-				std::vector<MEMORY_HOOK_RECORD*> vecToErase;
+				std::vector<PMEMORY_HOOK_RECORD> vecToErase;
 
 				AcquireSRWLockExclusive(&g_MemoryHookStacksLock);
 				{
-					auto OpenStack = g_MemoryHookOpenedStacks.find(unTID);
-					auto PostStack = g_MemoryHookPostStacks.find(unTID);
+					const auto& OpenStack = g_MemoryHookOpenedStacks.find(unTID);
+					const auto& PostStack = g_MemoryHookPostStacks.find(unTID);
 
 					while (OpenStack != g_MemoryHookOpenedStacks.end() && !OpenStack->second.empty()) {
-						auto pRecord = OpenStack->second.back();
+						const auto& pRecord = OpenStack->second.back();
 						OpenStack->second.pop_back();
 
 						MEMORY_HOOK_POST_CONTEXT PostCTX = {};
@@ -8438,7 +8422,7 @@ namespace Detours {
 						}
 
 						if (pRecord->m_pPostCallBack) {
-							if (PostCTX.m_pFaultAddress && __address_in_range(pRecord->m_pUserAddress, pRecord->m_unUserSize, PostCTX.m_pFaultAddress)) {
+							if (PostCTX.m_pFaultAddress && __is_in_range(pRecord->m_pUserAddress, pRecord->m_unUserSize, PostCTX.m_pFaultAddress)) {
 								pRecord->m_pPostCallBack(pCTX, PostCTX.m_pExceptionAddress ? PostCTX.m_pExceptionAddress : reinterpret_cast<void*>(Exception.ExceptionAddress), PostCTX.m_unOperation, pRecord->m_pUserAddress, PostCTX.m_pFaultAddress);
 							}
 						}
@@ -8481,7 +8465,7 @@ namespace Detours {
 				if (!vecToErase.empty()) {
 					AcquireSRWLockExclusive(&g_MemoryHookRecordsLock);
 					{
-						for (auto& pRecord : vecToErase) {
+						for (const auto& pRecord : vecToErase) {
 							for (auto it = g_MemoryHookRecords.begin(); it != g_MemoryHookRecords.end(); ++it) {
 								if (it->get() == pRecord) {
 									g_MemoryHookRecords.erase(it);
@@ -8495,7 +8479,7 @@ namespace Detours {
 
 				AcquireSRWLockExclusive(&g_HandlerDepthLock);
 				{
-					auto it = g_HandlerDepth.find(unTID);
+					const auto& it = g_HandlerDepth.find(unTID);
 					if (it != g_HandlerDepth.end()) {
 						if (it->second > 0) {
 							--it->second;
@@ -8510,8 +8494,9 @@ namespace Detours {
 				return true;
 			}
 
-			if ((Exception.ExceptionCode != EXCEPTION_ACCESS_VIOLATION) || (Exception.NumberParameters < 2))
+			if ((Exception.ExceptionCode != EXCEPTION_ACCESS_VIOLATION) || (Exception.NumberParameters < 2)) {
 				return false;
+			}
 
 			const ULONG_PTR unAccessType = Exception.ExceptionInformation[0];
 			if ((unAccessType != 0) && (unAccessType != 1) && (unAccessType != 8)) {
@@ -8532,8 +8517,8 @@ namespace Detours {
 				unOperation = MEMORY_HOOK_OPERATION::MEMORY_EXECUTE; 
 			} 
 
-			std::vector<MEMORY_HOOK_RECORD*> vecCommitOpenStack;
-			std::vector<MEMORY_HOOK_RECORD*> vecCallBacks;
+			std::vector<PMEMORY_HOOK_RECORD> vecCommitOpenStack;
+			std::vector<PMEMORY_HOOK_RECORD> vecCallBacks;
 
 			AcquireSRWLockShared(&g_MemoryHookRecordsLock);
 			{
@@ -8543,11 +8528,11 @@ namespace Detours {
 						continue;
 					}
 
-					if (!pRecord->m_bIsVirtual && __address_in_range(pRecord->m_pAddress, pRecord->m_unSize, pFaultAddress)) {
+					if (!pRecord->m_bIsVirtual && __is_in_range(pRecord->m_pAddress, pRecord->m_unSize, pFaultAddress)) {
 						vecCommitOpenStack.push_back(pRecord);
 					}
 
-					if (__address_in_range(pRecord->m_pUserAddress, pRecord->m_unUserSize, pFaultAddress)) {
+					if (__is_in_range(pRecord->m_pUserAddress, pRecord->m_unUserSize, pFaultAddress)) {
 						vecCallBacks.push_back(pRecord);
 					}
 				}
@@ -8558,11 +8543,12 @@ namespace Detours {
 				return false;
 			}
 
-			std::vector<MEMORY_HOOK_RECORD*> vecOpened;
+			std::vector<PMEMORY_HOOK_RECORD> vecOpened;
 			vecOpened.reserve(vecCommitOpenStack.size());
+
 			bool bOpenSuccess = true;
 
-			for (auto& pRecord : vecCommitOpenStack) {
+			for (const auto& pRecord : vecCommitOpenStack) {
 				AcquireSRWLockExclusive(&pRecord->m_Lock);
 				{
 					if (pRecord->m_unActiveThreads.load(std::memory_order_acquire) == 0) {
@@ -8588,7 +8574,7 @@ namespace Detours {
 			}
 
 			if (!bOpenSuccess) {
-				for (auto& pRecord : vecOpened) {
+				for (const auto& pRecord : vecOpened) {
 					AcquireSRWLockExclusive(&pRecord->m_Lock);
 					{
 						if (pRecord->m_unActiveThreads.fetch_sub(1, std::memory_order_acq_rel) == 1) {
@@ -8608,17 +8594,19 @@ namespace Detours {
 			AcquireSRWLockExclusive(&g_MemoryHookStacksLock);
 			{
 				auto& OpenedStack = g_MemoryHookOpenedStacks[unTID];
-				auto& Posts = g_MemoryHookPostStacks[unTID];
-				for (auto& pRecord : vecOpened) {
+				auto& PostStack = g_MemoryHookPostStacks[unTID];
+
+				for (const auto& pRecord : vecOpened) {
 					OpenedStack.push_back(pRecord);
 
-					MEMORY_HOOK_POST_CONTEXT ctx {};
-					ctx.m_pRecord = pRecord;
-					ctx.m_pExceptionAddress = pExceptionAddress;
-					ctx.m_pFaultAddress = pFaultAddress;
-					ctx.m_unOperation = unOperation;
+					MEMORY_HOOK_POST_CONTEXT PostCTX = {};
 
-					Posts.push_back(ctx);
+					PostCTX.m_pRecord = pRecord;
+					PostCTX.m_pExceptionAddress = pExceptionAddress;
+					PostCTX.m_pFaultAddress = pFaultAddress;
+					PostCTX.m_unOperation = unOperation;
+
+					PostStack.push_back(PostCTX);
 				}
 			}
 			ReleaseSRWLockExclusive(&g_MemoryHookStacksLock);
@@ -8631,7 +8619,7 @@ namespace Detours {
 
 			eflags.m_unTF = 1;
 
-			for (auto& pRecord : vecCallBacks) {
+			for (const auto& pRecord : vecCallBacks) {
 				pRecord->m_pCallBack(pCTX, pExceptionAddress, unOperation, pRecord->m_pUserAddress, pFaultAddress);
 			}
 
@@ -86030,7 +86018,7 @@ namespace Detours {
 				return false;
 			}
 
-			auto vecPages = __get_pages_info(pAddress, unSize, true);
+			const auto vecPages = __get_pages_info(pAddress, unSize, true);
 			if (vecPages.empty()) {
 				return false;
 			}
@@ -86055,12 +86043,14 @@ namespace Detours {
 					if (bIsCommit) {
 						CurrentSegment.m_PageBases.push_back(pi.m_pBaseAddress);
 					}
+
 				} else if (CurrentSegment.m_bIsCommit == bIsCommit) {
 					CurrentSegment.m_unSize += pi.m_unSize;
 
 					if (bIsCommit) {
 						CurrentSegment.m_PageBases.push_back(pi.m_pBaseAddress);
 					}
+
 				} else {
 					if (CurrentSegment.m_bIsCommit) {
 						vecCommitSegments.push_back(CurrentSegment);
@@ -86098,12 +86088,12 @@ namespace Detours {
 			AcquireSRWLockExclusive(&g_MemoryHookRecordsLock);
 			{
 				for (const auto& up : g_MemoryHookRecords) {
-					auto pRecord = up.get();
+					const auto& pRecord = up.get();
 					if (!pRecord) {
 						continue;
 					}
 
-					if (__ranges_overlap(pRecord->m_pUserAddress, pRecord->m_unUserSize, pAddress, unSize)) {
+					if (__is_range_in_range(pRecord->m_pUserAddress, pRecord->m_unUserSize, pAddress, unSize)) {
 						ReleaseSRWLockExclusive(&g_MemoryHookRecordsLock);
 						g_Suspender.Resume();
 						return false;
@@ -86113,7 +86103,7 @@ namespace Detours {
 				std::vector<void*> vecInstalled;
 				std::vector<std::unique_ptr<MEMORY_HOOK_RECORD>> vecNewRecords;
 
-				for (const auto& seg : vecCommitSegments) {
+				for (const auto& Segment : vecCommitSegments) {
 					auto pRecord = std::make_unique<MEMORY_HOOK_RECORD>();
 					if (!pRecord) {
 						ReleaseSRWLockExclusive(&g_MemoryHookRecordsLock);
@@ -86128,17 +86118,25 @@ namespace Detours {
 					pRecord->m_bIsVirtual = false;
 					pRecord->m_pCallBack = pCallBack;
 					pRecord->m_pPostCallBack = pPostCallBack;
-					pRecord->m_pAddress = seg.m_pBaseAddress;
-					pRecord->m_unSize = seg.m_unSize;
+					pRecord->m_pAddress = Segment.m_pBaseAddress;
+					pRecord->m_unSize = Segment.m_unSize;
 
 					void* pUserBase = nullptr;
 					size_t unUserSize = 0;
-					__range_intersection(pAddress, unSize, seg.m_pBaseAddress, seg.m_unSize, &pUserBase, &unUserSize);
+					if (!__range_intersection(pAddress, unSize, Segment.m_pBaseAddress, Segment.m_unSize, &pUserBase, &unUserSize)) {
+						ReleaseSRWLockExclusive(&g_MemoryHookRecordsLock);
+						for (const auto& pPageAddress : vecInstalled) {
+							__reg_uninstall_page(pPageAddress);
+						}
+
+						g_Suspender.Resume();
+						return false;
+					}
 
 					pRecord->m_pUserAddress = pUserBase;
 					pRecord->m_unUserSize = unUserSize;
 
-					for (auto& pPageAddress : seg.m_PageBases) {
+					for (const auto& pPageAddress : Segment.m_PageBases) {
 						auto pPage = std::make_unique<Page>(pPageAddress, false, false);
 						if (!pPage) {
 							ReleaseSRWLockExclusive(&g_MemoryHookRecordsLock);
@@ -86167,7 +86165,7 @@ namespace Detours {
 					vecNewRecords.emplace_back(std::move(pRecord));
 				}
 
-				for (const auto& seg : vecVirtualSegments) {
+				for (const auto& Segment : vecVirtualSegments) {
 					auto pRecord = std::make_unique<MEMORY_HOOK_RECORD>();
 					if (!pRecord) {
 						ReleaseSRWLockExclusive(&g_MemoryHookRecordsLock);
@@ -86182,12 +86180,20 @@ namespace Detours {
 					pRecord->m_bIsVirtual = true;
 					pRecord->m_pCallBack = pCallBack;
 					pRecord->m_pPostCallBack = pPostCallBack;
-					pRecord->m_pAddress = seg.m_pBaseAddress;
-					pRecord->m_unSize = seg.m_unSize;
+					pRecord->m_pAddress = Segment.m_pBaseAddress;
+					pRecord->m_unSize = Segment.m_unSize;
 
 					void* pUserAddress = nullptr;
 					size_t unUserSize = 0;
-					__range_intersection(pAddress, unSize, seg.m_pBaseAddress, seg.m_unSize, &pUserAddress, &unUserSize);
+					if (!__range_intersection(pAddress, unSize, Segment.m_pBaseAddress, Segment.m_unSize, &pUserAddress, &unUserSize)) {
+						ReleaseSRWLockExclusive(&g_MemoryHookRecordsLock);
+						for (const auto& pInstalledPageAddress : vecInstalled) {
+							__reg_uninstall_page(pInstalledPageAddress);
+						}
+
+						g_Suspender.Resume();
+						return false;
+					}
 
 					pRecord->m_pUserAddress = pUserAddress;
 					pRecord->m_unUserSize = unUserSize;
@@ -86231,17 +86237,17 @@ namespace Detours {
 			AcquireSRWLockExclusive(&g_MemoryHookRecordsLock);
 			{
 				for (auto it = g_MemoryHookRecords.begin(); it != g_MemoryHookRecords.end(); ++it) {
-					auto& pRecord = *it;
+					const auto& pRecord = *it;
 					if (!pRecord) {
 						continue;
 					}
 
-					if ((pRecord->m_pCallBack == pCallBack) && __address_in_range(pRecord->m_pUserAddress, pRecord->m_unUserSize, pAddress)) {
+					if ((pRecord->m_pCallBack == pCallBack) && __is_in_range(pRecord->m_pUserAddress, pRecord->m_unUserSize, pAddress)) {
 						AcquireSRWLockExclusive(&pRecord->m_Lock);
 
 						if (!pRecord->m_bPendingDeletion) {
 							if (!pRecord->m_bIsVirtual) {
-								for (auto& pRecordPage : pRecord->m_Pages) {
+								for (const auto& pRecordPage : pRecord->m_Pages) {
 									if (pRecordPage) {
 										__reg_uninstall_page(pRecordPage->GetPageAddress());
 									}
