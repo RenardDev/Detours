@@ -6576,27 +6576,32 @@ namespace Detours {
 		static inline bool __ranges_overlap(const void* a, size_t asz,
 			const void* b, size_t bsz) {
 			if (asz == 0 || bsz == 0) return false;
-			const uintptr_t a0 = (uintptr_t)a, a1 = a0 + asz;
-			const uintptr_t b0 = (uintptr_t)b, b1 = b0 + bsz;
-			// полузакрытые интервалы [a0,a1) и [b0,b1)
+			const uintptr_t a0 = reinterpret_cast<uintptr_t>(a), a1 = a0 + asz;
+			const uintptr_t b0 = reinterpret_cast<uintptr_t>(b), b1 = b0 + bsz;
 			return (a0 < b1) && (b0 < a1);
 		}
 
-		static inline bool __addr_in_range(const void* base, size_t size, const void* addr) {
-			const uintptr_t b = (uintptr_t)base;
-			const uintptr_t a = (uintptr_t)addr;
-			return (a - b) < size; // корректно даже при a<b
+		static inline bool __address_in_range(const void* base, size_t size, const void* addr) {
+			const uintptr_t b = reinterpret_cast<uintptr_t>(base);
+			const uintptr_t a = reinterpret_cast<uintptr_t>(addr);
+			return (a - b) < size;
 		}
 
-		static inline bool __range_intersection(const void* a, size_t asz,
-			const void* b, size_t bsz,
-			void** outStart, size_t* outSize) {
-			const uintptr_t a0 = (uintptr_t)a, a1 = a0 + asz;
-			const uintptr_t b0 = (uintptr_t)b, b1 = b0 + bsz;
+		static inline bool __range_intersection(const void* a, size_t asz, const void* b, size_t bsz, void** outStart, size_t* outSize) {
+			const uintptr_t a0 = reinterpret_cast<uintptr_t>(a), a1 = a0 + asz;
+			const uintptr_t b0 = reinterpret_cast<uintptr_t>(b), b1 = b0 + bsz;
 			const uintptr_t s = (a0 > b0 ? a0 : b0);
 			const uintptr_t e = (a1 < b1 ? a1 : b1);
-			if (e > s) { *outStart = (void*)s; *outSize = (size_t)(e - s); return true; }
-			*outStart = nullptr; *outSize = 0; return false;
+
+			if (e > s) {
+				*outStart = reinterpret_cast<void*>(s);
+				*outSize = static_cast<size_t>(e - s);
+				return true;
+			}
+
+			*outStart = nullptr;
+			*outSize = 0;
+			return false;
 		}
 
 		// ----------------------------------------------------------------
@@ -8433,7 +8438,7 @@ namespace Detours {
 						}
 
 						if (pRecord->m_pPostCallBack) {
-							if (PostCTX.m_pFaultAddress && __addr_in_range(pRecord->m_pUserAddress, pRecord->m_unUserSize, PostCTX.m_pFaultAddress)) {
+							if (PostCTX.m_pFaultAddress && __address_in_range(pRecord->m_pUserAddress, pRecord->m_unUserSize, PostCTX.m_pFaultAddress)) {
 								pRecord->m_pPostCallBack(pCTX, PostCTX.m_pExceptionAddress ? PostCTX.m_pExceptionAddress : reinterpret_cast<void*>(Exception.ExceptionAddress), PostCTX.m_unOperation, pRecord->m_pUserAddress, PostCTX.m_pFaultAddress);
 							}
 						}
@@ -8538,11 +8543,11 @@ namespace Detours {
 						continue;
 					}
 
-					if (!pRecord->m_bIsVirtual && __addr_in_range(pRecord->m_pAddress, pRecord->m_unSize, pFaultAddress)) {
+					if (!pRecord->m_bIsVirtual && __address_in_range(pRecord->m_pAddress, pRecord->m_unSize, pFaultAddress)) {
 						vecCommitOpenStack.push_back(pRecord);
 					}
 
-					if (__addr_in_range(pRecord->m_pUserAddress, pRecord->m_unUserSize, pFaultAddress)) {
+					if (__address_in_range(pRecord->m_pUserAddress, pRecord->m_unUserSize, pFaultAddress)) {
 						vecCallBacks.push_back(pRecord);
 					}
 				}
@@ -86112,11 +86117,12 @@ namespace Detours {
 					auto pRecord = std::make_unique<MEMORY_HOOK_RECORD>();
 					if (!pRecord) {
 						ReleaseSRWLockExclusive(&g_MemoryHookRecordsLock);
-						for (const auto& pPage : vecInstalled) {
-							__reg_uninstall_page(pPage);
-							g_Suspender.Resume();
-							return false;
+						for (const auto& pPageAddress : vecInstalled) {
+							__reg_uninstall_page(pPageAddress);
 						}
+
+						g_Suspender.Resume();
+						return false;
 					}
 
 					pRecord->m_bIsVirtual = false;
@@ -86136,8 +86142,8 @@ namespace Detours {
 						auto pPage = std::make_unique<Page>(pPageAddress, false, false);
 						if (!pPage) {
 							ReleaseSRWLockExclusive(&g_MemoryHookRecordsLock);
-							for (void* b : vecInstalled) {
-								__reg_uninstall_page(b);
+							for (const auto& pInstalledPageAddress : vecInstalled) {
+								__reg_uninstall_page(pInstalledPageAddress);
 							}
 							
 							g_Suspender.Resume();
@@ -86146,8 +86152,8 @@ namespace Detours {
 
 						if (!__reg_install_page(pPageAddress)) {
 							ReleaseSRWLockExclusive(&g_MemoryHookRecordsLock);
-							for (void* b : vecInstalled) {
-								__reg_uninstall_page(b);
+							for (const auto& pInstalledPageAddress : vecInstalled) {
+								__reg_uninstall_page(pInstalledPageAddress);
 							}
 							
 							g_Suspender.Resume();
@@ -86165,8 +86171,8 @@ namespace Detours {
 					auto pRecord = std::make_unique<MEMORY_HOOK_RECORD>();
 					if (!pRecord) {
 						ReleaseSRWLockExclusive(&g_MemoryHookRecordsLock);
-						for (void* b : vecInstalled) {
-							__reg_uninstall_page(b);
+						for (const auto& pInstalledPageAddress : vecInstalled) {
+							__reg_uninstall_page(pInstalledPageAddress);
 						}
 						
 						g_Suspender.Resume();
@@ -86182,14 +86188,15 @@ namespace Detours {
 					void* pUserAddress = nullptr;
 					size_t unUserSize = 0;
 					__range_intersection(pAddress, unSize, seg.m_pBaseAddress, seg.m_unSize, &pUserAddress, &unUserSize);
+
 					pRecord->m_pUserAddress = pUserAddress;
 					pRecord->m_unUserSize = unUserSize;
 
 					vecNewRecords.emplace_back(std::move(pRecord));
 				}
 
-				for (auto& rec : vecNewRecords) {
-					g_MemoryHookRecords.emplace_back(std::move(rec));
+				for (auto& pNewRecord : vecNewRecords) {
+					g_MemoryHookRecords.emplace_back(std::move(pNewRecord));
 				}
 			}
 			ReleaseSRWLockExclusive(&g_MemoryHookRecordsLock);
@@ -86229,15 +86236,14 @@ namespace Detours {
 						continue;
 					}
 
-					if ((pRecord->m_pCallBack == pCallBack) && __addr_in_range(pRecord->m_pUserAddress, pRecord->m_unUserSize, pAddress))
-					{
+					if ((pRecord->m_pCallBack == pCallBack) && __address_in_range(pRecord->m_pUserAddress, pRecord->m_unUserSize, pAddress)) {
 						AcquireSRWLockExclusive(&pRecord->m_Lock);
 
 						if (!pRecord->m_bPendingDeletion) {
 							if (!pRecord->m_bIsVirtual) {
-								for (auto& p : pRecord->m_Pages) {
-									if (p) {
-										__reg_uninstall_page(p->GetPageAddress());
+								for (auto& pRecordPage : pRecord->m_Pages) {
+									if (pRecordPage) {
+										__reg_uninstall_page(pRecordPage->GetPageAddress());
 									}
 								}
 							}
