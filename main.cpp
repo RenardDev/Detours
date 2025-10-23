@@ -2507,7 +2507,7 @@ TEST_SUITE("Detours::Hook") {
 			reinterpret_cast<BYTE*>(pArray) - sizeof(int),
 			sizeof(int),
 			nullptr,
-			/true) == true);
+			true) == true);
 
 		CHECK(Detours::Hook::HookMemory(
 			MemoryHookModify2,
