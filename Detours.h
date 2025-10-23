@@ -5656,8 +5656,8 @@ namespace Detours {
 		// Memory Hook
 		// ----------------------------------------------------------------
 
-		bool HookMemory(const fnMemoryHookCallBack pCallBack, void* pAddress, size_t unSize, const fnMemoryHookCallBack pPostCallBack = nullptr);
-		bool UnHookMemory(const fnMemoryHookCallBack pCallBack);
+		bool HookMemory(const fnMemoryHookCallBack pCallBack, void* pAddress, size_t unSize, const fnMemoryHookCallBack pPostCallBack = nullptr, bool bAllowVirtual = false);
+		bool UnHookMemory(const fnMemoryHookCallBack pCallBack, void* pAddress);
 
 		// ----------------------------------------------------------------
 		// Interrupt Hook CallBack

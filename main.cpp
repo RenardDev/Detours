@@ -31,6 +31,8 @@ extern "C" unsigned int __cdecl CallInterrupt(unsigned int unEAX, unsigned int u
 //extern "C" void __cdecl CallInrerruptReturn(unsigned int unEIP, unsigned int unCS, unsigned int unEFLAGS, unsigned int unESP, unsigned int unSS);
 #endif
 
+extern "C" unsigned char __cdecl TryRead(void* pData);
+
 class BaseMessage {
 public:
 	virtual ~BaseMessage() {}
@@ -2007,7 +2009,57 @@ TEST_SUITE("Detours::Hook") {
 
 		_tprintf_s(_T("[MemoryHookSelfUnHook] Mem access! TID=%lu\n"), GetCurrentThreadId());
 
-		Detours::Hook::UnHookMemory(MemoryHookSelfUnHook);
+		Detours::Hook::UnHookMemory(MemoryHookSelfUnHook, const_cast<void*>(pHookAddress));
+	}
+
+	void MemoryHookSelfUnHook2(const PCONTEXT pCTX, const void* pExceptionAddress, Detours::Hook::MEMORY_HOOK_OPERATION unOperation, const void* pHookAddress, const void* pAccessAddress) {
+		UNREFERENCED_PARAMETER(pCTX);
+		UNREFERENCED_PARAMETER(pExceptionAddress);
+		UNREFERENCED_PARAMETER(unOperation);
+		UNREFERENCED_PARAMETER(pHookAddress);
+		UNREFERENCED_PARAMETER(pAccessAddress);
+
+		_tprintf_s(_T("[MemoryHookSelfUnHook2] Mem access! TID=%lu\n"), GetCurrentThreadId());
+
+		Detours::Hook::UnHookMemory(MemoryHookSelfUnHook2, const_cast<void*>(pHookAddress));
+	}
+
+	void MemoryHookModify(const PCONTEXT pCTX, const void* pExceptionAddress, Detours::Hook::MEMORY_HOOK_OPERATION unOperation, const void* pHookAddress, const void* pAccessAddress) {
+		UNREFERENCED_PARAMETER(pCTX);
+		UNREFERENCED_PARAMETER(pExceptionAddress);
+		UNREFERENCED_PARAMETER(unOperation);
+		UNREFERENCED_PARAMETER(pHookAddress);
+		UNREFERENCED_PARAMETER(pAccessAddress);
+
+		_tprintf_s(_T("[MemoryHookModify] Mem access! TID=%lu\n"), GetCurrentThreadId());
+
+		static int unDummy = 0;
+
+#ifdef _M_X64
+		pCTX->Rax = reinterpret_cast<DWORD64>(&unDummy);
+#elif _M_IX86
+		pCTX->Eax = reinterpret_cast<DWORD>(&unDummy);
+#endif
+
+		Detours::Hook::UnHookMemory(MemoryHookModify, const_cast<void*>(pHookAddress));
+	}
+
+	void MemoryHookModify2(const PCONTEXT pCTX, const void* pExceptionAddress, Detours::Hook::MEMORY_HOOK_OPERATION unOperation, const void* pHookAddress, const void* pAccessAddress) {
+		UNREFERENCED_PARAMETER(pCTX);
+		UNREFERENCED_PARAMETER(pExceptionAddress);
+		UNREFERENCED_PARAMETER(unOperation);
+		UNREFERENCED_PARAMETER(pHookAddress);
+		UNREFERENCED_PARAMETER(pAccessAddress);
+
+		_tprintf_s(_T("[MemoryHookModify2] Mem access! TID=%lu\n"), GetCurrentThreadId());
+
+		static int unDummy = 0;
+
+#ifdef _M_X64
+		pCTX->Rax = reinterpret_cast<DWORD64>(&unDummy);
+#elif _M_IX86
+		pCTX->Eax = reinterpret_cast<DWORD>(&unDummy);
+#endif
 	}
 
 	bool InterruptHook(const PCONTEXT pCTX, const unsigned char unInterrupt) {
@@ -2299,7 +2351,7 @@ TEST_SUITE("Detours::Hook") {
 		CHECK(pArray[1] == 0xDEEDFACE);
 		CHECK(pArray[2] == 0xFACE);
 
-		CHECK(Detours::Hook::UnHookMemory(MemoryHook) == true);
+		CHECK(Detours::Hook::UnHookMemory(MemoryHook, pArray) == true);
 	}
 
 	TEST_CASE("MemoryHook 2") {
@@ -2336,7 +2388,7 @@ TEST_SUITE("Detours::Hook") {
 		CHECK(pArray[1] == 0xDEEDFACE);
 		CHECK(pArray[2] == 0xFACE);
 
-		CHECK(Detours::Hook::UnHookMemory(MemoryHook) == true);
+		CHECK(Detours::Hook::UnHookMemory(MemoryHook, pArray) == true);
 	}
 
 	TEST_CASE("MemoryHook 3") {
@@ -2379,7 +2431,100 @@ TEST_SUITE("Detours::Hook") {
 			reinterpret_cast<unsigned char*>(pAddress)[0] = 2;
 		}
 		MESSAGE("Benckmark with 1 000 000 iterations (with hook): ", (Detours::KUserSharedData.SystemTime.LowPart - unBegin) / 10000, " ms");
-		CHECK(Detours::Hook::UnHookMemory(MemoryHook) == true);
+		CHECK(Detours::Hook::UnHookMemory(MemoryHook, Region.GetRegionAddress()) == true);
+	}
+
+	TEST_CASE("MemoryHook 4") {
+		Detours::Memory::Page Page(nullptr);
+		CHECK(Page.GetPageAddress() != nullptr);
+		void* pAddress = Page.Alloc(sizeof(int) * 6);
+
+		int* pArray = reinterpret_cast<int*>(pAddress);
+
+		TryRead(&pArray[0]);
+		TryRead(&pArray[3]);
+
+		CHECK(Detours::Hook::HookMemory(MemoryHookSelfUnHook, pArray, sizeof(int) * 3) == true);
+		CHECK(Detours::Hook::HookMemory(MemoryHookSelfUnHook2, pArray + 3, sizeof(int) * 3) == true);
+		CHECK(Detours::Hook::HookMemory(MemoryHookSelfUnHook, pArray + 3, sizeof(int) * 3) == false);
+
+		TryRead(&pArray[0]);
+		TryRead(&pArray[3]);
+
+		TryRead(&pArray[0]);
+		TryRead(&pArray[3]);
+	}
+
+	TEST_CASE("MemoryHook 5") {
+		CHECK(Detours::Hook::HookMemory(MemoryHookModify, reinterpret_cast<void*>(0x4), sizeof(int), nullptr, true) == true);
+
+		TryRead(reinterpret_cast<void*>(0x4));
+	}
+
+	TEST_CASE("MemoryHook 6") {
+		SYSTEM_INFO si = {};
+		GetSystemInfo(&si);
+		const size_t kPageSize = si.dwPageSize;
+
+		Detours::Memory::Page page(nullptr);
+		REQUIRE(page.GetPageAddress() != nullptr);
+
+		int* pArray = reinterpret_cast<int*>(page.GetPageAddress());
+
+		MEMORY_BASIC_INFORMATION mbiHere{}, mbiPrev{};
+		REQUIRE(VirtualQuery(pArray, &mbiHere, sizeof(mbiHere)) == sizeof(mbiHere));
+		REQUIRE(mbiHere.State == MEM_COMMIT);
+
+		void* prevByte = reinterpret_cast<BYTE*>(pArray) - 1;
+		REQUIRE(VirtualQuery(prevByte, &mbiPrev, sizeof(mbiPrev)) == sizeof(mbiPrev));
+
+		bool usedFallback = false;
+		void* region = nullptr;
+
+		if (mbiPrev.State == MEM_COMMIT) {
+			region = VirtualAlloc(nullptr, 2 * kPageSize, MEM_RESERVE, PAGE_READWRITE);
+			REQUIRE(region != nullptr);
+
+			void* commit = VirtualAlloc(static_cast<BYTE*>(region) + kPageSize,
+				kPageSize, MEM_COMMIT, PAGE_READWRITE);
+			REQUIRE(commit != nullptr);
+
+			pArray = static_cast<int*>(commit);
+
+			REQUIRE(VirtualQuery(pArray, &mbiHere, sizeof(mbiHere)) == sizeof(mbiHere));
+			REQUIRE(mbiHere.State == MEM_COMMIT);
+
+			prevByte = static_cast<BYTE*>(commit) - 1;
+			REQUIRE(VirtualQuery(prevByte, &mbiPrev, sizeof(mbiPrev)) == sizeof(mbiPrev));
+			REQUIRE(mbiPrev.State != MEM_COMMIT);
+			usedFallback = true;
+		} else {
+			REQUIRE(mbiPrev.State != MEM_COMMIT);
+		}
+
+		CHECK(Detours::Hook::HookMemory(
+			MemoryHookModify2,
+			reinterpret_cast<BYTE*>(pArray) - sizeof(int),
+			sizeof(int),
+			nullptr,
+			/true) == true);
+
+		CHECK(Detours::Hook::HookMemory(
+			MemoryHookModify2,
+			pArray,
+			sizeof(int),
+			nullptr,
+			false) == true);
+
+		TryRead(reinterpret_cast<BYTE*>(pArray) - sizeof(int));
+		TryRead(pArray);
+
+		CHECK(Detours::Hook::UnHookMemory(MemoryHookModify2, pArray) == true);
+		CHECK(Detours::Hook::UnHookMemory(MemoryHookModify2, reinterpret_cast<BYTE*>(pArray) - sizeof(int)) == true);
+
+		if (usedFallback) {
+			VirtualFree(region, 0, MEM_RELEASE);
+		}
 	}
 
 	TEST_CASE("InterruptHook") {

@@ -66,4 +66,10 @@
 		add rsp, 8
 		iretq
 	CallInrerruptReturn endp
+
+	TryRead proc
+		mov rax, rcx
+		mov al, byte ptr [rax]
+		ret
+	TryRead endp
 end

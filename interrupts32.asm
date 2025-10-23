@@ -48,4 +48,10 @@
 		add esp, 4
 		iretd
 	CallInrerruptReturn endp
+
+	TryRead proc
+		mov eax, dword ptr [esp+04h]
+		mov al, byte ptr [eax]
+		ret
+	TryRead endp
 end
