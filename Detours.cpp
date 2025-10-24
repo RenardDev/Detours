@@ -8094,84 +8094,84 @@ namespace Detours {
 
 				unsigned char unTypeValue = 0;
 				switch (pRecord->m_unType) {
-				case HARDWARE_HOOK_TYPE::TYPE_EXECUTE:
-					unTypeValue = 0;
-					break;
+					case HARDWARE_HOOK_TYPE::TYPE_EXECUTE:
+						unTypeValue = 0;
+						break;
 
-				case HARDWARE_HOOK_TYPE::TYPE_WRITE:
-					unTypeValue = 1;
-					break;
+					case HARDWARE_HOOK_TYPE::TYPE_WRITE:
+						unTypeValue = 1;
+						break;
 
-				case HARDWARE_HOOK_TYPE::TYPE_ACCESS:
-					unTypeValue = 3;
-					break;
+					case HARDWARE_HOOK_TYPE::TYPE_ACCESS:
+						unTypeValue = 3;
+						break;
 				}
 
 				unsigned char unSizeValue = 0;
 				switch (pRecord->m_unSize) {
-				case 1:
-					unSizeValue = 0;
-					break;
+					case 1:
+						unSizeValue = 0;
+						break;
 
-				case 2:
-					unSizeValue = 1;
-					break;
+					case 2:
+						unSizeValue = 1;
+						break;
 
-				case 4:
-					unSizeValue = 3;
-					break;
+					case 4:
+						unSizeValue = 3;
+						break;
 
 #ifdef _M_X64
-				case 8:
-					unSizeValue = 2;
-					break;
+					case 8:
+						unSizeValue = 2;
+						break;
 #endif
 				}
 
 				switch (pRecord->m_unRegister) {
-				case HARDWARE_HOOK_REGISTER::REGISTER_DR0:
+					case HARDWARE_HOOK_REGISTER::REGISTER_DR0:
 #ifdef _M_X64
-					pCTX->Dr0 = reinterpret_cast<DWORD64>(pRecord->m_pAddress);
+						pCTX->Dr0 = reinterpret_cast<DWORD64>(pRecord->m_pAddress);
 #else
-					pCTX->Dr0 = reinterpret_cast<DWORD>(pRecord->m_pAddress);
+						pCTX->Dr0 = reinterpret_cast<DWORD>(pRecord->m_pAddress);
 #endif
-					dr7.m_unL0 = 1;
-					dr7.m_unRW0 = unTypeValue;
-					dr7.m_unLEN0 = unSizeValue;
-					break;
+						dr7.m_unL0 = 1;
+						dr7.m_unRW0 = unTypeValue;
+						dr7.m_unLEN0 = unSizeValue;
+						break;
 
-				case HARDWARE_HOOK_REGISTER::REGISTER_DR1:
+					case HARDWARE_HOOK_REGISTER::REGISTER_DR1:
 #ifdef _M_X64
-					pCTX->Dr1 = reinterpret_cast<DWORD64>(pRecord->m_pAddress);
+						pCTX->Dr1 = reinterpret_cast<DWORD64>(pRecord->m_pAddress);
 #else
-					pCTX->Dr1 = reinterpret_cast<DWORD>(pRecord->m_pAddress);
+						pCTX->Dr1 = reinterpret_cast<DWORD>(pRecord->m_pAddress);
 #endif
-					dr7.m_unL1 = 1;
-					dr7.m_unRW1 = unTypeValue;
-					dr7.m_unLEN1 = unSizeValue;
-					break;
+						dr7.m_unL1 = 1;
+						dr7.m_unRW1 = unTypeValue;
+						dr7.m_unLEN1 = unSizeValue;
+						break;
 
-				case HARDWARE_HOOK_REGISTER::REGISTER_DR2:
+					case HARDWARE_HOOK_REGISTER::REGISTER_DR2:
 #ifdef _M_X64
-					pCTX->Dr2 = reinterpret_cast<DWORD64>(pRecord->m_pAddress);
+						pCTX->Dr2 = reinterpret_cast<DWORD64>(pRecord->m_pAddress);
 #else
-					pCTX->Dr2 = reinterpret_cast<DWORD>(pRecord->m_pAddress);
+						pCTX->Dr2 = reinterpret_cast<DWORD>(pRecord->m_pAddress);
 #endif
-					dr7.m_unL2 = 1;
-					dr7.m_unRW2 = unTypeValue;
-					dr7.m_unLEN2 = unSizeValue;
-					break;
+						dr7.m_unL2 = 1;
+						dr7.m_unRW2 = unTypeValue;
+						dr7.m_unLEN2 = unSizeValue;
+						break;
 
-				case HARDWARE_HOOK_REGISTER::REGISTER_DR3:
+					case HARDWARE_HOOK_REGISTER::REGISTER_DR3:
 #ifdef _M_X64
-					pCTX->Dr3 = reinterpret_cast<DWORD64>(pRecord->m_pAddress);
+						pCTX->Dr3 = reinterpret_cast<DWORD64>(pRecord->m_pAddress);
 #else
-					pCTX->Dr3 = reinterpret_cast<DWORD>(pRecord->m_pAddress);
+						pCTX->Dr3 = reinterpret_cast<DWORD>(pRecord->m_pAddress);
 #endif
-					dr7.m_unL3 = 1;
-					dr7.m_unRW3 = unTypeValue;
-					dr7.m_unLEN3 = unSizeValue;
-					break;
+						dr7.m_unL3 = 1;
+						dr7.m_unRW3 = unTypeValue;
+						dr7.m_unLEN3 = unSizeValue;
+						break;
 				}
 
 				dr7.m_unLE = 0;
@@ -8221,21 +8221,21 @@ namespace Detours {
 				bool bEnabled = false;
 
 				switch (unRegister) {
-				case HARDWARE_HOOK_REGISTER::REGISTER_DR0:
-					bEnabled = (dr7.m_unL0 || dr7.m_unG0);
-					break;
+					case HARDWARE_HOOK_REGISTER::REGISTER_DR0:
+						bEnabled = (dr7.m_unL0 || dr7.m_unG0);
+						break;
 
-				case HARDWARE_HOOK_REGISTER::REGISTER_DR1:
-					bEnabled = (dr7.m_unL1 || dr7.m_unG1);
-					break;
+					case HARDWARE_HOOK_REGISTER::REGISTER_DR1:
+						bEnabled = (dr7.m_unL1 || dr7.m_unG1);
+						break;
 
-				case HARDWARE_HOOK_REGISTER::REGISTER_DR2:
-					bEnabled = (dr7.m_unL2 || dr7.m_unG2);
-					break;
+					case HARDWARE_HOOK_REGISTER::REGISTER_DR2:
+						bEnabled = (dr7.m_unL2 || dr7.m_unG2);
+						break;
 
-				case HARDWARE_HOOK_REGISTER::REGISTER_DR3:
-					bEnabled = (dr7.m_unL3 || dr7.m_unG3);
-					break;
+					case HARDWARE_HOOK_REGISTER::REGISTER_DR3:
+						bEnabled = (dr7.m_unL3 || dr7.m_unG3);
+						break;
 				}
 
 				if (!bEnabled) {
@@ -8245,29 +8245,29 @@ namespace Detours {
 				pRecord->m_bPendingRestore.store(true, std::memory_order_release);
 
 				switch (unRegister) {
-				case HARDWARE_HOOK_REGISTER::REGISTER_DR0:
-					dr6.m_unB0 = 0;
-					dr7.m_unL0 = 0;
-					dr7.m_unG0 = 0;
-					break;
+					case HARDWARE_HOOK_REGISTER::REGISTER_DR0:
+						dr6.m_unB0 = 0;
+						dr7.m_unL0 = 0;
+						dr7.m_unG0 = 0;
+						break;
 
-				case HARDWARE_HOOK_REGISTER::REGISTER_DR1:
-					dr6.m_unB1 = 0;
-					dr7.m_unL1 = 0;
-					dr7.m_unG1 = 0;
-					break;
+					case HARDWARE_HOOK_REGISTER::REGISTER_DR1:
+						dr6.m_unB1 = 0;
+						dr7.m_unL1 = 0;
+						dr7.m_unG1 = 0;
+						break;
 
-				case HARDWARE_HOOK_REGISTER::REGISTER_DR2:
-					dr6.m_unB2 = 0;
-					dr7.m_unL2 = 0;
-					dr7.m_unG2 = 0;
-					break;
+					case HARDWARE_HOOK_REGISTER::REGISTER_DR2:
+						dr6.m_unB2 = 0;
+						dr7.m_unL2 = 0;
+						dr7.m_unG2 = 0;
+						break;
 
-				case HARDWARE_HOOK_REGISTER::REGISTER_DR3:
-					dr6.m_unB3 = 0;
-					dr7.m_unL3 = 0;
-					dr7.m_unG3 = 0;
-					break;
+					case HARDWARE_HOOK_REGISTER::REGISTER_DR3:
+						dr6.m_unB3 = 0;
+						dr7.m_unL3 = 0;
+						dr7.m_unG3 = 0;
+						break;
 				}
 
 				eflags.m_unTF = 1;
@@ -35989,53 +35989,53 @@ namespace Detours {
 
 				if (g_pPrefixesMap[unPrefix] == RD_PREF_CODE_STANDARD) {
 					switch (unPrefix) {
-					case RD_PREFIX_G0_LOCK:
-						pInstruction->HasLock = true;
-						bMorePrefixes = true;
-						break;
-					case RD_PREFIX_G1_REPE_REPZ:
-						pInstruction->Rep = RD_PREFIX_G1_REPE_REPZ;
-						pInstruction->HasRepRepzXrelease = true;
-						bMorePrefixes = true;
-						break;
-					case RD_PREFIX_G1_REPNE_REPNZ:
-						pInstruction->Rep = RD_PREFIX_G1_REPNE_REPNZ;
-						pInstruction->HasRepnzXacquireBnd = true;
-						bMorePrefixes = true;
-						break;
-					case RD_PREFIX_G2_SEG_CS:
-					case RD_PREFIX_G2_SEG_SS:
-					case RD_PREFIX_G2_SEG_DS:
-					case RD_PREFIX_G2_SEG_ES:
-					case RD_PREFIX_G2_SEG_FS:
-					case RD_PREFIX_G2_SEG_GS:
-						if (pInstruction->DefCode == RD_CODE_64) {
-							if ((unPrefix == RD_PREFIX_G2_SEG_FS) || (unPrefix == RD_PREFIX_G2_SEG_GS)) {
-								pInstruction->Seg = unPrefix;
-								pInstruction->HasSeg = true;
-							} else if ((unPrefix == RD_PREFIX_G2_NO_TRACK) && (pInstruction->Seg != RD_PREFIX_G2_SEG_FS) && (pInstruction->Seg != RD_PREFIX_G2_SEG_GS)) {
-								pInstruction->Seg = unPrefix;
-								pInstruction->HasSeg = true;
-							} else if ((pInstruction->Seg != RD_PREFIX_G2_SEG_FS) && (pInstruction->Seg != RD_PREFIX_G2_SEG_GS) && (pInstruction->Seg != RD_PREFIX_G2_NO_TRACK)) {
+						case RD_PREFIX_G0_LOCK:
+							pInstruction->HasLock = true;
+							bMorePrefixes = true;
+							break;
+						case RD_PREFIX_G1_REPE_REPZ:
+							pInstruction->Rep = RD_PREFIX_G1_REPE_REPZ;
+							pInstruction->HasRepRepzXrelease = true;
+							bMorePrefixes = true;
+							break;
+						case RD_PREFIX_G1_REPNE_REPNZ:
+							pInstruction->Rep = RD_PREFIX_G1_REPNE_REPNZ;
+							pInstruction->HasRepnzXacquireBnd = true;
+							bMorePrefixes = true;
+							break;
+						case RD_PREFIX_G2_SEG_CS:
+						case RD_PREFIX_G2_SEG_SS:
+						case RD_PREFIX_G2_SEG_DS:
+						case RD_PREFIX_G2_SEG_ES:
+						case RD_PREFIX_G2_SEG_FS:
+						case RD_PREFIX_G2_SEG_GS:
+							if (pInstruction->DefCode == RD_CODE_64) {
+								if ((unPrefix == RD_PREFIX_G2_SEG_FS) || (unPrefix == RD_PREFIX_G2_SEG_GS)) {
+									pInstruction->Seg = unPrefix;
+									pInstruction->HasSeg = true;
+								} else if ((unPrefix == RD_PREFIX_G2_NO_TRACK) && (pInstruction->Seg != RD_PREFIX_G2_SEG_FS) && (pInstruction->Seg != RD_PREFIX_G2_SEG_GS)) {
+									pInstruction->Seg = unPrefix;
+									pInstruction->HasSeg = true;
+								} else if ((pInstruction->Seg != RD_PREFIX_G2_SEG_FS) && (pInstruction->Seg != RD_PREFIX_G2_SEG_GS) && (pInstruction->Seg != RD_PREFIX_G2_NO_TRACK)) {
+									pInstruction->Seg = unPrefix;
+									pInstruction->HasSeg = true;
+								}
+							} else {
 								pInstruction->Seg = unPrefix;
 								pInstruction->HasSeg = true;
 							}
-						} else {
-							pInstruction->Seg = unPrefix;
-							pInstruction->HasSeg = true;
-						}
-						bMorePrefixes = true;
-						break;
-					case RD_PREFIX_G3_OPERARD_SIZE:
-						pInstruction->HasOpSize = true;
-						bMorePrefixes = true;
-						break;
-					case RD_PREFIX_G4_ADDR_SIZE:
-						pInstruction->HasAddrSize = true;
-						bMorePrefixes = true;
-						break;
-					default:
-						break;
+							bMorePrefixes = true;
+							break;
+						case RD_PREFIX_G3_OPERARD_SIZE:
+							pInstruction->HasOpSize = true;
+							bMorePrefixes = true;
+							break;
+						case RD_PREFIX_G4_ADDR_SIZE:
+							pInstruction->HasAddrSize = true;
+							bMorePrefixes = true;
+							break;
+						default:
+							break;
 					}
 				}
 
@@ -36106,20 +36106,20 @@ namespace Detours {
 
 		static unsigned int RdGetAddrAndOpMode(PINSTRUCTION pInstruction) {
 			switch (pInstruction->DefCode) {
-			case RD_CODE_16:
-				pInstruction->AddrMode = pInstruction->HasAddrSize ? RD_ADDR_32 : RD_ADDR_16;
-				pInstruction->OpMode = pInstruction->HasOpSize ? RD_OPSZ_32 : RD_OPSZ_16;
-				break;
-			case RD_CODE_32:
-				pInstruction->AddrMode = pInstruction->HasAddrSize ? RD_ADDR_16 : RD_ADDR_32;
-				pInstruction->OpMode = pInstruction->HasOpSize ? RD_OPSZ_16 : RD_OPSZ_32;
-				break;
-			case RD_CODE_64:
-				pInstruction->AddrMode = pInstruction->HasAddrSize ? RD_ADDR_32 : RD_ADDR_64;
-				pInstruction->OpMode = pInstruction->Exs.w ? RD_OPSZ_64 : (pInstruction->HasOpSize ? RD_OPSZ_16 : RD_OPSZ_32);
-				break;
-			default:
-				return RD_STATUS_INVALID_INSTRUX;
+				case RD_CODE_16:
+					pInstruction->AddrMode = pInstruction->HasAddrSize ? RD_ADDR_32 : RD_ADDR_16;
+					pInstruction->OpMode = pInstruction->HasOpSize ? RD_OPSZ_32 : RD_OPSZ_16;
+					break;
+				case RD_CODE_32:
+					pInstruction->AddrMode = pInstruction->HasAddrSize ? RD_ADDR_16 : RD_ADDR_32;
+					pInstruction->OpMode = pInstruction->HasOpSize ? RD_OPSZ_16 : RD_OPSZ_32;
+					break;
+				case RD_CODE_64:
+					pInstruction->AddrMode = pInstruction->HasAddrSize ? RD_ADDR_32 : RD_ADDR_64;
+					pInstruction->OpMode = pInstruction->Exs.w ? RD_OPSZ_64 : (pInstruction->HasOpSize ? RD_OPSZ_16 : RD_OPSZ_32);
+					break;
+				default:
+					return RD_STATUS_INVALID_INSTRUX;
 			}
 
 			return RD_STATUS_SUCCESS;
@@ -36226,18 +36226,18 @@ namespace Detours {
 		static unsigned int RdFindInstruction(PINSTRUCTION pInstruction, unsigned char* pCode, size_t unSize, RD_INSTRUCTION** pInsDef) {
 			const RD_TABLE* pTable = nullptr;
 			switch (pInstruction->EncMode) {
-			case RD_ENCM_LEGACY:
-				pTable = g_pRootTable;
-				break;
-			case RD_ENCM_XOP:
-				pTable = g_pXopTable;
-				break;
-			case RD_ENCM_VEX:
-				pTable = g_pVexTable;
-				break;
-			case RD_ENCM_EVEX:
-				pTable = g_pEvexTable;
-				break;
+				case RD_ENCM_LEGACY:
+					pTable = g_pRootTable;
+					break;
+				case RD_ENCM_XOP:
+					pTable = g_pXopTable;
+					break;
+				case RD_ENCM_VEX:
+					pTable = g_pVexTable;
+					break;
+				case RD_ENCM_EVEX:
+					pTable = g_pEvexTable;
+					break;
 			}
 
 			PRD_INSTRUCTION pIns = nullptr;
@@ -36252,199 +36252,20 @@ namespace Detours {
 			bool bStop = false;
 			while (!bStop && pTable) {
 				switch (pTable->m_unType) {
-				case RD_ILUT_INSTRUCTION:
-					pIns = const_cast<PRD_INSTRUCTION>(reinterpret_cast<const RD_INSTRUCTION*>(reinterpret_cast<const RD_TABLE_INSTRUCTION*>(pTable)->m_pInstruction));
-					bStop = true;
-					break;
-				case RD_ILUT_OPCODE:
-					unStatus = RdFetchOpcode(pInstruction, pCode, pInstruction->Length, unSize);
-					if (!RD_SUCCESS(unStatus)) {
+					case RD_ILUT_INSTRUCTION:
+						pIns = const_cast<PRD_INSTRUCTION>(reinterpret_cast<const RD_INSTRUCTION*>(reinterpret_cast<const RD_TABLE_INSTRUCTION*>(pTable)->m_pInstruction));
 						bStop = true;
 						break;
-					}
-
-					pTable = reinterpret_cast<const RD_TABLE*>(pTable->m_pTable[pInstruction->OpCodeBytes[unNextOpcode++]]);
-					break;
-				case RD_ILUT_OPCODE_3DNOW:
-					if (!pInstruction->HasModRm) {
-						unStatus = RdFetchModrmAndSib(pInstruction, pCode, pInstruction->Length, unSize);
+					case RD_ILUT_OPCODE:
+						unStatus = RdFetchOpcode(pInstruction, pCode, pInstruction->Length, unSize);
 						if (!RD_SUCCESS(unStatus)) {
 							bStop = true;
 							break;
 						}
 
-						unStatus = RdFetchDisplacement(pInstruction, pCode, pInstruction->Length, unSize);
-						if (!RD_SUCCESS(unStatus)) {
-							bStop = true;
-							break;
-						}
-					}
-
-					unStatus = RdFetchOpcode(pInstruction, pCode, pInstruction->Length, unSize);
-					if (!RD_SUCCESS(unStatus)) {
-						bStop = true;
+						pTable = reinterpret_cast<const RD_TABLE*>(pTable->m_pTable[pInstruction->OpCodeBytes[unNextOpcode++]]);
 						break;
-					}
-
-					pTable = reinterpret_cast<const RD_TABLE*>(pTable->m_pTable[pInstruction->OpCodeBytes[unNextOpcode++]]);
-					break;
-				case RD_ILUT_MODRM_MOD:
-					if (!pInstruction->HasModRm) {
-						unStatus = RdFetchModrmAndSib(pInstruction, pCode, pInstruction->Length, unSize);
-						if (!RD_SUCCESS(unStatus)) {
-							bStop = true;
-							break;
-						}
-
-						unStatus = RdFetchDisplacement(pInstruction, pCode, pInstruction->Length, unSize);
-						if (!RD_SUCCESS(unStatus)) {
-							bStop = true;
-							break;
-						}
-					}
-
-					pTable = reinterpret_cast<const RD_TABLE*>(pTable->m_pTable[(pInstruction->ModRm.mod == 3) ? 1 : 0]);
-					break;
-				case RD_ILUT_MODRM_REG:
-					if (!pInstruction->HasModRm) {
-						unStatus = RdFetchModrmAndSib(pInstruction, pCode, pInstruction->Length, unSize);
-						if (!RD_SUCCESS(unStatus)) {
-							bStop = true;
-							break;
-						}
-
-						unStatus = RdFetchDisplacement(pInstruction, pCode, pInstruction->Length, unSize);
-						if (!RD_SUCCESS(unStatus)) {
-							bStop = true;
-							break;
-						}
-					}
-
-					pTable = reinterpret_cast<const RD_TABLE*>(pTable->m_pTable[pInstruction->ModRm.reg]);
-					break;
-				case RD_ILUT_MODRM_RM:
-					if (!pInstruction->HasModRm) {
-						unStatus = RdFetchModrmAndSib(pInstruction, pCode, pInstruction->Length, unSize);
-						if (!RD_SUCCESS(unStatus)) {
-							bStop = true;
-							break;
-						}
-
-						unStatus = RdFetchDisplacement(pInstruction, pCode, pInstruction->Length, unSize);
-						if (!RD_SUCCESS(unStatus)) {
-							bStop = true;
-							break;
-						}
-					}
-
-					pTable = reinterpret_cast<const RD_TABLE*>(pTable->m_pTable[pInstruction->ModRm.rm]);
-					break;
-				case RD_ILUT_MAN_PREFIX:
-					if ((pInstruction->Rep == 0xF2) && !bF2) {
-						bF2 = true;
-						unNextIndex = RD_ILUT_INDEX_MAN_PREF_F2;
-						pInstruction->HasMandatoryF2 = true;
-					} else if ((pInstruction->Rep == 0xF3) && !bF3) {
-						bF3 = true;
-						unNextIndex = RD_ILUT_INDEX_MAN_PREF_F3;
-						pInstruction->HasMandatoryF3 = true;
-					} else if (pInstruction->HasOpSize) {
-						unNextIndex = RD_ILUT_INDEX_MAN_PREF_66;
-						pInstruction->HasMandatory66 = true;
-					} else {
-						unNextIndex = RD_ILUT_INDEX_MAN_PREF_NONE;
-					}
-
-					pTable = reinterpret_cast<const RD_TABLE*>(pTable->m_pTable[unNextIndex]);
-					break;
-				case RD_ILUT_MODE: {
-					static const unsigned char pIndexes[3] = { RD_ILUT_INDEX_MODE_16, RD_ILUT_INDEX_MODE_32, RD_ILUT_INDEX_MODE_64 };
-
-					unNextIndex = RD_ILUT_INDEX_MODE_NONE;
-
-					if (pTable->m_pTable[pIndexes[pInstruction->DefCode]]) {
-						unNextIndex = pIndexes[pInstruction->DefCode];
-					}
-
-					pTable = reinterpret_cast<const RD_TABLE*>(pTable->m_pTable[unNextIndex]);
-				} break;
-				case RD_ILUT_DSIZE: {
-					static const unsigned char pIndexes[3] = { RD_ILUT_INDEX_DSIZE_16, RD_ILUT_INDEX_DSIZE_32, RD_ILUT_INDEX_DSIZE_64 };
-
-					unNextIndex = RD_ILUT_INDEX_DSIZE_NONE;
-
-					if (pTable->m_pTable[pIndexes[pInstruction->OpMode]]) {
-						unNextIndex = pIndexes[pInstruction->OpMode];
-					}
-
-					if (pInstruction->DefCode == RD_CODE_64) {
-						if (pTable->m_pTable[4] && (!pInstruction->HasOpSize || pInstruction->Exs.w)) {
-							unNextIndex = 4;
-						} else if (pTable->m_pTable[5]) {
-							unNextIndex = 5;
-						}
-					}
-
-					pTable = reinterpret_cast<const RD_TABLE*>(pTable->m_pTable[unNextIndex]);
-				} break;
-				case RD_ILUT_ASIZE: {
-					static const unsigned char pIndexes[3] = { RD_ILUT_INDEX_ASIZE_16, RD_ILUT_INDEX_ASIZE_32, RD_ILUT_INDEX_ASIZE_64 };
-
-					unNextIndex = RD_ILUT_INDEX_ASIZE_NONE;
-
-					if (pTable->m_pTable[pIndexes[pInstruction->AddrMode]]) {
-						unNextIndex = pIndexes[pInstruction->AddrMode];
-					}
-
-					pTable = reinterpret_cast<const RD_TABLE*>(pTable->m_pTable[unNextIndex]);
-				} break;
-				case RD_ILUT_AUXILIARY:
-					if (pInstruction->HasRex && pInstruction->Rex.b && pTable->m_pTable[RD_ILUT_INDEX_AUX_REXB]) {
-						unNextIndex = RD_ILUT_INDEX_AUX_REXB;
-					} else if (pInstruction->HasRex && pInstruction->Rex.w && pTable->m_pTable[RD_ILUT_INDEX_AUX_REXW]) {
-						unNextIndex = RD_ILUT_INDEX_AUX_REXW;
-					} else if ((pInstruction->DefCode == RD_CODE_64) && pTable->m_pTable[RD_ILUT_INDEX_AUX_O64]) {
-						unNextIndex = RD_ILUT_INDEX_AUX_O64;
-					} else if ((pInstruction->Rep == RD_PREFIX_G1_REPE_REPZ) && pTable->m_pTable[RD_ILUT_INDEX_AUX_F3]) {
-						unNextIndex = RD_ILUT_INDEX_AUX_F3;
-					} else if (pInstruction->Rep && pTable->m_pTable[RD_ILUT_INDEX_AUX_REP]) {
-						unNextIndex = RD_ILUT_INDEX_AUX_REP;
-					} else if ((pInstruction->DefCode == RD_CODE_64) && pInstruction->HasModRm && (pInstruction->ModRm.mod == 0) && (pInstruction->ModRm.rm == RDR_RBP) && pTable->m_pTable[RD_ILUT_INDEX_AUX_RIPREL]) {
-						unNextIndex = RD_ILUT_INDEX_AUX_RIPREL;
-					} else {
-						unNextIndex = RD_ILUT_INDEX_AUX_NONE;
-					}
-
-					pTable = reinterpret_cast<const RD_TABLE*>(pTable->m_pTable[unNextIndex]);
-					break;
-				case RD_ILUT_VENDOR:
-					if (pTable->m_pTable[pInstruction->VendMode]) {
-						pTable = reinterpret_cast<const RD_TABLE*>(pTable->m_pTable[pInstruction->VendMode]);
-					} else {
-						pTable = reinterpret_cast<const RD_TABLE*>(pTable->m_pTable[RD_VERD_ANY]);
-					}
-					break;
-				case RD_ILUT_FEATURE:
-					if (pTable->m_pTable[RD_ILUT_FEATURE_MPX] && (pInstruction->FeatMode & RD_FEAT_MPX)) {
-						pTable = reinterpret_cast<const RD_TABLE*>(pTable->m_pTable[RD_ILUT_FEATURE_MPX]);
-					} else if (pTable->m_pTable[RD_ILUT_FEATURE_CET] && (pInstruction->FeatMode & RD_FEAT_CET)) {
-						pTable = reinterpret_cast<const RD_TABLE*>(pTable->m_pTable[RD_ILUT_FEATURE_CET]);
-					} else if (pTable->m_pTable[RD_ILUT_FEATURE_CLDEMOTE] && (pInstruction->FeatMode & RD_FEAT_CLDEMOTE)) {
-						pTable = reinterpret_cast<const RD_TABLE*>(pTable->m_pTable[RD_ILUT_FEATURE_CLDEMOTE]);
-					} else if (pTable->m_pTable[RD_ILUT_FEATURE_PITI] && (pInstruction->FeatMode & RD_FEAT_PITI)) {
-						pTable = reinterpret_cast<const RD_TABLE*>(pTable->m_pTable[RD_ILUT_FEATURE_PITI]);
-					} else {
-						pTable = reinterpret_cast<const RD_TABLE*>(pTable->m_pTable[RD_ILUT_FEATURE_NONE]);
-					}
-					break;
-				case RD_ILUT_VEX_MMMMM:
-					pTable = reinterpret_cast<const RD_TABLE*>(pTable->m_pTable[pInstruction->Exs.m]);
-					break;
-				case RD_ILUT_VEX_PP:
-					pTable = reinterpret_cast<const RD_TABLE*>(pTable->m_pTable[pInstruction->Exs.p]);
-					break;
-				case RD_ILUT_VEX_L:
-					if (pInstruction->HasEvex && pInstruction->Exs.bm) {
+					case RD_ILUT_OPCODE_3DNOW:
 						if (!pInstruction->HasModRm) {
 							unStatus = RdFetchModrmAndSib(pInstruction, pCode, pInstruction->Length, unSize);
 							if (!RD_SUCCESS(unStatus)) {
@@ -36459,31 +36280,210 @@ namespace Detours {
 							}
 						}
 
-						if (pInstruction->ModRm.mod == 3) {
-							if (pTable->m_pTable[2]) {
-								pTable = reinterpret_cast<const RD_TABLE*>(pTable->m_pTable[2]);
-							} else if (pTable->m_pTable[1]) {
-								pTable = reinterpret_cast<const RD_TABLE*>(pTable->m_pTable[1]);
+						unStatus = RdFetchOpcode(pInstruction, pCode, pInstruction->Length, unSize);
+						if (!RD_SUCCESS(unStatus)) {
+							bStop = true;
+							break;
+						}
+
+						pTable = reinterpret_cast<const RD_TABLE*>(pTable->m_pTable[pInstruction->OpCodeBytes[unNextOpcode++]]);
+						break;
+					case RD_ILUT_MODRM_MOD:
+						if (!pInstruction->HasModRm) {
+							unStatus = RdFetchModrmAndSib(pInstruction, pCode, pInstruction->Length, unSize);
+							if (!RD_SUCCESS(unStatus)) {
+								bStop = true;
+								break;
+							}
+
+							unStatus = RdFetchDisplacement(pInstruction, pCode, pInstruction->Length, unSize);
+							if (!RD_SUCCESS(unStatus)) {
+								bStop = true;
+								break;
+							}
+						}
+
+						pTable = reinterpret_cast<const RD_TABLE*>(pTable->m_pTable[(pInstruction->ModRm.mod == 3) ? 1 : 0]);
+						break;
+					case RD_ILUT_MODRM_REG:
+						if (!pInstruction->HasModRm) {
+							unStatus = RdFetchModrmAndSib(pInstruction, pCode, pInstruction->Length, unSize);
+							if (!RD_SUCCESS(unStatus)) {
+								bStop = true;
+								break;
+							}
+
+							unStatus = RdFetchDisplacement(pInstruction, pCode, pInstruction->Length, unSize);
+							if (!RD_SUCCESS(unStatus)) {
+								bStop = true;
+								break;
+							}
+						}
+
+						pTable = reinterpret_cast<const RD_TABLE*>(pTable->m_pTable[pInstruction->ModRm.reg]);
+						break;
+					case RD_ILUT_MODRM_RM:
+						if (!pInstruction->HasModRm) {
+							unStatus = RdFetchModrmAndSib(pInstruction, pCode, pInstruction->Length, unSize);
+							if (!RD_SUCCESS(unStatus)) {
+								bStop = true;
+								break;
+							}
+
+							unStatus = RdFetchDisplacement(pInstruction, pCode, pInstruction->Length, unSize);
+							if (!RD_SUCCESS(unStatus)) {
+								bStop = true;
+								break;
+							}
+						}
+
+						pTable = reinterpret_cast<const RD_TABLE*>(pTable->m_pTable[pInstruction->ModRm.rm]);
+						break;
+					case RD_ILUT_MAN_PREFIX:
+						if ((pInstruction->Rep == 0xF2) && !bF2) {
+							bF2 = true;
+							unNextIndex = RD_ILUT_INDEX_MAN_PREF_F2;
+							pInstruction->HasMandatoryF2 = true;
+						} else if ((pInstruction->Rep == 0xF3) && !bF3) {
+							bF3 = true;
+							unNextIndex = RD_ILUT_INDEX_MAN_PREF_F3;
+							pInstruction->HasMandatoryF3 = true;
+						} else if (pInstruction->HasOpSize) {
+							unNextIndex = RD_ILUT_INDEX_MAN_PREF_66;
+							pInstruction->HasMandatory66 = true;
+						} else {
+							unNextIndex = RD_ILUT_INDEX_MAN_PREF_NONE;
+						}
+
+						pTable = reinterpret_cast<const RD_TABLE*>(pTable->m_pTable[unNextIndex]);
+						break;
+					case RD_ILUT_MODE: {
+						static const unsigned char pIndexes[3] = { RD_ILUT_INDEX_MODE_16, RD_ILUT_INDEX_MODE_32, RD_ILUT_INDEX_MODE_64 };
+
+						unNextIndex = RD_ILUT_INDEX_MODE_NONE;
+
+						if (pTable->m_pTable[pIndexes[pInstruction->DefCode]]) {
+							unNextIndex = pIndexes[pInstruction->DefCode];
+						}
+
+						pTable = reinterpret_cast<const RD_TABLE*>(pTable->m_pTable[unNextIndex]);
+					} break;
+					case RD_ILUT_DSIZE: {
+						static const unsigned char pIndexes[3] = { RD_ILUT_INDEX_DSIZE_16, RD_ILUT_INDEX_DSIZE_32, RD_ILUT_INDEX_DSIZE_64 };
+
+						unNextIndex = RD_ILUT_INDEX_DSIZE_NONE;
+
+						if (pTable->m_pTable[pIndexes[pInstruction->OpMode]]) {
+							unNextIndex = pIndexes[pInstruction->OpMode];
+						}
+
+						if (pInstruction->DefCode == RD_CODE_64) {
+							if (pTable->m_pTable[4] && (!pInstruction->HasOpSize || pInstruction->Exs.w)) {
+								unNextIndex = 4;
+							} else if (pTable->m_pTable[5]) {
+								unNextIndex = 5;
+							}
+						}
+
+						pTable = reinterpret_cast<const RD_TABLE*>(pTable->m_pTable[unNextIndex]);
+					} break;
+					case RD_ILUT_ASIZE: {
+						static const unsigned char pIndexes[3] = { RD_ILUT_INDEX_ASIZE_16, RD_ILUT_INDEX_ASIZE_32, RD_ILUT_INDEX_ASIZE_64 };
+
+						unNextIndex = RD_ILUT_INDEX_ASIZE_NONE;
+
+						if (pTable->m_pTable[pIndexes[pInstruction->AddrMode]]) {
+							unNextIndex = pIndexes[pInstruction->AddrMode];
+						}
+
+						pTable = reinterpret_cast<const RD_TABLE*>(pTable->m_pTable[unNextIndex]);
+					} break;
+					case RD_ILUT_AUXILIARY:
+						if (pInstruction->HasRex && pInstruction->Rex.b && pTable->m_pTable[RD_ILUT_INDEX_AUX_REXB]) {
+							unNextIndex = RD_ILUT_INDEX_AUX_REXB;
+						} else if (pInstruction->HasRex && pInstruction->Rex.w && pTable->m_pTable[RD_ILUT_INDEX_AUX_REXW]) {
+							unNextIndex = RD_ILUT_INDEX_AUX_REXW;
+						} else if ((pInstruction->DefCode == RD_CODE_64) && pTable->m_pTable[RD_ILUT_INDEX_AUX_O64]) {
+							unNextIndex = RD_ILUT_INDEX_AUX_O64;
+						} else if ((pInstruction->Rep == RD_PREFIX_G1_REPE_REPZ) && pTable->m_pTable[RD_ILUT_INDEX_AUX_F3]) {
+							unNextIndex = RD_ILUT_INDEX_AUX_F3;
+						} else if (pInstruction->Rep && pTable->m_pTable[RD_ILUT_INDEX_AUX_REP]) {
+							unNextIndex = RD_ILUT_INDEX_AUX_REP;
+						} else if ((pInstruction->DefCode == RD_CODE_64) && pInstruction->HasModRm && (pInstruction->ModRm.mod == 0) && (pInstruction->ModRm.rm == RDR_RBP) && pTable->m_pTable[RD_ILUT_INDEX_AUX_RIPREL]) {
+							unNextIndex = RD_ILUT_INDEX_AUX_RIPREL;
+						} else {
+							unNextIndex = RD_ILUT_INDEX_AUX_NONE;
+						}
+
+						pTable = reinterpret_cast<const RD_TABLE*>(pTable->m_pTable[unNextIndex]);
+						break;
+					case RD_ILUT_VENDOR:
+						if (pTable->m_pTable[pInstruction->VendMode]) {
+							pTable = reinterpret_cast<const RD_TABLE*>(pTable->m_pTable[pInstruction->VendMode]);
+						} else {
+							pTable = reinterpret_cast<const RD_TABLE*>(pTable->m_pTable[RD_VERD_ANY]);
+						}
+						break;
+					case RD_ILUT_FEATURE:
+						if (pTable->m_pTable[RD_ILUT_FEATURE_MPX] && (pInstruction->FeatMode & RD_FEAT_MPX)) {
+							pTable = reinterpret_cast<const RD_TABLE*>(pTable->m_pTable[RD_ILUT_FEATURE_MPX]);
+						} else if (pTable->m_pTable[RD_ILUT_FEATURE_CET] && (pInstruction->FeatMode & RD_FEAT_CET)) {
+							pTable = reinterpret_cast<const RD_TABLE*>(pTable->m_pTable[RD_ILUT_FEATURE_CET]);
+						} else if (pTable->m_pTable[RD_ILUT_FEATURE_CLDEMOTE] && (pInstruction->FeatMode & RD_FEAT_CLDEMOTE)) {
+							pTable = reinterpret_cast<const RD_TABLE*>(pTable->m_pTable[RD_ILUT_FEATURE_CLDEMOTE]);
+						} else if (pTable->m_pTable[RD_ILUT_FEATURE_PITI] && (pInstruction->FeatMode & RD_FEAT_PITI)) {
+							pTable = reinterpret_cast<const RD_TABLE*>(pTable->m_pTable[RD_ILUT_FEATURE_PITI]);
+						} else {
+							pTable = reinterpret_cast<const RD_TABLE*>(pTable->m_pTable[RD_ILUT_FEATURE_NONE]);
+						}
+						break;
+					case RD_ILUT_VEX_MMMMM:
+						pTable = reinterpret_cast<const RD_TABLE*>(pTable->m_pTable[pInstruction->Exs.m]);
+						break;
+					case RD_ILUT_VEX_PP:
+						pTable = reinterpret_cast<const RD_TABLE*>(pTable->m_pTable[pInstruction->Exs.p]);
+						break;
+					case RD_ILUT_VEX_L:
+						if (pInstruction->HasEvex && pInstruction->Exs.bm) {
+							if (!pInstruction->HasModRm) {
+								unStatus = RdFetchModrmAndSib(pInstruction, pCode, pInstruction->Length, unSize);
+								if (!RD_SUCCESS(unStatus)) {
+									bStop = true;
+									break;
+								}
+
+								unStatus = RdFetchDisplacement(pInstruction, pCode, pInstruction->Length, unSize);
+								if (!RD_SUCCESS(unStatus)) {
+									bStop = true;
+									break;
+								}
+							}
+
+							if (pInstruction->ModRm.mod == 3) {
+								if (pTable->m_pTable[2]) {
+									pTable = reinterpret_cast<const RD_TABLE*>(pTable->m_pTable[2]);
+								} else if (pTable->m_pTable[1]) {
+									pTable = reinterpret_cast<const RD_TABLE*>(pTable->m_pTable[1]);
+								} else {
+									pTable = reinterpret_cast<const RD_TABLE*>(pTable->m_pTable[0]);
+								}
 							} else {
-								pTable = reinterpret_cast<const RD_TABLE*>(pTable->m_pTable[0]);
+								pTable = reinterpret_cast<const RD_TABLE*>(pTable->m_pTable[pInstruction->Exs.l]);
 							}
 						} else {
 							pTable = reinterpret_cast<const RD_TABLE*>(pTable->m_pTable[pInstruction->Exs.l]);
 						}
-					} else {
-						pTable = reinterpret_cast<const RD_TABLE*>(pTable->m_pTable[pInstruction->Exs.l]);
-					}
-					break;
-				case RD_ILUT_VEX_W:
-					pTable = reinterpret_cast<const RD_TABLE*>(pTable->m_pTable[pInstruction->Exs.w]);
-					break;
-				case RD_ILUT_VEX_WI:
-					pTable = reinterpret_cast<const RD_TABLE*>(pTable->m_pTable[(pInstruction->DefCode == RD_CODE_64) ? pInstruction->Exs.w : 0]);
-					break;
-				default:
-					unStatus = RD_STATUS_INTERNAL_ERROR;
-					bStop = true;
-					break;
+						break;
+					case RD_ILUT_VEX_W:
+						pTable = reinterpret_cast<const RD_TABLE*>(pTable->m_pTable[pInstruction->Exs.w]);
+						break;
+					case RD_ILUT_VEX_WI:
+						pTable = reinterpret_cast<const RD_TABLE*>(pTable->m_pTable[(pInstruction->DefCode == RD_CODE_64) ? pInstruction->Exs.w : 0]);
+						break;
+					default:
+						unStatus = RD_STATUS_INTERNAL_ERROR;
+						bStop = true;
+						break;
 				}
 			}
 
@@ -36544,18 +36544,18 @@ namespace Detours {
 			bool bHas66 = pInstruction->HasOpSize && (!pInstruction->HasMandatory66 || (pInstruction->Attributes & RD_FLAG_S66));
 
 			switch (pInstruction->DefCode) {
-			case RD_CODE_16:
-				pInstruction->EfOpMode = bHas66 ? RD_OPSZ_32 : RD_OPSZ_16;
-				break;
-			case RD_CODE_32:
-				pInstruction->EfOpMode = bHas66 ? RD_OPSZ_16 : RD_OPSZ_32;
-				break;
-			case RD_CODE_64:
-				pInstruction->EfOpMode = (bWidth || bF64 || (bD64 && !bHas66)) ? RD_OPSZ_64 : (bHas66 ? RD_OPSZ_16 : RD_OPSZ_32);
-				pInstruction->AddrMode = (pInstruction->Attributes & RD_FLAG_I67) ? RD_ADDR_64 : pInstruction->AddrMode;
-				break;
-			default:
-				return RD_STATUS_INVALID_INSTRUX;
+				case RD_CODE_16:
+					pInstruction->EfOpMode = bHas66 ? RD_OPSZ_32 : RD_OPSZ_16;
+					break;
+				case RD_CODE_32:
+					pInstruction->EfOpMode = bHas66 ? RD_OPSZ_16 : RD_OPSZ_32;
+					break;
+				case RD_CODE_64:
+					pInstruction->EfOpMode = (bWidth || bF64 || (bD64 && !bHas66)) ? RD_OPSZ_64 : (bHas66 ? RD_OPSZ_16 : RD_OPSZ_32);
+					pInstruction->AddrMode = (pInstruction->Attributes & RD_FLAG_I67) ? RD_ADDR_64 : pInstruction->AddrMode;
+					break;
+				default:
+					return RD_STATUS_INVALID_INSTRUX;
 			}
 
 			pInstruction->WordLength = pLut[pInstruction->EfOpMode];
@@ -36629,20 +36629,20 @@ namespace Detours {
 			}
 
 			switch (pInstruction->Exs.l) {
-			case 0:
-				pInstruction->VecMode = RD_VECM_128;
-				pInstruction->EfVecMode = RD_VECM_128;
-				break;
-			case 1:
-				pInstruction->VecMode = RD_VECM_256;
-				pInstruction->EfVecMode = (pInstruction->Attributes & RD_FLAG_LIG) ? RD_VECM_128 : RD_VECM_256;
-				break;
-			case 2:
-				pInstruction->VecMode = RD_VECM_512;
-				pInstruction->EfVecMode = (pInstruction->Attributes & RD_FLAG_LIG) ? RD_VECM_128 : RD_VECM_512;
-				break;
-			default:
-				return RD_STATUS_BAD_EVEX_LL;
+				case 0:
+					pInstruction->VecMode = RD_VECM_128;
+					pInstruction->EfVecMode = RD_VECM_128;
+					break;
+				case 1:
+					pInstruction->VecMode = RD_VECM_256;
+					pInstruction->EfVecMode = (pInstruction->Attributes & RD_FLAG_LIG) ? RD_VECM_128 : RD_VECM_256;
+					break;
+				case 2:
+					pInstruction->VecMode = RD_VECM_512;
+					pInstruction->EfVecMode = (pInstruction->Attributes & RD_FLAG_LIG) ? RD_VECM_128 : RD_VECM_512;
+					break;
+				default:
+					return RD_STATUS_BAD_EVEX_LL;
 			}
 
 			if ((pInstruction->EfVecMode == RD_VECM_128) && (pInstruction->Attributes & RD_FLAG_NOL0)) {
@@ -36740,20 +36740,20 @@ namespace Detours {
 			}
 
 			switch (pInstruction->Seg) {
-			case RD_PREFIX_G2_SEG_CS:
-				return RDR_CS;
-			case RD_PREFIX_G2_SEG_DS:
-				return RDR_DS;
-			case RD_PREFIX_G2_SEG_ES:
-				return RDR_ES;
-			case RD_PREFIX_G2_SEG_SS:
-				return RDR_SS;
-			case RD_PREFIX_G2_SEG_FS:
-				return RDR_FS;
-			case RD_PREFIX_G2_SEG_GS:
-				return RDR_GS;
-			default:
-				return unDefaultSeg;
+				case RD_PREFIX_G2_SEG_CS:
+					return RDR_CS;
+				case RD_PREFIX_G2_SEG_DS:
+					return RDR_DS;
+				case RD_PREFIX_G2_SEG_ES:
+					return RDR_ES;
+				case RD_PREFIX_G2_SEG_SS:
+					return RDR_SS;
+				case RD_PREFIX_G2_SEG_FS:
+					return RDR_FS;
+				case RD_PREFIX_G2_SEG_GS:
+					return RDR_GS;
+				default:
+					return unDefaultSeg;
 			}
 		}
 
@@ -36772,42 +36772,42 @@ namespace Detours {
 			}
 
 			switch (pInstruction->TupleType) {
-			case RD_TUPLE_FV:
-				return fvpLut[pInstruction->Exs.l];
-			case RD_TUPLE_HV:
-				return hvpLut[pInstruction->Exs.l];
-			case RD_TUPLE_QV:
-				return qvpLut[pInstruction->Exs.l];
-			case RD_TUPLE_DUP:
-				return duppLut[pInstruction->Exs.l];
-			case RD_TUPLE_FVM:
-				return fvmpLut[pInstruction->Exs.l];
-			case RD_TUPLE_HVM:
-				return hvmpLut[pInstruction->Exs.l];
-			case RD_TUPLE_QVM:
-				return qvmpLut[pInstruction->Exs.l];
-			case RD_TUPLE_OVM:
-				return ovmpLut[pInstruction->Exs.l];
-			case RD_TUPLE_M128:
-				return 16;
-			case RD_TUPLE_T1S8:
-				return 1;
-			case RD_TUPLE_T1S16:
-				return 2;
-			case RD_TUPLE_T1S:
-				return (pInstruction->Attributes & RD_FLAG_WIG) ? 4 : (pInstruction->Exs.w ? 8 : 4);
-			case RD_TUPLE_T1F:
-				return static_cast<unsigned char>(unMemSize & 0xFF);
-			case RD_TUPLE_T2:
-				return pInstruction->Exs.w ? 16 : 8;
-			case RD_TUPLE_T4:
-				return pInstruction->Exs.w ? 32 : 16;
-			case RD_TUPLE_T8:
-				return 32;
-			case RD_TUPLE_T1_4X:
-				return 16;
-			default:
-				return 1;
+				case RD_TUPLE_FV:
+					return fvpLut[pInstruction->Exs.l];
+				case RD_TUPLE_HV:
+					return hvpLut[pInstruction->Exs.l];
+				case RD_TUPLE_QV:
+					return qvpLut[pInstruction->Exs.l];
+				case RD_TUPLE_DUP:
+					return duppLut[pInstruction->Exs.l];
+				case RD_TUPLE_FVM:
+					return fvmpLut[pInstruction->Exs.l];
+				case RD_TUPLE_HVM:
+					return hvmpLut[pInstruction->Exs.l];
+				case RD_TUPLE_QVM:
+					return qvmpLut[pInstruction->Exs.l];
+				case RD_TUPLE_OVM:
+					return ovmpLut[pInstruction->Exs.l];
+				case RD_TUPLE_M128:
+					return 16;
+				case RD_TUPLE_T1S8:
+					return 1;
+				case RD_TUPLE_T1S16:
+					return 2;
+				case RD_TUPLE_T1S:
+					return (pInstruction->Attributes & RD_FLAG_WIG) ? 4 : (pInstruction->Exs.w ? 8 : 4);
+				case RD_TUPLE_T1F:
+					return static_cast<unsigned char>(unMemSize & 0xFF);
+				case RD_TUPLE_T2:
+					return pInstruction->Exs.w ? 16 : 8;
+				case RD_TUPLE_T4:
+					return pInstruction->Exs.w ? 32 : 16;
+				case RD_TUPLE_T8:
+					return 32;
+				case RD_TUPLE_T1_4X:
+					return 16;
+				default:
+					return 1;
 			}
 		}
 
@@ -36850,1039 +36850,1020 @@ namespace Detours {
 			pOperand->Access.Access = unOPA;
 
 			switch (unOPS) {
-			case RD_OPS_asz:
-				unDispSize = 2 << pInstruction->AddrMode;
-				break;
-			case RD_OPS_ssz:
-				unDispSize = 2 << pInstruction->DefStack;
-				break;
-			case RD_OPS_0:
-				unDispSize = 0;
-				break;
-			case RD_OPS_b:
-				unDispSize = RD_SIZE_8BIT;
-				break;
-			case RD_OPS_w:
-				unDispSize = RD_SIZE_16BIT;
-				break;
-			case RD_OPS_d:
-				unDispSize = RD_SIZE_32BIT;
-				break;
-			case RD_OPS_q:
-				unDispSize = RD_SIZE_64BIT;
-				break;
-			case RD_OPS_dq:
-				unDispSize = RD_SIZE_128BIT;
-				break;
-			case RD_OPS_qq:
-				unDispSize = RD_SIZE_256BIT;
-				break;
-			case RD_OPS_oq:
-				unDispSize = RD_SIZE_512BIT;
-				break;
-			case RD_OPS_fa:
-				unDispSize = RD_SIZE_80BIT;
-				break;
-			case RD_OPS_fw:
-				unDispSize = RD_SIZE_16BIT;
-				break;
-			case RD_OPS_fd:
-				unDispSize = RD_SIZE_32BIT;
-				break;
-			case RD_OPS_fq:
-				unDispSize = RD_SIZE_64BIT;
-				break;
-			case RD_OPS_ft:
-				unDispSize = RD_SIZE_80BIT;
-				break;
-			case RD_OPS_fe:
-				unDispSize = (pInstruction->EfOpMode == RD_OPSZ_16) ? RD_SIZE_112BIT : RD_SIZE_224BIT;
-				break;
-			case RD_OPS_fs:
-				unDispSize = (pInstruction->EfOpMode == RD_OPSZ_16) ? RD_SIZE_752BIT : RD_SIZE_864BIT;
-				break;
-			case RD_OPS_rx:
-				unDispSize = RD_SIZE_4096BIT;
-				break;
-			case RD_OPS_cl:
-				unDispSize = RD_SIZE_CACHE_LINE;
-				break;
-			case RD_OPS_v: {
-				static const unsigned char pLut[3] = { RD_SIZE_16BIT, RD_SIZE_32BIT, RD_SIZE_64BIT };
-				unDispSize = pLut[pInstruction->EfOpMode];
-			} break;
-			case RD_OPS_y: {
-				static const unsigned char pLut[3] = { RD_SIZE_32BIT, RD_SIZE_32BIT, RD_SIZE_64BIT };
-				unDispSize = pLut[pInstruction->EfOpMode];
-			} break;
-			case RD_OPS_yf: {
-				static const unsigned char pLut[3] = { RD_SIZE_32BIT, RD_SIZE_32BIT, RD_SIZE_64BIT };
-				unDispSize = pLut[pInstruction->DefCode];
-			} break;
-			case RD_OPS_z: {
-				static const unsigned char pLut[3] = { RD_SIZE_16BIT, RD_SIZE_32BIT, RD_SIZE_32BIT };
-				unDispSize = pLut[pInstruction->EfOpMode];
-			} break;
-			case RD_OPS_a: {
-				static const unsigned char pLut[3] = { RD_SIZE_16BIT * 2, RD_SIZE_32BIT * 2, 0 };
-
-				if (pInstruction->DefCode > RD_CODE_32) {
-					return RD_STATUS_INVALID_INSTRUX;
-				}
-
-				unDispSize = pLut[pInstruction->EfOpMode];
-			} break;
-			case RD_OPS_c:
-				switch (pInstruction->DefCode) {
-				case RD_CODE_16:
-					unDispSize = pInstruction->HasOpSize ? RD_SIZE_16BIT : RD_SIZE_8BIT;
+				case RD_OPS_asz:
+					unDispSize = 2 << pInstruction->AddrMode;
 					break;
-				case RD_CODE_32:
-					unDispSize = pInstruction->HasOpSize ? RD_SIZE_16BIT : RD_SIZE_32BIT;
+				case RD_OPS_ssz:
+					unDispSize = 2 << pInstruction->DefStack;
 					break;
-				case RD_CODE_64:
+				case RD_OPS_0:
+					unDispSize = 0;
+					break;
+				case RD_OPS_b:
+					unDispSize = RD_SIZE_8BIT;
+					break;
+				case RD_OPS_w:
+					unDispSize = RD_SIZE_16BIT;
+					break;
+				case RD_OPS_d:
+					unDispSize = RD_SIZE_32BIT;
+					break;
+				case RD_OPS_q:
 					unDispSize = RD_SIZE_64BIT;
 					break;
-				default:
-					return RD_STATUS_INVALID_INSTRUX;
-				}
-				break;
-			case RD_OPS_p: {
-				static const unsigned char pLut[3] = { RD_SIZE_32BIT, RD_SIZE_48BIT, RD_SIZE_80BIT };
-				unDispSize = pLut[pInstruction->EfOpMode];
-			} break;
-			case RD_OPS_s: {
-				static const unsigned char pLut[3] = { RD_SIZE_48BIT, RD_SIZE_48BIT, RD_SIZE_80BIT };
-				unDispSize = pLut[pInstruction->DefCode];
-			} break;
-			case RD_OPS_l: {
-				static const unsigned char pLut[3] = { RD_SIZE_64BIT, RD_SIZE_64BIT, RD_SIZE_128BIT };
-				unDispSize = pLut[pInstruction->DefCode];
-			} break;
-			case RD_OPS_x: {
-				static const unsigned char pLut[3] = { RD_SIZE_128BIT, RD_SIZE_256BIT, RD_SIZE_512BIT };
-				unDispSize = pLut[pInstruction->EfVecMode];
-			} break;
-			case RD_OPS_fv: {
-				static const unsigned char pLut[3] = { RD_SIZE_128BIT, RD_SIZE_256BIT, RD_SIZE_512BIT };
-				unDispSize = pLut[pInstruction->EfVecMode];
-			} break;
-			case RD_OPS_uv: {
-				static const unsigned char pLut[3] = { 0, RD_SIZE_256BIT, RD_SIZE_512BIT };
+				case RD_OPS_dq:
+					unDispSize = RD_SIZE_128BIT;
+					break;
+				case RD_OPS_qq:
+					unDispSize = RD_SIZE_256BIT;
+					break;
+				case RD_OPS_oq:
+					unDispSize = RD_SIZE_512BIT;
+					break;
+				case RD_OPS_fa:
+					unDispSize = RD_SIZE_80BIT;
+					break;
+				case RD_OPS_fw:
+					unDispSize = RD_SIZE_16BIT;
+					break;
+				case RD_OPS_fd:
+					unDispSize = RD_SIZE_32BIT;
+					break;
+				case RD_OPS_fq:
+					unDispSize = RD_SIZE_64BIT;
+					break;
+				case RD_OPS_ft:
+					unDispSize = RD_SIZE_80BIT;
+					break;
+				case RD_OPS_fe:
+					unDispSize = (pInstruction->EfOpMode == RD_OPSZ_16) ? RD_SIZE_112BIT : RD_SIZE_224BIT;
+					break;
+				case RD_OPS_fs:
+					unDispSize = (pInstruction->EfOpMode == RD_OPSZ_16) ? RD_SIZE_752BIT : RD_SIZE_864BIT;
+					break;
+				case RD_OPS_rx:
+					unDispSize = RD_SIZE_4096BIT;
+					break;
+				case RD_OPS_cl:
+					unDispSize = RD_SIZE_CACHE_LINE;
+					break;
+				case RD_OPS_v: {
+					static const unsigned char pLut[3] = { RD_SIZE_16BIT, RD_SIZE_32BIT, RD_SIZE_64BIT };
+					unDispSize = pLut[pInstruction->EfOpMode];
+				} break;
+				case RD_OPS_y: {
+					static const unsigned char pLut[3] = { RD_SIZE_32BIT, RD_SIZE_32BIT, RD_SIZE_64BIT };
+					unDispSize = pLut[pInstruction->EfOpMode];
+				} break;
+				case RD_OPS_yf: {
+					static const unsigned char pLut[3] = { RD_SIZE_32BIT, RD_SIZE_32BIT, RD_SIZE_64BIT };
+					unDispSize = pLut[pInstruction->DefCode];
+				} break;
+				case RD_OPS_z: {
+					static const unsigned char pLut[3] = { RD_SIZE_16BIT, RD_SIZE_32BIT, RD_SIZE_32BIT };
+					unDispSize = pLut[pInstruction->EfOpMode];
+				} break;
+				case RD_OPS_a: {
+					static const unsigned char pLut[3] = { RD_SIZE_16BIT * 2, RD_SIZE_32BIT * 2, 0 };
 
-				if (RD_VECM_128 == pInstruction->EfVecMode) {
-					return RD_STATUS_INVALID_INSTRUX;
-				}
+					if (pInstruction->DefCode > RD_CODE_32) {
+						return RD_STATUS_INVALID_INSTRUX;
+					}
 
-				unDispSize = pLut[pInstruction->EfVecMode];
-			} break;
-			case RD_OPS_ev: {
-				static const unsigned char pLut[3] = { RD_SIZE_16BIT, RD_SIZE_32BIT, RD_SIZE_64BIT };
-				unDispSize = pLut[pInstruction->EfVecMode];
-			} break;
-			case RD_OPS_qv: {
-				static const unsigned char pLut[3] = { RD_SIZE_32BIT, RD_SIZE_64BIT, RD_SIZE_128BIT };
-				unDispSize = pLut[pInstruction->EfVecMode];
-			} break;
-			case RD_OPS_hv: {
-				static const unsigned char pLut[3] = { RD_SIZE_64BIT, RD_SIZE_128BIT, RD_SIZE_256BIT };
-				unDispSize = pLut[pInstruction->EfVecMode];
-			} break;
-			case RD_OPS_pd:
-			case RD_OPS_ps:
-			case RD_OPS_ph: {
-				static const unsigned char pLut[3] = { RD_SIZE_128BIT, RD_SIZE_256BIT, RD_SIZE_512BIT };
-				unDispSize = pLut[pInstruction->EfVecMode];
-			} break;
-			case RD_OPS_sd:
-				unDispSize = RD_SIZE_64BIT;
-				break;
-			case RD_OPS_ss:
-				unDispSize = RD_SIZE_32BIT;
-				break;
-			case RD_OPS_sh:
-				unDispSize = RD_SIZE_16BIT;
-				break;
-			case RD_OPS_mib:
-				unDispSize = 0;
-				break;
-			case RD_OPS_vm32x:
-			case RD_OPS_vm32y:
-			case RD_OPS_vm32z:
-				unVSibIndexSize = RD_SIZE_32BIT;
-				unVSibIndexCount = (pInstruction->Exs.l == 0) ? 4 : ((pInstruction->Exs.l == 1) ? 8 : 16);
-				unVSibRegSize = (unOPS == RD_OPS_vm32x)   ? RD_SIZE_128BIT
-				                : (unOPS == RD_OPS_vm32y) ? RD_SIZE_256BIT
-				                                          : RD_SIZE_512BIT;
-				unDispSize = unVSibIndexCount * (bWidth ? RD_SIZE_64BIT : RD_SIZE_32BIT);
-				break;
-			case RD_OPS_vm32h:
-				unVSibIndexSize = RD_SIZE_32BIT;
-				unVSibIndexCount = (pInstruction->Exs.l == 0) ? 2 : ((pInstruction->Exs.l == 1) ? 4 : 8);
-				unVSibRegSize = (pInstruction->Exs.l == 0)   ? RD_SIZE_128BIT
-				                : (pInstruction->Exs.l == 1) ? RD_SIZE_128BIT
-				                                             : RD_SIZE_256BIT;
-				unDispSize = unVSibIndexCount * (bWidth ? RD_SIZE_64BIT : RD_SIZE_32BIT);
-				break;
-			case RD_OPS_vm32n:
-				unVSibIndexSize = RD_SIZE_32BIT;
-				unVSibIndexCount = (pInstruction->Exs.l == 0) ? 4 : ((pInstruction->Exs.l == 1) ? 8 : 16);
-				unVSibRegSize = (pInstruction->Exs.l == 0)   ? RD_SIZE_128BIT
-				                : (pInstruction->Exs.l == 1) ? RD_SIZE_256BIT
-				                                             : RD_SIZE_512BIT;
-				unDispSize = unVSibIndexCount * (bWidth ? RD_SIZE_64BIT : RD_SIZE_32BIT);
-				break;
-			case RD_OPS_vm64x:
-			case RD_OPS_vm64y:
-			case RD_OPS_vm64z:
-				unVSibIndexSize = RD_SIZE_64BIT;
-				unVSibIndexCount = (pInstruction->Exs.l == 0) ? 2 : ((pInstruction->Exs.l == 1) ? 4 : 8);
-				unVSibRegSize = (unOPS == RD_OPS_vm64x)   ? RD_SIZE_128BIT
-				                : (unOPS == RD_OPS_vm64y) ? RD_SIZE_256BIT
-				                                          : RD_SIZE_512BIT;
-				unDispSize = unVSibIndexCount * (bWidth ? RD_SIZE_64BIT : RD_SIZE_32BIT);
-				break;
-			case RD_OPS_vm64h:
-				unVSibIndexSize = RD_SIZE_64BIT;
-				unVSibIndexCount = (pInstruction->Exs.l == 0) ? 1 : ((pInstruction->Exs.l == 1) ? 2 : 4);
-				unVSibRegSize = (pInstruction->Exs.l == 0)   ? RD_SIZE_128BIT
-				                : (pInstruction->Exs.l == 1) ? RD_SIZE_128BIT
-				                                             : RD_SIZE_256BIT;
-				unDispSize = unVSibIndexCount * (bWidth ? RD_SIZE_64BIT : RD_SIZE_32BIT);
-				break;
-			case RD_OPS_vm64n:
-				unVSibIndexSize = RD_SIZE_64BIT;
-				unVSibIndexCount = (pInstruction->Exs.l == 0) ? 2 : ((pInstruction->Exs.l == 1) ? 4 : 8);
-				unVSibRegSize = (pInstruction->Exs.l == 0)   ? RD_SIZE_128BIT
-				                : (pInstruction->Exs.l == 1) ? RD_SIZE_256BIT
-				                                             : RD_SIZE_512BIT;
-				unDispSize = unVSibIndexCount * (bWidth ? RD_SIZE_64BIT : RD_SIZE_32BIT);
-				break;
-			case RD_OPS_v2:
-			case RD_OPS_v3:
-			case RD_OPS_v4:
-			case RD_OPS_v5:
-			case RD_OPS_v8: {
-				static const unsigned char pLut[3] = { RD_SIZE_16BIT, RD_SIZE_32BIT, RD_SIZE_64BIT };
+					unDispSize = pLut[pInstruction->EfOpMode];
+				} break;
+				case RD_OPS_c:
+					switch (pInstruction->DefCode) {
+						case RD_CODE_16:
+							unDispSize = pInstruction->HasOpSize ? RD_SIZE_16BIT : RD_SIZE_8BIT;
+							break;
+						case RD_CODE_32:
+							unDispSize = pInstruction->HasOpSize ? RD_SIZE_16BIT : RD_SIZE_32BIT;
+							break;
+						case RD_CODE_64:
+							unDispSize = RD_SIZE_64BIT;
+							break;
+						default:
+							return RD_STATUS_INVALID_INSTRUX;
+					}
+					break;
+				case RD_OPS_p: {
+					static const unsigned char pLut[3] = { RD_SIZE_32BIT, RD_SIZE_48BIT, RD_SIZE_80BIT };
+					unDispSize = pLut[pInstruction->EfOpMode];
+				} break;
+				case RD_OPS_s: {
+					static const unsigned char pLut[3] = { RD_SIZE_48BIT, RD_SIZE_48BIT, RD_SIZE_80BIT };
+					unDispSize = pLut[pInstruction->DefCode];
+				} break;
+				case RD_OPS_l: {
+					static const unsigned char pLut[3] = { RD_SIZE_64BIT, RD_SIZE_64BIT, RD_SIZE_128BIT };
+					unDispSize = pLut[pInstruction->DefCode];
+				} break;
+				case RD_OPS_x: {
+					static const unsigned char pLut[3] = { RD_SIZE_128BIT, RD_SIZE_256BIT, RD_SIZE_512BIT };
+					unDispSize = pLut[pInstruction->EfVecMode];
+				} break;
+				case RD_OPS_fv: {
+					static const unsigned char pLut[3] = { RD_SIZE_128BIT, RD_SIZE_256BIT, RD_SIZE_512BIT };
+					unDispSize = pLut[pInstruction->EfVecMode];
+				} break;
+				case RD_OPS_uv: {
+					static const unsigned char pLut[3] = { 0, RD_SIZE_256BIT, RD_SIZE_512BIT };
 
-				switch (unOPS) {
+					if (RD_VECM_128 == pInstruction->EfVecMode) {
+						return RD_STATUS_INVALID_INSTRUX;
+					}
+
+					unDispSize = pLut[pInstruction->EfVecMode];
+				} break;
+				case RD_OPS_ev: {
+					static const unsigned char pLut[3] = { RD_SIZE_16BIT, RD_SIZE_32BIT, RD_SIZE_64BIT };
+					unDispSize = pLut[pInstruction->EfVecMode];
+				} break;
+				case RD_OPS_qv: {
+					static const unsigned char pLut[3] = { RD_SIZE_32BIT, RD_SIZE_64BIT, RD_SIZE_128BIT };
+					unDispSize = pLut[pInstruction->EfVecMode];
+				} break;
+				case RD_OPS_hv: {
+					static const unsigned char pLut[3] = { RD_SIZE_64BIT, RD_SIZE_128BIT, RD_SIZE_256BIT };
+					unDispSize = pLut[pInstruction->EfVecMode];
+				} break;
+				case RD_OPS_pd:
+				case RD_OPS_ps:
+				case RD_OPS_ph: {
+					static const unsigned char pLut[3] = { RD_SIZE_128BIT, RD_SIZE_256BIT, RD_SIZE_512BIT };
+					unDispSize = pLut[pInstruction->EfVecMode];
+				} break;
+				case RD_OPS_sd:
+					unDispSize = RD_SIZE_64BIT;
+					break;
+				case RD_OPS_ss:
+					unDispSize = RD_SIZE_32BIT;
+					break;
+				case RD_OPS_sh:
+					unDispSize = RD_SIZE_16BIT;
+					break;
+				case RD_OPS_mib:
+					unDispSize = 0;
+					break;
+				case RD_OPS_vm32x:
+				case RD_OPS_vm32y:
+				case RD_OPS_vm32z:
+					unVSibIndexSize = RD_SIZE_32BIT;
+					unVSibIndexCount = (pInstruction->Exs.l == 0) ? 4 : ((pInstruction->Exs.l == 1) ? 8 : 16);
+					unVSibRegSize = (unOPS == RD_OPS_vm32x)   ? RD_SIZE_128BIT
+					                : (unOPS == RD_OPS_vm32y) ? RD_SIZE_256BIT
+					                                          : RD_SIZE_512BIT;
+					unDispSize = unVSibIndexCount * (bWidth ? RD_SIZE_64BIT : RD_SIZE_32BIT);
+					break;
+				case RD_OPS_vm32h:
+					unVSibIndexSize = RD_SIZE_32BIT;
+					unVSibIndexCount = (pInstruction->Exs.l == 0) ? 2 : ((pInstruction->Exs.l == 1) ? 4 : 8);
+					unVSibRegSize = (pInstruction->Exs.l == 0)   ? RD_SIZE_128BIT
+					                : (pInstruction->Exs.l == 1) ? RD_SIZE_128BIT
+					                                             : RD_SIZE_256BIT;
+					unDispSize = unVSibIndexCount * (bWidth ? RD_SIZE_64BIT : RD_SIZE_32BIT);
+					break;
+				case RD_OPS_vm32n:
+					unVSibIndexSize = RD_SIZE_32BIT;
+					unVSibIndexCount = (pInstruction->Exs.l == 0) ? 4 : ((pInstruction->Exs.l == 1) ? 8 : 16);
+					unVSibRegSize = (pInstruction->Exs.l == 0)   ? RD_SIZE_128BIT
+					                : (pInstruction->Exs.l == 1) ? RD_SIZE_256BIT
+					                                             : RD_SIZE_512BIT;
+					unDispSize = unVSibIndexCount * (bWidth ? RD_SIZE_64BIT : RD_SIZE_32BIT);
+					break;
+				case RD_OPS_vm64x:
+				case RD_OPS_vm64y:
+				case RD_OPS_vm64z:
+					unVSibIndexSize = RD_SIZE_64BIT;
+					unVSibIndexCount = (pInstruction->Exs.l == 0) ? 2 : ((pInstruction->Exs.l == 1) ? 4 : 8);
+					unVSibRegSize = (unOPS == RD_OPS_vm64x)   ? RD_SIZE_128BIT
+					                : (unOPS == RD_OPS_vm64y) ? RD_SIZE_256BIT
+					                                          : RD_SIZE_512BIT;
+					unDispSize = unVSibIndexCount * (bWidth ? RD_SIZE_64BIT : RD_SIZE_32BIT);
+					break;
+				case RD_OPS_vm64h:
+					unVSibIndexSize = RD_SIZE_64BIT;
+					unVSibIndexCount = (pInstruction->Exs.l == 0) ? 1 : ((pInstruction->Exs.l == 1) ? 2 : 4);
+					unVSibRegSize = (pInstruction->Exs.l == 0)   ? RD_SIZE_128BIT
+					                : (pInstruction->Exs.l == 1) ? RD_SIZE_128BIT
+					                                             : RD_SIZE_256BIT;
+					unDispSize = unVSibIndexCount * (bWidth ? RD_SIZE_64BIT : RD_SIZE_32BIT);
+					break;
+				case RD_OPS_vm64n:
+					unVSibIndexSize = RD_SIZE_64BIT;
+					unVSibIndexCount = (pInstruction->Exs.l == 0) ? 2 : ((pInstruction->Exs.l == 1) ? 4 : 8);
+					unVSibRegSize = (pInstruction->Exs.l == 0)   ? RD_SIZE_128BIT
+					                : (pInstruction->Exs.l == 1) ? RD_SIZE_256BIT
+					                                             : RD_SIZE_512BIT;
+					unDispSize = unVSibIndexCount * (bWidth ? RD_SIZE_64BIT : RD_SIZE_32BIT);
+					break;
 				case RD_OPS_v2:
-					unDispSize = 2 * pLut[pInstruction->EfOpMode];
-					break;
 				case RD_OPS_v3:
-					unDispSize = 3 * pLut[pInstruction->EfOpMode];
-					break;
 				case RD_OPS_v4:
-					unDispSize = 4 * pLut[pInstruction->EfOpMode];
-					break;
 				case RD_OPS_v5:
-					unDispSize = 5 * pLut[pInstruction->EfOpMode];
+				case RD_OPS_v8: {
+					static const unsigned char pLut[3] = { RD_SIZE_16BIT, RD_SIZE_32BIT, RD_SIZE_64BIT };
+
+					switch (unOPS) {
+						case RD_OPS_v2:
+							unDispSize = 2 * pLut[pInstruction->EfOpMode];
+							break;
+						case RD_OPS_v3:
+							unDispSize = 3 * pLut[pInstruction->EfOpMode];
+							break;
+						case RD_OPS_v4:
+							unDispSize = 4 * pLut[pInstruction->EfOpMode];
+							break;
+						case RD_OPS_v5:
+							unDispSize = 5 * pLut[pInstruction->EfOpMode];
+							break;
+						default:
+							unDispSize = 8 * pLut[pInstruction->EfOpMode];
+							break;
+					}
+				} break;
+				case RD_OPS_12:
+					unDispSize = 12;
+					break;
+				case RD_OPS_t:
+					unDispSize = RD_SIZE_1KB;
+					break;
+				case RD_OPS_384:
+					unDispSize = RD_SIZE_384BIT;
+					break;
+				case RD_OPS_512:
+					unDispSize = RD_SIZE_512BIT;
+					break;
+				case RD_OPS_4096:
+					unDispSize = RD_SIZE_4096BIT;
+					break;
+				case RD_OPS_unknown:
+					unDispSize = RD_SIZE_UNKNOWN;
 					break;
 				default:
-					unDispSize = 8 * pLut[pInstruction->EfOpMode];
-					break;
-				}
-			} break;
-			case RD_OPS_12:
-				unDispSize = 12;
-				break;
-			case RD_OPS_t:
-				unDispSize = RD_SIZE_1KB;
-				break;
-			case RD_OPS_384:
-				unDispSize = RD_SIZE_384BIT;
-				break;
-			case RD_OPS_512:
-				unDispSize = RD_SIZE_512BIT;
-				break;
-			case RD_OPS_4096:
-				unDispSize = RD_SIZE_4096BIT;
-				break;
-			case RD_OPS_unknown:
-				unDispSize = RD_SIZE_UNKNOWN;
-				break;
-			default:
-				return RD_STATUS_INVALID_INSTRUX;
+					return RD_STATUS_INVALID_INSTRUX;
 			}
 
 			pOperand->Size = pOperand->RawSize = unBroadcastSize = unDispSize;
 
 			switch (unOPT) {
-			case RD_OPT_CONST_1:
-				pOperand->Type = RD_OP_CONST;
-				pOperand->Info.Constant.Const = 1;
-				break;
-			case RD_OPT_RIP:
-				pOperand->Type = RD_OP_REG;
-				pOperand->Info.Register.Type = RD_REG_RIP;
-				pOperand->Info.Register.Size = static_cast<unsigned int>(unDispSize & 0xFFFFFFFF);
-				pOperand->Info.Register.Reg = 0;
-				pInstruction->RipAccess |= pOperand->Access.Access;
-				break;
-			case RD_OPT_GPR_rAX:
-				pOperand->Type = RD_OP_REG;
-				pOperand->Info.Register.Type = RD_REG_GPR;
-				pOperand->Info.Register.Size = static_cast<unsigned int>(unDispSize & 0xFFFFFFFF);
-				pOperand->Info.Register.Reg = RDR_RAX;
-				break;
-			case RD_OPT_GPR_AH:
-				pOperand->Type = RD_OP_REG;
-				pOperand->Info.Register.Type = RD_REG_GPR;
-				pOperand->Info.Register.Size = RD_SIZE_8BIT;
-				pOperand->Info.Register.Reg = RDR_AH;
-				pOperand->Info.Register.IsHigh8 = true;
-				break;
-			case RD_OPT_GPR_rCX:
-				pOperand->Type = RD_OP_REG;
-				pOperand->Info.Register.Type = RD_REG_GPR;
-				pOperand->Info.Register.Size = static_cast<unsigned int>(unDispSize & 0xFFFFFFFF);
-				pOperand->Info.Register.Reg = RDR_RCX;
-				break;
-			case RD_OPT_GPR_rDX:
-				pOperand->Type = RD_OP_REG;
-				pOperand->Info.Register.Type = RD_REG_GPR;
-				pOperand->Info.Register.Size = static_cast<unsigned int>(unDispSize & 0xFFFFFFFF);
-				pOperand->Info.Register.Reg = RDR_RDX;
-				break;
-			case RD_OPT_GPR_rBX:
-				pOperand->Type = RD_OP_REG;
-				pOperand->Info.Register.Type = RD_REG_GPR;
-				pOperand->Info.Register.Size = static_cast<unsigned int>(unDispSize & 0xFFFFFFFF);
-				pOperand->Info.Register.Reg = RDR_RBX;
-				break;
-			case RD_OPT_GPR_rBP:
-				pOperand->Type = RD_OP_REG;
-				pOperand->Info.Register.Type = RD_REG_GPR;
-				pOperand->Info.Register.Size = static_cast<unsigned int>(unDispSize & 0xFFFFFFFF);
-				pOperand->Info.Register.Reg = RDR_RBP;
-				break;
-			case RD_OPT_GPR_rSP:
-				pOperand->Type = RD_OP_REG;
-				pOperand->Info.Register.Type = RD_REG_GPR;
-				pOperand->Info.Register.Size = static_cast<unsigned int>(unDispSize & 0xFFFFFFFF);
-				pOperand->Info.Register.Reg = RDR_RSP;
-				break;
-			case RD_OPT_GPR_rSI:
-				pOperand->Type = RD_OP_REG;
-				pOperand->Info.Register.Type = RD_REG_GPR;
-				pOperand->Info.Register.Size = static_cast<unsigned int>(unDispSize & 0xFFFFFFFF);
-				pOperand->Info.Register.Reg = RDR_RSI;
-				break;
-			case RD_OPT_GPR_rDI:
-				pOperand->Type = RD_OP_REG;
-				pOperand->Info.Register.Type = RD_REG_GPR;
-				pOperand->Info.Register.Size = static_cast<unsigned int>(unDispSize & 0xFFFFFFFF);
-				pOperand->Info.Register.Reg = RDR_RDI;
-				break;
-			case RD_OPT_GPR_rR8:
-				pOperand->Type = RD_OP_REG;
-				pOperand->Info.Register.Type = RD_REG_GPR;
-				pOperand->Info.Register.Size = static_cast<unsigned int>(unDispSize & 0xFFFFFFFF);
-				pOperand->Info.Register.Reg = RDR_R8;
-				break;
-			case RD_OPT_GPR_rR9:
-				pOperand->Type = RD_OP_REG;
-				pOperand->Info.Register.Type = RD_REG_GPR;
-				pOperand->Info.Register.Size = static_cast<unsigned int>(unDispSize & 0xFFFFFFFF);
-				pOperand->Info.Register.Reg = RDR_R9;
-				break;
-			case RD_OPT_GPR_rR11:
-				pOperand->Type = RD_OP_REG;
-				pOperand->Info.Register.Type = RD_REG_GPR;
-				pOperand->Info.Register.Size = static_cast<unsigned int>(unDispSize & 0xFFFFFFFF);
-				pOperand->Info.Register.Reg = RDR_R11;
-				break;
-			case RD_OPT_SEG_CS:
-				pOperand->Type = RD_OP_REG;
-				pOperand->Info.Register.Type = RD_REG_SEG;
-				pOperand->Info.Register.Size = static_cast<unsigned int>(unDispSize & 0xFFFFFFFF);
-				pOperand->Info.Register.Reg = RDR_CS;
-				pInstruction->CsAccess |= pOperand->Access.Access;
-				break;
-			case RD_OPT_SEG_SS:
-				pOperand->Type = RD_OP_REG;
-				pOperand->Info.Register.Type = RD_REG_SEG;
-				pOperand->Info.Register.Size = static_cast<unsigned int>(unDispSize & 0xFFFFFFFF);
-				pOperand->Info.Register.Reg = RDR_SS;
-				break;
-			case RD_OPT_SEG_DS:
-				pOperand->Type = RD_OP_REG;
-				pOperand->Info.Register.Type = RD_REG_SEG;
-				pOperand->Info.Register.Size = static_cast<unsigned int>(unDispSize & 0xFFFFFFFF);
-				pOperand->Info.Register.Reg = RDR_DS;
-				break;
-			case RD_OPT_SEG_ES:
-				pOperand->Type = RD_OP_REG;
-				pOperand->Info.Register.Type = RD_REG_SEG;
-				pOperand->Info.Register.Size = static_cast<unsigned int>(unDispSize & 0xFFFFFFFF);
-				pOperand->Info.Register.Reg = RDR_ES;
-				break;
-			case RD_OPT_SEG_FS:
-				pOperand->Type = RD_OP_REG;
-				pOperand->Info.Register.Type = RD_REG_SEG;
-				pOperand->Info.Register.Size = static_cast<unsigned int>(unDispSize & 0xFFFFFFFF);
-				pOperand->Info.Register.Reg = RDR_FS;
-				break;
-			case RD_OPT_SEG_GS:
-				pOperand->Type = RD_OP_REG;
-				pOperand->Info.Register.Type = RD_REG_SEG;
-				pOperand->Info.Register.Size = static_cast<unsigned int>(unDispSize & 0xFFFFFFFF);
-				pOperand->Info.Register.Reg = RDR_GS;
-				break;
-			case RD_OPT_FPU_ST0:
-				pOperand->Type = RD_OP_REG;
-				pOperand->Info.Register.Type = RD_REG_FPU;
-				pOperand->Info.Register.Size = RD_SIZE_80BIT;
-				pOperand->Info.Register.Reg = 0;
-				break;
-			case RD_OPT_FPU_STX:
-				pOperand->Type = RD_OP_REG;
-				pOperand->Info.Register.Type = RD_REG_FPU;
-				pOperand->Info.Register.Size = RD_SIZE_80BIT;
-				pOperand->Info.Register.Reg = pInstruction->ModRm.rm;
-				break;
-			case RD_OPT_SSE_XMM0:
-			case RD_OPT_SSE_XMM1:
-			case RD_OPT_SSE_XMM2:
-			case RD_OPT_SSE_XMM3:
-			case RD_OPT_SSE_XMM4:
-			case RD_OPT_SSE_XMM5:
-			case RD_OPT_SSE_XMM6:
-			case RD_OPT_SSE_XMM7:
-				pOperand->Type = RD_OP_REG;
-				pOperand->Info.Register.Type = RD_REG_SSE;
-				pOperand->Info.Register.Size = RD_SIZE_128BIT;
-				pOperand->Info.Register.Reg = unOPT - RD_OPT_SSE_XMM0;
-				break;
-			case RD_OPT_CR_0:
-				pOperand->Type = RD_OP_REG;
-				pOperand->Info.Register.Type = RD_REG_CR;
-				pOperand->Info.Register.Size = static_cast<unsigned int>(unDispSize & 0xFFFFFFFF);
-				pOperand->Info.Register.Reg = RDR_CR0;
-				break;
-			case RD_OPT_SYS_GDTR:
-				pOperand->Type = RD_OP_REG;
-				pOperand->Info.Register.Type = RD_REG_SYS;
-				pOperand->Info.Register.Size = static_cast<unsigned int>(unDispSize & 0xFFFFFFFF);
-				pOperand->Info.Register.Reg = RDR_GDTR;
-				break;
-			case RD_OPT_SYS_IDTR:
-				pOperand->Type = RD_OP_REG;
-				pOperand->Info.Register.Type = RD_REG_SYS;
-				pOperand->Info.Register.Size = static_cast<unsigned int>(unDispSize & 0xFFFFFFFF);
-				pOperand->Info.Register.Reg = RDR_IDTR;
-				break;
-			case RD_OPT_SYS_LDTR:
-				pOperand->Type = RD_OP_REG;
-				pOperand->Info.Register.Type = RD_REG_SYS;
-				pOperand->Info.Register.Size = static_cast<unsigned int>(unDispSize & 0xFFFFFFFF);
-				pOperand->Info.Register.Reg = RDR_LDTR;
-				break;
-			case RD_OPT_SYS_TR:
-				pOperand->Type = RD_OP_REG;
-				pOperand->Info.Register.Type = RD_REG_SYS;
-				pOperand->Info.Register.Size = static_cast<unsigned int>(unDispSize & 0xFFFFFFFF);
-				pOperand->Info.Register.Reg = RDR_TR;
-				break;
-			case RD_OPT_X87_CONTROL:
-				pOperand->Type = RD_OP_REG;
-				pOperand->Info.Register.Type = RD_REG_SYS;
-				pOperand->Info.Register.Size = RD_SIZE_16BIT;
-				pOperand->Info.Register.Reg = RDR_X87_CONTROL;
-				break;
-			case RD_OPT_X87_TAG:
-				pOperand->Type = RD_OP_REG;
-				pOperand->Info.Register.Type = RD_REG_SYS;
-				pOperand->Info.Register.Size = RD_SIZE_16BIT;
-				pOperand->Info.Register.Reg = RDR_X87_TAG;
-				break;
-			case RD_OPT_X87_STATUS:
-				pOperand->Type = RD_OP_REG;
-				pOperand->Info.Register.Type = RD_REG_SYS;
-				pOperand->Info.Register.Size = RD_SIZE_16BIT;
-				pOperand->Info.Register.Reg = RDR_X87_STATUS;
-				break;
-			case RD_OPT_MXCSR:
-				pOperand->Type = RD_OP_REG;
-				pOperand->Info.Register.Type = RD_REG_MXCSR;
-				pOperand->Info.Register.Size = RD_SIZE_32BIT;
-				pOperand->Info.Register.Reg = 0;
-				break;
-			case RD_OPT_PKRU:
-				pOperand->Type = RD_OP_REG;
-				pOperand->Info.Register.Type = RD_REG_PKRU;
-				pOperand->Info.Register.Size = RD_SIZE_32BIT;
-				pOperand->Info.Register.Reg = 0;
-				break;
-			case RD_OPT_SSP:
-				pOperand->Type = RD_OP_REG;
-				pOperand->Info.Register.Type = RD_REG_SSP;
-				pOperand->Info.Register.Size = pOperand->Size;
-				pOperand->Info.Register.Reg = 0;
-				break;
-			case RD_OPT_UIF:
-				pOperand->Type = RD_OP_REG;
-				pOperand->Info.Register.Type = RD_REG_UIF;
-				pOperand->Info.Register.Size = RD_SIZE_8BIT;
-				pOperand->Info.Register.Reg = 0;
-				break;
-			case RD_OPT_MSR:
-				pOperand->Type = RD_OP_REG;
-				pOperand->Info.Register.Type = RD_REG_MSR;
-				pOperand->Info.Register.Size = RD_SIZE_64BIT;
-				pOperand->Info.Register.Reg = 0xFFFFFFFF;
-				break;
-			case RD_OPT_MSR_TSC:
-				pOperand->Type = RD_OP_REG;
-				pOperand->Info.Register.Type = RD_REG_MSR;
-				pOperand->Info.Register.Size = RD_SIZE_64BIT;
-				pOperand->Info.Register.Reg = RDR_IA32_TSC;
-				break;
-			case RD_OPT_MSR_TSCAUX:
-				pOperand->Type = RD_OP_REG;
-				pOperand->Info.Register.Type = RD_REG_MSR;
-				pOperand->Info.Register.Size = RD_SIZE_64BIT;
-				pOperand->Info.Register.Reg = RDR_IA32_TSC_AUX;
-				break;
-			case RD_OPT_MSR_SCS:
-				pOperand->Type = RD_OP_REG;
-				pOperand->Info.Register.Type = RD_REG_MSR;
-				pOperand->Info.Register.Size = RD_SIZE_64BIT;
-				pOperand->Info.Register.Reg = RDR_IA32_SYSENTER_CS;
-				break;
-			case RD_OPT_MSR_SESP:
-				pOperand->Type = RD_OP_REG;
-				pOperand->Info.Register.Type = RD_REG_MSR;
-				pOperand->Info.Register.Size = RD_SIZE_64BIT;
-				pOperand->Info.Register.Reg = RDR_IA32_SYSENTER_ESP;
-				break;
-			case RD_OPT_MSR_SEIP:
-				pOperand->Type = RD_OP_REG;
-				pOperand->Info.Register.Type = RD_REG_MSR;
-				pOperand->Info.Register.Size = RD_SIZE_64BIT;
-				pOperand->Info.Register.Reg = RDR_IA32_SYSENTER_EIP;
-				break;
-			case RD_OPT_MSR_STAR:
-				pOperand->Type = RD_OP_REG;
-				pOperand->Info.Register.Type = RD_REG_MSR;
-				pOperand->Info.Register.Size = RD_SIZE_64BIT;
-				pOperand->Info.Register.Reg = RDR_IA32_STAR;
-				break;
-			case RD_OPT_MSR_LSTAR:
-				pOperand->Type = RD_OP_REG;
-				pOperand->Info.Register.Type = RD_REG_MSR;
-				pOperand->Info.Register.Size = RD_SIZE_64BIT;
-				pOperand->Info.Register.Reg = RDR_IA32_LSTAR;
-				break;
-			case RD_OPT_MSR_FMASK:
-				pOperand->Type = RD_OP_REG;
-				pOperand->Info.Register.Type = RD_REG_MSR;
-				pOperand->Info.Register.Size = RD_SIZE_64BIT;
-				pOperand->Info.Register.Reg = RDR_IA32_FMASK;
-				break;
-			case RD_OPT_MSR_FSBASE:
-				pOperand->Type = RD_OP_REG;
-				pOperand->Info.Register.Type = RD_REG_MSR;
-				pOperand->Info.Register.Size = RD_SIZE_64BIT;
-				pOperand->Info.Register.Reg = RDR_IA32_FS_BASE;
-				break;
-			case RD_OPT_MSR_GSBASE:
-				pOperand->Type = RD_OP_REG;
-				pOperand->Info.Register.Type = RD_REG_MSR;
-				pOperand->Info.Register.Size = RD_SIZE_64BIT;
-				pOperand->Info.Register.Reg = RDR_IA32_GS_BASE;
-				break;
-			case RD_OPT_MSR_KGSBASE:
-				pOperand->Type = RD_OP_REG;
-				pOperand->Info.Register.Type = RD_REG_MSR;
-				pOperand->Info.Register.Size = RD_SIZE_64BIT;
-				pOperand->Info.Register.Reg = RDR_IA32_KERNEL_GS_BASE;
-				break;
-			case RD_OPT_XCR:
-				pOperand->Type = RD_OP_REG;
-				pOperand->Info.Register.Type = RD_REG_XCR;
-				pOperand->Info.Register.Size = RD_SIZE_64BIT;
-				pOperand->Info.Register.Reg = 0xFF;
-				break;
-			case RD_OPT_XCR_0:
-				pOperand->Type = RD_OP_REG;
-				pOperand->Info.Register.Type = RD_REG_XCR;
-				pOperand->Info.Register.Size = RD_SIZE_64BIT;
-				pOperand->Info.Register.Reg = 0;
-				break;
-			case RD_OPT_REG_BANK:
-				if ((pInstruction->Instruction == RD_INS_PUSHA) || (pInstruction->Instruction == RD_INS_POPA)) {
+				case RD_OPT_CONST_1:
+					pOperand->Type = RD_OP_CONST;
+					pOperand->Info.Constant.Const = 1;
+					break;
+				case RD_OPT_RIP:
 					pOperand->Type = RD_OP_REG;
-					pOperand->Size = pOperand->RawSize = pInstruction->WordLength;
-					pOperand->Info.Register.Type = RD_REG_GPR;
-					pOperand->Info.Register.Size = pInstruction->WordLength;
-					pOperand->Info.Register.Reg = RDR_EAX;
-					pOperand->Info.Register.Count = 8;
-					pOperand->Info.Register.IsBlock = true;
-				} else {
-					pOperand->Type = RD_OP_BANK;
-				}
-				break;
-			case RD_OPT_A: {
-				const unsigned int unStatus = RdFetchAddress(pInstruction, pCode, unOffset, unSize, static_cast<unsigned char>(unDispSize & 0xFF));
-				if (!RD_SUCCESS(unStatus)) {
-					return unStatus;
-				}
-
-				pOperand->Type = RD_OP_ADDR;
-				pOperand->Info.Address.BaseSeg = pInstruction->Address.Cs;
-				pOperand->Info.Address.Offset = pInstruction->Address.Ip;
-			} break;
-			case RD_OPT_B:
-				pOperand->Type = RD_OP_REG;
-				pOperand->Info.Register.Type = RD_REG_GPR;
-				pOperand->Info.Register.Size = static_cast<unsigned int>(unDispSize & 0xFFFFFFFF);
-
-				if (pInstruction->Exs.vp) {
-					return RD_STATUS_INVALID_REGISTER_IN_INSTRUCTION;
-				}
-
-				pOperand->Info.Register.Reg = static_cast<unsigned char>(pInstruction->Exs.v & 0xFF);
-				break;
-			case RD_OPT_C:
-				pOperand->Type = RD_OP_REG;
-				pOperand->Info.Register.Type = RD_REG_CR;
-				pOperand->Info.Register.Size = static_cast<unsigned int>(unDispSize & 0xFFFFFFFF);
-				pOperand->Info.Register.Reg = static_cast<unsigned char>(((pInstruction->Exs.r << 3) | pInstruction->ModRm.reg) & 0xFF);
-
-				if ((pInstruction->DefCode != RD_CODE_64) && pInstruction->HasLock) {
-					pOperand->Info.Register.Reg |= 0x8;
-				}
-
-				if (pOperand->Info.Register.Reg && (pOperand->Info.Register.Reg != 2) && (pOperand->Info.Register.Reg != 3) && (pOperand->Info.Register.Reg != 4) && (pOperand->Info.Register.Reg != 8)) {
-					return RD_STATUS_INVALID_REGISTER_IN_INSTRUCTION;
-				}
-				break;
-			case RD_OPT_D:
-				pOperand->Type = RD_OP_REG;
-				pOperand->Info.Register.Type = RD_REG_DR;
-				pOperand->Info.Register.Size = static_cast<unsigned int>(unDispSize & 0xFFFFFFFF);
-				pOperand->Info.Register.Reg = static_cast<unsigned char>(((pInstruction->Exs.r << 3) | pInstruction->ModRm.reg) & 0xFF);
-
-				if (pOperand->Info.Register.Reg >= 8) {
-					return RD_STATUS_INVALID_REGISTER_IN_INSTRUCTION;
-				}
-				break;
-			case RD_OPT_T:
-				pOperand->Type = RD_OP_REG;
-				pOperand->Info.Register.Type = RD_REG_TR;
-				pOperand->Info.Register.Size = static_cast<unsigned int>(unDispSize & 0xFFFFFFFF);
-				pOperand->Info.Register.Reg = static_cast<unsigned char>(((pInstruction->Exs.r << 3) | pInstruction->ModRm.reg) & 0xFF);
-
-				if (pOperand->Info.Register.Reg >= 8) {
-					return RD_STATUS_INVALID_REGISTER_IN_INSTRUCTION;
-				}
-				break;
-			case RD_OPT_S:
-				pOperand->Type = RD_OP_REG;
-				pOperand->Info.Register.Type = RD_REG_SEG;
-				pOperand->Info.Register.Size = static_cast<unsigned int>(unDispSize & 0xFFFFFFFF);
-				pOperand->Info.Register.Reg = pInstruction->ModRm.reg;
-
-				if (pOperand->Info.Register.Reg >= 6) {
-					return RD_STATUS_INVALID_REGISTER_IN_INSTRUCTION;
-				}
-
-				if ((pOperand->Info.Register.Reg == RDR_CS) && pOperand->Access.Write) {
-					return RD_STATUS_CS_LOAD;
-				}
-				break;
-			case RD_OPT_E:
-				if (pInstruction->ModRm.mod == 3) {
+					pOperand->Info.Register.Type = RD_REG_RIP;
+					pOperand->Info.Register.Size = static_cast<unsigned int>(unDispSize & 0xFFFFFFFF);
+					pOperand->Info.Register.Reg = 0;
+					pInstruction->RipAccess |= pOperand->Access.Access;
+					break;
+				case RD_OPT_GPR_rAX:
 					pOperand->Type = RD_OP_REG;
 					pOperand->Info.Register.Type = RD_REG_GPR;
 					pOperand->Info.Register.Size = static_cast<unsigned int>(unDispSize & 0xFFFFFFFF);
-					pOperand->Info.Register.Reg = static_cast<unsigned char>(((pInstruction->Exs.b << 3) | pInstruction->ModRm.rm) & 0xFF);
-					pOperand->Info.Register.IsHigh8 = (pOperand->Info.Register.Size == 1) && (pOperand->Info.Register.Reg >= 4) && (pInstruction->EncMode == RD_ENCM_LEGACY) && !pInstruction->HasRex;
-				} else {
-					goto OPT_M;
-				}
-				break;
-			case RD_OPT_F:
-				pOperand->Type = RD_OP_REG;
-				pOperand->Info.Register.Type = RD_REG_FLG;
-				pOperand->Info.Register.Size = static_cast<unsigned int>(unDispSize & 0xFFFFFFFF);
-				pOperand->Info.Register.Reg = 0;
-				pInstruction->FlagsAccess.RegAccess |= pOperand->Access.Access;
-				break;
-			case RD_OPT_K: {
-				static const unsigned char pLut[3] = { RD_SIZE_16BIT, RD_SIZE_32BIT, RD_SIZE_64BIT };
-				pInstruction->MemoryAccess |= pOperand->Access.Access;
-				pOperand->Type = RD_OP_MEM;
-				pOperand->Info.Memory.IsStack = true;
-				pOperand->Info.Memory.HasBase = true;
-				pOperand->Info.Memory.Base = RDR_RSP;
-				pOperand->Info.Memory.BaseSize = pLut[pInstruction->DefStack];
-				pOperand->Info.Memory.HasSeg = true;
-				pOperand->Info.Memory.Seg = RDR_SS;
-				pInstruction->StackWords = static_cast<unsigned char>((pOperand->Size / pInstruction->WordLength) & 0xFF);
-				pInstruction->StackAccess |= pOperand->Access.Access;
-			} break;
-			case RD_OPT_G:
-				pOperand->Type = RD_OP_REG;
-				pOperand->Info.Register.Type = RD_REG_GPR;
-				pOperand->Info.Register.Size = static_cast<unsigned int>(unDispSize & 0xFFFFFFFF);
-
-				if (pInstruction->Exs.rp) {
-					return RD_STATUS_INVALID_REGISTER_IN_INSTRUCTION;
-				}
-
-				pOperand->Info.Register.Reg = static_cast<unsigned char>(((pInstruction->Exs.r << 3) | pInstruction->ModRm.reg) & 0xFF);
-				pOperand->Info.Register.IsHigh8 = (pOperand->Info.Register.Size == 1) && (pOperand->Info.Register.Reg >= 4) && (pInstruction->EncMode == RD_ENCM_LEGACY) && !pInstruction->HasRex;
-				break;
-			case RD_OPT_R:
-				if ((pInstruction->ModRm.mod == 3) || (pInstruction->Attributes & RD_FLAG_MFR)) {
+					pOperand->Info.Register.Reg = RDR_RAX;
+					break;
+				case RD_OPT_GPR_AH:
+					pOperand->Type = RD_OP_REG;
+					pOperand->Info.Register.Type = RD_REG_GPR;
+					pOperand->Info.Register.Size = RD_SIZE_8BIT;
+					pOperand->Info.Register.Reg = RDR_AH;
+					pOperand->Info.Register.IsHigh8 = true;
+					break;
+				case RD_OPT_GPR_rCX:
 					pOperand->Type = RD_OP_REG;
 					pOperand->Info.Register.Type = RD_REG_GPR;
 					pOperand->Info.Register.Size = static_cast<unsigned int>(unDispSize & 0xFFFFFFFF);
-					pOperand->Info.Register.Reg = static_cast<unsigned char>(((pInstruction->Exs.b << 3) | pInstruction->ModRm.rm) & 0xFF);
-					pOperand->Info.Register.IsHigh8 = (pOperand->Info.Register.Size == 1) && (pOperand->Info.Register.Reg >= 4) && (pInstruction->EncMode == RD_ENCM_LEGACY) && !pInstruction->HasRex;
-				} else {
-					return RD_STATUS_INVALID_ENCODING;
-				}
-				break;
-			case RD_OPT_I: {
-				const unsigned int unStatus = RdFetchImmediate(pInstruction, pCode, unOffset, unSize, static_cast<unsigned char>(unDispSize & 0xFF));
-				if (!RD_SUCCESS(unStatus)) {
-					return unStatus;
-				}
+					pOperand->Info.Register.Reg = RDR_RCX;
+					break;
+				case RD_OPT_GPR_rDX:
+					pOperand->Type = RD_OP_REG;
+					pOperand->Info.Register.Type = RD_REG_GPR;
+					pOperand->Info.Register.Size = static_cast<unsigned int>(unDispSize & 0xFFFFFFFF);
+					pOperand->Info.Register.Reg = RDR_RDX;
+					break;
+				case RD_OPT_GPR_rBX:
+					pOperand->Type = RD_OP_REG;
+					pOperand->Info.Register.Type = RD_REG_GPR;
+					pOperand->Info.Register.Size = static_cast<unsigned int>(unDispSize & 0xFFFFFFFF);
+					pOperand->Info.Register.Reg = RDR_RBX;
+					break;
+				case RD_OPT_GPR_rBP:
+					pOperand->Type = RD_OP_REG;
+					pOperand->Info.Register.Type = RD_REG_GPR;
+					pOperand->Info.Register.Size = static_cast<unsigned int>(unDispSize & 0xFFFFFFFF);
+					pOperand->Info.Register.Reg = RDR_RBP;
+					break;
+				case RD_OPT_GPR_rSP:
+					pOperand->Type = RD_OP_REG;
+					pOperand->Info.Register.Type = RD_REG_GPR;
+					pOperand->Info.Register.Size = static_cast<unsigned int>(unDispSize & 0xFFFFFFFF);
+					pOperand->Info.Register.Reg = RDR_RSP;
+					break;
+				case RD_OPT_GPR_rSI:
+					pOperand->Type = RD_OP_REG;
+					pOperand->Info.Register.Type = RD_REG_GPR;
+					pOperand->Info.Register.Size = static_cast<unsigned int>(unDispSize & 0xFFFFFFFF);
+					pOperand->Info.Register.Reg = RDR_RSI;
+					break;
+				case RD_OPT_GPR_rDI:
+					pOperand->Type = RD_OP_REG;
+					pOperand->Info.Register.Type = RD_REG_GPR;
+					pOperand->Info.Register.Size = static_cast<unsigned int>(unDispSize & 0xFFFFFFFF);
+					pOperand->Info.Register.Reg = RDR_RDI;
+					break;
+				case RD_OPT_GPR_rR8:
+					pOperand->Type = RD_OP_REG;
+					pOperand->Info.Register.Type = RD_REG_GPR;
+					pOperand->Info.Register.Size = static_cast<unsigned int>(unDispSize & 0xFFFFFFFF);
+					pOperand->Info.Register.Reg = RDR_R8;
+					break;
+				case RD_OPT_GPR_rR9:
+					pOperand->Type = RD_OP_REG;
+					pOperand->Info.Register.Type = RD_REG_GPR;
+					pOperand->Info.Register.Size = static_cast<unsigned int>(unDispSize & 0xFFFFFFFF);
+					pOperand->Info.Register.Reg = RDR_R9;
+					break;
+				case RD_OPT_GPR_rR11:
+					pOperand->Type = RD_OP_REG;
+					pOperand->Info.Register.Type = RD_REG_GPR;
+					pOperand->Info.Register.Size = static_cast<unsigned int>(unDispSize & 0xFFFFFFFF);
+					pOperand->Info.Register.Reg = RDR_R11;
+					break;
+				case RD_OPT_SEG_CS:
+					pOperand->Type = RD_OP_REG;
+					pOperand->Info.Register.Type = RD_REG_SEG;
+					pOperand->Info.Register.Size = static_cast<unsigned int>(unDispSize & 0xFFFFFFFF);
+					pOperand->Info.Register.Reg = RDR_CS;
+					pInstruction->CsAccess |= pOperand->Access.Access;
+					break;
+				case RD_OPT_SEG_SS:
+					pOperand->Type = RD_OP_REG;
+					pOperand->Info.Register.Type = RD_REG_SEG;
+					pOperand->Info.Register.Size = static_cast<unsigned int>(unDispSize & 0xFFFFFFFF);
+					pOperand->Info.Register.Reg = RDR_SS;
+					break;
+				case RD_OPT_SEG_DS:
+					pOperand->Type = RD_OP_REG;
+					pOperand->Info.Register.Type = RD_REG_SEG;
+					pOperand->Info.Register.Size = static_cast<unsigned int>(unDispSize & 0xFFFFFFFF);
+					pOperand->Info.Register.Reg = RDR_DS;
+					break;
+				case RD_OPT_SEG_ES:
+					pOperand->Type = RD_OP_REG;
+					pOperand->Info.Register.Type = RD_REG_SEG;
+					pOperand->Info.Register.Size = static_cast<unsigned int>(unDispSize & 0xFFFFFFFF);
+					pOperand->Info.Register.Reg = RDR_ES;
+					break;
+				case RD_OPT_SEG_FS:
+					pOperand->Type = RD_OP_REG;
+					pOperand->Info.Register.Type = RD_REG_SEG;
+					pOperand->Info.Register.Size = static_cast<unsigned int>(unDispSize & 0xFFFFFFFF);
+					pOperand->Info.Register.Reg = RDR_FS;
+					break;
+				case RD_OPT_SEG_GS:
+					pOperand->Type = RD_OP_REG;
+					pOperand->Info.Register.Type = RD_REG_SEG;
+					pOperand->Info.Register.Size = static_cast<unsigned int>(unDispSize & 0xFFFFFFFF);
+					pOperand->Info.Register.Reg = RDR_GS;
+					break;
+				case RD_OPT_FPU_ST0:
+					pOperand->Type = RD_OP_REG;
+					pOperand->Info.Register.Type = RD_REG_FPU;
+					pOperand->Info.Register.Size = RD_SIZE_80BIT;
+					pOperand->Info.Register.Reg = 0;
+					break;
+				case RD_OPT_FPU_STX:
+					pOperand->Type = RD_OP_REG;
+					pOperand->Info.Register.Type = RD_REG_FPU;
+					pOperand->Info.Register.Size = RD_SIZE_80BIT;
+					pOperand->Info.Register.Reg = pInstruction->ModRm.rm;
+					break;
+				case RD_OPT_SSE_XMM0:
+				case RD_OPT_SSE_XMM1:
+				case RD_OPT_SSE_XMM2:
+				case RD_OPT_SSE_XMM3:
+				case RD_OPT_SSE_XMM4:
+				case RD_OPT_SSE_XMM5:
+				case RD_OPT_SSE_XMM6:
+				case RD_OPT_SSE_XMM7:
+					pOperand->Type = RD_OP_REG;
+					pOperand->Info.Register.Type = RD_REG_SSE;
+					pOperand->Info.Register.Size = RD_SIZE_128BIT;
+					pOperand->Info.Register.Reg = unOPT - RD_OPT_SSE_XMM0;
+					break;
+				case RD_OPT_CR_0:
+					pOperand->Type = RD_OP_REG;
+					pOperand->Info.Register.Type = RD_REG_CR;
+					pOperand->Info.Register.Size = static_cast<unsigned int>(unDispSize & 0xFFFFFFFF);
+					pOperand->Info.Register.Reg = RDR_CR0;
+					break;
+				case RD_OPT_SYS_GDTR:
+					pOperand->Type = RD_OP_REG;
+					pOperand->Info.Register.Type = RD_REG_SYS;
+					pOperand->Info.Register.Size = static_cast<unsigned int>(unDispSize & 0xFFFFFFFF);
+					pOperand->Info.Register.Reg = RDR_GDTR;
+					break;
+				case RD_OPT_SYS_IDTR:
+					pOperand->Type = RD_OP_REG;
+					pOperand->Info.Register.Type = RD_REG_SYS;
+					pOperand->Info.Register.Size = static_cast<unsigned int>(unDispSize & 0xFFFFFFFF);
+					pOperand->Info.Register.Reg = RDR_IDTR;
+					break;
+				case RD_OPT_SYS_LDTR:
+					pOperand->Type = RD_OP_REG;
+					pOperand->Info.Register.Type = RD_REG_SYS;
+					pOperand->Info.Register.Size = static_cast<unsigned int>(unDispSize & 0xFFFFFFFF);
+					pOperand->Info.Register.Reg = RDR_LDTR;
+					break;
+				case RD_OPT_SYS_TR:
+					pOperand->Type = RD_OP_REG;
+					pOperand->Info.Register.Type = RD_REG_SYS;
+					pOperand->Info.Register.Size = static_cast<unsigned int>(unDispSize & 0xFFFFFFFF);
+					pOperand->Info.Register.Reg = RDR_TR;
+					break;
+				case RD_OPT_X87_CONTROL:
+					pOperand->Type = RD_OP_REG;
+					pOperand->Info.Register.Type = RD_REG_SYS;
+					pOperand->Info.Register.Size = RD_SIZE_16BIT;
+					pOperand->Info.Register.Reg = RDR_X87_CONTROL;
+					break;
+				case RD_OPT_X87_TAG:
+					pOperand->Type = RD_OP_REG;
+					pOperand->Info.Register.Type = RD_REG_SYS;
+					pOperand->Info.Register.Size = RD_SIZE_16BIT;
+					pOperand->Info.Register.Reg = RDR_X87_TAG;
+					break;
+				case RD_OPT_X87_STATUS:
+					pOperand->Type = RD_OP_REG;
+					pOperand->Info.Register.Type = RD_REG_SYS;
+					pOperand->Info.Register.Size = RD_SIZE_16BIT;
+					pOperand->Info.Register.Reg = RDR_X87_STATUS;
+					break;
+				case RD_OPT_MXCSR:
+					pOperand->Type = RD_OP_REG;
+					pOperand->Info.Register.Type = RD_REG_MXCSR;
+					pOperand->Info.Register.Size = RD_SIZE_32BIT;
+					pOperand->Info.Register.Reg = 0;
+					break;
+				case RD_OPT_PKRU:
+					pOperand->Type = RD_OP_REG;
+					pOperand->Info.Register.Type = RD_REG_PKRU;
+					pOperand->Info.Register.Size = RD_SIZE_32BIT;
+					pOperand->Info.Register.Reg = 0;
+					break;
+				case RD_OPT_SSP:
+					pOperand->Type = RD_OP_REG;
+					pOperand->Info.Register.Type = RD_REG_SSP;
+					pOperand->Info.Register.Size = pOperand->Size;
+					pOperand->Info.Register.Reg = 0;
+					break;
+				case RD_OPT_UIF:
+					pOperand->Type = RD_OP_REG;
+					pOperand->Info.Register.Type = RD_REG_UIF;
+					pOperand->Info.Register.Size = RD_SIZE_8BIT;
+					pOperand->Info.Register.Reg = 0;
+					break;
+				case RD_OPT_MSR:
+					pOperand->Type = RD_OP_REG;
+					pOperand->Info.Register.Type = RD_REG_MSR;
+					pOperand->Info.Register.Size = RD_SIZE_64BIT;
+					pOperand->Info.Register.Reg = 0xFFFFFFFF;
+					break;
+				case RD_OPT_MSR_TSC:
+					pOperand->Type = RD_OP_REG;
+					pOperand->Info.Register.Type = RD_REG_MSR;
+					pOperand->Info.Register.Size = RD_SIZE_64BIT;
+					pOperand->Info.Register.Reg = RDR_IA32_TSC;
+					break;
+				case RD_OPT_MSR_TSCAUX:
+					pOperand->Type = RD_OP_REG;
+					pOperand->Info.Register.Type = RD_REG_MSR;
+					pOperand->Info.Register.Size = RD_SIZE_64BIT;
+					pOperand->Info.Register.Reg = RDR_IA32_TSC_AUX;
+					break;
+				case RD_OPT_MSR_SCS:
+					pOperand->Type = RD_OP_REG;
+					pOperand->Info.Register.Type = RD_REG_MSR;
+					pOperand->Info.Register.Size = RD_SIZE_64BIT;
+					pOperand->Info.Register.Reg = RDR_IA32_SYSENTER_CS;
+					break;
+				case RD_OPT_MSR_SESP:
+					pOperand->Type = RD_OP_REG;
+					pOperand->Info.Register.Type = RD_REG_MSR;
+					pOperand->Info.Register.Size = RD_SIZE_64BIT;
+					pOperand->Info.Register.Reg = RDR_IA32_SYSENTER_ESP;
+					break;
+				case RD_OPT_MSR_SEIP:
+					pOperand->Type = RD_OP_REG;
+					pOperand->Info.Register.Type = RD_REG_MSR;
+					pOperand->Info.Register.Size = RD_SIZE_64BIT;
+					pOperand->Info.Register.Reg = RDR_IA32_SYSENTER_EIP;
+					break;
+				case RD_OPT_MSR_STAR:
+					pOperand->Type = RD_OP_REG;
+					pOperand->Info.Register.Type = RD_REG_MSR;
+					pOperand->Info.Register.Size = RD_SIZE_64BIT;
+					pOperand->Info.Register.Reg = RDR_IA32_STAR;
+					break;
+				case RD_OPT_MSR_LSTAR:
+					pOperand->Type = RD_OP_REG;
+					pOperand->Info.Register.Type = RD_REG_MSR;
+					pOperand->Info.Register.Size = RD_SIZE_64BIT;
+					pOperand->Info.Register.Reg = RDR_IA32_LSTAR;
+					break;
+				case RD_OPT_MSR_FMASK:
+					pOperand->Type = RD_OP_REG;
+					pOperand->Info.Register.Type = RD_REG_MSR;
+					pOperand->Info.Register.Size = RD_SIZE_64BIT;
+					pOperand->Info.Register.Reg = RDR_IA32_FMASK;
+					break;
+				case RD_OPT_MSR_FSBASE:
+					pOperand->Type = RD_OP_REG;
+					pOperand->Info.Register.Type = RD_REG_MSR;
+					pOperand->Info.Register.Size = RD_SIZE_64BIT;
+					pOperand->Info.Register.Reg = RDR_IA32_FS_BASE;
+					break;
+				case RD_OPT_MSR_GSBASE:
+					pOperand->Type = RD_OP_REG;
+					pOperand->Info.Register.Type = RD_REG_MSR;
+					pOperand->Info.Register.Size = RD_SIZE_64BIT;
+					pOperand->Info.Register.Reg = RDR_IA32_GS_BASE;
+					break;
+				case RD_OPT_MSR_KGSBASE:
+					pOperand->Type = RD_OP_REG;
+					pOperand->Info.Register.Type = RD_REG_MSR;
+					pOperand->Info.Register.Size = RD_SIZE_64BIT;
+					pOperand->Info.Register.Reg = RDR_IA32_KERNEL_GS_BASE;
+					break;
+				case RD_OPT_XCR:
+					pOperand->Type = RD_OP_REG;
+					pOperand->Info.Register.Type = RD_REG_XCR;
+					pOperand->Info.Register.Size = RD_SIZE_64BIT;
+					pOperand->Info.Register.Reg = 0xFF;
+					break;
+				case RD_OPT_XCR_0:
+					pOperand->Type = RD_OP_REG;
+					pOperand->Info.Register.Type = RD_REG_XCR;
+					pOperand->Info.Register.Size = RD_SIZE_64BIT;
+					pOperand->Info.Register.Reg = 0;
+					break;
+				case RD_OPT_REG_BANK:
+					if ((pInstruction->Instruction == RD_INS_PUSHA) || (pInstruction->Instruction == RD_INS_POPA)) {
+						pOperand->Type = RD_OP_REG;
+						pOperand->Size = pOperand->RawSize = pInstruction->WordLength;
+						pOperand->Info.Register.Type = RD_REG_GPR;
+						pOperand->Info.Register.Size = pInstruction->WordLength;
+						pOperand->Info.Register.Reg = RDR_EAX;
+						pOperand->Info.Register.Count = 8;
+						pOperand->Info.Register.IsBlock = true;
+					} else {
+						pOperand->Type = RD_OP_BANK;
+					}
+					break;
+				case RD_OPT_A: {
+					const unsigned int unStatus = RdFetchAddress(pInstruction, pCode, unOffset, unSize, static_cast<unsigned char>(unDispSize & 0xFF));
+					if (!RD_SUCCESS(unStatus)) {
+						return unStatus;
+					}
 
-				unsigned long long unImm = 0;
+					pOperand->Type = RD_OP_ADDR;
+					pOperand->Info.Address.BaseSeg = pInstruction->Address.Cs;
+					pOperand->Info.Address.Offset = pInstruction->Address.Ip;
+				} break;
+				case RD_OPT_B:
+					pOperand->Type = RD_OP_REG;
+					pOperand->Info.Register.Type = RD_REG_GPR;
+					pOperand->Info.Register.Size = static_cast<unsigned int>(unDispSize & 0xFFFFFFFF);
 
-				if (pInstruction->HasImm3) {
-					unImm = pInstruction->Immediate3;
-				} else if (pInstruction->HasImm2) {
-					unImm = pInstruction->Immediate2;
-				} else {
-					unImm = pInstruction->Immediate1;
-				}
+					if (pInstruction->Exs.vp) {
+						return RD_STATUS_INVALID_REGISTER_IN_INSTRUCTION;
+					}
 
-				pOperand->Type = RD_OP_IMM;
+					pOperand->Info.Register.Reg = static_cast<unsigned char>(pInstruction->Exs.v & 0xFF);
+					break;
+				case RD_OPT_C:
+					pOperand->Type = RD_OP_REG;
+					pOperand->Info.Register.Type = RD_REG_CR;
+					pOperand->Info.Register.Size = static_cast<unsigned int>(unDispSize & 0xFFFFFFFF);
+					pOperand->Info.Register.Reg = static_cast<unsigned char>(((pInstruction->Exs.r << 3) | pInstruction->ModRm.reg) & 0xFF);
 
-				if (pOperand->Flags.SignExtendedDws) {
+					if ((pInstruction->DefCode != RD_CODE_64) && pInstruction->HasLock) {
+						pOperand->Info.Register.Reg |= 0x8;
+					}
+
+					if (pOperand->Info.Register.Reg && (pOperand->Info.Register.Reg != 2) && (pOperand->Info.Register.Reg != 3) && (pOperand->Info.Register.Reg != 4) && (pOperand->Info.Register.Reg != 8)) {
+						return RD_STATUS_INVALID_REGISTER_IN_INSTRUCTION;
+					}
+					break;
+				case RD_OPT_D:
+					pOperand->Type = RD_OP_REG;
+					pOperand->Info.Register.Type = RD_REG_DR;
+					pOperand->Info.Register.Size = static_cast<unsigned int>(unDispSize & 0xFFFFFFFF);
+					pOperand->Info.Register.Reg = static_cast<unsigned char>(((pInstruction->Exs.r << 3) | pInstruction->ModRm.reg) & 0xFF);
+
+					if (pOperand->Info.Register.Reg >= 8) {
+						return RD_STATUS_INVALID_REGISTER_IN_INSTRUCTION;
+					}
+					break;
+				case RD_OPT_T:
+					pOperand->Type = RD_OP_REG;
+					pOperand->Info.Register.Type = RD_REG_TR;
+					pOperand->Info.Register.Size = static_cast<unsigned int>(unDispSize & 0xFFFFFFFF);
+					pOperand->Info.Register.Reg = static_cast<unsigned char>(((pInstruction->Exs.r << 3) | pInstruction->ModRm.reg) & 0xFF);
+
+					if (pOperand->Info.Register.Reg >= 8) {
+						return RD_STATUS_INVALID_REGISTER_IN_INSTRUCTION;
+					}
+					break;
+				case RD_OPT_S:
+					pOperand->Type = RD_OP_REG;
+					pOperand->Info.Register.Type = RD_REG_SEG;
+					pOperand->Info.Register.Size = static_cast<unsigned int>(unDispSize & 0xFFFFFFFF);
+					pOperand->Info.Register.Reg = pInstruction->ModRm.reg;
+
+					if (pOperand->Info.Register.Reg >= 6) {
+						return RD_STATUS_INVALID_REGISTER_IN_INSTRUCTION;
+					}
+
+					if ((pOperand->Info.Register.Reg == RDR_CS) && pOperand->Access.Write) {
+						return RD_STATUS_CS_LOAD;
+					}
+					break;
+				case RD_OPT_E:
+					if (pInstruction->ModRm.mod == 3) {
+						pOperand->Type = RD_OP_REG;
+						pOperand->Info.Register.Type = RD_REG_GPR;
+						pOperand->Info.Register.Size = static_cast<unsigned int>(unDispSize & 0xFFFFFFFF);
+						pOperand->Info.Register.Reg = static_cast<unsigned char>(((pInstruction->Exs.b << 3) | pInstruction->ModRm.rm) & 0xFF);
+						pOperand->Info.Register.IsHigh8 = (pOperand->Info.Register.Size == 1) && (pOperand->Info.Register.Reg >= 4) && (pInstruction->EncMode == RD_ENCM_LEGACY) && !pInstruction->HasRex;
+					} else {
+						goto OPT_M;
+					}
+					break;
+				case RD_OPT_F:
+					pOperand->Type = RD_OP_REG;
+					pOperand->Info.Register.Type = RD_REG_FLG;
+					pOperand->Info.Register.Size = static_cast<unsigned int>(unDispSize & 0xFFFFFFFF);
+					pOperand->Info.Register.Reg = 0;
+					pInstruction->FlagsAccess.RegAccess |= pOperand->Access.Access;
+					break;
+				case RD_OPT_K: {
 					static const unsigned char pLut[3] = { RD_SIZE_16BIT, RD_SIZE_32BIT, RD_SIZE_64BIT };
-					pOperand->Size = pLut[pInstruction->EfOpMode];
-					pOperand->Info.Immediate.Imm = RD_SIGN_EX(unDispSize, unImm);
-				} else if (pOperand->Flags.SignExtendedOp1) {
-					pOperand->Size = pInstruction->Operands[0].Size;
-					pOperand->Info.Immediate.Imm = RD_SIGN_EX(unDispSize, unImm);
-				} else {
-					pOperand->Info.Immediate.Imm = unImm;
-				}
-			} break;
-			case RD_OPT_Im2z:
-				pOperand->Type = RD_OP_IMM;
-				pOperand->Info.Immediate.Imm = pInstruction->SseImmediate & 3;
-				break;
-			case RD_OPT_J: {
-				const unsigned int unStatus = RdFetchRelativeOffset(pInstruction, pCode, unOffset, unSize, static_cast<unsigned char>(unDispSize & 0xFF));
-				if (!RD_SUCCESS(unStatus)) {
-					return unStatus;
-				}
+					pInstruction->MemoryAccess |= pOperand->Access.Access;
+					pOperand->Type = RD_OP_MEM;
+					pOperand->Info.Memory.IsStack = true;
+					pOperand->Info.Memory.HasBase = true;
+					pOperand->Info.Memory.Base = RDR_RSP;
+					pOperand->Info.Memory.BaseSize = pLut[pInstruction->DefStack];
+					pOperand->Info.Memory.HasSeg = true;
+					pOperand->Info.Memory.Seg = RDR_SS;
+					pInstruction->StackWords = static_cast<unsigned char>((pOperand->Size / pInstruction->WordLength) & 0xFF);
+					pInstruction->StackAccess |= pOperand->Access.Access;
+				} break;
+				case RD_OPT_G:
+					pOperand->Type = RD_OP_REG;
+					pOperand->Info.Register.Type = RD_REG_GPR;
+					pOperand->Info.Register.Size = static_cast<unsigned int>(unDispSize & 0xFFFFFFFF);
 
-				pInstruction->IsRipRelative = true;
+					if (pInstruction->Exs.rp) {
+						return RD_STATUS_INVALID_REGISTER_IN_INSTRUCTION;
+					}
 
-				pOperand->Type = RD_OP_OFFS;
+					pOperand->Info.Register.Reg = static_cast<unsigned char>(((pInstruction->Exs.r << 3) | pInstruction->ModRm.reg) & 0xFF);
+					pOperand->Info.Register.IsHigh8 = (pOperand->Info.Register.Size == 1) && (pOperand->Info.Register.Reg >= 4) && (pInstruction->EncMode == RD_ENCM_LEGACY) && !pInstruction->HasRex;
+					break;
+				case RD_OPT_R:
+					if ((pInstruction->ModRm.mod == 3) || (pInstruction->Attributes & RD_FLAG_MFR)) {
+						pOperand->Type = RD_OP_REG;
+						pOperand->Info.Register.Type = RD_REG_GPR;
+						pOperand->Info.Register.Size = static_cast<unsigned int>(unDispSize & 0xFFFFFFFF);
+						pOperand->Info.Register.Reg = static_cast<unsigned char>(((pInstruction->Exs.b << 3) | pInstruction->ModRm.rm) & 0xFF);
+						pOperand->Info.Register.IsHigh8 = (pOperand->Info.Register.Size == 1) && (pOperand->Info.Register.Reg >= 4) && (pInstruction->EncMode == RD_ENCM_LEGACY) && !pInstruction->HasRex;
+					} else {
+						return RD_STATUS_INVALID_ENCODING;
+					}
+					break;
+				case RD_OPT_I: {
+					const unsigned int unStatus = RdFetchImmediate(pInstruction, pCode, unOffset, unSize, static_cast<unsigned char>(unDispSize & 0xFF));
+					if (!RD_SUCCESS(unStatus)) {
+						return unStatus;
+					}
 
-				pOperand->Size = pInstruction->WordLength;
-				pOperand->Info.RelativeOffset.Rel = RD_SIGN_EX(unDispSize, pInstruction->RelativeOffset);
-			} break;
-			case RD_OPT_N:
-				if (pInstruction->ModRm.mod != 3) {
-					return RD_STATUS_INVALID_ENCODING;
-				}
+					unsigned long long unImm = 0;
 
-				pOperand->Type = RD_OP_REG;
-				pOperand->Info.Register.Type = RD_REG_MMX;
-				pOperand->Info.Register.Size = RD_SIZE_64BIT;
-				pOperand->Info.Register.Reg = pInstruction->ModRm.rm;
-				break;
-			case RD_OPT_P:
-				pOperand->Type = RD_OP_REG;
-				pOperand->Info.Register.Type = RD_REG_MMX;
-				pOperand->Info.Register.Size = RD_SIZE_64BIT;
-				pOperand->Info.Register.Reg = pInstruction->ModRm.reg;
-				break;
-			case RD_OPT_Q:
-				if (pInstruction->ModRm.mod == 3) {
+					if (pInstruction->HasImm3) {
+						unImm = pInstruction->Immediate3;
+					} else if (pInstruction->HasImm2) {
+						unImm = pInstruction->Immediate2;
+					} else {
+						unImm = pInstruction->Immediate1;
+					}
+
+					pOperand->Type = RD_OP_IMM;
+
+					if (pOperand->Flags.SignExtendedDws) {
+						static const unsigned char pLut[3] = { RD_SIZE_16BIT, RD_SIZE_32BIT, RD_SIZE_64BIT };
+						pOperand->Size = pLut[pInstruction->EfOpMode];
+						pOperand->Info.Immediate.Imm = RD_SIGN_EX(unDispSize, unImm);
+					} else if (pOperand->Flags.SignExtendedOp1) {
+						pOperand->Size = pInstruction->Operands[0].Size;
+						pOperand->Info.Immediate.Imm = RD_SIGN_EX(unDispSize, unImm);
+					} else {
+						pOperand->Info.Immediate.Imm = unImm;
+					}
+				} break;
+				case RD_OPT_Im2z:
+					pOperand->Type = RD_OP_IMM;
+					pOperand->Info.Immediate.Imm = pInstruction->SseImmediate & 3;
+					break;
+				case RD_OPT_J: {
+					const unsigned int unStatus = RdFetchRelativeOffset(pInstruction, pCode, unOffset, unSize, static_cast<unsigned char>(unDispSize & 0xFF));
+					if (!RD_SUCCESS(unStatus)) {
+						return unStatus;
+					}
+
+					pInstruction->IsRipRelative = true;
+
+					pOperand->Type = RD_OP_OFFS;
+
+					pOperand->Size = pInstruction->WordLength;
+					pOperand->Info.RelativeOffset.Rel = RD_SIGN_EX(unDispSize, pInstruction->RelativeOffset);
+				} break;
+				case RD_OPT_N:
+					if (pInstruction->ModRm.mod != 3) {
+						return RD_STATUS_INVALID_ENCODING;
+					}
+
 					pOperand->Type = RD_OP_REG;
 					pOperand->Info.Register.Type = RD_REG_MMX;
 					pOperand->Info.Register.Size = RD_SIZE_64BIT;
 					pOperand->Info.Register.Reg = pInstruction->ModRm.rm;
-				} else {
-					goto OPT_M;
-				}
-				break;
-			case RD_OPT_O: {
-				const unsigned int unStatus = RdFetchMoffset(pInstruction, pCode, unOffset, unSize, 2 << pInstruction->AddrMode);
-				if (!RD_SUCCESS(unStatus)) {
-					return unStatus;
-				}
-
-				pInstruction->MemoryAccess |= pOperand->Access.Access;
-				pOperand->Type = RD_OP_MEM;
-				pOperand->Info.Memory.HasDisp = true;
-				pOperand->Info.Memory.IsDirect = true;
-				pOperand->Info.Memory.DispSize = pInstruction->MoffsetLength;
-				pOperand->Info.Memory.Disp = pInstruction->Moffset;
-				pOperand->Info.Memory.HasSeg = true;
-				pOperand->Info.Memory.Seg = RdGetSegOverride(pInstruction, RDR_DS);
-			} break;
-			case RD_OPT_M:
-				if (pInstruction->ModRm.mod == 3) {
-					return RD_STATUS_INVALID_ENCODING;
-				}
-
-			OPT_M:
-				pInstruction->MemoryAccess |= pOperand->Access.Access;
-				pOperand->Type = RD_OP_MEM;
-				pOperand->Info.Memory.HasSeg = true;
-
-				if (pInstruction->AddrMode == RD_ADDR_16) {
-					if (pInstruction->Attributes & RD_FLAG_NOA16) {
-						return RD_STATUS_16_BIT_ADDRESSING_NOT_SUPPORTED;
-					}
-
-					switch (pInstruction->ModRm.rm) {
-					case 0:
-						pOperand->Info.Memory.HasBase = true;
-						pOperand->Info.Memory.HasIndex = true;
-						pOperand->Info.Memory.Scale = 1;
-						pOperand->Info.Memory.Base = RDR_BX;
-						pOperand->Info.Memory.Index = RDR_SI;
-						pOperand->Info.Memory.BaseSize = RD_SIZE_16BIT;
-						pOperand->Info.Memory.IndexSize = RD_SIZE_16BIT;
-						pOperand->Info.Memory.Seg = RDR_DS;
-						break;
-					case 1:
-						pOperand->Info.Memory.HasBase = true;
-						pOperand->Info.Memory.HasIndex = true;
-						pOperand->Info.Memory.Scale = 1;
-						pOperand->Info.Memory.Base = RDR_BX;
-						pOperand->Info.Memory.Index = RDR_DI;
-						pOperand->Info.Memory.BaseSize = RD_SIZE_16BIT;
-						pOperand->Info.Memory.IndexSize = RD_SIZE_16BIT;
-						pOperand->Info.Memory.Seg = RDR_DS;
-						break;
-					case 2:
-						pOperand->Info.Memory.HasBase = true;
-						pOperand->Info.Memory.HasIndex = true;
-						pOperand->Info.Memory.Scale = 1;
-						pOperand->Info.Memory.Base = RDR_BP;
-						pOperand->Info.Memory.Index = RDR_SI;
-						pOperand->Info.Memory.BaseSize = RD_SIZE_16BIT;
-						pOperand->Info.Memory.IndexSize = RD_SIZE_16BIT;
-						pOperand->Info.Memory.Seg = RDR_SS;
-						break;
-					case 3:
-						pOperand->Info.Memory.HasBase = true;
-						pOperand->Info.Memory.HasIndex = true;
-						pOperand->Info.Memory.Scale = 1;
-						pOperand->Info.Memory.Base = RDR_BP;
-						pOperand->Info.Memory.Index = RDR_DI;
-						pOperand->Info.Memory.BaseSize = RD_SIZE_16BIT;
-						pOperand->Info.Memory.IndexSize = RD_SIZE_16BIT;
-						pOperand->Info.Memory.Seg = RDR_SS;
-						break;
-					case 4:
-						pOperand->Info.Memory.HasBase = true;
-						pOperand->Info.Memory.Base = RDR_SI;
-						pOperand->Info.Memory.BaseSize = RD_SIZE_16BIT;
-						pOperand->Info.Memory.Seg = RDR_DS;
-						break;
-					case 5:
-						pOperand->Info.Memory.HasBase = true;
-						pOperand->Info.Memory.Base = RDR_DI;
-						pOperand->Info.Memory.BaseSize = RD_SIZE_16BIT;
-						pOperand->Info.Memory.Seg = RDR_DS;
-						break;
-					case 6:
-						if (pInstruction->ModRm.mod != 0) {
-							pOperand->Info.Memory.HasBase = true;
-							pOperand->Info.Memory.Base = RDR_BP;
-							pOperand->Info.Memory.BaseSize = RD_SIZE_16BIT;
-							pOperand->Info.Memory.Seg = RDR_SS;
-						} else {
-							pOperand->Info.Memory.Seg = RDR_DS;
-						}
-						break;
-					case 7:
-						pOperand->Info.Memory.HasBase = true;
-						pOperand->Info.Memory.Base = RDR_BX;
-						pOperand->Info.Memory.BaseSize = RD_SIZE_16BIT;
-						pOperand->Info.Memory.Seg = RDR_DS;
-						break;
-					}
-
-					pOperand->Info.Memory.HasDisp = pInstruction->HasDisp;
-					pOperand->Info.Memory.DispSize = pInstruction->DispLength;
-					pOperand->Info.Memory.Disp = RD_SIGN_EX(pInstruction->DispLength, pInstruction->Displacement);
-				} else {
-					unsigned char unDefSize = (pInstruction->AddrMode == RD_ADDR_32 ? RD_SIZE_32BIT : RD_SIZE_64BIT);
-
-					pOperand->Info.Memory.Seg = RDR_DS;
-
-					if (pInstruction->HasSib) {
-						if (!((pInstruction->ModRm.mod == 0) && (pInstruction->Sib.base == RDR_RBP))) {
-							pOperand->Info.Memory.HasBase = true;
-							pOperand->Info.Memory.BaseSize = unDefSize;
-							pOperand->Info.Memory.Base = static_cast<unsigned char>(((pInstruction->Exs.b << 3) | pInstruction->Sib.base) & 0xFF);
-
-							if ((pOperand->Info.Memory.Base == RDR_RSP) || (pOperand->Info.Memory.Base == RDR_RBP)) {
-								pOperand->Info.Memory.Seg = RDR_SS;
-							}
-						}
-
-						if ((((pInstruction->Exs.x << 3) | pInstruction->Sib.index) != RDR_RSP) || RD_HAS_VSIB(pInstruction)) {
-							pOperand->Info.Memory.HasIndex = true;
-							pOperand->Info.Memory.IndexSize = unDefSize;
-							pOperand->Info.Memory.Index = static_cast<unsigned char>(((pInstruction->Exs.x << 3) | pInstruction->Sib.index) & 0xFF);
-
-							if (RD_HAS_VSIB(pInstruction)) {
-								pOperand->Info.Memory.IndexSize = unVSibRegSize;
-								pOperand->Info.Memory.Index |= pInstruction->Exs.vp << 4;
-							}
-
-							pOperand->Info.Memory.Scale = 1 << pInstruction->Sib.scale;
-						}
+					break;
+				case RD_OPT_P:
+					pOperand->Type = RD_OP_REG;
+					pOperand->Info.Register.Type = RD_REG_MMX;
+					pOperand->Info.Register.Size = RD_SIZE_64BIT;
+					pOperand->Info.Register.Reg = pInstruction->ModRm.reg;
+					break;
+				case RD_OPT_Q:
+					if (pInstruction->ModRm.mod == 3) {
+						pOperand->Type = RD_OP_REG;
+						pOperand->Info.Register.Type = RD_REG_MMX;
+						pOperand->Info.Register.Size = RD_SIZE_64BIT;
+						pOperand->Info.Register.Reg = pInstruction->ModRm.rm;
 					} else {
-						if ((pInstruction->ModRm.mod == 0) && (pInstruction->ModRm.rm == RDR_RBP)) {
-							pOperand->Info.Memory.IsRipRel = pInstruction->IsRipRelative = (pInstruction->DefCode == RD_CODE_64);
+						goto OPT_M;
+					}
+					break;
+				case RD_OPT_O: {
+					const unsigned int unStatus = RdFetchMoffset(pInstruction, pCode, unOffset, unSize, 2 << pInstruction->AddrMode);
+					if (!RD_SUCCESS(unStatus)) {
+						return unStatus;
+					}
 
-							if (pOperand->Info.Memory.IsRipRel && (pInstruction->Attributes & RD_FLAG_NO_RIP_REL)) {
-								return RD_STATUS_RIP_REL_ADDRESSING_NOT_SUPPORTED;
+					pInstruction->MemoryAccess |= pOperand->Access.Access;
+					pOperand->Type = RD_OP_MEM;
+					pOperand->Info.Memory.HasDisp = true;
+					pOperand->Info.Memory.IsDirect = true;
+					pOperand->Info.Memory.DispSize = pInstruction->MoffsetLength;
+					pOperand->Info.Memory.Disp = pInstruction->Moffset;
+					pOperand->Info.Memory.HasSeg = true;
+					pOperand->Info.Memory.Seg = RdGetSegOverride(pInstruction, RDR_DS);
+				} break;
+				case RD_OPT_M:
+					if (pInstruction->ModRm.mod == 3) {
+						return RD_STATUS_INVALID_ENCODING;
+					}
+
+				OPT_M:
+					pInstruction->MemoryAccess |= pOperand->Access.Access;
+					pOperand->Type = RD_OP_MEM;
+					pOperand->Info.Memory.HasSeg = true;
+
+					if (pInstruction->AddrMode == RD_ADDR_16) {
+						if (pInstruction->Attributes & RD_FLAG_NOA16) {
+							return RD_STATUS_16_BIT_ADDRESSING_NOT_SUPPORTED;
+						}
+
+						switch (pInstruction->ModRm.rm) {
+							case 0:
+								pOperand->Info.Memory.HasBase = true;
+								pOperand->Info.Memory.HasIndex = true;
+								pOperand->Info.Memory.Scale = 1;
+								pOperand->Info.Memory.Base = RDR_BX;
+								pOperand->Info.Memory.Index = RDR_SI;
+								pOperand->Info.Memory.BaseSize = RD_SIZE_16BIT;
+								pOperand->Info.Memory.IndexSize = RD_SIZE_16BIT;
+								pOperand->Info.Memory.Seg = RDR_DS;
+								break;
+							case 1:
+								pOperand->Info.Memory.HasBase = true;
+								pOperand->Info.Memory.HasIndex = true;
+								pOperand->Info.Memory.Scale = 1;
+								pOperand->Info.Memory.Base = RDR_BX;
+								pOperand->Info.Memory.Index = RDR_DI;
+								pOperand->Info.Memory.BaseSize = RD_SIZE_16BIT;
+								pOperand->Info.Memory.IndexSize = RD_SIZE_16BIT;
+								pOperand->Info.Memory.Seg = RDR_DS;
+								break;
+							case 2:
+								pOperand->Info.Memory.HasBase = true;
+								pOperand->Info.Memory.HasIndex = true;
+								pOperand->Info.Memory.Scale = 1;
+								pOperand->Info.Memory.Base = RDR_BP;
+								pOperand->Info.Memory.Index = RDR_SI;
+								pOperand->Info.Memory.BaseSize = RD_SIZE_16BIT;
+								pOperand->Info.Memory.IndexSize = RD_SIZE_16BIT;
+								pOperand->Info.Memory.Seg = RDR_SS;
+								break;
+							case 3:
+								pOperand->Info.Memory.HasBase = true;
+								pOperand->Info.Memory.HasIndex = true;
+								pOperand->Info.Memory.Scale = 1;
+								pOperand->Info.Memory.Base = RDR_BP;
+								pOperand->Info.Memory.Index = RDR_DI;
+								pOperand->Info.Memory.BaseSize = RD_SIZE_16BIT;
+								pOperand->Info.Memory.IndexSize = RD_SIZE_16BIT;
+								pOperand->Info.Memory.Seg = RDR_SS;
+								break;
+							case 4:
+								pOperand->Info.Memory.HasBase = true;
+								pOperand->Info.Memory.Base = RDR_SI;
+								pOperand->Info.Memory.BaseSize = RD_SIZE_16BIT;
+								pOperand->Info.Memory.Seg = RDR_DS;
+								break;
+							case 5:
+								pOperand->Info.Memory.HasBase = true;
+								pOperand->Info.Memory.Base = RDR_DI;
+								pOperand->Info.Memory.BaseSize = RD_SIZE_16BIT;
+								pOperand->Info.Memory.Seg = RDR_DS;
+								break;
+							case 6:
+								if (pInstruction->ModRm.mod != 0) {
+									pOperand->Info.Memory.HasBase = true;
+									pOperand->Info.Memory.Base = RDR_BP;
+									pOperand->Info.Memory.BaseSize = RD_SIZE_16BIT;
+									pOperand->Info.Memory.Seg = RDR_SS;
+								} else {
+									pOperand->Info.Memory.Seg = RDR_DS;
+								}
+								break;
+							case 7:
+								pOperand->Info.Memory.HasBase = true;
+								pOperand->Info.Memory.Base = RDR_BX;
+								pOperand->Info.Memory.BaseSize = RD_SIZE_16BIT;
+								pOperand->Info.Memory.Seg = RDR_DS;
+								break;
+						}
+
+						pOperand->Info.Memory.HasDisp = pInstruction->HasDisp;
+						pOperand->Info.Memory.DispSize = pInstruction->DispLength;
+						pOperand->Info.Memory.Disp = RD_SIGN_EX(pInstruction->DispLength, pInstruction->Displacement);
+					} else {
+						unsigned char unDefSize = (pInstruction->AddrMode == RD_ADDR_32 ? RD_SIZE_32BIT : RD_SIZE_64BIT);
+
+						pOperand->Info.Memory.Seg = RDR_DS;
+
+						if (pInstruction->HasSib) {
+							if (!((pInstruction->ModRm.mod == 0) && (pInstruction->Sib.base == RDR_RBP))) {
+								pOperand->Info.Memory.HasBase = true;
+								pOperand->Info.Memory.BaseSize = unDefSize;
+								pOperand->Info.Memory.Base = static_cast<unsigned char>(((pInstruction->Exs.b << 3) | pInstruction->Sib.base) & 0xFF);
+
+								if ((pOperand->Info.Memory.Base == RDR_RSP) || (pOperand->Info.Memory.Base == RDR_RBP)) {
+									pOperand->Info.Memory.Seg = RDR_SS;
+								}
+							}
+
+							if ((((pInstruction->Exs.x << 3) | pInstruction->Sib.index) != RDR_RSP) || RD_HAS_VSIB(pInstruction)) {
+								pOperand->Info.Memory.HasIndex = true;
+								pOperand->Info.Memory.IndexSize = unDefSize;
+								pOperand->Info.Memory.Index = static_cast<unsigned char>(((pInstruction->Exs.x << 3) | pInstruction->Sib.index) & 0xFF);
+
+								if (RD_HAS_VSIB(pInstruction)) {
+									pOperand->Info.Memory.IndexSize = unVSibRegSize;
+									pOperand->Info.Memory.Index |= pInstruction->Exs.vp << 4;
+								}
+
+								pOperand->Info.Memory.Scale = 1 << pInstruction->Sib.scale;
 							}
 						} else {
-							pOperand->Info.Memory.HasBase = true;
-							pOperand->Info.Memory.BaseSize = unDefSize;
-							pOperand->Info.Memory.Base = static_cast<unsigned char>(((pInstruction->Exs.b << 3) | pInstruction->ModRm.rm) & 0xFF);
+							if ((pInstruction->ModRm.mod == 0) && (pInstruction->ModRm.rm == RDR_RBP)) {
+								pOperand->Info.Memory.IsRipRel = pInstruction->IsRipRelative = (pInstruction->DefCode == RD_CODE_64);
 
-							if ((pOperand->Info.Memory.Base == RDR_RSP) || (pOperand->Info.Memory.Base == RDR_RBP)) {
-								pOperand->Info.Memory.Seg = RDR_SS;
+								if (pOperand->Info.Memory.IsRipRel && (pInstruction->Attributes & RD_FLAG_NO_RIP_REL)) {
+									return RD_STATUS_RIP_REL_ADDRESSING_NOT_SUPPORTED;
+								}
+							} else {
+								pOperand->Info.Memory.HasBase = true;
+								pOperand->Info.Memory.BaseSize = unDefSize;
+								pOperand->Info.Memory.Base = static_cast<unsigned char>(((pInstruction->Exs.b << 3) | pInstruction->ModRm.rm) & 0xFF);
+
+								if ((pOperand->Info.Memory.Base == RDR_RSP) || (pOperand->Info.Memory.Base == RDR_RBP)) {
+									pOperand->Info.Memory.Seg = RDR_SS;
+								}
 							}
 						}
+
+						pOperand->Info.Memory.HasDisp = pInstruction->HasDisp;
+						pOperand->Info.Memory.DispSize = pInstruction->DispLength;
+						pOperand->Info.Memory.Disp = RD_SIGN_EX(pInstruction->DispLength, pInstruction->Displacement);
 					}
 
-					pOperand->Info.Memory.HasDisp = pInstruction->HasDisp;
-					pOperand->Info.Memory.DispSize = pInstruction->DispLength;
-					pOperand->Info.Memory.Disp = RD_SIGN_EX(pInstruction->DispLength, pInstruction->Displacement);
-				}
-
-				if (pInstruction->HasSeg) {
-					pOperand->Info.Memory.Seg = RdGetSegOverride(pInstruction, pOperand->Info.Memory.Seg);
-				}
-
-				if (RD_HAS_VSIB(pInstruction)) {
-					if (!pInstruction->HasSib) {
-						return RD_STATUS_VSIB_WITHOUT_SIB;
+					if (pInstruction->HasSeg) {
+						pOperand->Info.Memory.Seg = RdGetSegOverride(pInstruction, pOperand->Info.Memory.Seg);
 					}
 
-					pOperand->Info.Memory.IsVSib = true;
+					if (RD_HAS_VSIB(pInstruction)) {
+						if (!pInstruction->HasSib) {
+							return RD_STATUS_VSIB_WITHOUT_SIB;
+						}
 
-					pOperand->Info.Memory.VSib.IndexSize = unVSibIndexSize;
-					pOperand->Info.Memory.VSib.ElemCount = unVSibIndexCount;
-					pOperand->Info.Memory.VSib.ElemSize = (unVSibIndexCount != 0) ? static_cast<unsigned char>((unDispSize / unVSibIndexCount) & 0xFF) : 0;
-				}
+						pOperand->Info.Memory.IsVSib = true;
 
-				if (RD_HAS_SIBMEM(pInstruction)) {
-					if (!pInstruction->HasSib) {
-						return RD_STATUS_SIBMEM_WITHOUT_SIB;
+						pOperand->Info.Memory.VSib.IndexSize = unVSibIndexSize;
+						pOperand->Info.Memory.VSib.ElemCount = unVSibIndexCount;
+						pOperand->Info.Memory.VSib.ElemSize = (unVSibIndexCount != 0) ? static_cast<unsigned char>((unDispSize / unVSibIndexCount) & 0xFF) : 0;
 					}
 
-					pOperand->Info.Memory.IsSibMem = true;
-				}
+					if (RD_HAS_SIBMEM(pInstruction)) {
+						if (!pInstruction->HasSib) {
+							return RD_STATUS_SIBMEM_WITHOUT_SIB;
+						}
 
-				if (pInstruction->HasBroadcast) {
-					pOperand->Info.Memory.HasBroadcast = true;
+						pOperand->Info.Memory.IsSibMem = true;
+					}
 
-					if (unOPD & RD_OPD_B32) {
-						unDispSize = RD_SIZE_32BIT;
-					} else if (unOPD & RD_OPD_B64) {
-						unDispSize = RD_SIZE_64BIT;
-					} else if (unOPD & RD_OPD_B16) {
-						unDispSize = RD_SIZE_16BIT;
+					if (pInstruction->HasBroadcast) {
+						pOperand->Info.Memory.HasBroadcast = true;
+
+						if (unOPD & RD_OPD_B32) {
+							unDispSize = RD_SIZE_32BIT;
+						} else if (unOPD & RD_OPD_B64) {
+							unDispSize = RD_SIZE_64BIT;
+						} else if (unOPD & RD_OPD_B16) {
+							unDispSize = RD_SIZE_16BIT;
+						} else {
+							unDispSize = bWidth ? RD_SIZE_64BIT : RD_SIZE_32BIT;
+						}
+
+						pOperand->Size = pOperand->RawSize = unDispSize;
+					}
+
+					if (pInstruction->HasCompDisp) {
+						pOperand->Info.Memory.HasCompDisp = true;
+						pOperand->Info.Memory.CompDispSize = RdGetCompDispSize(pInstruction, pOperand->Size);
+					}
+
+					pOperand->Info.Memory.IsMib = RD_HAS_MIB(pInstruction);
+
+					pOperand->Info.Memory.IsBitbase = RD_HAS_BITBASE(pInstruction);
+
+					if (RD_HAS_AG(pInstruction)) {
+						pOperand->Info.Memory.IsAG = true;
+
+						pOperand->Info.Memory.HasSeg = false;
+						pOperand->Info.Memory.Seg = 0;
+					}
+
+					if (RD_HAS_SHS(pInstruction)) {
+						pOperand->Info.Memory.IsShadowStack = true;
+						pOperand->Info.Memory.ShStkType = RD_SHSTK_EXPLICIT;
+					}
+					break;
+				case RD_OPT_H:
+					if (pInstruction->EncMode == RD_ENCM_LEGACY) {
+						return RD_STATUS_HINT_OPERARD_NOT_USED;
 					} else {
-						unDispSize = bWidth ? RD_SIZE_64BIT : RD_SIZE_32BIT;
+						pOperand->Type = RD_OP_REG;
+						pOperand->Info.Register.Type = RD_REG_SSE;
+						pOperand->Info.Register.Size = static_cast<unsigned int>(((unDispSize < RD_SIZE_128BIT) ? RD_SIZE_128BIT : unDispSize) & 0xFFFFFFFF);
+						pOperand->Info.Register.Reg = static_cast<unsigned char>(((pInstruction->Exs.vp << 4) | pInstruction->Exs.v) & 0xFF);
+					}
+					break;
+				case RD_OPT_L: {
+					const unsigned int unStatus = RdFetchSseImmediate(pInstruction, pCode, unOffset, unSize, 1);
+					if (!RD_SUCCESS(unStatus)) {
+						return unStatus;
 					}
 
-					pOperand->Size = pOperand->RawSize = unDispSize;
-				}
-
-				if (pInstruction->HasCompDisp) {
-					pOperand->Info.Memory.HasCompDisp = true;
-					pOperand->Info.Memory.CompDispSize = RdGetCompDispSize(pInstruction, pOperand->Size);
-				}
-
-				pOperand->Info.Memory.IsMib = RD_HAS_MIB(pInstruction);
-
-				pOperand->Info.Memory.IsBitbase = RD_HAS_BITBASE(pInstruction);
-
-				if (RD_HAS_AG(pInstruction)) {
-					pOperand->Info.Memory.IsAG = true;
-
-					pOperand->Info.Memory.HasSeg = false;
-					pOperand->Info.Memory.Seg = 0;
-				}
-
-				if (RD_HAS_SHS(pInstruction)) {
-					pOperand->Info.Memory.IsShadowStack = true;
-					pOperand->Info.Memory.ShStkType = RD_SHSTK_EXPLICIT;
-				}
-				break;
-			case RD_OPT_H:
-				if (pInstruction->EncMode == RD_ENCM_LEGACY) {
-					return RD_STATUS_HINT_OPERARD_NOT_USED;
-				} else {
 					pOperand->Type = RD_OP_REG;
 					pOperand->Info.Register.Type = RD_REG_SSE;
 					pOperand->Info.Register.Size = static_cast<unsigned int>(((unDispSize < RD_SIZE_128BIT) ? RD_SIZE_128BIT : unDispSize) & 0xFFFFFFFF);
-					pOperand->Info.Register.Reg = static_cast<unsigned char>(((pInstruction->Exs.vp << 4) | pInstruction->Exs.v) & 0xFF);
-				}
-				break;
-			case RD_OPT_L: {
-				const unsigned int unStatus = RdFetchSseImmediate(pInstruction, pCode, unOffset, unSize, 1);
-				if (!RD_SUCCESS(unStatus)) {
-					return unStatus;
-				}
+					pOperand->Info.Register.Reg = (pInstruction->SseImmediate >> 4) & 0xF;
 
-				pOperand->Type = RD_OP_REG;
-				pOperand->Info.Register.Type = RD_REG_SSE;
-				pOperand->Info.Register.Size = static_cast<unsigned int>(((unDispSize < RD_SIZE_128BIT) ? RD_SIZE_128BIT : unDispSize) & 0xFFFFFFFF);
-				pOperand->Info.Register.Reg = (pInstruction->SseImmediate >> 4) & 0xF;
+					if (pInstruction->DefCode != RD_CODE_64) {
+						pOperand->Info.Register.Reg &= 0x7;
+					}
+				} break;
+				case RD_OPT_U:
+					if (pInstruction->ModRm.mod != 3) {
+						return RD_STATUS_INVALID_ENCODING;
+					}
 
-				if (pInstruction->DefCode != RD_CODE_64) {
-					pOperand->Info.Register.Reg &= 0x7;
-				}
-			} break;
-			case RD_OPT_U:
-				if (pInstruction->ModRm.mod != 3) {
-					return RD_STATUS_INVALID_ENCODING;
-				}
-
-				pOperand->Type = RD_OP_REG;
-				pOperand->Info.Register.Type = RD_REG_SSE;
-				pOperand->Info.Register.Size = static_cast<unsigned int>(((unDispSize < RD_SIZE_128BIT) ? RD_SIZE_128BIT : unDispSize) & 0xFFFFFFFF);
-				pOperand->Info.Register.Reg = static_cast<unsigned char>(((pInstruction->Exs.b << 3) | pInstruction->ModRm.rm) & 0xFF);
-				if (pInstruction->HasEvex || pInstruction->HasMvex) {
-					pOperand->Info.Register.Reg |= pInstruction->Exs.x << 4;
-				}
-				break;
-			case RD_OPT_V:
-				pOperand->Type = RD_OP_REG;
-				pOperand->Info.Register.Type = RD_REG_SSE;
-				pOperand->Info.Register.Size = static_cast<unsigned int>(((unDispSize < RD_SIZE_128BIT) ? RD_SIZE_128BIT : unDispSize) & 0xFFFFFFFF);
-				pOperand->Info.Register.Reg = static_cast<unsigned char>(((pInstruction->Exs.r << 3) | pInstruction->ModRm.reg) & 0xFF);
-				if (pInstruction->HasEvex || pInstruction->HasMvex) {
-					pOperand->Info.Register.Reg |= pInstruction->Exs.rp << 4;
-				}
-				break;
-			case RD_OPT_W:
-				if (pInstruction->ModRm.mod == 3) {
 					pOperand->Type = RD_OP_REG;
 					pOperand->Info.Register.Type = RD_REG_SSE;
 					pOperand->Info.Register.Size = static_cast<unsigned int>(((unDispSize < RD_SIZE_128BIT) ? RD_SIZE_128BIT : unDispSize) & 0xFFFFFFFF);
@@ -37890,207 +37871,226 @@ namespace Detours {
 					if (pInstruction->HasEvex || pInstruction->HasMvex) {
 						pOperand->Info.Register.Reg |= pInstruction->Exs.x << 4;
 					}
-				} else {
-					goto OPT_M;
-				}
-				break;
-			case RD_OPT_X:
-			case RD_OPT_Y:
-			case RD_OPT_MEM_rDI:
-				pInstruction->MemoryAccess |= pOperand->Access.Access;
-				pOperand->Type = RD_OP_MEM;
-				pOperand->Info.Memory.HasBase = true;
-				pOperand->Info.Memory.BaseSize = 2 << pInstruction->AddrMode;
-				pOperand->Info.Memory.HasSeg = true;
-				pOperand->Info.Memory.Base = static_cast<unsigned char>((((unOPT == RD_OPT_X) ? RDR_RSI : RDR_RDI)) & 0xFF);
-				pOperand->Info.Memory.IsString = ((unOPT == RD_OPT_X) || (unOPT == RD_OPT_Y));
+					break;
+				case RD_OPT_V:
+					pOperand->Type = RD_OP_REG;
+					pOperand->Info.Register.Type = RD_REG_SSE;
+					pOperand->Info.Register.Size = static_cast<unsigned int>(((unDispSize < RD_SIZE_128BIT) ? RD_SIZE_128BIT : unDispSize) & 0xFFFFFFFF);
+					pOperand->Info.Register.Reg = static_cast<unsigned char>(((pInstruction->Exs.r << 3) | pInstruction->ModRm.reg) & 0xFF);
+					if (pInstruction->HasEvex || pInstruction->HasMvex) {
+						pOperand->Info.Register.Reg |= pInstruction->Exs.rp << 4;
+					}
+					break;
+				case RD_OPT_W:
+					if (pInstruction->ModRm.mod == 3) {
+						pOperand->Type = RD_OP_REG;
+						pOperand->Info.Register.Type = RD_REG_SSE;
+						pOperand->Info.Register.Size = static_cast<unsigned int>(((unDispSize < RD_SIZE_128BIT) ? RD_SIZE_128BIT : unDispSize) & 0xFFFFFFFF);
+						pOperand->Info.Register.Reg = static_cast<unsigned char>(((pInstruction->Exs.b << 3) | pInstruction->ModRm.rm) & 0xFF);
+						if (pInstruction->HasEvex || pInstruction->HasMvex) {
+							pOperand->Info.Register.Reg |= pInstruction->Exs.x << 4;
+						}
+					} else {
+						goto OPT_M;
+					}
+					break;
+				case RD_OPT_X:
+				case RD_OPT_Y:
+				case RD_OPT_MEM_rDI:
+					pInstruction->MemoryAccess |= pOperand->Access.Access;
+					pOperand->Type = RD_OP_MEM;
+					pOperand->Info.Memory.HasBase = true;
+					pOperand->Info.Memory.BaseSize = 2 << pInstruction->AddrMode;
+					pOperand->Info.Memory.HasSeg = true;
+					pOperand->Info.Memory.Base = static_cast<unsigned char>((((unOPT == RD_OPT_X) ? RDR_RSI : RDR_RDI)) & 0xFF);
+					pOperand->Info.Memory.IsString = ((unOPT == RD_OPT_X) || (unOPT == RD_OPT_Y));
 
-				if (unOPT == RD_OPT_Y) {
-					pOperand->Info.Memory.Seg = RDR_ES;
-				} else {
+					if (unOPT == RD_OPT_Y) {
+						pOperand->Info.Memory.Seg = RDR_ES;
+					} else {
+						pOperand->Info.Memory.Seg = RdGetSegOverride(pInstruction, RDR_DS);
+					}
+					break;
+				case RD_OPT_MEM_rBX_AL:
+					pInstruction->MemoryAccess |= pOperand->Access.Access;
+					pOperand->Type = RD_OP_MEM;
+					pOperand->Info.Memory.HasBase = true;
+					pOperand->Info.Memory.HasIndex = true;
+					pOperand->Info.Memory.BaseSize = 2 << pInstruction->AddrMode;
+					pOperand->Info.Memory.IndexSize = RD_SIZE_8BIT;
+					pOperand->Info.Memory.Base = RDR_RBX;
+					pOperand->Info.Memory.Index = RDR_AL;
+					pOperand->Info.Memory.Scale = 1;
+					pOperand->Info.Memory.HasSeg = true;
 					pOperand->Info.Memory.Seg = RdGetSegOverride(pInstruction, RDR_DS);
-				}
-				break;
-			case RD_OPT_MEM_rBX_AL:
-				pInstruction->MemoryAccess |= pOperand->Access.Access;
-				pOperand->Type = RD_OP_MEM;
-				pOperand->Info.Memory.HasBase = true;
-				pOperand->Info.Memory.HasIndex = true;
-				pOperand->Info.Memory.BaseSize = 2 << pInstruction->AddrMode;
-				pOperand->Info.Memory.IndexSize = RD_SIZE_8BIT;
-				pOperand->Info.Memory.Base = RDR_RBX;
-				pOperand->Info.Memory.Index = RDR_AL;
-				pOperand->Info.Memory.Scale = 1;
-				pOperand->Info.Memory.HasSeg = true;
-				pOperand->Info.Memory.Seg = RdGetSegOverride(pInstruction, RDR_DS);
-				break;
-			case RD_OPT_MEM_rAX:
-				pInstruction->MemoryAccess |= pOperand->Access.Access;
-				pOperand->Type = RD_OP_MEM;
-				pOperand->Info.Memory.HasBase = true;
-				pOperand->Info.Memory.BaseSize = 2 << pInstruction->AddrMode;
-				pOperand->Info.Memory.Base = RDR_RAX;
-				pOperand->Info.Memory.HasSeg = true;
-				pOperand->Info.Memory.Seg = RdGetSegOverride(pInstruction, RDR_DS);
-				break;
-			case RD_OPT_MEM_rCX:
-				pInstruction->MemoryAccess |= pOperand->Access.Access;
-				pOperand->Type = RD_OP_MEM;
-				pOperand->Info.Memory.HasBase = true;
-				pOperand->Info.Memory.BaseSize = 2 << pInstruction->AddrMode;
-				pOperand->Info.Memory.Base = RDR_RCX;
-				pOperand->Info.Memory.HasSeg = true;
-				pOperand->Info.Memory.Seg = RdGetSegOverride(pInstruction, RDR_DS);
-				break;
-			case RD_OPT_MEM_SHS:
-				pInstruction->MemoryAccess |= pOperand->Access.Access;
-				pOperand->Type = RD_OP_MEM;
-				pOperand->Info.Memory.IsShadowStack = true;
-				pOperand->Info.Memory.ShStkType = RD_SHSTK_SSP_LD_ST;
-				break;
-			case RD_OPT_MEM_SHS0:
-				pInstruction->MemoryAccess |= pOperand->Access.Access;
-				pOperand->Type = RD_OP_MEM;
-				pOperand->Info.Memory.IsShadowStack = true;
-				pOperand->Info.Memory.ShStkType = RD_SHSTK_PL0_SSP;
-				break;
-			case RD_OPT_MEM_SMSRT:
-				pInstruction->MemoryAccess |= pOperand->Access.Access;
-				pOperand->Type = RD_OP_MEM;
-				pOperand->Info.Memory.HasBase = true;
-				pOperand->Info.Memory.BaseSize = 2 << pInstruction->AddrMode;
-				pOperand->Info.Memory.Base = RDR_RSI;
-				pOperand->Info.Memory.HasSeg = false;
-				break;
-			case RD_OPT_MEM_DMSRT:
-				pInstruction->MemoryAccess |= pOperand->Access.Access;
-				pOperand->Type = RD_OP_MEM;
-				pOperand->Info.Memory.HasBase = true;
-				pOperand->Info.Memory.BaseSize = 2 << pInstruction->AddrMode;
-				pOperand->Info.Memory.Base = RDR_RDI;
-				pOperand->Info.Memory.HasSeg = false;
-				break;
-			case RD_OPT_MEM_SHSP:
-				pInstruction->MemoryAccess |= pOperand->Access.Access;
-				pOperand->Type = RD_OP_MEM;
-				pOperand->Info.Memory.IsShadowStack = true;
-				pOperand->Info.Memory.ShStkType = RD_SHSTK_SSP_PUSH_POP;
-				break;
-			case RD_OPT_Z:
-				pOperand->Type = RD_OP_REG;
-				pOperand->Info.Register.Type = RD_REG_GPR;
-				pOperand->Info.Register.Size = static_cast<unsigned int>(unDispSize & 0xFFFFFFFF);
-				pOperand->Info.Register.Reg = static_cast<unsigned char>(((pInstruction->Exs.b << 3) | (pInstruction->PrimaryOpCode & 0x7)) & 0xFF);
-				pOperand->Info.Register.IsHigh8 = (pOperand->Info.Register.Size == 1) && (pOperand->Info.Register.Reg >= 4) && (pInstruction->EncMode == RD_ENCM_LEGACY) && !pInstruction->HasRex;
-				break;
-			case RD_OPT_rB:
-				pOperand->Type = RD_OP_REG;
-				pOperand->Info.Register.Type = RD_REG_BND;
-				pOperand->Info.Register.Size = static_cast<unsigned int>(unDispSize & 0xFFFFFFFF);
-				pOperand->Info.Register.Reg = static_cast<unsigned char>(((pInstruction->Exs.r << 3) | pInstruction->ModRm.reg) & 0xFF);
-				if (pOperand->Info.Register.Reg >= 4) {
-					return RD_STATUS_INVALID_REGISTER_IN_INSTRUCTION;
-				}
-				break;
-			case RD_OPT_mB:
-				if (pInstruction->ModRm.mod == 3) {
+					break;
+				case RD_OPT_MEM_rAX:
+					pInstruction->MemoryAccess |= pOperand->Access.Access;
+					pOperand->Type = RD_OP_MEM;
+					pOperand->Info.Memory.HasBase = true;
+					pOperand->Info.Memory.BaseSize = 2 << pInstruction->AddrMode;
+					pOperand->Info.Memory.Base = RDR_RAX;
+					pOperand->Info.Memory.HasSeg = true;
+					pOperand->Info.Memory.Seg = RdGetSegOverride(pInstruction, RDR_DS);
+					break;
+				case RD_OPT_MEM_rCX:
+					pInstruction->MemoryAccess |= pOperand->Access.Access;
+					pOperand->Type = RD_OP_MEM;
+					pOperand->Info.Memory.HasBase = true;
+					pOperand->Info.Memory.BaseSize = 2 << pInstruction->AddrMode;
+					pOperand->Info.Memory.Base = RDR_RCX;
+					pOperand->Info.Memory.HasSeg = true;
+					pOperand->Info.Memory.Seg = RdGetSegOverride(pInstruction, RDR_DS);
+					break;
+				case RD_OPT_MEM_SHS:
+					pInstruction->MemoryAccess |= pOperand->Access.Access;
+					pOperand->Type = RD_OP_MEM;
+					pOperand->Info.Memory.IsShadowStack = true;
+					pOperand->Info.Memory.ShStkType = RD_SHSTK_SSP_LD_ST;
+					break;
+				case RD_OPT_MEM_SHS0:
+					pInstruction->MemoryAccess |= pOperand->Access.Access;
+					pOperand->Type = RD_OP_MEM;
+					pOperand->Info.Memory.IsShadowStack = true;
+					pOperand->Info.Memory.ShStkType = RD_SHSTK_PL0_SSP;
+					break;
+				case RD_OPT_MEM_SMSRT:
+					pInstruction->MemoryAccess |= pOperand->Access.Access;
+					pOperand->Type = RD_OP_MEM;
+					pOperand->Info.Memory.HasBase = true;
+					pOperand->Info.Memory.BaseSize = 2 << pInstruction->AddrMode;
+					pOperand->Info.Memory.Base = RDR_RSI;
+					pOperand->Info.Memory.HasSeg = false;
+					break;
+				case RD_OPT_MEM_DMSRT:
+					pInstruction->MemoryAccess |= pOperand->Access.Access;
+					pOperand->Type = RD_OP_MEM;
+					pOperand->Info.Memory.HasBase = true;
+					pOperand->Info.Memory.BaseSize = 2 << pInstruction->AddrMode;
+					pOperand->Info.Memory.Base = RDR_RDI;
+					pOperand->Info.Memory.HasSeg = false;
+					break;
+				case RD_OPT_MEM_SHSP:
+					pInstruction->MemoryAccess |= pOperand->Access.Access;
+					pOperand->Type = RD_OP_MEM;
+					pOperand->Info.Memory.IsShadowStack = true;
+					pOperand->Info.Memory.ShStkType = RD_SHSTK_SSP_PUSH_POP;
+					break;
+				case RD_OPT_Z:
+					pOperand->Type = RD_OP_REG;
+					pOperand->Info.Register.Type = RD_REG_GPR;
+					pOperand->Info.Register.Size = static_cast<unsigned int>(unDispSize & 0xFFFFFFFF);
+					pOperand->Info.Register.Reg = static_cast<unsigned char>(((pInstruction->Exs.b << 3) | (pInstruction->PrimaryOpCode & 0x7)) & 0xFF);
+					pOperand->Info.Register.IsHigh8 = (pOperand->Info.Register.Size == 1) && (pOperand->Info.Register.Reg >= 4) && (pInstruction->EncMode == RD_ENCM_LEGACY) && !pInstruction->HasRex;
+					break;
+				case RD_OPT_rB:
 					pOperand->Type = RD_OP_REG;
 					pOperand->Info.Register.Type = RD_REG_BND;
 					pOperand->Info.Register.Size = static_cast<unsigned int>(unDispSize & 0xFFFFFFFF);
-					pOperand->Info.Register.Reg = static_cast<unsigned char>(((pInstruction->Exs.b << 3) | pInstruction->ModRm.rm) & 0xFF);
+					pOperand->Info.Register.Reg = static_cast<unsigned char>(((pInstruction->Exs.r << 3) | pInstruction->ModRm.reg) & 0xFF);
 					if (pOperand->Info.Register.Reg >= 4) {
 						return RD_STATUS_INVALID_REGISTER_IN_INSTRUCTION;
 					}
-				} else {
-					goto OPT_M;
-				}
-				break;
-			case RD_OPT_rK:
-				pOperand->Type = RD_OP_REG;
-				pOperand->Info.Register.Type = RD_REG_MSK;
+					break;
+				case RD_OPT_mB:
+					if (pInstruction->ModRm.mod == 3) {
+						pOperand->Type = RD_OP_REG;
+						pOperand->Info.Register.Type = RD_REG_BND;
+						pOperand->Info.Register.Size = static_cast<unsigned int>(unDispSize & 0xFFFFFFFF);
+						pOperand->Info.Register.Reg = static_cast<unsigned char>(((pInstruction->Exs.b << 3) | pInstruction->ModRm.rm) & 0xFF);
+						if (pOperand->Info.Register.Reg >= 4) {
+							return RD_STATUS_INVALID_REGISTER_IN_INSTRUCTION;
+						}
+					} else {
+						goto OPT_M;
+					}
+					break;
+				case RD_OPT_rK:
+					pOperand->Type = RD_OP_REG;
+					pOperand->Info.Register.Type = RD_REG_MSK;
 
-				if (pInstruction->Exs.r || pInstruction->Exs.rp) {
-					return RD_STATUS_INVALID_REGISTER_IN_INSTRUCTION;
-				}
+					if (pInstruction->Exs.r || pInstruction->Exs.rp) {
+						return RD_STATUS_INVALID_REGISTER_IN_INSTRUCTION;
+					}
 
-				pOperand->Info.Register.Size = RD_SIZE_64BIT;
-				pOperand->Info.Register.Reg = static_cast<unsigned char>(pInstruction->ModRm.reg & 0xFF);
+					pOperand->Info.Register.Size = RD_SIZE_64BIT;
+					pOperand->Info.Register.Reg = static_cast<unsigned char>(pInstruction->ModRm.reg & 0xFF);
 
-				break;
-			case RD_OPT_vK:
-				pOperand->Type = RD_OP_REG;
-				pOperand->Info.Register.Type = RD_REG_MSK;
-				pOperand->Info.Register.Size = RD_SIZE_64BIT;
-				pOperand->Info.Register.Reg = static_cast<unsigned char>(pInstruction->Exs.v & 0xFF);
-				if (pOperand->Info.Register.Reg >= 8) {
-					return RD_STATUS_INVALID_REGISTER_IN_INSTRUCTION;
-				}
-				break;
-			case RD_OPT_mK:
-				if (pInstruction->ModRm.mod == 3) {
+					break;
+				case RD_OPT_vK:
 					pOperand->Type = RD_OP_REG;
 					pOperand->Info.Register.Type = RD_REG_MSK;
 					pOperand->Info.Register.Size = RD_SIZE_64BIT;
+					pOperand->Info.Register.Reg = static_cast<unsigned char>(pInstruction->Exs.v & 0xFF);
+					if (pOperand->Info.Register.Reg >= 8) {
+						return RD_STATUS_INVALID_REGISTER_IN_INSTRUCTION;
+					}
+					break;
+				case RD_OPT_mK:
+					if (pInstruction->ModRm.mod == 3) {
+						pOperand->Type = RD_OP_REG;
+						pOperand->Info.Register.Type = RD_REG_MSK;
+						pOperand->Info.Register.Size = RD_SIZE_64BIT;
 
+						pOperand->Info.Register.Reg = pInstruction->ModRm.rm;
+					} else {
+						goto OPT_M;
+					}
+					break;
+				case RD_OPT_aK:
+					pOperand->Type = RD_OP_REG;
+					pOperand->Info.Register.Type = RD_REG_MSK;
+					pOperand->Info.Register.Size = RD_SIZE_64BIT;
+					pOperand->Info.Register.Reg = pInstruction->Exs.k;
+					break;
+				case RD_OPT_rM:
+					pOperand->Type = RD_OP_MEM;
+					pOperand->Info.Memory.HasBase = true;
+					pOperand->Info.Memory.Base = static_cast<unsigned char>(((pInstruction->Exs.r << 3) | pInstruction->ModRm.reg) & 0xFF);
+					pOperand->Info.Memory.BaseSize = 2 << pInstruction->AddrMode;
+					pOperand->Info.Memory.HasSeg = true;
+					pOperand->Info.Memory.Seg = RDR_ES;
+					break;
+				case RD_OPT_mM:
+					pOperand->Type = RD_OP_MEM;
+					pOperand->Info.Memory.HasBase = true;
+					pOperand->Info.Memory.Base = static_cast<unsigned char>(((pInstruction->Exs.m << 3) | pInstruction->ModRm.rm) & 0xFF);
+					pOperand->Info.Memory.BaseSize = 2 << pInstruction->AddrMode;
+					pOperand->Info.Memory.HasSeg = true;
+					pOperand->Info.Memory.Seg = RdGetSegOverride(pInstruction, RDR_DS);
+					break;
+				case RD_OPT_rT:
+					pOperand->Type = RD_OP_REG;
+					pOperand->Info.Register.Type = RD_REG_TILE;
+					pOperand->Info.Register.Size = unDispSize;
+					pOperand->Info.Register.Reg = pInstruction->ModRm.reg;
+
+					if (pInstruction->Exs.r) {
+						return RD_STATUS_INVALID_REGISTER_IN_INSTRUCTION;
+					}
+					break;
+				case RD_OPT_mT:
+					pOperand->Type = RD_OP_REG;
+					pOperand->Info.Register.Type = RD_REG_TILE;
+					pOperand->Info.Register.Size = unDispSize;
 					pOperand->Info.Register.Reg = pInstruction->ModRm.rm;
-				} else {
-					goto OPT_M;
-				}
-				break;
-			case RD_OPT_aK:
-				pOperand->Type = RD_OP_REG;
-				pOperand->Info.Register.Type = RD_REG_MSK;
-				pOperand->Info.Register.Size = RD_SIZE_64BIT;
-				pOperand->Info.Register.Reg = pInstruction->Exs.k;
-				break;
-			case RD_OPT_rM:
-				pOperand->Type = RD_OP_MEM;
-				pOperand->Info.Memory.HasBase = true;
-				pOperand->Info.Memory.Base = static_cast<unsigned char>(((pInstruction->Exs.r << 3) | pInstruction->ModRm.reg) & 0xFF);
-				pOperand->Info.Memory.BaseSize = 2 << pInstruction->AddrMode;
-				pOperand->Info.Memory.HasSeg = true;
-				pOperand->Info.Memory.Seg = RDR_ES;
-				break;
-			case RD_OPT_mM:
-				pOperand->Type = RD_OP_MEM;
-				pOperand->Info.Memory.HasBase = true;
-				pOperand->Info.Memory.Base = static_cast<unsigned char>(((pInstruction->Exs.m << 3) | pInstruction->ModRm.rm) & 0xFF);
-				pOperand->Info.Memory.BaseSize = 2 << pInstruction->AddrMode;
-				pOperand->Info.Memory.HasSeg = true;
-				pOperand->Info.Memory.Seg = RdGetSegOverride(pInstruction, RDR_DS);
-				break;
-			case RD_OPT_rT:
-				pOperand->Type = RD_OP_REG;
-				pOperand->Info.Register.Type = RD_REG_TILE;
-				pOperand->Info.Register.Size = unDispSize;
-				pOperand->Info.Register.Reg = pInstruction->ModRm.reg;
 
-				if (pInstruction->Exs.r) {
-					return RD_STATUS_INVALID_REGISTER_IN_INSTRUCTION;
-				}
-				break;
-			case RD_OPT_mT:
-				pOperand->Type = RD_OP_REG;
-				pOperand->Info.Register.Type = RD_REG_TILE;
-				pOperand->Info.Register.Size = unDispSize;
-				pOperand->Info.Register.Reg = pInstruction->ModRm.rm;
+					if (pInstruction->Exs.b) {
+						return RD_STATUS_INVALID_REGISTER_IN_INSTRUCTION;
+					}
+					break;
+				case RD_OPT_vT:
+					pOperand->Type = RD_OP_REG;
+					pOperand->Info.Register.Type = RD_REG_TILE;
+					pOperand->Info.Register.Size = unDispSize;
+					pOperand->Info.Register.Reg = pInstruction->Exs.v;
 
-				if (pInstruction->Exs.b) {
-					return RD_STATUS_INVALID_REGISTER_IN_INSTRUCTION;
-				}
-				break;
-			case RD_OPT_vT:
-				pOperand->Type = RD_OP_REG;
-				pOperand->Info.Register.Type = RD_REG_TILE;
-				pOperand->Info.Register.Size = unDispSize;
-				pOperand->Info.Register.Reg = pInstruction->Exs.v;
-
-				if (pOperand->Info.Register.Reg > 7) {
-					return RD_STATUS_INVALID_REGISTER_IN_INSTRUCTION;
-				}
-				break;
-			default:
-				return RD_STATUS_INVALID_INSTRUX;
+					if (pOperand->Info.Register.Reg > 7) {
+						return RD_STATUS_INVALID_REGISTER_IN_INSTRUCTION;
+					}
+					break;
+				default:
+					return RD_STATUS_INVALID_INSTRUX;
 			}
 
 			if (pOperand->Type == RD_OP_REG) {
@@ -38433,70 +38433,70 @@ namespace Detours {
 					}
 				} else if (pOperand->Type == RD_OP_REG) {
 					switch (pOperand->Info.Register.Type) {
-					case RD_REG_GPR:
-						for (unsigned int k = 0; k < pOperand->Info.Register.Count; ++k) {
-							if (pOperand->Info.Register.IsHigh8) {
-								pAccessMap->GprAccess[pOperand->Info.Register.Reg - 4 + k] |= pOperand->Access.Access;
-							} else {
-								pAccessMap->GprAccess[pOperand->Info.Register.Reg + k] |= pOperand->Access.Access;
+						case RD_REG_GPR:
+							for (unsigned int k = 0; k < pOperand->Info.Register.Count; ++k) {
+								if (pOperand->Info.Register.IsHigh8) {
+									pAccessMap->GprAccess[pOperand->Info.Register.Reg - 4 + k] |= pOperand->Access.Access;
+								} else {
+									pAccessMap->GprAccess[pOperand->Info.Register.Reg + k] |= pOperand->Access.Access;
+								}
 							}
-						}
-						break;
-					case RD_REG_SEG:
-						pAccessMap->SegAccess[pOperand->Info.Register.Reg] |= pOperand->Access.Access;
-						break;
-					case RD_REG_FPU:
-						pAccessMap->FpuAccess[pOperand->Info.Register.Reg] |= pOperand->Access.Access;
-						break;
-					case RD_REG_MMX:
-						pAccessMap->MmxAccess[pOperand->Info.Register.Reg] |= pOperand->Access.Access;
-						break;
-					case RD_REG_SSE:
-						for (unsigned int k = 0; k < pOperand->Info.Register.Count; ++k) {
-							pAccessMap->SseAccess[pOperand->Info.Register.Reg + k] |= pOperand->Access.Access;
-						}
-						break;
-					case RD_REG_CR:
-						pAccessMap->CrAccess[pOperand->Info.Register.Reg] |= pOperand->Access.Access;
-						break;
-					case RD_REG_DR:
-						pAccessMap->DrAccess[pOperand->Info.Register.Reg] |= pOperand->Access.Access;
-						break;
-					case RD_REG_TR:
-						pAccessMap->TrAccess[pOperand->Info.Register.Reg] |= pOperand->Access.Access;
-						break;
-					case RD_REG_BND:
-						pAccessMap->BndAccess[pOperand->Info.Register.Reg] |= pOperand->Access.Access;
-						break;
-					case RD_REG_MSK:
-						pAccessMap->MskAccess[pOperand->Info.Register.Reg] |= pOperand->Access.Access;
-						break;
-					case RD_REG_SYS:
-						pAccessMap->SysAccess[pOperand->Info.Register.Reg] |= pOperand->Access.Access;
-						break;
-					case RD_REG_X87:
-						pAccessMap->X87Access[pOperand->Info.Register.Reg] |= pOperand->Access.Access;
-						break;
-					case RD_REG_FLG:
-						pAccessMap->FlagsAccess |= pOperand->Access.Access;
-						break;
-					case RD_REG_RIP:
-						pAccessMap->RipAccess |= pOperand->Access.Access;
-						break;
-					case RD_REG_MXCSR:
-						pAccessMap->MxcsrAccess |= pOperand->Access.Access;
-						break;
-					case RD_REG_PKRU:
-						pAccessMap->PkruAccess |= pOperand->Access.Access;
-						break;
-					case RD_REG_SSP:
-						pAccessMap->SspAccess |= pOperand->Access.Access;
-						break;
-					case RD_REG_TILE:
-						pAccessMap->TmmAccess[pOperand->Info.Register.Reg] |= pOperand->Access.Access;
-						break;
-					default:
-						break;
+							break;
+						case RD_REG_SEG:
+							pAccessMap->SegAccess[pOperand->Info.Register.Reg] |= pOperand->Access.Access;
+							break;
+						case RD_REG_FPU:
+							pAccessMap->FpuAccess[pOperand->Info.Register.Reg] |= pOperand->Access.Access;
+							break;
+						case RD_REG_MMX:
+							pAccessMap->MmxAccess[pOperand->Info.Register.Reg] |= pOperand->Access.Access;
+							break;
+						case RD_REG_SSE:
+							for (unsigned int k = 0; k < pOperand->Info.Register.Count; ++k) {
+								pAccessMap->SseAccess[pOperand->Info.Register.Reg + k] |= pOperand->Access.Access;
+							}
+							break;
+						case RD_REG_CR:
+							pAccessMap->CrAccess[pOperand->Info.Register.Reg] |= pOperand->Access.Access;
+							break;
+						case RD_REG_DR:
+							pAccessMap->DrAccess[pOperand->Info.Register.Reg] |= pOperand->Access.Access;
+							break;
+						case RD_REG_TR:
+							pAccessMap->TrAccess[pOperand->Info.Register.Reg] |= pOperand->Access.Access;
+							break;
+						case RD_REG_BND:
+							pAccessMap->BndAccess[pOperand->Info.Register.Reg] |= pOperand->Access.Access;
+							break;
+						case RD_REG_MSK:
+							pAccessMap->MskAccess[pOperand->Info.Register.Reg] |= pOperand->Access.Access;
+							break;
+						case RD_REG_SYS:
+							pAccessMap->SysAccess[pOperand->Info.Register.Reg] |= pOperand->Access.Access;
+							break;
+						case RD_REG_X87:
+							pAccessMap->X87Access[pOperand->Info.Register.Reg] |= pOperand->Access.Access;
+							break;
+						case RD_REG_FLG:
+							pAccessMap->FlagsAccess |= pOperand->Access.Access;
+							break;
+						case RD_REG_RIP:
+							pAccessMap->RipAccess |= pOperand->Access.Access;
+							break;
+						case RD_REG_MXCSR:
+							pAccessMap->MxcsrAccess |= pOperand->Access.Access;
+							break;
+						case RD_REG_PKRU:
+							pAccessMap->PkruAccess |= pOperand->Access.Access;
+							break;
+						case RD_REG_SSP:
+							pAccessMap->SspAccess |= pOperand->Access.Access;
+							break;
+						case RD_REG_TILE:
+							pAccessMap->TmmAccess[pOperand->Info.Register.Reg] |= pOperand->Access.Access;
+							break;
+						default:
+							break;
 					}
 				} else if (pInstruction->Operands[i].Type == RD_OP_BANK) {
 					if (pInstruction->Instruction == RD_INS_FNSAVE) {
@@ -38570,26 +38570,26 @@ namespace Detours {
 
 				if ((pInstruction->Operands[i].Type == RD_OP_REG) && pInstruction->Operands[0].Flags.IsDefault) {
 					switch (pInstruction->Operands[i].Info.Register.Type) {
-					case RD_REG_FLG:
-						pRlut->Flags = &pInstruction->Operands[i];
-						break;
-					case RD_REG_RIP:
-						pRlut->Rip = &pInstruction->Operands[i];
-						break;
-					case RD_REG_SEG:
-						if (pInstruction->Operands[i].Info.Register.Reg == RDR_CS) {
-							pRlut->Cs = &pInstruction->Operands[i];
-						} else if (pInstruction->Operands[i].Info.Register.Reg == RDR_SS) {
-							pRlut->Ss = &pInstruction->Operands[i];
-						}
-						break;
-					case RD_REG_GPR:
-						if (pInstruction->Operands[i].Info.Register.Reg < 8) {
-							*(&pRlut->Rax + pInstruction->Operands[i].Info.Register.Reg) = &pInstruction->Operands[i];
-						}
-						break;
-					default:
-						break;
+						case RD_REG_FLG:
+							pRlut->Flags = &pInstruction->Operands[i];
+							break;
+						case RD_REG_RIP:
+							pRlut->Rip = &pInstruction->Operands[i];
+							break;
+						case RD_REG_SEG:
+							if (pInstruction->Operands[i].Info.Register.Reg == RDR_CS) {
+								pRlut->Cs = &pInstruction->Operands[i];
+							} else if (pInstruction->Operands[i].Info.Register.Reg == RDR_SS) {
+								pRlut->Ss = &pInstruction->Operands[i];
+							}
+							break;
+						case RD_REG_GPR:
+							if (pInstruction->Operands[i].Info.Register.Reg < 8) {
+								*(&pRlut->Rax + pInstruction->Operands[i].Info.Register.Reg) = &pInstruction->Operands[i];
+							}
+							break;
+						default:
+							break;
 					}
 				}
 			}
@@ -38691,131 +38691,131 @@ namespace Detours {
 
 			unsigned char unDRIndex = 0;
 			switch (unRegister) {
-			case HARDWARE_HOOK_REGISTER::REGISTER_DR0:
+				case HARDWARE_HOOK_REGISTER::REGISTER_DR0:
 #ifdef _M_X64
-				ctx.Dr0 = reinterpret_cast<DWORD64>(pAddress);
+					ctx.Dr0 = reinterpret_cast<DWORD64>(pAddress);
 #elif _M_IX86
-				ctx.Dr0 = reinterpret_cast<DWORD>(pAddress);
+					ctx.Dr0 = reinterpret_cast<DWORD>(pAddress);
 #endif
-				unDRIndex = 0;
-				break;
+					unDRIndex = 0;
+					break;
 
-			case HARDWARE_HOOK_REGISTER::REGISTER_DR1:
+				case HARDWARE_HOOK_REGISTER::REGISTER_DR1:
 #ifdef _M_X64
-				ctx.Dr1 = reinterpret_cast<DWORD64>(pAddress);
+					ctx.Dr1 = reinterpret_cast<DWORD64>(pAddress);
 #elif _M_IX86
-				ctx.Dr1 = reinterpret_cast<DWORD>(pAddress);
+					ctx.Dr1 = reinterpret_cast<DWORD>(pAddress);
 #endif
-				unDRIndex = 1;
-				break;
+					unDRIndex = 1;
+					break;
 
-			case HARDWARE_HOOK_REGISTER::REGISTER_DR2:
+				case HARDWARE_HOOK_REGISTER::REGISTER_DR2:
 #ifdef _M_X64
-				ctx.Dr2 = reinterpret_cast<DWORD64>(pAddress);
+					ctx.Dr2 = reinterpret_cast<DWORD64>(pAddress);
 #elif _M_IX86
-				ctx.Dr2 = reinterpret_cast<DWORD>(pAddress);
+					ctx.Dr2 = reinterpret_cast<DWORD>(pAddress);
 #endif
-				unDRIndex = 2;
-				break;
+					unDRIndex = 2;
+					break;
 
-			case HARDWARE_HOOK_REGISTER::REGISTER_DR3:
+				case HARDWARE_HOOK_REGISTER::REGISTER_DR3:
 #ifdef _M_X64
-				ctx.Dr3 = reinterpret_cast<DWORD64>(pAddress);
+					ctx.Dr3 = reinterpret_cast<DWORD64>(pAddress);
 #elif _M_IX86
-				ctx.Dr3 = reinterpret_cast<DWORD>(pAddress);
+					ctx.Dr3 = reinterpret_cast<DWORD>(pAddress);
 #endif
-				unDRIndex = 3;
-				break;
+					unDRIndex = 3;
+					break;
 			}
 
 			unsigned char unTypeValue = 0;
 			switch (unType) {
-			case HARDWARE_HOOK_TYPE::TYPE_EXECUTE:
-				unTypeValue = 0;
-				break;
+				case HARDWARE_HOOK_TYPE::TYPE_EXECUTE:
+					unTypeValue = 0;
+					break;
 
-			case HARDWARE_HOOK_TYPE::TYPE_WRITE:
-				unTypeValue = 1;
-				break;
+				case HARDWARE_HOOK_TYPE::TYPE_WRITE:
+					unTypeValue = 1;
+					break;
 
-			case HARDWARE_HOOK_TYPE::TYPE_ACCESS:
-				unTypeValue = 3;
-				break;
+				case HARDWARE_HOOK_TYPE::TYPE_ACCESS:
+					unTypeValue = 3;
+					break;
 			}
 
 			unsigned char unSizeValue = 0;
 			switch (unSize) {
-			case 1:
-				unSizeValue = 0;
-				break;
+				case 1:
+					unSizeValue = 0;
+					break;
 
-			case 2:
-				unSizeValue = 1;
-				break;
+				case 2:
+					unSizeValue = 1;
+					break;
 
-			case 4:
-				unSizeValue = 3;
-				break;
+				case 4:
+					unSizeValue = 3;
+					break;
 
 #ifdef _M_X64
-			case 8:
-				unSizeValue = 2;
-				break;
+				case 8:
+					unSizeValue = 2;
+					break;
 #endif
 			}
 
 			auto& dr7 = *reinterpret_cast<REGISTER_DR7*>(&ctx.Dr7);
 
 			switch (unDRIndex) {
-			case 0:
-				dr7.m_unL0 = 0;
-				dr7.m_unRW0 = 0;
-				dr7.m_unLEN0 = 0;
-				break;
+				case 0:
+					dr7.m_unL0 = 0;
+					dr7.m_unRW0 = 0;
+					dr7.m_unLEN0 = 0;
+					break;
 
-			case 1:
-				dr7.m_unL1 = 0;
-				dr7.m_unRW1 = 0;
-				dr7.m_unLEN1 = 0;
-				break;
+				case 1:
+					dr7.m_unL1 = 0;
+					dr7.m_unRW1 = 0;
+					dr7.m_unLEN1 = 0;
+					break;
 
-			case 2:
-				dr7.m_unL2 = 0;
-				dr7.m_unRW2 = 0;
-				dr7.m_unLEN2 = 0;
-				break;
+				case 2:
+					dr7.m_unL2 = 0;
+					dr7.m_unRW2 = 0;
+					dr7.m_unLEN2 = 0;
+					break;
 
-			case 3:
-				dr7.m_unL3 = 0;
-				dr7.m_unRW3 = 0;
-				dr7.m_unLEN3 = 0;
-				break;
+				case 3:
+					dr7.m_unL3 = 0;
+					dr7.m_unRW3 = 0;
+					dr7.m_unLEN3 = 0;
+					break;
 			}
 
 			switch (unDRIndex) {
-			case 0:
-				dr7.m_unL0 = 1;
-				dr7.m_unRW0 = unTypeValue;
-				dr7.m_unLEN0 = unSizeValue;
-				break;
+				case 0:
+					dr7.m_unL0 = 1;
+					dr7.m_unRW0 = unTypeValue;
+					dr7.m_unLEN0 = unSizeValue;
+					break;
 
-			case 1:
-				dr7.m_unL1 = 1;
-				dr7.m_unRW1 = unTypeValue;
-				dr7.m_unLEN1 = unSizeValue;
-				break;
+				case 1:
+					dr7.m_unL1 = 1;
+					dr7.m_unRW1 = unTypeValue;
+					dr7.m_unLEN1 = unSizeValue;
+					break;
 
-			case 2:
-				dr7.m_unL2 = 1;
-				dr7.m_unRW2 = unTypeValue;
-				dr7.m_unLEN2 = unSizeValue;
-				break;
+				case 2:
+					dr7.m_unL2 = 1;
+					dr7.m_unRW2 = unTypeValue;
+					dr7.m_unLEN2 = unSizeValue;
+					break;
 
-			case 3:
-				dr7.m_unL3 = 1;
-				dr7.m_unRW3 = unTypeValue;
-				dr7.m_unLEN3 = unSizeValue;
-				break;
+				case 3:
+					dr7.m_unL3 = 1;
+					dr7.m_unRW3 = unTypeValue;
+					dr7.m_unLEN3 = unSizeValue;
+					break;
 			}
 
 			if (!SetThreadContext(hThread, &ctx)) {
@@ -38889,37 +38889,37 @@ namespace Detours {
 					if (GetThreadContext(hThread, &ctx)) {
 						auto& dr7 = *reinterpret_cast<REGISTER_DR7*>(&ctx.Dr7);
 						switch (unRegister) {
-						case HARDWARE_HOOK_REGISTER::REGISTER_DR0:
-							ctx.Dr0 = 0;
-							dr7.m_unL0 = 0;
-							dr7.m_unG0 = 0;
-							dr7.m_unRW0 = 0;
-							dr7.m_unLEN0 = 0;
-							break;
+							case HARDWARE_HOOK_REGISTER::REGISTER_DR0:
+								ctx.Dr0 = 0;
+								dr7.m_unL0 = 0;
+								dr7.m_unG0 = 0;
+								dr7.m_unRW0 = 0;
+								dr7.m_unLEN0 = 0;
+								break;
 
-						case HARDWARE_HOOK_REGISTER::REGISTER_DR1:
-							ctx.Dr1 = 0;
-							dr7.m_unL1 = 0;
-							dr7.m_unG1 = 0;
-							dr7.m_unRW1 = 0;
-							dr7.m_unLEN1 = 0;
-							break;
+							case HARDWARE_HOOK_REGISTER::REGISTER_DR1:
+								ctx.Dr1 = 0;
+								dr7.m_unL1 = 0;
+								dr7.m_unG1 = 0;
+								dr7.m_unRW1 = 0;
+								dr7.m_unLEN1 = 0;
+								break;
 
-						case HARDWARE_HOOK_REGISTER::REGISTER_DR2:
-							ctx.Dr2 = 0;
-							dr7.m_unL2 = 0;
-							dr7.m_unG2 = 0;
-							dr7.m_unRW2 = 0;
-							dr7.m_unLEN2 = 0;
-							break;
+							case HARDWARE_HOOK_REGISTER::REGISTER_DR2:
+								ctx.Dr2 = 0;
+								dr7.m_unL2 = 0;
+								dr7.m_unG2 = 0;
+								dr7.m_unRW2 = 0;
+								dr7.m_unLEN2 = 0;
+								break;
 
-						case HARDWARE_HOOK_REGISTER::REGISTER_DR3:
-							ctx.Dr3 = 0;
-							dr7.m_unL3 = 0;
-							dr7.m_unG3 = 0;
-							dr7.m_unRW3 = 0;
-							dr7.m_unLEN3 = 0;
-							break;
+							case HARDWARE_HOOK_REGISTER::REGISTER_DR3:
+								ctx.Dr3 = 0;
+								dr7.m_unL3 = 0;
+								dr7.m_unG3 = 0;
+								dr7.m_unRW3 = 0;
+								dr7.m_unLEN3 = 0;
+								break;
 						}
 
 						SetThreadContext(hThread, &ctx);
@@ -39603,40 +39603,40 @@ namespace Detours {
 					const size_t unNewDisp = unTargetAddress - unTrampolineAddress;
 
 					switch (ins.DispLength) {
-					//case 1: // FIXME: Impossible to do. (FIX: Replace disp8 with disp32)
-					//	*reinterpret_cast<unsigned char*>(reinterpret_cast<size_t>(m_pTrampoline) + unIndex + ins.DispOffset) = static_cast<unsigned char>(unNewDisp & 0xFF);
-					//	break;
-					//case 2: // FIXME: Possible crash. (FIX: Same as with disp8)
-					//	*reinterpret_cast<unsigned short*>(reinterpret_cast<size_t>(m_pTrampoline) + unIndex + ins.DispOffset) = static_cast<unsigned short>(unNewDisp & 0xFFFF);
-					//	break;
-					case 4:
-						*reinterpret_cast<unsigned int*>(reinterpret_cast<size_t>(m_pTrampoline) + unIndex + ins.DispOffset) = static_cast<unsigned int>(unNewDisp & 0xFFFFFFFF);
-						break;
-					default:
-						g_HookStorage.DeAlloc(m_pTrampoline);
-						m_pTrampoline = nullptr;
-						g_Suspender.Resume();
-						return false;
+						//case 1: // FIXME: Impossible to do. (FIX: Replace disp8 with disp32)
+						//	*reinterpret_cast<unsigned char*>(reinterpret_cast<size_t>(m_pTrampoline) + unIndex + ins.DispOffset) = static_cast<unsigned char>(unNewDisp & 0xFF);
+						//	break;
+						//case 2: // FIXME: Possible crash. (FIX: Same as with disp8)
+						//	*reinterpret_cast<unsigned short*>(reinterpret_cast<size_t>(m_pTrampoline) + unIndex + ins.DispOffset) = static_cast<unsigned short>(unNewDisp & 0xFFFF);
+						//	break;
+						case 4:
+							*reinterpret_cast<unsigned int*>(reinterpret_cast<size_t>(m_pTrampoline) + unIndex + ins.DispOffset) = static_cast<unsigned int>(unNewDisp & 0xFFFFFFFF);
+							break;
+						default:
+							g_HookStorage.DeAlloc(m_pTrampoline);
+							m_pTrampoline = nullptr;
+							g_Suspender.Resume();
+							return false;
 					}
 				} else if (ins.HasRelOffs) {
 					const size_t unTargetAddress = unAddress + static_cast<size_t>(ins.RelativeOffset);
 					const size_t unNewOffset = unTargetAddress - unTrampolineAddress;
 
 					switch (ins.RelOffsLength) {
-					//case 1: // FIXME: Impossible to do. (FIX: Replace rel8 with rel32)
-					//	*reinterpret_cast<unsigned char*>(reinterpret_cast<size_t>(m_pTrampoline) + unIndex + ins.RelOffsOffset) = static_cast<unsigned char>(unNewOffset & 0xFF);
-					//	break;
-					//case 2: // FIXME: Possible crash. (FIX: Same as with rel8)
-					//	*reinterpret_cast<unsigned short*>(reinterpret_cast<size_t>(m_pTrampoline) + unIndex + ins.RelOffsOffset) = static_cast<unsigned short>(unNewOffset & 0xFFFF);
-					//	break;
-					case 4:
-						*reinterpret_cast<unsigned int*>(reinterpret_cast<size_t>(m_pTrampoline) + unIndex + ins.RelOffsOffset) = static_cast<unsigned int>(unNewOffset & 0xFFFFFFFF);
-						break;
-					default:
-						g_HookStorage.DeAlloc(m_pTrampoline);
-						m_pTrampoline = nullptr;
-						g_Suspender.Resume();
-						return false;
+						//case 1: // FIXME: Impossible to do. (FIX: Replace rel8 with rel32)
+						//	*reinterpret_cast<unsigned char*>(reinterpret_cast<size_t>(m_pTrampoline) + unIndex + ins.RelOffsOffset) = static_cast<unsigned char>(unNewOffset & 0xFF);
+						//	break;
+						//case 2: // FIXME: Possible crash. (FIX: Same as with rel8)
+						//	*reinterpret_cast<unsigned short*>(reinterpret_cast<size_t>(m_pTrampoline) + unIndex + ins.RelOffsOffset) = static_cast<unsigned short>(unNewOffset & 0xFFFF);
+						//	break;
+						case 4:
+							*reinterpret_cast<unsigned int*>(reinterpret_cast<size_t>(m_pTrampoline) + unIndex + ins.RelOffsOffset) = static_cast<unsigned int>(unNewOffset & 0xFFFFFFFF);
+							break;
+						default:
+							g_HookStorage.DeAlloc(m_pTrampoline);
+							m_pTrampoline = nullptr;
+							g_Suspender.Resume();
+							return false;
 					}
 				}
 
@@ -40103,44 +40103,44 @@ namespace Detours {
 					const size_t unNewDisp = unTargetAddress - unTrampolineAddress;
 
 					switch (ins.DispLength) {
-					//case 1: // FIXME: Impossible to do. (FIX: Replace disp8 with disp32)
-					//	*reinterpret_cast<unsigned char*>(reinterpret_cast<size_t>(m_pTrampoline) + unIndex + ins.DispOffset) = static_cast<unsigned char>(unNewDisp & 0xFF);
-					//	break;
-					//case 2: // FIXME: Possible crash. (FIX: Same as with disp8)
-					//	*reinterpret_cast<unsigned short*>(reinterpret_cast<size_t>(m_pTrampoline) + unIndex + ins.DispOffset) = static_cast<unsigned short>(unNewDisp & 0xFFFF);
-					//	break;
-					case 4:
-						*reinterpret_cast<unsigned int*>(reinterpret_cast<size_t>(m_pTrampoline) + unIndex + ins.DispOffset) = static_cast<unsigned int>(unNewDisp & 0xFFFFFFFF);
-						break;
-					default:
-						g_HookStorage.DeAlloc(m_pTrampoline);
-						m_pTrampoline = nullptr;
-						g_HookStorage.DeAlloc(m_pWrapper);
-						m_pWrapper = nullptr;
-						g_Suspender.Resume();
-						return false;
+						//case 1: // FIXME: Impossible to do. (FIX: Replace disp8 with disp32)
+						//	*reinterpret_cast<unsigned char*>(reinterpret_cast<size_t>(m_pTrampoline) + unIndex + ins.DispOffset) = static_cast<unsigned char>(unNewDisp & 0xFF);
+						//	break;
+						//case 2: // FIXME: Possible crash. (FIX: Same as with disp8)
+						//	*reinterpret_cast<unsigned short*>(reinterpret_cast<size_t>(m_pTrampoline) + unIndex + ins.DispOffset) = static_cast<unsigned short>(unNewDisp & 0xFFFF);
+						//	break;
+						case 4:
+							*reinterpret_cast<unsigned int*>(reinterpret_cast<size_t>(m_pTrampoline) + unIndex + ins.DispOffset) = static_cast<unsigned int>(unNewDisp & 0xFFFFFFFF);
+							break;
+						default:
+							g_HookStorage.DeAlloc(m_pTrampoline);
+							m_pTrampoline = nullptr;
+							g_HookStorage.DeAlloc(m_pWrapper);
+							m_pWrapper = nullptr;
+							g_Suspender.Resume();
+							return false;
 					}
 				} else if (ins.HasRelOffs) {
 					const size_t unTargetAddress = unAddress + static_cast<size_t>(ins.RelativeOffset);
 					const size_t unNewOffset = unTargetAddress - unTrampolineAddress;
 
 					switch (ins.RelOffsLength) {
-					//case 1: // FIXME: Impossible to do. (FIX: Replace rel8 with rel32)
-					//	*reinterpret_cast<unsigned char*>(reinterpret_cast<size_t>(m_pTrampoline) + unIndex + ins.RelOffsOffset) = static_cast<unsigned char>(unNewOffset & 0xFF);
-					//	break;
-					//case 2: // FIXME: Possible crash. (FIX: Same as with rel8)
-					//	*reinterpret_cast<unsigned short*>(reinterpret_cast<size_t>(m_pTrampoline) + unIndex + ins.RelOffsOffset) = static_cast<unsigned short>(unNewOffset & 0xFFFF);
-					//	break;
-					case 4:
-						*reinterpret_cast<unsigned int*>(reinterpret_cast<size_t>(m_pTrampoline) + unIndex + ins.RelOffsOffset) = static_cast<unsigned int>(unNewOffset & 0xFFFFFFFF);
-						break;
-					default:
-						g_HookStorage.DeAlloc(m_pTrampoline);
-						m_pTrampoline = nullptr;
-						g_HookStorage.DeAlloc(m_pWrapper);
-						m_pWrapper = nullptr;
-						g_Suspender.Resume();
-						return false;
+						//case 1: // FIXME: Impossible to do. (FIX: Replace rel8 with rel32)
+						//	*reinterpret_cast<unsigned char*>(reinterpret_cast<size_t>(m_pTrampoline) + unIndex + ins.RelOffsOffset) = static_cast<unsigned char>(unNewOffset & 0xFF);
+						//	break;
+						//case 2: // FIXME: Possible crash. (FIX: Same as with rel8)
+						//	*reinterpret_cast<unsigned short*>(reinterpret_cast<size_t>(m_pTrampoline) + unIndex + ins.RelOffsOffset) = static_cast<unsigned short>(unNewOffset & 0xFFFF);
+						//	break;
+						case 4:
+							*reinterpret_cast<unsigned int*>(reinterpret_cast<size_t>(m_pTrampoline) + unIndex + ins.RelOffsOffset) = static_cast<unsigned int>(unNewOffset & 0xFFFFFFFF);
+							break;
+						default:
+							g_HookStorage.DeAlloc(m_pTrampoline);
+							m_pTrampoline = nullptr;
+							g_HookStorage.DeAlloc(m_pWrapper);
+							m_pWrapper = nullptr;
+							g_Suspender.Resume();
+							return false;
 					}
 				}
 
@@ -41660,46 +41660,46 @@ namespace Detours {
 					const size_t unNewDisp = unTargetAddress - unTrampolineAddress;
 
 					switch (ins.DispLength) {
-					//case 1: // FIXME: Impossible to do (FIX: Replace disp8 to disp32)
-					//	*reinterpret_cast<unsigned char*>(reinterpret_cast<size_t>(m_pTrampoline) + unIndex + ins.DispOffset) = static_cast<unsigned char>(unNewDisp & 0xFF);
-					//	break;
-					//case 2: // FIXME: Possible crash (FIX: Same as disp8)
-					//	*reinterpret_cast<unsigned short*>(reinterpret_cast<size_t>(m_pTrampoline) + unIndex + ins.DispOffset) = static_cast<unsigned short>(unNewDisp & 0xFFFF);
-					//	break;
-					case 4:
-						*reinterpret_cast<unsigned int*>(reinterpret_cast<size_t>(m_pTrampoline) + unIndex + ins.DispOffset) = static_cast<unsigned int>(unNewDisp & 0xFFFFFFFF);
-						break;
-					default:
-						g_HookStorage.DeAlloc(m_pTrampoline);
-						m_pTrampoline = nullptr;
-						m_unFirstInstructionSize = 0;
-						g_HookStorage.DeAlloc(m_pWrapper);
-						m_pWrapper = nullptr;
-						g_Suspender.Resume();
-						return false;
+						//case 1: // FIXME: Impossible to do (FIX: Replace disp8 to disp32)
+						//	*reinterpret_cast<unsigned char*>(reinterpret_cast<size_t>(m_pTrampoline) + unIndex + ins.DispOffset) = static_cast<unsigned char>(unNewDisp & 0xFF);
+						//	break;
+						//case 2: // FIXME: Possible crash (FIX: Same as disp8)
+						//	*reinterpret_cast<unsigned short*>(reinterpret_cast<size_t>(m_pTrampoline) + unIndex + ins.DispOffset) = static_cast<unsigned short>(unNewDisp & 0xFFFF);
+						//	break;
+						case 4:
+							*reinterpret_cast<unsigned int*>(reinterpret_cast<size_t>(m_pTrampoline) + unIndex + ins.DispOffset) = static_cast<unsigned int>(unNewDisp & 0xFFFFFFFF);
+							break;
+						default:
+							g_HookStorage.DeAlloc(m_pTrampoline);
+							m_pTrampoline = nullptr;
+							m_unFirstInstructionSize = 0;
+							g_HookStorage.DeAlloc(m_pWrapper);
+							m_pWrapper = nullptr;
+							g_Suspender.Resume();
+							return false;
 					}
 				} else if (ins.HasRelOffs) {
 					const size_t unTargetAddress = unAddress + static_cast<size_t>(ins.RelativeOffset);
 					const size_t unNewOffset = unTargetAddress - unTrampolineAddress;
 
 					switch (ins.RelOffsLength) {
-					//case 1: // FIXME: Impossible to do (FIX: Replace rel8 to rel32)
-					//	*reinterpret_cast<unsigned char*>(reinterpret_cast<size_t>(m_pTrampoline) + unIndex + ins.RelOffsOffset) = static_cast<unsigned char>(unNewOffset & 0xFF);
-					//	break;
-					//case 2: // FIXME: Possible error (FIX: Same as rel8)
-					//	*reinterpret_cast<unsigned short*>(reinterpret_cast<size_t>(m_pTrampoline) + unIndex + ins.RelOffsOffset) = static_cast<unsigned short>(unNewOffset & 0xFFFF);
-					//	break;
-					case 4:
-						*reinterpret_cast<unsigned int*>(reinterpret_cast<size_t>(m_pTrampoline) + unIndex + ins.RelOffsOffset) = static_cast<unsigned int>(unNewOffset & 0xFFFFFFFF);
-						break;
-					default:
-						g_HookStorage.DeAlloc(m_pTrampoline);
-						m_pTrampoline = nullptr;
-						m_unFirstInstructionSize = 0;
-						g_HookStorage.DeAlloc(m_pWrapper);
-						m_pWrapper = nullptr;
-						g_Suspender.Resume();
-						return false;
+						//case 1: // FIXME: Impossible to do (FIX: Replace rel8 to rel32)
+						//	*reinterpret_cast<unsigned char*>(reinterpret_cast<size_t>(m_pTrampoline) + unIndex + ins.RelOffsOffset) = static_cast<unsigned char>(unNewOffset & 0xFF);
+						//	break;
+						//case 2: // FIXME: Possible error (FIX: Same as rel8)
+						//	*reinterpret_cast<unsigned short*>(reinterpret_cast<size_t>(m_pTrampoline) + unIndex + ins.RelOffsOffset) = static_cast<unsigned short>(unNewOffset & 0xFFFF);
+						//	break;
+						case 4:
+							*reinterpret_cast<unsigned int*>(reinterpret_cast<size_t>(m_pTrampoline) + unIndex + ins.RelOffsOffset) = static_cast<unsigned int>(unNewOffset & 0xFFFFFFFF);
+							break;
+						default:
+							g_HookStorage.DeAlloc(m_pTrampoline);
+							m_pTrampoline = nullptr;
+							m_unFirstInstructionSize = 0;
+							g_HookStorage.DeAlloc(m_pWrapper);
+							m_pWrapper = nullptr;
+							g_Suspender.Resume();
+							return false;
 					}
 				}
 
