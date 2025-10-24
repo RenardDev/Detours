@@ -1,0 +1,18 @@
+
+root = true
+
+[*]
+charset = utf-8
+end_of_line = crlf
+insert_final_newline = true
+trim_trailing_whitespace = true
+
+[*.asm]
+indent_style = tab
+indent_size = 4
+tab_width = 4
+
+[*.{c,cc,cxx,cpp,h,hpp,hxx,inl,ipp,ixx,tlh,tli}]
+indent_style = tab
+indent_size = 4
+tab_width = 4

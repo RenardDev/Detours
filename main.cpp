@@ -36,6 +36,7 @@ extern "C" unsigned char __cdecl TryRead(void* pData);
 class BaseMessage {
 public:
 	virtual ~BaseMessage() {}
+
 	virtual void Message() const {
 		_tprintf_s(_T("Hello, World!\n"));
 	}
@@ -73,8 +74,13 @@ public:
 
 class BaseTestingRTTI {
 public:
-	virtual bool foo() { return false; }
-	virtual bool boo() { return true; }
+	virtual bool foo() {
+		return false;
+	}
+
+	virtual bool boo() {
+		return true;
+	}
 };
 
 class TestingRTTI : public BaseTestingRTTI {
@@ -84,8 +90,13 @@ public:
 		m_bBoo = false;
 	}
 
-	bool foo() override { return m_bFoo; }
-	bool boo() override { return m_bBoo; }
+	bool foo() override {
+		return m_bFoo;
+	}
+
+	bool boo() override {
+		return m_bBoo;
+	}
 
 private:
 	bool m_bFoo;
@@ -94,62 +105,107 @@ private:
 
 struct SI_Base {
 	virtual ~SI_Base() {}
-	virtual int id() { return 1; }
-	virtual bool base_only() { return true; }
+
+	virtual int id() {
+		return 1;
+	}
+
+	virtual bool base_only() {
+		return true;
+	}
 };
 
 struct SI_Derived : SI_Base {
 	~SI_Derived() override {}
-	int id() override { return 2; }
-	bool base_only() override { return false; }
+
+	int id() override {
+		return 2;
+	}
+
+	bool base_only() override {
+		return false;
+	}
 };
 
 struct MI_A {
 	virtual ~MI_A() {}
-	virtual int a() { return 10; }
+
+	virtual int a() {
+		return 10;
+	}
 };
 
 struct MI_B {
 	virtual ~MI_B() {}
-	virtual int b() { return 20; }
+
+	virtual int b() {
+		return 20;
+	}
 };
 
 struct MI_D : MI_A, MI_B {
 	~MI_D() override {}
-	int a() override { return 11; }
-	int b() override { return 21; }
+
+	int a() override {
+		return 11;
+	}
+
+	int b() override {
+		return 21;
+	}
 };
 
 struct VI_V {
 	virtual ~VI_V() {}
-	virtual const char* v() { return "V"; }
+
+	virtual const char* v() {
+		return "V";
+	}
 };
 
 struct VI_A : virtual VI_V {
 	~VI_A() override {}
-	const char* v() override { return "A"; }
+
+	const char* v() override {
+		return "A";
+	}
 };
 
 struct VI_B : virtual VI_V {
 	~VI_B() override {}
-	const char* v() override { return "B"; }
+
+	const char* v() override {
+		return "B";
+	}
 };
 
 struct VI_D : VI_A, VI_B {
 	~VI_D() override {}
-	const char* v() override { return "D"; }
+
+	const char* v() override {
+		return "D";
+	}
 };
 
 struct PrivBase {
 	virtual ~PrivBase() {}
-	virtual int tag() { return 777; }
+
+	virtual int tag() {
+		return 777;
+	}
 };
 
 struct PrivDerived : private PrivBase {
 public:
 	~PrivDerived() override {}
-	PrivBase* AsBase() { return static_cast<PrivBase*>(this); }
-	int tag() override { return 888; }
+
+	PrivBase* AsBase() {
+		return static_cast<PrivBase*>(this);
+	}
+
+	int tag() override {
+		return 888;
+	}
 };
 
 template <typename T>
@@ -286,7 +342,7 @@ TEST_SUITE("Detours::Codec") {
 	}
 
 #pragma warning(push)
-#pragma warning(disable: 6001)
+#pragma warning(disable : 6001)
 
 	TEST_CASE("Encode") {
 		int nEncodeSize = Detours::Codec::Encode(CP_UTF8, "Hello, World!");
@@ -339,7 +395,7 @@ TEST_SUITE("Detours::Scan") {
 	TEST_CASE("FindSection") {
 		void* pSection = nullptr;
 		size_t unSectionSize = 0;
-		CHECK(Detours::Scan::FindSection(GetModuleHandle(nullptr), {'.', 't', 'e', 'x', 't', 0, 0, 0}, &pSection, &unSectionSize) == true);
+		CHECK(Detours::Scan::FindSection(GetModuleHandle(nullptr), { '.', 't', 'e', 'x', 't', 0, 0, 0 }, &pSection, &unSectionSize) == true);
 		CHECK(pSection != nullptr);
 		CHECK(unSectionSize != 0);
 	}
@@ -990,359 +1046,359 @@ TEST_SUITE("Detours::Scan") {
 DISABLE_OPTIMIZATION_BEGIN("") {
 #endif
 
-TEST_SUITE("Detours::RTTI") {
+	TEST_SUITE("Detours::RTTI") {
 
-	TEST_CASE("DumpRTTI") {
-		auto TDs = Detours::RTTI::DumpRTTI(GetModuleHandle(nullptr));
-		for (auto& pTD : TDs) {
-			printf("Name: `%s`\n", pTD->GetTypeDescriptor()->m_szName);
+		TEST_CASE("DumpRTTI") {
+			auto TDs = Detours::RTTI::DumpRTTI(GetModuleHandle(nullptr));
+			for (auto& pTD : TDs) {
+				printf("Name: `%s`\n", pTD->GetTypeDescriptor()->m_szName);
+			}
 		}
-	}
 
-	TEST_CASE("FindRTTI") {
-		// Construct a small hierarchy and verify we can locate RTTI for a derived type
-		// and extract a working vtable to call through.
-		g_pBaseTestingRTTI = new BaseTestingRTTI();
-		CHECK(g_pBaseTestingRTTI != nullptr);
+		TEST_CASE("FindRTTI") {
+			// Construct a small hierarchy and verify we can locate RTTI for a derived type
+			// and extract a working vtable to call through.
+			g_pBaseTestingRTTI = new BaseTestingRTTI();
+			CHECK(g_pBaseTestingRTTI != nullptr);
 
-		g_pTestingRTTI = new TestingRTTI();
-		CHECK(g_pTestingRTTI != nullptr);
+			g_pTestingRTTI = new TestingRTTI();
+			CHECK(g_pTestingRTTI != nullptr);
 
-		// Find TestingRTTI while asserting it has BaseTestingRTTI as a parent.
-		const auto& pObject = Detours::RTTI::FindObject(GetModuleHandle(nullptr), ".?AVTestingRTTI@@", ".?AVBaseTestingRTTI@@");
-		CHECK(pObject != nullptr);
+			// Find TestingRTTI while asserting it has BaseTestingRTTI as a parent.
+			const auto& pObject = Detours::RTTI::FindObject(GetModuleHandle(nullptr), ".?AVTestingRTTI@@", ".?AVBaseTestingRTTI@@");
+			CHECK(pObject != nullptr);
 
-		// Pull vtable for direct call tests.
-		const auto& pVTable = pObject->GetVTable();
-		CHECK(pVTable != nullptr);
+			// Pull vtable for direct call tests.
+			const auto& pVTable = pObject->GetVTable();
+			CHECK(pVTable != nullptr);
 
-		// The test interface: two virtuals with boolean returns.
-		using fnFoo = bool(__fastcall*)(void* pThis, void*);
-		using fnBoo = bool(__fastcall*)(void* pThis, void*);
+			// The test interface: two virtuals with boolean returns.
+			using fnFoo = bool(__fastcall*)(void* pThis, void*);
+			using fnBoo = bool(__fastcall*)(void* pThis, void*);
 
-		// Validate the vtable entries invoke expected implementations.
-		CHECK(reinterpret_cast<fnFoo>(pVTable[0])(g_pTestingRTTI, nullptr) == true);
-		CHECK(reinterpret_cast<fnBoo>(pVTable[1])(g_pTestingRTTI, nullptr) == false);
+			// Validate the vtable entries invoke expected implementations.
+			CHECK(reinterpret_cast<fnFoo>(pVTable[0])(g_pTestingRTTI, nullptr) == true);
+			CHECK(reinterpret_cast<fnBoo>(pVTable[1])(g_pTestingRTTI, nullptr) == false);
 
-		delete g_pTestingRTTI;
-		delete g_pBaseTestingRTTI;
-	}
+			delete g_pTestingRTTI;
+			delete g_pBaseTestingRTTI;
+		}
 
-	TEST_CASE("DynamicCastingRTTI") {
-		// Cross-check base->derived selection using our dynamic cast engine.
-		const auto& pMsg1 = new MessageOne();
-		CHECK(pMsg1 != nullptr);
+		TEST_CASE("DynamicCastingRTTI") {
+			// Cross-check base->derived selection using our dynamic cast engine.
+			const auto& pMsg1 = new MessageOne();
+			CHECK(pMsg1 != nullptr);
 
-		const auto& pMsg2 = new MessageTwo();
-		CHECK(pMsg2 != nullptr);
+			const auto& pMsg2 = new MessageTwo();
+			CHECK(pMsg2 != nullptr);
 
-		// Query RTTI nodes for BaseMessage and the two derived message types.
-		const auto& pBaseMessageObject = Detours::RTTI::FindObject(GetModuleHandle(nullptr), ".?AVBaseMessage@@", nullptr, false);
-		CHECK(pBaseMessageObject != nullptr);
+			// Query RTTI nodes for BaseMessage and the two derived message types.
+			const auto& pBaseMessageObject = Detours::RTTI::FindObject(GetModuleHandle(nullptr), ".?AVBaseMessage@@", nullptr, false);
+			CHECK(pBaseMessageObject != nullptr);
 
-		const auto& pMessageOneObject = Detours::RTTI::FindObject(GetModuleHandle(nullptr), ".?AVMessageOne@@", ".?AVBaseMessage@@");
-		CHECK(pMessageOneObject != nullptr);
+			const auto& pMessageOneObject = Detours::RTTI::FindObject(GetModuleHandle(nullptr), ".?AVMessageOne@@", ".?AVBaseMessage@@");
+			CHECK(pMessageOneObject != nullptr);
 
-		const auto& pMessageTwoObject = Detours::RTTI::FindObject(GetModuleHandle(nullptr), ".?AVMessageTwo@@");
-		CHECK(pMessageTwoObject != nullptr);
+			const auto& pMessageTwoObject = Detours::RTTI::FindObject(GetModuleHandle(nullptr), ".?AVMessageTwo@@");
+			CHECK(pMessageTwoObject != nullptr);
 
-		// base -> MessageOne should succeed for Msg1; fail for Msg2 (and vice versa).
-		CHECK(pBaseMessageObject->DynamicCast(pMsg1, pMessageOneObject.get()) != nullptr);
-		CHECK(pBaseMessageObject->DynamicCast(pMsg1, pMessageTwoObject.get()) == nullptr);
-		CHECK(pBaseMessageObject->DynamicCast(pMsg2, pMessageOneObject.get()) == nullptr);
-		CHECK(pBaseMessageObject->DynamicCast(pMsg2, pMessageTwoObject.get()) != nullptr);
+			// base -> MessageOne should succeed for Msg1; fail for Msg2 (and vice versa).
+			CHECK(pBaseMessageObject->DynamicCast(pMsg1, pMessageOneObject.get()) != nullptr);
+			CHECK(pBaseMessageObject->DynamicCast(pMsg1, pMessageTwoObject.get()) == nullptr);
+			CHECK(pBaseMessageObject->DynamicCast(pMsg2, pMessageOneObject.get()) == nullptr);
+			CHECK(pBaseMessageObject->DynamicCast(pMsg2, pMessageTwoObject.get()) != nullptr);
 
-		delete pMsg1;
-		delete pMsg2;
-	}
+			delete pMsg1;
+			delete pMsg2;
+		}
 
-	TEST_CASE("FindRTTI_SI_by_typeid") {
-		// Validate simple single-inheritance upcast and downcast using RTTI graph.
-		auto* d = new SI_Derived();
-		REQUIRE(d != nullptr);
-
-		// Fetch RTTI nodes by typeid-mangled name: SI_Base and SI_Derived.
-		auto baseObj = Detours::RTTI::FindObject(GetModuleHandle(nullptr), nameof<SI_Base>(), nullptr, /*bCompleteObject*/false);
-		auto derivedObj = Detours::RTTI::FindObject(GetModuleHandle(nullptr), nameof<SI_Derived>(), nameof<SI_Base>());
-
-		CHECK(baseObj != nullptr);
-		CHECK(derivedObj != nullptr);
-
-		// Upcast: Derived* -> Base* must succeed.
-		CHECK(derivedObj->DynamicCast(d, baseObj.get()) != nullptr);
-
-		// Downcast: Base* -> Derived* must succeed too (same most-derived).
-		SI_Base* b = d;
-		CHECK(baseObj->DynamicCast(b, derivedObj.get()) != nullptr);
-
-		delete d;
-	}
-
-	TEST_CASE("FindRTTI_ParentFilter_Positive_and_Negative") {
-		// Verify the optional "parent" filter in FindObject acts as expected.
-		auto* d = new MI_D();
-		REQUIRE(d != nullptr);
-
-		// Positive: MI_D has MI_A somewhere in its ancestry.
-		auto d_has_A = Detours::RTTI::FindObject(GetModuleHandle(nullptr), nameof<MI_D>(), nameof<MI_A>());
-		CHECK(d_has_A != nullptr);
-
-		// Negative: MI_D is not derived from SI_Derived.
-		auto d_has_fake = Detours::RTTI::FindObject(GetModuleHandle(nullptr), nameof<MI_D>(), nameof<SI_Derived>());
-		CHECK(d_has_fake == nullptr);
-
-		delete d;
-	}
-
-	TEST_CASE("FindRTTI_MI_CompleteObject_Offsets") {
-		// When searching for a complete object, the offset must match the
-		// subobject layout of the most-derived (MI) object.
-		auto* d = new MI_D();
-		REQUIRE(d != nullptr);
-
-		// Take subobject pointers and compute their offsets within D.
-		auto* asA = static_cast<MI_A*>(d);
-		auto* asB = static_cast<MI_B*>(d);
-		auto* asD = static_cast<void*>(d);
-
-		ptrdiff_t offA = reinterpret_cast<const char*>(static_cast<void*>(asA)) - reinterpret_cast<const char*>(asD);
-		ptrdiff_t offB = reinterpret_cast<const char*>(static_cast<void*>(asB)) - reinterpret_cast<const char*>(asD);
-
-		// Correct offset for A must yield a valid object with vtable.
-		auto d_offA = Detours::RTTI::FindObject(GetModuleHandle(nullptr), nameof<MI_D>(), /*parent*/nullptr, /*bCompleteObject*/true, static_cast<unsigned>(offA));
-		CHECK(d_offA != nullptr);
-		CHECK(d_offA->GetVTable() != nullptr);
-
-		// Wrong offset should not match.
-		auto d_wrong = Detours::RTTI::FindObject(GetModuleHandle(nullptr), nameof<MI_D>(), /*parent*/nullptr, /*bCompleteObject*/true, static_cast<unsigned>(offB + 4));
-		CHECK(d_wrong == nullptr);
-
-		// Correct offset for B must also match.
-		auto d_offB = Detours::RTTI::FindObject(GetModuleHandle(nullptr), nameof<MI_D>(), /*parent*/nullptr, /*bCompleteObject*/true, static_cast<unsigned>(offB));
-		CHECK(d_offB != nullptr);
-		CHECK(d_offB->GetVTable() != nullptr);
-
-		delete d;
-	}
-
-	TEST_CASE("DynamicCast_CrossCast_MI") {
-		// Cross-cast across branches in an MI diamond:
-		//   D : A, B - casting A* -> B* and B* -> A* should succeed via D.
-		auto* d = new MI_D();
-		REQUIRE(d != nullptr);
-
-		auto aObj = Detours::RTTI::FindObject(GetModuleHandle(nullptr), nameof<MI_A>(), nullptr, false);
-		auto bObj = Detours::RTTI::FindObject(GetModuleHandle(nullptr), nameof<MI_B>(), nullptr, false);
-		CHECK(aObj != nullptr);
-		CHECK(bObj != nullptr);
-
-		MI_A* pa = d;
-		CHECK(aObj->DynamicCast(pa, bObj.get()) != nullptr);
-
-		MI_B* pb = d;
-		CHECK(bObj->DynamicCast(pb, aObj.get()) != nullptr);
-
-		delete d;
-	}
-
-	TEST_CASE("DynamicCast_CrossCast_VI") {
-		// Cross-cast through a virtual base path:
-		//   D : VI_A, VI_B; both are virtually derived from VI_V.
-		auto* d = new VI_D();
-		REQUIRE(d != nullptr);
-
-		auto aObj = Detours::RTTI::FindObject(GetModuleHandle(nullptr), nameof<VI_A>(), nullptr, false);
-		auto bObj = Detours::RTTI::FindObject(GetModuleHandle(nullptr), nameof<VI_B>(), nullptr, false);
-		CHECK(aObj != nullptr);
-		CHECK(bObj != nullptr);
-
-		VI_A* pa = d;
-		CHECK(aObj->DynamicCast(pa, bObj.get()) != nullptr);
-
-		VI_B* pb = d;
-		CHECK(bObj->DynamicCast(pb, aObj.get()) != nullptr);
-
-		delete d;
-	}
-
-	TEST_CASE("DynamicCast_PrivateBase_is_blocked") {
-		// Access control must be enforced: private base prevents a legal up/down cast.
-		auto* d = new PrivDerived();
-		REQUIRE(d != nullptr);
-
-		auto baseObj = Detours::RTTI::FindObject(GetModuleHandle(nullptr), nameof<PrivBase>(), nullptr, false);
-		auto drvObj = Detours::RTTI::FindObject(GetModuleHandle(nullptr), nameof<PrivDerived>(), nameof<PrivBase>());
-		CHECK(baseObj != nullptr);
-		CHECK(drvObj != nullptr);
-
-		PrivBase* pb = d->AsBase(); // returns pointer to private base subobject
-		CHECK(baseObj->DynamicCast(pb, drvObj.get()) == nullptr); // cast must be blocked
-
-		delete d;
-	}
-
-	TEST_CASE("FindObject_Wide_and_Ansi_ModuleName") {
-		// The ANSI and WIDE variants must both locate the same type in the same module.
-		wchar_t wpath[MAX_PATH] = {};
-		DWORD wn = GetModuleFileNameW(nullptr, wpath, MAX_PATH);
-		REQUIRE(wn > 0);
-
-		char apath[MAX_PATH] = {};
-		DWORD an = GetModuleFileNameA(nullptr, apath, MAX_PATH);
-		REQUIRE(an > 0);
-
-		auto fromW = Detours::RTTI::FindObjectW(wpath, nameof<SI_Derived>(), nameof<SI_Base>());
-		auto fromA = Detours::RTTI::FindObjectA(apath, nameof<SI_Derived>(), nameof<SI_Base>());
-		CHECK(fromW != nullptr);
-		CHECK(fromA != nullptr);
-	}
-
-	TEST_CASE("FindRTTI_NotFound_WrongName") {
-		// Gracefully returns nullptr for non-existent type names.
-		auto o = Detours::RTTI::FindObject(GetModuleHandle(nullptr), ".?AV__Definitely_No_Such_Type__@@", nullptr, false);
-		CHECK(o == nullptr);
-	}
-
-	TEST_CASE("FindRTTI_Complete_vs_Partial_paths") {
-		// Compare the partial (no strict COL) and complete (strict COL + offset) paths.
-		auto* d = new SI_Derived();
-		REQUIRE(d != nullptr);
-
-		auto partial = Detours::RTTI::FindObject(GetModuleHandle(nullptr), nameof<SI_Derived>(), nameof<SI_Base>(), /*bCompleteObject*/false);
-		CHECK(partial != nullptr);
-
-		auto complete = Detours::RTTI::FindObject(GetModuleHandle(nullptr), nameof<SI_Derived>(), nameof<SI_Base>(), /*bCompleteObject*/true, /*unOffset*/0);
-		CHECK(complete != nullptr);
-
-		auto wrong = Detours::RTTI::FindObject(GetModuleHandle(nullptr), nameof<SI_Derived>(), nameof<SI_Base>(), /*bCompleteObject*/true, /*unOffset*/4);
-		CHECK(wrong == nullptr);
-
-		delete d;
-	}
-
-	TEST_CASE("RTCastToVoid_returns_complete_object_SI_MI_VI") {
-		// RTCastToVoid should return the most-derived (complete object) pointer.
-
-		// --- SI case ---
-		{
+		TEST_CASE("FindRTTI_SI_by_typeid") {
+			// Validate simple single-inheritance upcast and downcast using RTTI graph.
 			auto* d = new SI_Derived();
 			REQUIRE(d != nullptr);
 
+			// Fetch RTTI nodes by typeid-mangled name: SI_Base and SI_Derived.
+			auto baseObj = Detours::RTTI::FindObject(GetModuleHandle(nullptr), nameof<SI_Base>(), nullptr, /*bCompleteObject*/ false);
+			auto derivedObj = Detours::RTTI::FindObject(GetModuleHandle(nullptr), nameof<SI_Derived>(), nameof<SI_Base>());
+
+			CHECK(baseObj != nullptr);
+			CHECK(derivedObj != nullptr);
+
+			// Upcast: Derived* -> Base* must succeed.
+			CHECK(derivedObj->DynamicCast(d, baseObj.get()) != nullptr);
+
+			// Downcast: Base* -> Derived* must succeed too (same most-derived).
 			SI_Base* b = d;
-			void* complete = static_cast<void*>(d);
-			CHECK(Detours::RTTI::RTCastToVoid(b) == complete);
+			CHECK(baseObj->DynamicCast(b, derivedObj.get()) != nullptr);
 
 			delete d;
 		}
 
-		// --- MI case ---
-		{
+		TEST_CASE("FindRTTI_ParentFilter_Positive_and_Negative") {
+			// Verify the optional "parent" filter in FindObject acts as expected.
 			auto* d = new MI_D();
 			REQUIRE(d != nullptr);
 
-			MI_A* pa = d;
-			MI_B* pb = d;
-			void* complete = static_cast<void*>(d);
+			// Positive: MI_D has MI_A somewhere in its ancestry.
+			auto d_has_A = Detours::RTTI::FindObject(GetModuleHandle(nullptr), nameof<MI_D>(), nameof<MI_A>());
+			CHECK(d_has_A != nullptr);
 
-			CHECK(Detours::RTTI::RTCastToVoid(pa) == complete);
-			CHECK(Detours::RTTI::RTCastToVoid(pb) == complete);
+			// Negative: MI_D is not derived from SI_Derived.
+			auto d_has_fake = Detours::RTTI::FindObject(GetModuleHandle(nullptr), nameof<MI_D>(), nameof<SI_Derived>());
+			CHECK(d_has_fake == nullptr);
 
 			delete d;
 		}
 
-		// --- VI case ---
-		{
+		TEST_CASE("FindRTTI_MI_CompleteObject_Offsets") {
+			// When searching for a complete object, the offset must match the
+			// subobject layout of the most-derived (MI) object.
+			auto* d = new MI_D();
+			REQUIRE(d != nullptr);
+
+			// Take subobject pointers and compute their offsets within D.
+			auto* asA = static_cast<MI_A*>(d);
+			auto* asB = static_cast<MI_B*>(d);
+			auto* asD = static_cast<void*>(d);
+
+			ptrdiff_t offA = reinterpret_cast<const char*>(static_cast<void*>(asA)) - reinterpret_cast<const char*>(asD);
+			ptrdiff_t offB = reinterpret_cast<const char*>(static_cast<void*>(asB)) - reinterpret_cast<const char*>(asD);
+
+			// Correct offset for A must yield a valid object with vtable.
+			auto d_offA = Detours::RTTI::FindObject(GetModuleHandle(nullptr), nameof<MI_D>(), /*parent*/ nullptr, /*bCompleteObject*/ true, static_cast<unsigned>(offA));
+			CHECK(d_offA != nullptr);
+			CHECK(d_offA->GetVTable() != nullptr);
+
+			// Wrong offset should not match.
+			auto d_wrong = Detours::RTTI::FindObject(GetModuleHandle(nullptr), nameof<MI_D>(), /*parent*/ nullptr, /*bCompleteObject*/ true, static_cast<unsigned>(offB + 4));
+			CHECK(d_wrong == nullptr);
+
+			// Correct offset for B must also match.
+			auto d_offB = Detours::RTTI::FindObject(GetModuleHandle(nullptr), nameof<MI_D>(), /*parent*/ nullptr, /*bCompleteObject*/ true, static_cast<unsigned>(offB));
+			CHECK(d_offB != nullptr);
+			CHECK(d_offB->GetVTable() != nullptr);
+
+			delete d;
+		}
+
+		TEST_CASE("DynamicCast_CrossCast_MI") {
+			// Cross-cast across branches in an MI diamond:
+			//   D : A, B - casting A* -> B* and B* -> A* should succeed via D.
+			auto* d = new MI_D();
+			REQUIRE(d != nullptr);
+
+			auto aObj = Detours::RTTI::FindObject(GetModuleHandle(nullptr), nameof<MI_A>(), nullptr, false);
+			auto bObj = Detours::RTTI::FindObject(GetModuleHandle(nullptr), nameof<MI_B>(), nullptr, false);
+			CHECK(aObj != nullptr);
+			CHECK(bObj != nullptr);
+
+			MI_A* pa = d;
+			CHECK(aObj->DynamicCast(pa, bObj.get()) != nullptr);
+
+			MI_B* pb = d;
+			CHECK(bObj->DynamicCast(pb, aObj.get()) != nullptr);
+
+			delete d;
+		}
+
+		TEST_CASE("DynamicCast_CrossCast_VI") {
+			// Cross-cast through a virtual base path:
+			//   D : VI_A, VI_B; both are virtually derived from VI_V.
 			auto* d = new VI_D();
 			REQUIRE(d != nullptr);
 
-			VI_A* pa = d;
-			VI_B* pb = d;
-			void* complete = static_cast<void*>(d);
+			auto aObj = Detours::RTTI::FindObject(GetModuleHandle(nullptr), nameof<VI_A>(), nullptr, false);
+			auto bObj = Detours::RTTI::FindObject(GetModuleHandle(nullptr), nameof<VI_B>(), nullptr, false);
+			CHECK(aObj != nullptr);
+			CHECK(bObj != nullptr);
 
-			CHECK(Detours::RTTI::RTCastToVoid(pa) == complete);
-			CHECK(Detours::RTTI::RTCastToVoid(pb) == complete);
+			VI_A* pa = d;
+			CHECK(aObj->DynamicCast(pa, bObj.get()) != nullptr);
+
+			VI_B* pb = d;
+			CHECK(bObj->DynamicCast(pb, aObj.get()) != nullptr);
 
 			delete d;
 		}
-	}
 
-	TEST_CASE("RTtypeid_dynamic_type_matches") {
-		// RTtypeid should reflect the dynamic type of the most-derived object
-		// no matter which base-subobject pointer is used.
+		TEST_CASE("DynamicCast_PrivateBase_is_blocked") {
+			// Access control must be enforced: private base prevents a legal up/down cast.
+			auto* d = new PrivDerived();
+			REQUIRE(d != nullptr);
 
-		// --- SI: Base* -> Derived dynamic type ---
-		{
+			auto baseObj = Detours::RTTI::FindObject(GetModuleHandle(nullptr), nameof<PrivBase>(), nullptr, false);
+			auto drvObj = Detours::RTTI::FindObject(GetModuleHandle(nullptr), nameof<PrivDerived>(), nameof<PrivBase>());
+			CHECK(baseObj != nullptr);
+			CHECK(drvObj != nullptr);
+
+			PrivBase* pb = d->AsBase();                               // returns pointer to private base subobject
+			CHECK(baseObj->DynamicCast(pb, drvObj.get()) == nullptr); // cast must be blocked
+
+			delete d;
+		}
+
+		TEST_CASE("FindObject_Wide_and_Ansi_ModuleName") {
+			// The ANSI and WIDE variants must both locate the same type in the same module.
+			wchar_t wpath[MAX_PATH] = {};
+			DWORD wn = GetModuleFileNameW(nullptr, wpath, MAX_PATH);
+			REQUIRE(wn > 0);
+
+			char apath[MAX_PATH] = {};
+			DWORD an = GetModuleFileNameA(nullptr, apath, MAX_PATH);
+			REQUIRE(an > 0);
+
+			auto fromW = Detours::RTTI::FindObjectW(wpath, nameof<SI_Derived>(), nameof<SI_Base>());
+			auto fromA = Detours::RTTI::FindObjectA(apath, nameof<SI_Derived>(), nameof<SI_Base>());
+			CHECK(fromW != nullptr);
+			CHECK(fromA != nullptr);
+		}
+
+		TEST_CASE("FindRTTI_NotFound_WrongName") {
+			// Gracefully returns nullptr for non-existent type names.
+			auto o = Detours::RTTI::FindObject(GetModuleHandle(nullptr), ".?AV__Definitely_No_Such_Type__@@", nullptr, false);
+			CHECK(o == nullptr);
+		}
+
+		TEST_CASE("FindRTTI_Complete_vs_Partial_paths") {
+			// Compare the partial (no strict COL) and complete (strict COL + offset) paths.
 			auto* d = new SI_Derived();
 			REQUIRE(d != nullptr);
 
-			SI_Base* b = d;
+			auto partial = Detours::RTTI::FindObject(GetModuleHandle(nullptr), nameof<SI_Derived>(), nameof<SI_Base>(), /*bCompleteObject*/ false);
+			CHECK(partial != nullptr);
+
+			auto complete = Detours::RTTI::FindObject(GetModuleHandle(nullptr), nameof<SI_Derived>(), nameof<SI_Base>(), /*bCompleteObject*/ true, /*unOffset*/ 0);
+			CHECK(complete != nullptr);
+
+			auto wrong = Detours::RTTI::FindObject(GetModuleHandle(nullptr), nameof<SI_Derived>(), nameof<SI_Base>(), /*bCompleteObject*/ true, /*unOffset*/ 4);
+			CHECK(wrong == nullptr);
+
+			delete d;
+		}
+
+		TEST_CASE("RTCastToVoid_returns_complete_object_SI_MI_VI") {
+			// RTCastToVoid should return the most-derived (complete object) pointer.
+
+			// --- SI case ---
+			{
+				auto* d = new SI_Derived();
+				REQUIRE(d != nullptr);
+
+				SI_Base* b = d;
+				void* complete = static_cast<void*>(d);
+				CHECK(Detours::RTTI::RTCastToVoid(b) == complete);
+
+				delete d;
+			}
+
+			// --- MI case ---
+			{
+				auto* d = new MI_D();
+				REQUIRE(d != nullptr);
+
+				MI_A* pa = d;
+				MI_B* pb = d;
+				void* complete = static_cast<void*>(d);
+
+				CHECK(Detours::RTTI::RTCastToVoid(pa) == complete);
+				CHECK(Detours::RTTI::RTCastToVoid(pb) == complete);
+
+				delete d;
+			}
+
+			// --- VI case ---
+			{
+				auto* d = new VI_D();
+				REQUIRE(d != nullptr);
+
+				VI_A* pa = d;
+				VI_B* pb = d;
+				void* complete = static_cast<void*>(d);
+
+				CHECK(Detours::RTTI::RTCastToVoid(pa) == complete);
+				CHECK(Detours::RTTI::RTCastToVoid(pb) == complete);
+
+				delete d;
+			}
+		}
+
+		TEST_CASE("RTtypeid_dynamic_type_matches") {
+			// RTtypeid should reflect the dynamic type of the most-derived object
+			// no matter which base-subobject pointer is used.
+
+			// --- SI: Base* -> Derived dynamic type ---
+			{
+				auto* d = new SI_Derived();
+				REQUIRE(d != nullptr);
+
+				SI_Base* b = d;
 #ifdef _M_X64
-			auto td = Detours::RTTI::RTtypeid(GetModuleHandle(nullptr), static_cast<void*>(b));
+				auto td = Detours::RTTI::RTtypeid(GetModuleHandle(nullptr), static_cast<void*>(b));
 #else
 			auto td = Detours::RTTI::RTtypeid(static_cast<void*>(b));
 #endif
-			REQUIRE(td != nullptr);
-			CHECK(strncmp(td->m_szName, nameof<SI_Derived>(), 0x1000) == 0);
+				REQUIRE(td != nullptr);
+				CHECK(strncmp(td->m_szName, nameof<SI_Derived>(), 0x1000) == 0);
 
-			delete d;
-		}
+				delete d;
+			}
 
-		// --- MI: Any base subobject must yield MI_D as dynamic type ---
-		{
-			auto* d = new MI_D();
-			REQUIRE(d != nullptr);
+			// --- MI: Any base subobject must yield MI_D as dynamic type ---
+			{
+				auto* d = new MI_D();
+				REQUIRE(d != nullptr);
 
-			MI_A* asA = d;
+				MI_A* asA = d;
 #ifdef _M_X64
-			auto tdA = Detours::RTTI::RTtypeid(GetModuleHandle(nullptr), static_cast<void*>(asA));
+				auto tdA = Detours::RTTI::RTtypeid(GetModuleHandle(nullptr), static_cast<void*>(asA));
 #else
 			auto tdA = Detours::RTTI::RTtypeid(static_cast<void*>(asA));
 #endif
-			REQUIRE(tdA != nullptr);
-			CHECK(strncmp(tdA->m_szName, nameof<MI_D>(), 0x1000) == 0);
+				REQUIRE(tdA != nullptr);
+				CHECK(strncmp(tdA->m_szName, nameof<MI_D>(), 0x1000) == 0);
 
-			MI_B* asB = d;
+				MI_B* asB = d;
 #ifdef _M_X64
-			auto tdB = Detours::RTTI::RTtypeid(GetModuleHandle(nullptr), static_cast<void*>(asB));
+				auto tdB = Detours::RTTI::RTtypeid(GetModuleHandle(nullptr), static_cast<void*>(asB));
 #else
 			auto tdB = Detours::RTTI::RTtypeid(static_cast<void*>(asB));
 #endif
-			REQUIRE(tdB != nullptr);
-			CHECK(strncmp(tdB->m_szName, nameof<MI_D>(), 0x1000) == 0);
+				REQUIRE(tdB != nullptr);
+				CHECK(strncmp(tdB->m_szName, nameof<MI_D>(), 0x1000) == 0);
 
-			delete d;
-		}
+				delete d;
+			}
 
-		// --- VI: Through virtually inherited subobject, dynamic must be VI_D ---
-		{
-			auto* d = new VI_D();
-			REQUIRE(d != nullptr);
+			// --- VI: Through virtually inherited subobject, dynamic must be VI_D ---
+			{
+				auto* d = new VI_D();
+				REQUIRE(d != nullptr);
 
-			VI_A* asA = d;
+				VI_A* asA = d;
 #ifdef _M_X64
-			auto td = Detours::RTTI::RTtypeid(GetModuleHandle(nullptr), static_cast<void*>(asA));
+				auto td = Detours::RTTI::RTtypeid(GetModuleHandle(nullptr), static_cast<void*>(asA));
 #else
 			auto td = Detours::RTTI::RTtypeid(static_cast<void*>(asA));
 #endif
-			REQUIRE(td != nullptr);
-			CHECK(strncmp(td->m_szName, nameof<VI_D>(), 0x1000) == 0);
+				REQUIRE(td != nullptr);
+				CHECK(strncmp(td->m_szName, nameof<VI_D>(), 0x1000) == 0);
 
-			delete d;
+				delete d;
+			}
 		}
-	}
 
-	TEST_CASE("RTtypeid_nullptr_throws_bad_typeid") {
-		// Standard compliance: typeid(*p) with p == nullptr should throw std::bad_typeid.
+		TEST_CASE("RTtypeid_nullptr_throws_bad_typeid") {
+			// Standard compliance: typeid(*p) with p == nullptr should throw std::bad_typeid.
 #ifdef _M_X64
-		CHECK_THROWS_AS(Detours::RTTI::RTtypeid(GetModuleHandle(nullptr), (void*)nullptr), std::bad_typeid);
+			CHECK_THROWS_AS(Detours::RTTI::RTtypeid(GetModuleHandle(nullptr), (void*)nullptr), std::bad_typeid);
 #else
 		CHECK_THROWS_AS(Detours::RTTI::RTtypeid((void*)nullptr), std::bad_typeid);
 #endif
+		}
 	}
-}
 
 #ifndef _DEBUG
-DISABLE_OPTIMIZATION_END("");
+	DISABLE_OPTIMIZATION_END("");
 }
 #endif
 
@@ -1834,7 +1890,7 @@ TEST_SUITE("Detours::Memory") {
 
 TEST_SUITE("Detours::Exception") {
 
-	bool OnException(const EXCEPTION_RECORD & Exception, const PCONTEXT pCTX) {
+	bool OnException(const EXCEPTION_RECORD& Exception, const PCONTEXT pCTX) {
 		if (Exception.ExceptionCode != EXCEPTION_ACCESS_VIOLATION) {
 			return false;
 		}
@@ -1904,7 +1960,6 @@ TEST_SUITE("Detours::Exception") {
 		CHECK(CallInterrupt(1, 2, 3, 4, 5, 6, 7) == 0xDEEDBEEF);
 #endif
 		CHECK(Detours::Exception::g_ExceptionListener.RemoveCallBack(OnException) == true);
-
 	}
 }
 
@@ -1925,8 +1980,8 @@ TEST_SUITE("Detours::rddisasm") {
 
 TEST_SUITE("Detours::Hook") {
 
-	typedef bool(__fastcall* fnFooOriginal)(void* pThis, void* /* unused */);
-	typedef bool(__fastcall* fnBooOriginal)(void* pThis, void* /* unused */);
+	typedef bool(__fastcall * fnFooOriginal)(void* pThis, void* /* unused */);
+	typedef bool(__fastcall * fnBooOriginal)(void* pThis, void* /* unused */);
 
 	void HardwareHook(const PCONTEXT pCTX) {
 		UNREFERENCED_PARAMETER(pCTX);
@@ -2471,7 +2526,7 @@ TEST_SUITE("Detours::Hook") {
 
 		int* pArray = reinterpret_cast<int*>(page.GetPageAddress());
 
-		MEMORY_BASIC_INFORMATION mbiHere{}, mbiPrev{};
+		MEMORY_BASIC_INFORMATION mbiHere {}, mbiPrev {};
 		REQUIRE(VirtualQuery(pArray, &mbiHere, sizeof(mbiHere)) == sizeof(mbiHere));
 		REQUIRE(mbiHere.State == MEM_COMMIT);
 
@@ -2485,8 +2540,7 @@ TEST_SUITE("Detours::Hook") {
 			region = VirtualAlloc(nullptr, 2 * kPageSize, MEM_RESERVE, PAGE_READWRITE);
 			REQUIRE(region != nullptr);
 
-			void* commit = VirtualAlloc(static_cast<BYTE*>(region) + kPageSize,
-				kPageSize, MEM_COMMIT, PAGE_READWRITE);
+			void* commit = VirtualAlloc(static_cast<BYTE*>(region) + kPageSize, kPageSize, MEM_COMMIT, PAGE_READWRITE);
 			REQUIRE(commit != nullptr);
 
 			pArray = static_cast<int*>(commit);
@@ -2502,19 +2556,8 @@ TEST_SUITE("Detours::Hook") {
 			REQUIRE(mbiPrev.State != MEM_COMMIT);
 		}
 
-		CHECK(Detours::Hook::HookMemory(
-			MemoryHookModify2,
-			reinterpret_cast<BYTE*>(pArray) - sizeof(int),
-			sizeof(int),
-			nullptr,
-			true) == true);
-
-		CHECK(Detours::Hook::HookMemory(
-			MemoryHookModify2,
-			pArray,
-			sizeof(int),
-			nullptr,
-			false) == true);
+		CHECK(Detours::Hook::HookMemory(MemoryHookModify2, reinterpret_cast<BYTE*>(pArray) - sizeof(int), sizeof(int), nullptr, true) == true);
+		CHECK(Detours::Hook::HookMemory(MemoryHookModify2, pArray, sizeof(int), nullptr, false) == true);
 
 		TryRead(reinterpret_cast<BYTE*>(pArray) - sizeof(int));
 		TryRead(pArray);
@@ -2682,13 +2725,16 @@ TEST_SUITE("Detours::Hook") {
 
 #pragma optimize("", on)
 
-	unsigned int DemoFunction() { SELF_EXPORT("DemoFunction");
+	unsigned int DemoFunction() {
+		SELF_EXPORT("DemoFunction");
+
 		int cpuinfo[4];
 		__cpuidex(cpuinfo, 7, 0);
 		_tprintf_s(_T("cpuinfo[0] = 0x%08X\n"), cpuinfo[0]);
 		_tprintf_s(_T("cpuinfo[1] = 0x%08X\n"), cpuinfo[1]);
 		_tprintf_s(_T("cpuinfo[2] = 0x%08X\n"), cpuinfo[2]);
 		_tprintf_s(_T("cpuinfo[3] = 0x%08X\n"), cpuinfo[3]);
+
 		return cpuinfo[1];
 	}
 
