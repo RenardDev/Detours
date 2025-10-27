@@ -30,6 +30,7 @@
 #include <mutex>
 #include <vector>
 #include <memory>
+#include <unordered_set>
 
 // ----------------------------------------------------------------
 // General definitions
