@@ -5694,24 +5694,37 @@ namespace Detours {
 		// Suspender
 		// ----------------------------------------------------------------
 
+		
 		Suspender::~Suspender() {
+			if (m_Mutex.Lock()) {
+				if (m_unSuspendDepth > 0) {
+					m_unSuspendDepth = 1;
+				}
+
+				m_Mutex.UnLock();
+			}
+
 			Resume();
 		}
 
-		bool Suspender::Suspend() {
+		bool Suspender::Suspend(bool bSweepThreads) {
 			if (!m_Mutex.Lock()) {
 				return false;
 			}
 
-			const auto& hSnap = CreateToolhelp32Snapshot(TH32CS_SNAPTHREAD, NULL);
+			if (m_unSuspendDepth > 0) {
+				++m_unSuspendDepth;
+				m_Mutex.UnLock();
+				return true;
+			}
+
+			const auto& hSnap = CreateToolhelp32Snapshot(TH32CS_SNAPTHREAD, 0);
 			if (!hSnap || (hSnap == INVALID_HANDLE_VALUE)) {
 				m_Mutex.UnLock();
 				return false;
 			}
 
-			THREADENTRY32 te;
-			memset(&te, 0, sizeof(te));
-
+			THREADENTRY32 te {};
 			te.dwSize = sizeof(THREADENTRY32);
 
 			if (!Thread32First(hSnap, &te)) {
@@ -5727,19 +5740,19 @@ namespace Detours {
 				return false;
 			}
 
+			m_SuspendedTIDs.clear();
+
 			do {
 				if ((pTEB->ClientId.UniqueProcess == te.th32OwnerProcessID) && (pTEB->ClientId.UniqueThread != te.th32ThreadID)) {
 					HANDLE hThread = OpenThread(THREAD_QUERY_LIMITED_INFORMATION | THREAD_SUSPEND_RESUME | THREAD_GET_CONTEXT | THREAD_SET_CONTEXT, FALSE, te.th32ThreadID);
 					if (hThread && (hThread != INVALID_HANDLE_VALUE)) {
 						if (SuspendThread(hThread) == static_cast<DWORD>(-1)) {
+							CloseHandle(hThread);
 							continue;
 						}
 
-						CONTEXT ctx;
-						memset(&ctx, 0, sizeof(CONTEXT));
-
+						CONTEXT ctx {};
 						ctx.ContextFlags = CONTEXT_FULL;
-
 						if (!GetThreadContext(hThread, &ctx)) {
 							ResumeThread(hThread);
 							CloseHandle(hThread);
@@ -5753,14 +5766,40 @@ namespace Detours {
 
 			CloseHandle(hSnap);
 
-			if (!m_Mutex.UnLock()) {
-				return false;
+			if (bSweepThreads) {
+				const DWORD64 unStartTick = GetTickCount64();
+
+				while (true) {
+					size_t unAdded = SuspendNewThreadsSnapshot();
+
+					if (GetTickCount64() - unStartTick >= 1000) {
+						break;
+					}
+
+					if (unAdded == 0) {
+						Sleep(50);
+					}
+				}
 			}
 
+			m_unSuspendDepth = 1;
+			m_Mutex.UnLock();
 			return true;
 		}
 
 		void Suspender::Resume() {
+			if (!m_Mutex.Lock())
+				return;
+
+			if (m_unSuspendDepth == 0) {
+				m_Mutex.UnLock();
+				return;
+			}
+
+			if (--m_unSuspendDepth > 0) {
+				m_Mutex.UnLock();
+				return;
+			}
 
 			for (auto& thread : m_Threads) {
 				SetThreadContext(thread.m_hHandle, &thread.m_CTX);
@@ -5769,6 +5808,9 @@ namespace Detours {
 			}
 
 			m_Threads.clear();
+			m_SuspendedTIDs.clear();
+
+			m_Mutex.UnLock();
 		}
 
 		bool Suspender::IsRegionExecuting(void* pAddress, size_t unSize) {
@@ -5817,7 +5859,7 @@ namespace Detours {
 		}
 
 		void Suspender::FixExecutionAddress(void* pAddress, void* pNewAddress) {
-			if (!pAddress || pNewAddress) {
+			if (!pAddress || !pNewAddress) {
 				return;
 			}
 
@@ -5842,6 +5884,56 @@ namespace Detours {
 				thread.m_CTX.Eip = unIP;
 #endif
 			}
+		}
+
+		size_t Suspender::SuspendNewThreadsSnapshot() {
+			size_t unAdded = 0;
+
+			const auto& pTEB = GetTEB();
+			if (!pTEB) {
+				return 0;
+			}
+
+			const auto& hSnap = CreateToolhelp32Snapshot(TH32CS_SNAPTHREAD, 0);
+			if (!hSnap || (hSnap == INVALID_HANDLE_VALUE)) {
+				return 0;
+			}
+
+			THREADENTRY32 te {};
+			te.dwSize = sizeof(THREADENTRY32);
+
+			if (!Thread32First(hSnap, &te)) {
+				CloseHandle(hSnap);
+				return 0;
+			}
+
+			do {
+				if ((pTEB->ClientId.UniqueProcess == te.th32OwnerProcessID) && (pTEB->ClientId.UniqueThread != te.th32ThreadID) && (m_SuspendedTIDs.find(te.th32ThreadID) == m_SuspendedTIDs.end())) {
+					HANDLE hThread = OpenThread(THREAD_QUERY_LIMITED_INFORMATION | THREAD_SUSPEND_RESUME | THREAD_GET_CONTEXT | THREAD_SET_CONTEXT, FALSE, te.th32ThreadID);
+					if (!hThread || (hThread == INVALID_HANDLE_VALUE))
+						continue;
+
+					if (SuspendThread(hThread) == static_cast<DWORD>(-1)) {
+						CloseHandle(hThread);
+						continue;
+					}
+
+					CONTEXT ctx {};
+					ctx.ContextFlags = CONTEXT_FULL;
+					if (!GetThreadContext(hThread, &ctx)) {
+						ResumeThread(hThread);
+						CloseHandle(hThread);
+						continue;
+					}
+
+					m_Threads.emplace_back(te.th32ThreadID, hThread, ctx);
+					m_SuspendedTIDs.insert(te.th32ThreadID);
+					++unAdded;
+				}
+			} while (Thread32Next(hSnap, &te));
+
+			CloseHandle(hSnap);
+			return unAdded;
 		}
 
 		Suspender g_Suspender;
