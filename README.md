@@ -93,6 +93,7 @@ A set of `Windows 10+`/`VS2022`/`C++14` tools for working with software modifica
 * RdIsInstruxRipRelative - Checks if the decoded instruction is RIP-relative.
 * RdGetFullAccessMap - Retrieves the full access map for the decoded instruction.
 * RdGetOperandRlut - Retrieves the operand register lookup table for the decoded instruction.
+* RdGetAddressFromRelOrDisp - Retrieves the rel/disp address from the decoded instruction.
 
 # Detours::Hook
 * HookHardware - Hooks the specified debug register (DRx) with the given access type (execute, write, read) and callback.
