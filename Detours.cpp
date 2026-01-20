@@ -416,14 +416,14 @@ namespace Detours {
 				}
 			}
 
-			CONTEXT ctx = {};
+			CONTEXT ctx {};
 			ctx.ContextFlags = CONTEXT_FULL;
 
 			if (!GetThreadContext(hThread, &ctx)) {
 				return vecCallStack;
 			}
 
-			STACKFRAME64 frame = {};
+			STACKFRAME64 frame {};
 			DWORD unMachineType = 0;
 
 #ifdef _M_X64
@@ -3731,7 +3731,7 @@ namespace Detours {
 		// PMDtoOffset
 		// ----------------------------------------------------------------
 
-		static inline ptrdiff_t PMDtoOffset(void* const pCompleteObject, const RTTI_PMD& pmd) {
+		static inline ptrdiff_t PMDtoOffset(void* const pCompleteObject, const RTTI_PMD pmd) {
 			if (!pCompleteObject) {
 				return 0;
 			}
@@ -8323,7 +8323,7 @@ namespace Detours {
 			{
 				auto it = g_PageRegistry.find(pBaseAddress);
 				if (it == g_PageRegistry.end()) {
-					MEMORY_HOOK_TRACKED_PAGE TrackedPage = {};
+					MEMORY_HOOK_TRACKED_PAGE TrackedPage {};
 
 					TrackedPage.m_pPage = std::make_unique<Page>(pBaseAddress, false, false);
 
@@ -8437,11 +8437,11 @@ namespace Detours {
 					const auto& OpenStack = g_MemoryHookOpenedStacks.find(unTID);
 					const auto& PostStack = g_MemoryHookPostStacks.find(unTID);
 
-					while (OpenStack != g_MemoryHookOpenedStacks.end() && !OpenStack->second.empty()) {
+					while ((OpenStack != g_MemoryHookOpenedStacks.end()) && !OpenStack->second.empty()) {
 						const auto& pRecord = OpenStack->second.back();
 						OpenStack->second.pop_back();
 
-						MEMORY_HOOK_POST_CONTEXT PostCTX = {};
+						MEMORY_HOOK_POST_CONTEXT PostCTX {};
 
 						if ((PostStack != g_MemoryHookPostStacks.end()) && !PostStack->second.empty()) {
 							auto& vec = PostStack->second;
@@ -8632,7 +8632,7 @@ namespace Detours {
 				for (const auto& pRecord : vecOpened) {
 					OpenedStack.push_back(pRecord);
 
-					MEMORY_HOOK_POST_CONTEXT PostCTX = {};
+					MEMORY_HOOK_POST_CONTEXT PostCTX {};
 
 					PostCTX.m_pRecord = pRecord;
 					PostCTX.m_pExceptionAddress = pExceptionAddress;
@@ -38710,7 +38710,7 @@ namespace Detours {
 				return false;
 			}
 
-			CONTEXT ctx = {};
+			CONTEXT ctx {};
 			ctx.ContextFlags = CONTEXT_DEBUG_REGISTERS;
 			if (!GetThreadContext(hThread, &ctx)) {
 				CloseHandle(hThread);
@@ -38913,7 +38913,7 @@ namespace Detours {
 
 				HANDLE hThread = OpenThread(THREAD_GET_CONTEXT | THREAD_SET_CONTEXT, FALSE, unThreadID);
 				if (hThread && (hThread != INVALID_HANDLE_VALUE)) {
-					CONTEXT ctx = {};
+					CONTEXT ctx {};
 					ctx.ContextFlags = CONTEXT_DEBUG_REGISTERS;
 					if (GetThreadContext(hThread, &ctx)) {
 						auto& dr7 = *reinterpret_cast<REGISTER_DR7*>(&ctx.Dr7);
@@ -38988,7 +38988,7 @@ namespace Detours {
 			std::vector<MEMORY_HOOK_SEGMENT> vecCommitSegments;
 			std::vector<MEMORY_HOOK_SEGMENT> vecVirtualSegments;
 
-			MEMORY_HOOK_SEGMENT CurrentSegment = {};
+			MEMORY_HOOK_SEGMENT CurrentSegment {};
 			bool bValid = false;
 
 			for (const auto& pi : vecPages) {
