@@ -3369,12 +3369,12 @@ namespace Detours {
 				}
 
 				const PIMAGE_DOS_HEADER pDH = reinterpret_cast<PIMAGE_DOS_HEADER>(pModuleBase);
-				if (!pDH || (pDH->e_magic != IMAGE_DOS_SIGNATURE)) {
+				if (pDH->e_magic != IMAGE_DOS_SIGNATURE) {
 					return false;
 				}
 
 				const PIMAGE_NT_HEADERS pNTHs = reinterpret_cast<PIMAGE_NT_HEADERS>(reinterpret_cast<char*>(pModuleBase) + pDH->e_lfanew);
-				if (!pNTHs || (pNTHs->Signature != IMAGE_NT_SIGNATURE)) {
+				if (pNTHs->Signature != IMAGE_NT_SIGNATURE) {
 					return false;
 				}
 
@@ -3425,7 +3425,7 @@ namespace Detours {
 				}
 
 				const unsigned int unNumberOfBaseClasses = pClassHierarchyDescriptor->m_unNumberOfBaseClasses;
-				if (!unNumberOfBaseClasses || (unNumberOfBaseClasses > 0x1000)) {
+				if (!unNumberOfBaseClasses || (unNumberOfBaseClasses > 0x1000)) { // NOTE: Limit bases into [0; 4096], right?
 					return false;
 				}
 
@@ -3445,42 +3445,40 @@ namespace Detours {
 					}
 				}
 
-				if (unNumberOfBaseClasses > 0) {
 #ifdef _M_X64
-					const PRTTI_BASE_CLASS_DESCRIPTOR pFirstBCD = reinterpret_cast<PRTTI_BASE_CLASS_DESCRIPTOR>(unImageBase + pBaseClassArray->m_unBaseClassDescriptors[0]);
+				const PRTTI_BASE_CLASS_DESCRIPTOR pFirstBCD = reinterpret_cast<PRTTI_BASE_CLASS_DESCRIPTOR>(unImageBase + pBaseClassArray->m_unBaseClassDescriptors[0]);
 #elif _M_IX86
-					const PRTTI_BASE_CLASS_DESCRIPTOR pFirstBCD = pBaseClassArray->m_pBaseClassDescriptors[0];
-					if (!pFirstBCD) {
-						return false;
-					}
+				const PRTTI_BASE_CLASS_DESCRIPTOR pFirstBCD = pBaseClassArray->m_pBaseClassDescriptors[0];
+				if (!pFirstBCD) {
+					return false;
+				}
 #endif
 
-					{
-						const uintptr_t unFirstBCD = reinterpret_cast<uintptr_t>(pFirstBCD);
-						if ((unFirstBCD < unImageBaseRtl) || (unFirstBCD >= unImageEndRtl)) {
-							return false;
-						}
+				{
+					const uintptr_t unFirstBCD = reinterpret_cast<uintptr_t>(pFirstBCD);
+					if ((unFirstBCD < unImageBaseRtl) || (unFirstBCD >= unImageEndRtl)) {
+						return false;
 					}
+				}
 
 #ifdef _M_X64
-					const PRTTI_TYPE_DESCRIPTOR pFirstTD = reinterpret_cast<PRTTI_TYPE_DESCRIPTOR>(unImageBase + pFirstBCD->m_unTypeDescriptor);
+				const PRTTI_TYPE_DESCRIPTOR pFirstTD = reinterpret_cast<PRTTI_TYPE_DESCRIPTOR>(unImageBase + pFirstBCD->m_unTypeDescriptor);
 #elif _M_IX86
-					const PRTTI_TYPE_DESCRIPTOR pFirstTD = pFirstBCD->m_pTypeDescriptor;
-					if (!pFirstTD) {
-						return false;
-					}
+				const PRTTI_TYPE_DESCRIPTOR pFirstTD = pFirstBCD->m_pTypeDescriptor;
+				if (!pFirstTD) {
+					return false;
+				}
 #endif
 
-					{
-						const uintptr_t unFirstTD = reinterpret_cast<uintptr_t>(pFirstTD);
-						if ((unFirstTD < unImageBaseRtl) || (unFirstTD >= unImageEndRtl)) {
-							return false;
-						}
-					}
-
-					if (pFirstTD != pTypeDescriptor) {
+				{
+					const uintptr_t unFirstTD = reinterpret_cast<uintptr_t>(pFirstTD);
+					if ((unFirstTD < unImageBaseRtl) || (unFirstTD >= unImageEndRtl)) {
 						return false;
 					}
+				}
+
+				if (pFirstTD != pTypeDescriptor) {
+					return false;
 				}
 
 				return true;
@@ -3524,6 +3522,9 @@ namespace Detours {
 
 			char* const pThisWithVfAt0 = reinterpret_cast<char*>(pAddress) + nVfDelta;
 			const auto& pCompleteObjectLocator = GetCompleteObjectLocatorFromObjectAt(pThisWithVfAt0);
+			if (!pCompleteObjectLocator) {
+				return nullptr;
+			}
 
 			char* pCompleteObject = pThisWithVfAt0 - pCompleteObjectLocator->m_unOffset;
 
@@ -4737,7 +4738,7 @@ namespace Detours {
 					}
 #endif
 
-					if ((pCheckTD == pTD) && pCHD && pBCA) {
+					if (pCheckTD == pTD) {
 						void** pVTable = nullptr;
 						void* pMetaReference = const_cast<void*>(pBegin);
 						while (pMetaReference && (reinterpret_cast<const char*>(pMetaReference) < reinterpret_cast<const char*>(pEnd))) {
@@ -8384,7 +8385,7 @@ namespace Detours {
 				auto& TrackedPage = it->second;
 				if (++TrackedPage.m_nOpenReferences == 1) {
 					if (!TrackedPage.m_pPage->RestoreProtection()) {
-						TrackedPage.m_nOpenReferences--;
+						--TrackedPage.m_nOpenReferences;
 						ReleaseSRWLockExclusive(&g_MemoryHookPageRegistryLock);
 						return false;
 					}
