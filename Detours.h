@@ -2290,7 +2290,7 @@ namespace Detours {
 
 		class Suspender {
 		public:
-			Suspender() = default;
+			Suspender();
 			~Suspender();
 
 		public:
@@ -2313,12 +2313,12 @@ namespace Detours {
 				CONTEXT m_CTX;
 			} SUSPENDER_DATA, *PSUSPENDER_DATA;
 
+			size_t SuspendNewThreadsSnapshot();
+
 			std::deque<SUSPENDER_DATA> m_Threads;
 			Mutex m_Mutex;
 			size_t m_unSuspendDepth;
 			std::unordered_set<DWORD> m_SuspendedTIDs;
-
-			size_t SuspendNewThreadsSnapshot();
 		};
 
 		extern Suspender g_Suspender;
@@ -2593,12 +2593,6 @@ namespace Detours {
 			bool GetOriginalProtection(const PDWORD pProtection);
 			bool ChangeProtection(const DWORD unNewProtection);
 			bool RestoreProtection();
-
-		public:
-			bool CloneFrom(Region* pSourceRegion);
-			bool CloneTo(Region* pDestinationRegion);
-			bool CloneFrom(void* pSourceBaseAddress, size_t unSize = 0);
-			bool CloneTo(void* pDestinationBaseAddress, size_t unSize = 0);
 
 		public:
 			void* Alloc(size_t unSize, size_t unSizeAlign = 1, size_t unAddressAlign = alignof(void*), Page** pUsedPage = nullptr);

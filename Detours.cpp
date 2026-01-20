@@ -367,9 +367,7 @@ namespace Detours {
 			}
 		}
 
-		THREAD_BASIC_INFORMATION tbi;
-		memset(&tbi, 0, sizeof(tbi));
-
+		THREAD_BASIC_INFORMATION tbi {};
 		if (NtQueryInformationThread(hThread, ThreadBasicInformation, &tbi, sizeof(tbi), nullptr) != 0) {
 			return nullptr;
 		}
@@ -390,7 +388,7 @@ namespace Detours {
 		using fnStackWalk64 = BOOL(__stdcall*)(DWORD MachineType, HANDLE hProcess, HANDLE hThread, LPSTACKFRAME64 StackFrame, PVOID ContextRecord, PREAD_PROCESS_MEMORY_ROUTINE64 ReadMemoryRoutine, PFUNCTION_TABLE_ACCESS_ROUTINE64 FunctionTableAccessRoutine, PGET_MODULE_BASE_ROUTINE64 GetModuleBaseRoutine, PTRANSLATE_ADDRESS_ROUTINE64 TranslateAddress);
 
 		static DWORD64 WINAPI GetModuleBaseByAddress(HANDLE hProcess, DWORD64 unAddress) {
-			MEMORY_BASIC_INFORMATION mbi;
+			MEMORY_BASIC_INFORMATION mbi {};
 			if (VirtualQueryEx(hProcess, reinterpret_cast<LPCVOID>(unAddress), &mbi, sizeof(mbi))) {
 				return reinterpret_cast<DWORD64>(mbi.BaseAddress);
 			}
@@ -516,7 +514,7 @@ namespace Detours {
 				return false;
 			}
 
-			MEMORY_BASIC_INFORMATION mbi;
+			MEMORY_BASIC_INFORMATION mbi {};
 			if (!VirtualQuery(reinterpret_cast<void**>(pCET->Ia32Pl3SspMsr), &mbi, sizeof(mbi))) {
 				return false;
 			}
@@ -1133,7 +1131,7 @@ namespace Detours {
 		template <typename T>
 		static const T inline __align_up(const T unValue, const T unAlignment) {
 			static_assert(std::is_integral<T>::value, "Template argument must be an integral type");
-			return (unValue + unAlignment - 1) & ~(unAlignment - 1);
+			return (unAlignment && ((unAlignment & (unAlignment - 1)) == 0)) ? ((unValue + (unAlignment - 1)) & ~(T(unAlignment - 1))) : unValue;
 		};
 
 		// ----------------------------------------------------------------
@@ -1143,7 +1141,7 @@ namespace Detours {
 		template <typename T>
 		static const T inline __align_down(const T unValue, const T unAlignment) {
 			static_assert(std::is_integral<T>::value, "Template argument must be an integral type");
-			return unValue & ~(unAlignment - 1);
+			return (unAlignment && ((unAlignment & (unAlignment - 1)) == 0)) ? (unValue & ~(T(unAlignment - 1))) : unValue;
 		};
 
 		// ----------------------------------------------------------------
@@ -1405,38 +1403,14 @@ namespace Detours {
 				return nullptr;
 			}
 
-			unsigned char const* const pData = static_cast<unsigned char const* const>(pAddress);
-			unsigned char const* const pSignature = reinterpret_cast<unsigned char const* const>(szSignature);
+			unsigned char const* pData = static_cast<unsigned char const*>(pAddress);
+			unsigned char const* pSignature = reinterpret_cast<unsigned char const*>(szSignature);
 
-			ptrdiff_t unAnchorIndex = -1;
-			unsigned char unAnchorValue = 0;
-
-			for (ptrdiff_t i = static_cast<ptrdiff_t>(unSignatureLength) - 1; i >= 0; --i) {
-				const unsigned char unByte = pSignature[static_cast<size_t>(i)];
-				if (unByte != unIgnoredByte) {
-					unAnchorIndex = i;
-					unAnchorValue = unByte;
-					break;
-				}
-			}
-
-			if (unAnchorIndex < 0) {
-				return pData + unOffset;
-			}
-
-			unsigned char const* pScanBegin = pData + static_cast<size_t>(unAnchorIndex);
-			size_t unScanCount = unSize - unSignatureLength + 1;
-			while (unScanCount) {
-				unsigned char const* const pAnchor = static_cast<unsigned char const*>(memchr(pScanBegin, unAnchorValue, unScanCount));
-				if (!pAnchor) {
-					break;
-				}
-
-				const size_t unBase = static_cast<size_t>(pAnchor - pData) - static_cast<size_t>(unAnchorIndex);
-
+			const size_t unLastBase = unSize - unSignatureLength;
+			for (size_t unBase = 0; unBase <= unLastBase; ++unBase) {
 				bool bMatched = true;
 
-				for (size_t i = 0; i < static_cast<size_t>(unAnchorIndex); ++i) {
+				for (size_t i = 0; i < unSignatureLength; ++i) {
 					const unsigned char unByte = pSignature[i];
 					if ((unByte != unIgnoredByte) && (pData[unBase + i] != unByte)) {
 						bMatched = false;
@@ -1445,22 +1419,8 @@ namespace Detours {
 				}
 
 				if (bMatched) {
-					for (size_t i = static_cast<size_t>(unAnchorIndex) + 1; i < unSignatureLength; ++i) {
-						const unsigned char unByte = pSignature[i];
-						if ((unByte != unIgnoredByte) && (pData[unBase + i] != unByte)) {
-							bMatched = false;
-							break;
-						}
-					}
-				}
-
-				if (bMatched) {
 					return pData + unBase + unOffset;
 				}
-
-				const size_t unAdvance = static_cast<size_t>((pAnchor + 1) - pScanBegin);
-				pScanBegin += unAdvance;
-				unScanCount -= unAdvance;
 			}
 
 			return nullptr;
@@ -2249,34 +2209,34 @@ namespace Detours {
 		// FindSignature (Auto)
 		// ----------------------------------------------------------------
 
-		static bool bOnceInitialization = false;
-		static bool bFeatureSSE2 = false;
-		static bool bFeatureAVX2 = false;
-		static bool bFeatureAVX512BW = false;
+		static bool g_bOnceInitialization = false;
+		static bool g_bFeatureSSE2 = false;
+		static bool g_bFeatureAVX2 = false;
+		static bool g_bFeatureAVX512BW = false;
 
 		void const* FindSignature(void const* const pAddress, const size_t unSize, char const* const szSignature, const unsigned char unIgnoredByte, const size_t unOffset) noexcept {
 
-			if (!bOnceInitialization) {
-				bOnceInitialization = true;
+			if (!g_bOnceInitialization) {
+				g_bOnceInitialization = true;
 				int pIDs[4];
 				__cpuid(pIDs, 0x00000000);
 				const int nIDs = pIDs[0];
 				if (nIDs >= 1) {
 					__cpuid(pIDs, 0x00000001);
-					bFeatureSSE2 = (pIDs[3] & (1 << 26)) != 0;
+					g_bFeatureSSE2 = (pIDs[3] & (1 << 26)) != 0;
 					if (nIDs >= 7) {
 						__cpuid(pIDs, 0x00000007);
-						bFeatureAVX2 = (pIDs[1] & (1 << 5)) != 0;
-						bFeatureAVX512BW = (pIDs[1] & (1 << 30)) != 0;
+						g_bFeatureAVX2 = (pIDs[1] & (1 << 5)) != 0;
+						g_bFeatureAVX512BW = (pIDs[1] & (1 << 30)) != 0;
 					}
 				}
 			}
 
-			if (bFeatureAVX512BW) {
+			if (g_bFeatureAVX512BW) {
 				return FindSignatureAVX512(pAddress, unSize, szSignature, unIgnoredByte, unOffset);
-			} else if (bFeatureAVX2) {
+			} else if (g_bFeatureAVX2) {
 				return FindSignatureAVX2(pAddress, unSize, szSignature, unIgnoredByte, unOffset);
-			} else if (bFeatureSSE2) {
+			} else if (g_bFeatureSSE2) {
 				return FindSignatureSSE2(pAddress, unSize, szSignature, unIgnoredByte, unOffset);
 			} else {
 				return FindSignatureNative(pAddress, unSize, szSignature, unIgnoredByte, unOffset);
@@ -2436,34 +2396,22 @@ namespace Detours {
 				return nullptr;
 			}
 
-			unsigned char const* const pSourceData = static_cast<unsigned char const*>(pAddress);
+			unsigned char const* pSource = static_cast<unsigned char const*>(pAddress);
+			const size_t unLastBase = unSize - unDataSize;
 
-			if (unDataSize == 1) {
-				return memchr(pSourceData, pData[0], unSize);
-			}
+			for (size_t unBase = 0; unBase <= unLastBase; ++unBase) {
+				bool bMatched = true;
 
-			const unsigned char unFirst = pData[0];
-			const unsigned char unAnchorValue = pData[unDataSize - 1];
-
-			unsigned char const* pScanBegin = pSourceData + (unDataSize - 1);
-			size_t unScanCount = unSize - (unDataSize - 1);
-			while (unScanCount) {
-				unsigned char const* const pAnchor = static_cast<unsigned char const*>(memchr(pScanBegin, unAnchorValue, unScanCount));
-				if (!pAnchor) {
-					break;
-				}
-
-				const size_t unBase = static_cast<size_t>(pAnchor - pSourceData) + 1 - unDataSize;
-
-				if (pSourceData[unBase] == unFirst) {
-					if ((unDataSize == 2) || (memcmp(pSourceData + unBase + 1, pData + 1, unDataSize - 2) == 0)) {
-						return pSourceData + unBase;
+				for (size_t i = 0; i < unDataSize; ++i) {
+					if (pSource[unBase + i] != pData[i]) {
+						bMatched = false;
+						break;
 					}
 				}
 
-				const size_t unAdvance = static_cast<size_t>((pAnchor + 1) - pScanBegin);
-				pScanBegin += unAdvance;
-				unScanCount -= unAdvance;
+				if (bMatched) {
+					return pSource + unBase;
+				}
 			}
 
 			return nullptr;
@@ -3222,27 +3170,27 @@ namespace Detours {
 
 		void const* FindData(void const* const pAddress, const size_t unSize, unsigned char const* const pData, const size_t unDataSize) noexcept {
 
-			if (!bOnceInitialization) {
-				bOnceInitialization = true;
+			if (!g_bOnceInitialization) {
+				g_bOnceInitialization = true;
 				int pIDs[4];
 				__cpuid(pIDs, 0x00000000);
 				const int nIDs = pIDs[0];
 				if (nIDs >= 1) {
 					__cpuid(pIDs, 0x00000001);
-					bFeatureSSE2 = (pIDs[3] & (1 << 26)) != 0;
+					g_bFeatureSSE2 = (pIDs[3] & (1 << 26)) != 0;
 					if (nIDs >= 7) {
 						__cpuid(pIDs, 0x00000007);
-						bFeatureAVX2 = (pIDs[1] & (1 << 5)) != 0;
-						bFeatureAVX512BW = (pIDs[1] & (1 << 30)) != 0;
+						g_bFeatureAVX2 = (pIDs[1] & (1 << 5)) != 0;
+						g_bFeatureAVX512BW = (pIDs[1] & (1 << 30)) != 0;
 					}
 				}
 			}
 
-			if (bFeatureAVX512BW) {
+			if (g_bFeatureAVX512BW) {
 				return FindDataAVX512(pAddress, unSize, pData, unDataSize);
-			} else if (bFeatureAVX2) {
+			} else if (g_bFeatureAVX2) {
 				return FindDataAVX2(pAddress, unSize, pData, unDataSize);
-			} else if (bFeatureSSE2) {
+			} else if (g_bFeatureSSE2) {
 				return FindDataSSE2(pAddress, unSize, pData, unDataSize);
 			} else {
 				return FindDataNative(pAddress, unSize, pData, unDataSize);
@@ -4700,12 +4648,12 @@ namespace Detours {
 
 		static inline char* FindTypeInfo(void const* const pBegin, void const* const pEnd) {
 			char pEncoded[] = { '\xD1', '\xC0', '\xBE', '\xA9', '\x8B', '\x86', '\x8F', '\x9A', '\xA0', '\x96', '\x91', '\x99', '\x90', '\xBF', '\xBF' }; // Encoded ".?AVtype_info@@" to prevent self-scan
-			char pPattern[sizeof(pEncoded) + 1] = {};
-			for (unsigned i = 0; i < sizeof(pEncoded); ++i) {
+			char pPattern[sizeof(pEncoded) + 1] {};
+			for (unsigned char i = 0; i < sizeof(pEncoded); ++i) {
 				pPattern[i] = pEncoded[i] ^ 0xFF;
 			}
 
-			return reinterpret_cast<char*>(const_cast<void*>(FindData(const_cast<void*>(pBegin), reinterpret_cast<size_t>(const_cast<char*>(reinterpret_cast<const char*>(pEnd))) - reinterpret_cast<size_t>(const_cast<void*>(pBegin)), reinterpret_cast<const unsigned char* const>(pPattern), strnlen(pPattern, 16))));
+			return reinterpret_cast<char*>(const_cast<void*>(FindData(const_cast<void*>(pBegin), reinterpret_cast<size_t>(const_cast<char*>(reinterpret_cast<const char*>(pEnd))) - reinterpret_cast<size_t>(const_cast<void*>(pBegin)), reinterpret_cast<const unsigned char* const>(pPattern), sizeof(pPattern))));
 		}
 
 		// ----------------------------------------------------------------
@@ -5125,8 +5073,8 @@ namespace Detours {
 				return;
 			}
 
-			TCHAR szEvent[64];
-			memset(szEvent, 0, sizeof(szEvent));
+			TCHAR szEvent[64] {};
+
 			if (bIsGlobal) {
 				if (_stprintf_s(szEvent, _T("Global\\%s"), m_szEventName) == -1) {
 					memset(m_szEventName, 0, sizeof(m_szEventName));
@@ -5221,8 +5169,8 @@ namespace Detours {
 				return;
 			}
 
-			TCHAR szEvent[64];
-			memset(szEvent, 0, sizeof(szEvent));
+			TCHAR szEvent[64] {};
+
 			if (bIsGlobal) {
 				if (_stprintf_s(szEvent, _T("Global\\%s"), szEventName) == -1) {
 					return;
@@ -5357,8 +5305,8 @@ namespace Detours {
 				return;
 			}
 
-			TCHAR szMutex[64];
-			memset(szMutex, 0, sizeof(szMutex));
+			TCHAR szMutex[64] {};
+
 			if (bIsGlobal) {
 				if (_stprintf_s(szMutex, _T("Global\\%s"), m_szMutexName) == -1) {
 					memset(m_szMutexName, 0, sizeof(m_szMutexName));
@@ -5429,8 +5377,8 @@ namespace Detours {
 				return;
 			}
 
-			TCHAR szMutex[64];
-			memset(szMutex, 0, sizeof(szMutex));
+			TCHAR szMutex[64] {};
+
 			if (bIsGlobal) {
 				if (_stprintf_s(szMutex, _T("Global\\%s"), szMutexName) == -1) {
 					return;
@@ -5541,8 +5489,8 @@ namespace Detours {
 				return;
 			}
 
-			TCHAR szSemaphore[64];
-			memset(szSemaphore, 0, sizeof(szSemaphore));
+			TCHAR szSemaphore[64] {};
+
 			if (bIsGlobal) {
 				if (_stprintf_s(szSemaphore, _T("Global\\%s"), m_szSemaphoreName) == -1) {
 					memset(m_szSemaphoreName, 0, sizeof(m_szSemaphoreName));
@@ -5613,8 +5561,8 @@ namespace Detours {
 				return;
 			}
 
-			TCHAR szSemaphore[64];
-			memset(szSemaphore, 0, sizeof(szSemaphore));
+			TCHAR szSemaphore[64] {};
+
 			if (bIsGlobal) {
 				if (_stprintf_s(szSemaphore, _T("Global\\%s"), szSemaphoreName) == -1) {
 					return;
@@ -5694,7 +5642,10 @@ namespace Detours {
 		// Suspender
 		// ----------------------------------------------------------------
 
-		
+		Suspender::Suspender() {
+			m_unSuspendDepth = 0;
+		}
+
 		Suspender::~Suspender() {
 			if (m_Mutex.Lock()) {
 				if (m_unSuspendDepth > 0) {
@@ -5718,7 +5669,7 @@ namespace Detours {
 				return true;
 			}
 
-			const auto& hSnap = CreateToolhelp32Snapshot(TH32CS_SNAPTHREAD, 0);
+			HANDLE hSnap = CreateToolhelp32Snapshot(TH32CS_SNAPTHREAD, 0);
 			if (!hSnap || (hSnap == INVALID_HANDLE_VALUE)) {
 				m_Mutex.UnLock();
 				return false;
@@ -5788,8 +5739,9 @@ namespace Detours {
 		}
 
 		void Suspender::Resume() {
-			if (!m_Mutex.Lock())
+			if (!m_Mutex.Lock()) {
 				return;
+			}
 
 			if (m_unSuspendDepth == 0) {
 				m_Mutex.UnLock();
@@ -5894,7 +5846,7 @@ namespace Detours {
 				return 0;
 			}
 
-			const auto& hSnap = CreateToolhelp32Snapshot(TH32CS_SNAPTHREAD, 0);
+			HANDLE hSnap = CreateToolhelp32Snapshot(TH32CS_SNAPTHREAD, 0);
 			if (!hSnap || (hSnap == INVALID_HANDLE_VALUE)) {
 				return 0;
 			}
@@ -5910,8 +5862,9 @@ namespace Detours {
 			do {
 				if ((pTEB->ClientId.UniqueProcess == te.th32OwnerProcessID) && (pTEB->ClientId.UniqueThread != te.th32ThreadID) && (m_SuspendedTIDs.find(te.th32ThreadID) == m_SuspendedTIDs.end())) {
 					HANDLE hThread = OpenThread(THREAD_QUERY_LIMITED_INFORMATION | THREAD_SUSPEND_RESUME | THREAD_GET_CONTEXT | THREAD_SET_CONTEXT, FALSE, te.th32ThreadID);
-					if (!hThread || (hThread == INVALID_HANDLE_VALUE))
+					if (!hThread || (hThread == INVALID_HANDLE_VALUE)) {
 						continue;
+					}
 
 					if (SuspendThread(hThread) == static_cast<DWORD>(-1)) {
 						CloseHandle(hThread);
@@ -5971,8 +5924,7 @@ namespace Detours {
 				return;
 			}
 
-			TCHAR szPipe[64];
-			memset(szPipe, 0, sizeof(szPipe));
+			TCHAR szPipe[64] {};
 			if (_stprintf_s(szPipe, _T("\\\\.\\pipe\\%s"), m_szPipeName) == -1) {
 				memset(m_szPipeName, 0, sizeof(m_szPipeName));
 				return;
@@ -5996,8 +5948,7 @@ namespace Detours {
 
 		bool PipeServer::Open() {
 			if (!m_hPipe || (m_hPipe == INVALID_HANDLE_VALUE)) {
-				TCHAR szPipe[64];
-				memset(szPipe, 0, sizeof(szPipe));
+				TCHAR szPipe[64] {};
 				if (_stprintf_s(szPipe, _T("\\\\.\\pipe\\%s"), m_szPipeName) == -1) {
 					memset(m_szPipeName, 0, sizeof(m_szPipeName));
 					return false;
@@ -6104,8 +6055,7 @@ namespace Detours {
 				return false;
 			}
 
-			TCHAR szPipe[64];
-			memset(szPipe, 0, sizeof(szPipe));
+			TCHAR szPipe[64] {};
 			_stprintf_s(szPipe, _T("\\\\.\\pipe\\%s"), szPipeName);
 
 			m_hPipe = CreateFile(szPipe, GENERIC_READ | GENERIC_WRITE, NULL, nullptr, OPEN_EXISTING, NULL, nullptr);
@@ -6468,36 +6418,33 @@ namespace Detours {
 		// __get_page_info
 		// ----------------------------------------------------------------
 
-		static void* pMinimumApplicationAddress = nullptr;
-		static void* pMaximumApplicationAddress = nullptr;
-		static DWORD unPageSize = 0;
-		static DWORD unAllocationGranularity = 0;
+		static void* g_pMinimumApplicationAddress = nullptr;
+		static void* g_pMaximumApplicationAddress = nullptr;
+		static DWORD g_unPageSize = 0;
+		static DWORD g_unAllocationGranularity = 0;
 
 		static bool inline __get_page_info(void* pAddress, PPAGE_INFO pPageInfo) {
-			if (!pAddress) {
-				return false;
+			if (!g_pMinimumApplicationAddress || !g_pMaximumApplicationAddress || !g_unPageSize || !g_unAllocationGranularity) {
+				SYSTEM_INFO si;
+				GetSystemInfo(&si);
+				g_pMinimumApplicationAddress = si.lpMinimumApplicationAddress;
+				g_pMaximumApplicationAddress = si.lpMaximumApplicationAddress;
+				g_unPageSize = si.dwPageSize;
+				g_unAllocationGranularity = si.dwAllocationGranularity;
 			}
 
-			if (!pMinimumApplicationAddress || !pMaximumApplicationAddress || !unPageSize || !unAllocationGranularity) {
-				SYSTEM_INFO sysinf;
-				GetSystemInfo(&sysinf);
-				pMinimumApplicationAddress = sysinf.lpMinimumApplicationAddress;
-				pMaximumApplicationAddress = sysinf.lpMaximumApplicationAddress;
-				unPageSize = sysinf.dwPageSize;
-				unAllocationGranularity = sysinf.dwAllocationGranularity;
-			}
+			const size_t unPageBase = __align_down(reinterpret_cast<size_t>(pAddress), static_cast<size_t>(g_unPageSize));
 
-			MEMORY_BASIC_INFORMATION mbi;
-			memset(&mbi, 0, sizeof(mbi));
-			if (VirtualQuery(pAddress, &mbi, sizeof(mbi)) != sizeof(mbi)) {
+			MEMORY_BASIC_INFORMATION mbi {};
+			if (VirtualQuery(reinterpret_cast<void*>(unPageBase), &mbi, sizeof(mbi)) != sizeof(mbi)) {
 				return false;
 			}
 
 			if (pPageInfo) {
 				memset(pPageInfo, 0, sizeof(PAGE_INFO));
 
-				pPageInfo->m_pBaseAddress = mbi.BaseAddress;
-				pPageInfo->m_unSize = unPageSize;
+				pPageInfo->m_pBaseAddress = reinterpret_cast<void*>(unPageBase);
+				pPageInfo->m_unSize = static_cast<size_t>(g_unPageSize);
 				pPageInfo->m_unState = mbi.State;
 				pPageInfo->m_unProtection = mbi.Protect;
 				pPageInfo->m_unType = mbi.Type;
@@ -6511,21 +6458,16 @@ namespace Detours {
 		// ----------------------------------------------------------------
 
 		static bool inline __get_region_info(void* pAddress, PREGION_INFO pRegionInfo) {
-			if (!pAddress) {
-				return false;
+			if (!g_pMinimumApplicationAddress || !g_pMaximumApplicationAddress || !g_unPageSize || !g_unAllocationGranularity) {
+				SYSTEM_INFO si;
+				GetSystemInfo(&si);
+				g_pMinimumApplicationAddress = si.lpMinimumApplicationAddress;
+				g_pMaximumApplicationAddress = si.lpMaximumApplicationAddress;
+				g_unPageSize = si.dwPageSize;
+				g_unAllocationGranularity = si.dwAllocationGranularity;
 			}
 
-			if (!pMinimumApplicationAddress || !pMaximumApplicationAddress || !unPageSize || !unAllocationGranularity) {
-				SYSTEM_INFO sysinf;
-				GetSystemInfo(&sysinf);
-				pMinimumApplicationAddress = sysinf.lpMinimumApplicationAddress;
-				pMaximumApplicationAddress = sysinf.lpMaximumApplicationAddress;
-				unPageSize = sysinf.dwPageSize;
-				unAllocationGranularity = sysinf.dwAllocationGranularity;
-			}
-
-			MEMORY_BASIC_INFORMATION mbi;
-			memset(&mbi, 0, sizeof(mbi));
+			MEMORY_BASIC_INFORMATION mbi {};
 			if (VirtualQuery(pAddress, &mbi, sizeof(mbi)) != sizeof(mbi)) {
 				return false;
 			}
@@ -6549,26 +6491,63 @@ namespace Detours {
 
 		static inline std::vector<PAGE_INFO> __get_pages_info(void* pAddress, size_t unSize, bool bUnLimitBounds = false) {
 			std::vector<PAGE_INFO> vecPages;
-			if (!pAddress || !unSize) {
+			if (!unSize) {
 				return vecPages;
 			}
 
-			if (!pMinimumApplicationAddress || !pMaximumApplicationAddress || !unPageSize || !unAllocationGranularity) {
-				SYSTEM_INFO sysinf;
-				GetSystemInfo(&sysinf);
-				pMinimumApplicationAddress = sysinf.lpMinimumApplicationAddress;
-				pMaximumApplicationAddress = sysinf.lpMaximumApplicationAddress;
-				unPageSize = sysinf.dwPageSize;
-				unAllocationGranularity = sysinf.dwAllocationGranularity;
+			if (!g_pMinimumApplicationAddress || !g_pMaximumApplicationAddress || !g_unPageSize || !g_unAllocationGranularity) {
+				SYSTEM_INFO si;
+				GetSystemInfo(&si);
+				g_pMinimumApplicationAddress = si.lpMinimumApplicationAddress;
+				g_pMaximumApplicationAddress = si.lpMaximumApplicationAddress;
+				g_unPageSize = si.dwPageSize;
+				g_unAllocationGranularity = si.dwAllocationGranularity;
 			}
 
-			const size_t unBegin = !bUnLimitBounds ? MAX(reinterpret_cast<size_t>(pMinimumApplicationAddress), reinterpret_cast<size_t>(pAddress)) : reinterpret_cast<size_t>(pAddress);
-			const size_t unEnd = !bUnLimitBounds ? MIN(reinterpret_cast<size_t>(pMaximumApplicationAddress), reinterpret_cast<size_t>(pAddress) + unSize) : reinterpret_cast<size_t>(pAddress) + unSize;
+			const size_t unMinAddress = reinterpret_cast<size_t>(g_pMinimumApplicationAddress);
+			const size_t unMaxAddress = reinterpret_cast<size_t>(g_pMaximumApplicationAddress);
 
-			PAGE_INFO pi;
-			memset(&pi, 0, sizeof(pi));
+			size_t unMaxEnd = unMaxAddress;
+			if (unMaxEnd != SIZE_MAX) {
+				unMaxEnd += 1;
+			}
 
-			for (size_t unAddress = unBegin; unAddress < unEnd; unAddress = __align_up(MIN(unAddress, reinterpret_cast<size_t>(pi.m_pBaseAddress)) + pi.m_unSize, static_cast<size_t>(unPageSize))) {
+			size_t unBegin = reinterpret_cast<size_t>(pAddress);
+			size_t unEnd = unBegin;
+
+			if (unSize > (SIZE_MAX - unBegin)) {
+				unEnd = SIZE_MAX;
+			} else {
+				unEnd = unBegin + unSize;
+			}
+
+			if (unEnd > unMaxEnd) {
+				unEnd = unMaxEnd;
+			}
+
+			if (!bUnLimitBounds) {
+				if (unBegin < unMinAddress) {
+					unBegin = unMinAddress;
+				}
+			}
+
+			unBegin = __align_down(unBegin, static_cast<size_t>(g_unPageSize));
+			unEnd = __align_up(unEnd, static_cast<size_t>(g_unPageSize));
+
+			if (unEnd > unMaxEnd) {
+				unEnd = __align_down(unMaxEnd, static_cast<size_t>(g_unPageSize));
+			}
+
+			if (!bUnLimitBounds && (unBegin < unMinAddress)) {
+				unBegin = unMinAddress;
+			}
+
+			if (unBegin >= unEnd) {
+				return vecPages;
+			}
+
+			PAGE_INFO pi {};
+			for (size_t unAddress = unBegin; unAddress < unEnd; unAddress += static_cast<size_t>(g_unPageSize)) {
 				if (!__get_page_info(reinterpret_cast<void*>(unAddress), &pi)) {
 					break;
 				}
@@ -6577,7 +6556,7 @@ namespace Detours {
 			}
 
 			return vecPages;
-		};
+		}
 
 		// ----------------------------------------------------------------
 		// __get_regions_info
@@ -6585,45 +6564,100 @@ namespace Detours {
 
 		static inline std::vector<REGION_INFO> __get_regions_info(void* pAddress, size_t unSize, bool bCombine = false, bool bUnLimitBounds = false) {
 			std::vector<REGION_INFO> vecRegions;
-			if (!pAddress || !unSize) {
+			if (!unSize) {
 				return vecRegions;
 			}
 
-			if (!pMinimumApplicationAddress || !pMaximumApplicationAddress || !unPageSize || !unAllocationGranularity) {
-				SYSTEM_INFO sysinf;
-				GetSystemInfo(&sysinf);
-				pMinimumApplicationAddress = sysinf.lpMinimumApplicationAddress;
-				pMaximumApplicationAddress = sysinf.lpMaximumApplicationAddress;
-				unPageSize = sysinf.dwPageSize;
-				unAllocationGranularity = sysinf.dwAllocationGranularity;
+			if (!g_pMinimumApplicationAddress || !g_pMaximumApplicationAddress || !g_unPageSize || !g_unAllocationGranularity) {
+				SYSTEM_INFO si;
+				GetSystemInfo(&si);
+				g_pMinimumApplicationAddress = si.lpMinimumApplicationAddress;
+				g_pMaximumApplicationAddress = si.lpMaximumApplicationAddress;
+				g_unPageSize = si.dwPageSize;
+				g_unAllocationGranularity = si.dwAllocationGranularity;
 			}
 
-			const size_t unBegin = !bUnLimitBounds ? MAX(reinterpret_cast<size_t>(pMinimumApplicationAddress), reinterpret_cast<size_t>(pAddress)) : reinterpret_cast<size_t>(pAddress);
-			const size_t unEnd = !bUnLimitBounds ? MIN(reinterpret_cast<size_t>(pMaximumApplicationAddress), reinterpret_cast<size_t>(pAddress) + unSize) : reinterpret_cast<size_t>(pAddress) + unSize;
+			const size_t unMinAddress = reinterpret_cast<size_t>(g_pMinimumApplicationAddress);
+			const size_t unMaxAddress = reinterpret_cast<size_t>(g_pMaximumApplicationAddress);
 
-			REGION_INFO ri;
-			memset(&ri, 0, sizeof(ri));
+			size_t unMaxEnd = unMaxAddress;
+			if (unMaxEnd != SIZE_MAX) {
+				unMaxEnd += 1;
+			}
 
-			for (size_t unAddress = unBegin; unAddress < unEnd; unAddress = __align_up(MIN(unAddress, reinterpret_cast<size_t>(ri.m_pBaseAddress)) + ri.m_unSize, static_cast<size_t>(unAllocationGranularity))) {
+			size_t unBegin = reinterpret_cast<size_t>(pAddress);
+			size_t unEnd = unBegin;
+
+			if (unSize > (SIZE_MAX - unBegin)) {
+				unEnd = SIZE_MAX;
+			} else {
+				unEnd = unBegin + unSize;
+			}
+
+			if (unEnd > unMaxEnd) {
+				unEnd = unMaxEnd;
+			}
+
+			if (!bUnLimitBounds) {
+				if (unBegin < unMinAddress) {
+					unBegin = unMinAddress;
+				}
+			}
+
+			if (unBegin >= unEnd) {
+				return vecRegions;
+			}
+
+			REGION_INFO ri {};
+			for (size_t unAddress = unBegin; unAddress < unEnd;) {
 				if (!__get_region_info(reinterpret_cast<void*>(unAddress), &ri)) {
 					break;
 				}
 
-				if (bCombine) {
-					if (!vecRegions.empty()) {
-						auto& LastRegion = vecRegions.back();
-						if (reinterpret_cast<size_t>(LastRegion.m_pBaseAddress) + LastRegion.m_unSize == reinterpret_cast<size_t>(ri.m_pBaseAddress)) {
-							LastRegion.m_unSize += ri.m_unSize;
-							continue;
+				bool bMerged = false;
+
+				if (bCombine && !vecRegions.empty()) {
+					auto& Last = vecRegions.back();
+
+					const size_t LastBase = reinterpret_cast<size_t>(Last.m_pBaseAddress);
+					const size_t CurrentBase = reinterpret_cast<size_t>(ri.m_pBaseAddress);
+
+					if ((LastBase <= (SIZE_MAX - Last.m_unSize)) && ((LastBase + Last.m_unSize) == CurrentBase) && (Last.m_unState == ri.m_unState) && (Last.m_unProtection == ri.m_unProtection) && (Last.m_unType == ri.m_unType)) {
+						if (Last.m_unSize <= (SIZE_MAX - ri.m_unSize)) {
+							Last.m_unSize += ri.m_unSize;
+						} else {
+							Last.m_unSize = SIZE_MAX;
 						}
+
+						bMerged = true;
 					}
 				}
 
-				vecRegions.emplace_back(ri);
+				if (!bMerged) {
+					vecRegions.emplace_back(ri);
+				}
+
+				if (ri.m_unSize == 0) {
+					break;
+				}
+
+				size_t unNextAddress = reinterpret_cast<size_t>(ri.m_pBaseAddress);
+				if (unNextAddress > (SIZE_MAX - ri.m_unSize)) {
+					break;
+				}
+
+				unNextAddress += ri.m_unSize;
+				unNextAddress = __align_up(unNextAddress, static_cast<size_t>(g_unAllocationGranularity));
+
+				if (unNextAddress <= unAddress) {
+					break;
+				}
+
+				unAddress = unNextAddress;
 			}
 
 			return vecRegions;
-		};
+		}
 
 		// ----------------------------------------------------------------
 		// __is_relative
@@ -6751,8 +6785,8 @@ namespace Detours {
 				return;
 			}
 
-			TCHAR szShared[64];
-			memset(szShared, 0, sizeof(szShared));
+			TCHAR szShared[64] {};
+
 			if (bIsGlobal) {
 				if (_stprintf_s(szShared, _T("Global\\%s"), m_szSharedName) == -1) {
 					memset(m_szSharedName, 0, sizeof(m_szSharedName));
@@ -6820,8 +6854,8 @@ namespace Detours {
 				return;
 			}
 
-			TCHAR szShared[64];
-			memset(szShared, 0, sizeof(szShared));
+			TCHAR szShared[64] {};
+
 			if (bIsGlobal) {
 				if (_stprintf_s(szShared, _T("Global\\%s"), szSharedName) == -1) {
 					return;
@@ -6871,24 +6905,24 @@ namespace Detours {
 			m_bCommitted = bCommitPage;
 			m_unOriginalProtection = 0;
 
-			if (!pMinimumApplicationAddress || !pMaximumApplicationAddress || !unPageSize || !unAllocationGranularity) {
-				SYSTEM_INFO sysinf;
-				GetSystemInfo(&sysinf);
-				pMinimumApplicationAddress = sysinf.lpMinimumApplicationAddress;
-				pMaximumApplicationAddress = sysinf.lpMaximumApplicationAddress;
-				unPageSize = sysinf.dwPageSize;
-				unAllocationGranularity = sysinf.dwAllocationGranularity;
+			if (!g_pMinimumApplicationAddress || !g_pMaximumApplicationAddress || !g_unPageSize || !g_unAllocationGranularity) {
+				SYSTEM_INFO si;
+				GetSystemInfo(&si);
+				g_pMinimumApplicationAddress = si.lpMinimumApplicationAddress;
+				g_pMaximumApplicationAddress = si.lpMaximumApplicationAddress;
+				g_unPageSize = si.dwPageSize;
+				g_unAllocationGranularity = si.dwAllocationGranularity;
 			}
 
 			if (!pBaseAddress) {
 				return;
 			}
 
-			m_unPageCapacity = unPageSize;
+			m_unPageCapacity = g_unPageSize;
 			if (bCommitPage) {
-				m_pPageAddress = VirtualAlloc(pBaseAddress, unPageSize, MEM_COMMIT, PAGE_READWRITE);
+				m_pPageAddress = VirtualAlloc(pBaseAddress, g_unPageSize, MEM_COMMIT, PAGE_READWRITE);
 				if (m_pPageAddress) {
-					m_FreeBlocks.emplace(m_pPageAddress, unPageSize);
+					m_FreeBlocks.emplace(m_pPageAddress, g_unPageSize);
 				}
 			} else {
 				PAGE_INFO pi;
@@ -6917,16 +6951,16 @@ namespace Detours {
 			m_bCommitted = false;
 			m_unOriginalProtection = 0;
 
-			if (!pMinimumApplicationAddress || !pMaximumApplicationAddress || !unPageSize || !unAllocationGranularity) {
-				SYSTEM_INFO sysinf;
-				GetSystemInfo(&sysinf);
-				pMinimumApplicationAddress = sysinf.lpMinimumApplicationAddress;
-				pMaximumApplicationAddress = sysinf.lpMaximumApplicationAddress;
-				unPageSize = sysinf.dwPageSize;
-				unAllocationGranularity = sysinf.dwAllocationGranularity;
+			if (!g_pMinimumApplicationAddress || !g_pMaximumApplicationAddress || !g_unPageSize || !g_unAllocationGranularity) {
+				SYSTEM_INFO si;
+				GetSystemInfo(&si);
+				g_pMinimumApplicationAddress = si.lpMinimumApplicationAddress;
+				g_pMaximumApplicationAddress = si.lpMaximumApplicationAddress;
+				g_unPageSize = si.dwPageSize;
+				g_unAllocationGranularity = si.dwAllocationGranularity;
 			}
 
-			m_unPageCapacity = unPageSize;
+			m_unPageCapacity = g_unPageSize;
 			if (pDesiredAddress) {
 				auto vecBackwardPages = __get_pages_info(reinterpret_cast<char*>(pDesiredAddress) - 0x7FFFFFFF + 1, 0x7FFFFFFF);
 				std::reverse(vecBackwardPages.begin(), vecBackwardPages.end());
@@ -6967,11 +7001,11 @@ namespace Detours {
 					}
 				}
 			} else {
-				m_pPageAddress = VirtualAlloc(nullptr, unPageSize, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
+				m_pPageAddress = VirtualAlloc(nullptr, g_unPageSize, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
 			}
 
 			if (m_pPageAddress) {
-				m_FreeBlocks.emplace(m_pPageAddress, unPageSize);
+				m_FreeBlocks.emplace(m_pPageAddress, g_unPageSize);
 				GetProtection(&m_unOriginalProtection);
 			}
 		}
@@ -6985,7 +7019,7 @@ namespace Detours {
 				if (m_bIsManualPage && m_bCommitted) {
 #pragma warning(push)
 #pragma warning(disable : 6250)
-					VirtualFree(m_pPageAddress, 0, MEM_DECOMMIT);
+					VirtualFree(m_pPageAddress, m_unPageCapacity, MEM_DECOMMIT);
 #pragma warning(pop)
 				}
 
@@ -7060,33 +7094,41 @@ namespace Detours {
 				return nullptr;
 			}
 
-			const bool bSizeAlign = (unSizeAlign > 1) && !(unSizeAlign & (unSizeAlign - 1));
-			const bool bAddressAlign = (unAddressAlign > 1) && !(unAddressAlign & (unAddressAlign - 1));
+			const bool bSizeAlign = (unSizeAlign > 1) && ((unSizeAlign & (unSizeAlign - 1)) == 0);
+			const bool bAddressAlign = (unAddressAlign > 1) && ((unAddressAlign & (unAddressAlign - 1)) == 0);
+
+			const size_t unAlignedSize = bSizeAlign ? __align_up(unSize, unSizeAlign) : unSize;
 
 			for (auto it = m_FreeBlocks.begin(); it != m_FreeBlocks.end(); ++it) {
-				const size_t unAddress = reinterpret_cast<size_t>(it->m_pAddress);
-				const size_t unAddressAlignSize = !bAddressAlign ? 0 : (((unAddress % unAddressAlign == 0) ? 0 : (unAddressAlign - (unAddress % unAddressAlign))));
+				const size_t unBlockA = reinterpret_cast<size_t>(it->m_pAddress);
+				const size_t unBlockS = it->m_unSize;
 
-				const size_t unSizeAlignSize = !bSizeAlign ? 0 : ((unSize % unSizeAlign) == 0) ? 0
-				                                                                               : (unSizeAlign - (unSize % unSizeAlign));
-				const size_t unAlignedSize = unSize + unSizeAlignSize;
+				const uintptr_t unAlignedA = bAddressAlign ? __align_up(unBlockA, unAddressAlign) : unBlockA;
+				const size_t unPrefix = unAlignedA - unBlockA;
 
-				if (it->m_unSize >= unAlignedSize + unAddressAlignSize) {
-					void* pAlignedAddress = reinterpret_cast<char*>(unAddress) + unAddressAlignSize;
-
-					if (it->m_unSize > unAlignedSize + unAddressAlignSize) {
-						m_FreeBlocks.emplace(reinterpret_cast<char*>(pAlignedAddress) + unAlignedSize, it->m_unSize - unAlignedSize - unAddressAlignSize);
-					}
-
-					m_ActiveBlocks.emplace(pAlignedAddress, unSize);
-					m_FreeBlocks.erase(it);
-
-					return pAlignedAddress;
+				if (unPrefix + unAlignedSize > unBlockS) {
+					continue;
 				}
+
+				m_FreeBlocks.erase(it);
+
+				if (unPrefix) {
+					m_FreeBlocks.emplace(reinterpret_cast<void*>(unBlockA), unPrefix);
+				}
+
+				const size_t unSuffix = unBlockS - unPrefix - unAlignedSize;
+				if (unSuffix) {
+					m_FreeBlocks.emplace(reinterpret_cast<void*>(unAlignedA + unAlignedSize), unSuffix);
+				}
+
+				m_ActiveBlocks.emplace(reinterpret_cast<void*>(unAlignedA), unAlignedSize);
+
+				return reinterpret_cast<void*>(unAlignedA);
 			}
 
 			return nullptr;
 		}
+
 
 		void* Page::ZeroAlloc(size_t unSize, size_t unSizeAlign, size_t unAddressAlign) {
 			if (!m_pPageAddress || !m_unPageCapacity || !unSize || !unSizeAlign || !unAddressAlign) {
@@ -7099,6 +7141,7 @@ namespace Detours {
 			}
 
 			memset(pAddress, 0, unSize);
+
 			return pAddress;
 		}
 
@@ -7222,22 +7265,22 @@ namespace Detours {
 			m_unOriginalProtection = 0;
 			m_unUsedSpace = 0;
 
-			if (!pMinimumApplicationAddress || !pMaximumApplicationAddress || !unPageSize || !unAllocationGranularity) {
-				SYSTEM_INFO sysinf;
-				GetSystemInfo(&sysinf);
-				pMinimumApplicationAddress = sysinf.lpMinimumApplicationAddress;
-				pMaximumApplicationAddress = sysinf.lpMaximumApplicationAddress;
-				unPageSize = sysinf.dwPageSize;
-				unAllocationGranularity = sysinf.dwAllocationGranularity;
+			if (!g_pMinimumApplicationAddress || !g_pMaximumApplicationAddress || !g_unPageSize || !g_unAllocationGranularity) {
+				SYSTEM_INFO si;
+				GetSystemInfo(&si);
+				g_pMinimumApplicationAddress = si.lpMinimumApplicationAddress;
+				g_pMaximumApplicationAddress = si.lpMaximumApplicationAddress;
+				g_unPageSize = si.dwPageSize;
+				g_unAllocationGranularity = si.dwAllocationGranularity;
 			}
 
 			if (!unCapacity) {
-				unCapacity = unPageSize;
+				unCapacity = g_unPageSize;
 			} else {
-				if (unCapacity < unPageSize) {
-					unCapacity = unPageSize;
+				if (unCapacity < g_unPageSize) {
+					unCapacity = g_unPageSize;
 				} else {
-					unCapacity = __align_up(unCapacity, static_cast<size_t>(unPageSize));
+					unCapacity = __align_up(unCapacity, static_cast<size_t>(g_unPageSize));
 				}
 			}
 
@@ -7376,120 +7419,6 @@ namespace Detours {
 			return true;
 		}
 
-		bool Region::CloneFrom(Region* pSourceRegion) {
-			if (m_Pages.empty() || !m_pRegionAddress || !m_unRegionCapacity || !pSourceRegion) {
-				return false;
-			}
-
-			if (m_unRegionCapacity != pSourceRegion->GetRegionCapacity()) {
-				return false;
-			}
-
-			DWORD unProtection = 0;
-			if (!pSourceRegion->GetProtection(&unProtection)) {
-				return false;
-			}
-
-			if (!pSourceRegion->ChangeProtection(PAGE_READONLY)) {
-				return false;
-			}
-
-			if (!ChangeProtection(PAGE_READWRITE)) {
-				return false;
-			}
-
-			memcpy(m_pRegionAddress, pSourceRegion->GetRegionAddress(), pSourceRegion->GetRegionCapacity());
-
-			if (!ChangeProtection(unProtection)) {
-				return false;
-			}
-
-			if (!pSourceRegion->RestoreProtection()) {
-				return false;
-			}
-
-			return true;
-		}
-
-		bool Region::CloneTo(Region* pDestinationRegion) {
-			if (m_Pages.empty() || !m_pRegionAddress || !m_unRegionCapacity || !pDestinationRegion) {
-				return false;
-			}
-
-			if (m_unRegionCapacity != pDestinationRegion->GetRegionCapacity()) {
-				return false;
-			}
-
-			DWORD unProtection = 0;
-			if (!GetProtection(&unProtection)) {
-				return false;
-			}
-
-			if (!ChangeProtection(PAGE_READONLY)) {
-				return false;
-			}
-
-			if (!pDestinationRegion->ChangeProtection(PAGE_READWRITE)) {
-				return false;
-			}
-
-			memcpy(pDestinationRegion->GetRegionAddress(), m_pRegionAddress, m_unRegionCapacity);
-
-			if (!pDestinationRegion->ChangeProtection(unProtection)) {
-				return false;
-			}
-
-			if (!RestoreProtection()) {
-				return false;
-			}
-
-			return true;
-		}
-
-		bool Region::CloneFrom(void* pSourceBaseAddress, size_t unSize) {
-			if (m_Pages.empty() || !m_pRegionAddress || !m_unRegionCapacity || !pSourceBaseAddress) {
-				return false;
-			}
-
-			REGION_INFO pi;
-			if (!__get_region_info(pSourceBaseAddress, &pi)) {
-				return false;
-			}
-
-			if (pi.m_pBaseAddress != pSourceBaseAddress) {
-				return false;
-			}
-
-			if (unSize && (pi.m_unSize != unSize)) {
-				return false;
-			}
-
-			Region SourceRegion(pSourceBaseAddress, pi.m_unSize);
-			return SourceRegion.CloneTo(this);
-		}
-
-		bool Region::CloneTo(void* pDestinationBaseAddress, size_t unSize) {
-			if (m_Pages.empty() || !m_pRegionAddress || !m_unRegionCapacity || !pDestinationBaseAddress) {
-				return false;
-			}
-
-			REGION_INFO pi;
-			if (!__get_region_info(pDestinationBaseAddress, &pi)) {
-				return false;
-			}
-
-			if (pi.m_pBaseAddress != pDestinationBaseAddress) {
-				return false;
-			}
-
-			if (unSize && (pi.m_unSize != unSize)) {
-				return false;
-			}
-
-			Region DestinationRegion(pDestinationBaseAddress, pi.m_unSize);
-			return DestinationRegion.CloneFrom(this);
-		}
-
 		void* Region::Alloc(size_t unSize, size_t unSizeAlign, size_t unAddressAlign, Page** pUsedPage) {
 			if (m_Pages.empty() || !m_pRegionAddress || !m_unRegionCapacity || !unSize || !unSizeAlign || !unAddressAlign) {
 				return nullptr;
@@ -7539,6 +7468,7 @@ namespace Detours {
 			}
 
 			memset(pAddress, 0, unSize);
+
 			return pAddress;
 		}
 
@@ -7548,9 +7478,12 @@ namespace Detours {
 			}
 
 			for (auto it = m_Pages.begin(); it != m_Pages.end(); ++it) {
-				const size_t unDataSize = it->GetDataSize();
+				const size_t unBefore = it->GetDataSize();
+
 				if (it->DeAlloc(pAddress)) {
-					m_unUsedSpace -= unDataSize;
+					const size_t unAfter = it->GetDataSize();
+					const size_t unFreed = (unBefore >= unAfter) ? (unBefore - unAfter) : 0;
+					m_unUsedSpace = (m_unUsedSpace >= unFreed) ? (m_unUsedSpace - unFreed) : 0;
 					return true;
 				}
 			}
@@ -7594,7 +7527,7 @@ namespace Detours {
 			}
 
 			for (auto& Page : m_Pages) {
-				if (Page.IsPageEmpty()) {
+				if (!Page.IsPageEmpty()) {
 					return false;
 				}
 			}
@@ -7607,32 +7540,32 @@ namespace Detours {
 		// ----------------------------------------------------------------
 
 		Storage::Storage(size_t unTotalCapacity, size_t unRegionCapacity) {
-			if (!pMinimumApplicationAddress || !pMaximumApplicationAddress || !unPageSize || !unAllocationGranularity) {
-				SYSTEM_INFO sysinf;
-				GetSystemInfo(&sysinf);
-				pMinimumApplicationAddress = sysinf.lpMinimumApplicationAddress;
-				pMaximumApplicationAddress = sysinf.lpMaximumApplicationAddress;
-				unPageSize = sysinf.dwPageSize;
-				unAllocationGranularity = sysinf.dwAllocationGranularity;
+			if (!g_pMinimumApplicationAddress || !g_pMaximumApplicationAddress || !g_unPageSize || !g_unAllocationGranularity) {
+				SYSTEM_INFO si;
+				GetSystemInfo(&si);
+				g_pMinimumApplicationAddress = si.lpMinimumApplicationAddress;
+				g_pMaximumApplicationAddress = si.lpMaximumApplicationAddress;
+				g_unPageSize = si.dwPageSize;
+				g_unAllocationGranularity = si.dwAllocationGranularity;
 			}
 
 			if (!unTotalCapacity) {
-				unTotalCapacity = unPageSize;
+				unTotalCapacity = g_unPageSize;
 			} else {
-				if (unTotalCapacity < unPageSize) {
-					unTotalCapacity = unPageSize;
+				if (unTotalCapacity < g_unPageSize) {
+					unTotalCapacity = g_unPageSize;
 				} else {
-					unTotalCapacity = __align_up(unTotalCapacity, static_cast<size_t>(unPageSize));
+					unTotalCapacity = __align_up(unTotalCapacity, static_cast<size_t>(g_unPageSize));
 				}
 			}
 
 			if (!unRegionCapacity) {
-				unRegionCapacity = unPageSize;
+				unRegionCapacity = g_unPageSize;
 			} else {
-				if (unRegionCapacity < unPageSize) {
-					unRegionCapacity = unPageSize;
+				if (unRegionCapacity < g_unPageSize) {
+					unRegionCapacity = g_unPageSize;
 				} else {
-					unRegionCapacity = __align_up(unRegionCapacity, static_cast<size_t>(unPageSize));
+					unRegionCapacity = __align_up(unRegionCapacity, static_cast<size_t>(g_unPageSize));
 				}
 			}
 
@@ -7741,18 +7674,22 @@ namespace Detours {
 			}
 
 			memset(pAddress, 0, unSize);
+
 			return pAddress;
 		}
 
 		bool Storage::DeAlloc(void* pAddress) {
-			if (m_Regions.empty()) {
+			if (m_Regions.empty() || !pAddress) {
 				return false;
 			}
 
 			for (auto it = m_Regions.begin(); it != m_Regions.end(); ++it) {
-				const size_t unDataSize = it->GetDataSize();
+				const size_t unBefore = it->GetDataSize();
+
 				if (it->DeAlloc(pAddress)) {
-					m_unUsedSpace -= unDataSize;
+					const size_t unAfter = it->GetDataSize();
+					const size_t unFreed = (unBefore >= unAfter) ? (unBefore - unAfter) : 0;
+					m_unUsedSpace = (m_unUsedSpace >= unFreed) ? (m_unUsedSpace - unFreed) : 0;
 
 					if (it->IsRegionEmpty()) {
 						m_Regions.erase(it);
@@ -7776,6 +7713,7 @@ namespace Detours {
 
 			m_Regions.clear();
 			m_unUsedSpace = 0;
+
 			return true;
 		}
 
@@ -8094,7 +8032,7 @@ namespace Detours {
 			unsigned int m_unRTM : 1; // Bit 15: Restricted Transactional Memory
 			unsigned int : 16;        // Bit 16-31: Reserved
 #ifdef _M_X64
-			unsigned int : 32; // Bit 32-63: Reserved (x64 upper bits)
+			unsigned int : 32;        // Bit 32-63: Reserved (x64 upper bits)
 #endif
 		};
 
@@ -8121,7 +8059,7 @@ namespace Detours {
 			unsigned int m_unRW3 : 2;  // Bit 28-29: Breakpoint 3 condition
 			unsigned int m_unLEN3 : 2; // Bit 30-31: Breakpoint 3 length
 #ifdef _M_X64
-			unsigned int : 32; // Bit 32-63: Reserved
+			unsigned int : 32;         // Bit 32-63: Reserved
 #endif
 		};
 
@@ -8149,7 +8087,7 @@ namespace Detours {
 			unsigned int m_unID : 1;   // Bit 21: ID Flag
 			unsigned int : 10;         // Bit 22-31: Reserved
 #ifdef _M_X64
-			unsigned int : 32; // Bit 32-63: Reserved
+			unsigned int : 32;         // Bit 32-63: Reserved
 #endif
 		};
 
@@ -39404,7 +39342,7 @@ namespace Detours {
 				return false;
 			}
 
-			const auto& pAddress = &m_pVTable[m_unIndex];
+			void** pAddress = &m_pVTable[m_unIndex];
 
 			Protection Patch(pAddress, sizeof(void*));
 			if (!Patch.Change(PAGE_READWRITE)) {
@@ -39426,7 +39364,7 @@ namespace Detours {
 				return false;
 			}
 
-			const auto& pAddress = &m_pVTable[m_unIndex];
+			void** pAddress = &m_pVTable[m_unIndex];
 
 			Protection Patch(pAddress, sizeof(void*));
 			if (!Patch.Change(PAGE_READWRITE)) {

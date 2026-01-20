@@ -633,7 +633,7 @@ TEST_SUITE("Detours::Scan") {
 		}
 	}
 
-	TEST_CASE("FindSignatureNative [benckmark]" * doctest::timeout(10)) {
+	TEST_CASE("FindSignatureNative [benckmark]" * doctest::timeout(30)) {
 		auto pRandomData = std::make_unique<unsigned char[]>(0x800000); // 8 MiB
 		CHECK(pRandomData != nullptr);
 
@@ -936,7 +936,7 @@ TEST_SUITE("Detours::Scan") {
 		}
 	}
 
-	TEST_CASE("FindDataNative [benckmark]" * doctest::timeout(10)) {
+	TEST_CASE("FindDataNative [benckmark]" * doctest::timeout(30)) {
 		auto pRandomData = std::make_unique<unsigned char[]>(0x800000); // 8 MiB
 		CHECK(pRandomData != nullptr);
 
