@@ -7129,7 +7129,6 @@ namespace Detours {
 			return nullptr;
 		}
 
-
 		void* Page::ZeroAlloc(size_t unSize, size_t unSizeAlign, size_t unAddressAlign) {
 			if (!m_pPageAddress || !m_unPageCapacity || !unSize || !unSizeAlign || !unAddressAlign) {
 				return nullptr;
