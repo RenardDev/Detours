@@ -3378,17 +3378,17 @@ namespace Detours {
 					return false;
 				}
 
-				const uintptr_t unImageBaseRtl = reinterpret_cast<uintptr_t>(pModuleBase);
-				const uintptr_t unImageEndRtl = unImageBaseRtl + pNTHs->OptionalHeader.SizeOfImage;
+				const size_t unImageBaseRtl = reinterpret_cast<size_t>(pModuleBase);
+				const size_t unImageEndRtl = unImageBaseRtl + pNTHs->OptionalHeader.SizeOfImage;
 
 #ifdef _M_X64
-				uintptr_t unImageBase = unImageBaseRtl;
+				size_t unImageBase = unImageBaseRtl;
 				if (unSignature == COL_SIG_REV1) {
 					if (pCompleteObjectLocator->m_unSelf == 0) {
 						return false;
 					}
 
-					unImageBase = reinterpret_cast<uintptr_t>(pCompleteObjectLocator) - static_cast<uintptr_t>(pCompleteObjectLocator->m_unSelf);
+					unImageBase = reinterpret_cast<size_t>(pCompleteObjectLocator) - static_cast<size_t>(pCompleteObjectLocator->m_unSelf);
 					if (unImageBase != unImageBaseRtl) {
 						return false;
 					}
@@ -3409,12 +3409,12 @@ namespace Detours {
 #endif
 
 				{
-					const uintptr_t unTypeDescriptor = reinterpret_cast<uintptr_t>(pTypeDescriptor);
+					const size_t unTypeDescriptor = reinterpret_cast<size_t>(pTypeDescriptor);
 					if ((unTypeDescriptor < unImageBaseRtl) || (unTypeDescriptor >= unImageEndRtl)) {
 						return false;
 					}
 
-					const uintptr_t unClassHierarchyDescriptor = reinterpret_cast<uintptr_t>(pClassHierarchyDescriptor);
+					const size_t unClassHierarchyDescriptor = reinterpret_cast<size_t>(pClassHierarchyDescriptor);
 					if ((unClassHierarchyDescriptor < unImageBaseRtl) || (unClassHierarchyDescriptor >= unImageEndRtl)) {
 						return false;
 					}
@@ -3439,7 +3439,7 @@ namespace Detours {
 #endif
 
 				{
-					const uintptr_t unBaseClassArray = reinterpret_cast<uintptr_t>(pBaseClassArray);
+					const size_t unBaseClassArray = reinterpret_cast<size_t>(pBaseClassArray);
 					if ((unBaseClassArray < unImageBaseRtl) || (unBaseClassArray >= unImageEndRtl)) {
 						return false;
 					}
@@ -3455,7 +3455,7 @@ namespace Detours {
 #endif
 
 				{
-					const uintptr_t unFirstBCD = reinterpret_cast<uintptr_t>(pFirstBCD);
+					const size_t unFirstBCD = reinterpret_cast<size_t>(pFirstBCD);
 					if ((unFirstBCD < unImageBaseRtl) || (unFirstBCD >= unImageEndRtl)) {
 						return false;
 					}
@@ -3471,7 +3471,7 @@ namespace Detours {
 #endif
 
 				{
-					const uintptr_t unFirstTD = reinterpret_cast<uintptr_t>(pFirstTD);
+					const size_t unFirstTD = reinterpret_cast<size_t>(pFirstTD);
 					if ((unFirstTD < unImageBaseRtl) || (unFirstTD >= unImageEndRtl)) {
 						return false;
 					}
@@ -4919,14 +4919,14 @@ namespace Detours {
 					continue;
 				}
 
-				auto ObjFull = BuildObjectFromCOL(pBaseAddress, pBegin, pEnd, const_cast<PRTTI_TYPE_DESCRIPTOR>(pTD));
-				if (ObjFull) {
-					TryEmplaceUniqueByTD(vecResult, seenTD, std::move(ObjFull));
+				auto ObjectFull = BuildObjectFromCOL(pBaseAddress, pBegin, pEnd, const_cast<PRTTI_TYPE_DESCRIPTOR>(pTD));
+				if (ObjectFull) {
+					TryEmplaceUniqueByTD(vecResult, seenTD, std::move(ObjectFull));
 					continue;
 				}
 
-				auto ObjPartial = BuildObjectFromBCD(pBaseAddress, pBegin, pEnd, const_cast<PRTTI_TYPE_DESCRIPTOR>(pTD));
-				TryEmplaceUniqueByTD(vecResult, seenTD, std::move(ObjPartial));
+				auto ObjectPartial = BuildObjectFromBCD(pBaseAddress, pBegin, pEnd, const_cast<PRTTI_TYPE_DESCRIPTOR>(pTD));
+				TryEmplaceUniqueByTD(vecResult, seenTD, std::move(ObjectPartial));
 			}
 
 			return vecResult;
@@ -6702,10 +6702,10 @@ namespace Detours {
 		}
 
 		static inline bool __range_intersection(void const* const pA, size_t unA, void const* const pB, size_t unB, void** pStart, size_t* pSize) {
-			const uintptr_t unA0 = reinterpret_cast<uintptr_t>(pA), unA1 = unA0 + unA;
-			const uintptr_t unB0 = reinterpret_cast<uintptr_t>(pB), unB1 = unB0 + unB;
-			const uintptr_t unS = ((unA0 > unB0) ? unA0 : unB0);
-			const uintptr_t unE = ((unA1 < unB1) ? unA1 : unB1);
+			const size_t unA0 = reinterpret_cast<size_t>(pA), unA1 = unA0 + unA;
+			const size_t unB0 = reinterpret_cast<size_t>(pB), unB1 = unB0 + unB;
+			const size_t unS = ((unA0 > unB0) ? unA0 : unB0);
+			const size_t unE = ((unA1 < unB1) ? unA1 : unB1);
 
 			if (unE > unS) {
 				*pStart = reinterpret_cast<void*>(unS);
@@ -7104,7 +7104,7 @@ namespace Detours {
 				const size_t unBlockA = reinterpret_cast<size_t>(it->m_pAddress);
 				const size_t unBlockS = it->m_unSize;
 
-				const uintptr_t unAlignedA = bAddressAlign ? __align_up(unBlockA, unAddressAlign) : unBlockA;
+				const size_t unAlignedA = bAddressAlign ? __align_up(unBlockA, unAddressAlign) : unBlockA;
 				const size_t unPrefix = unAlignedA - unBlockA;
 
 				if (unPrefix + unAlignedSize > unBlockS) {
