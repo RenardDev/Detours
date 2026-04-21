@@ -5772,7 +5772,7 @@ namespace Detours {
 				return false;
 			}
 
-			const bool bSuspended = (m_unSuspendDepth > 0);
+			const bool bSuspended = m_unSuspendDepth > 0;
 			m_Mutex.UnLock();
 			return bSuspended;
 		}
