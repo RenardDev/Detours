@@ -1688,8 +1688,8 @@ TEST_SUITE("Detours::Sync") {
 	}
 
 	TEST_CASE("Suspender") {
-		CHECK(Detours::Sync::g_Suspender.Suspend() == true);
-		Detours::Sync::g_Suspender.Resume();
+		Detours::Sync::SuspendTransaction Transaction(Detours::Sync::g_Suspender);
+		CHECK(static_cast<bool>(Transaction) == true);
 	}
 }
 

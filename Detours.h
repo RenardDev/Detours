@@ -626,7 +626,7 @@
 #define RD_SAE_SUPPORT(X) ((X)->ValidDecorators.Sae)
 #define RD_BROADCAST_SUPPORT(X) ((X)->ValidDecorators.Broadcast)
 
-#define RD_OP_REG_ID(OP) ((static_cast<unsigned long long>((OP)->Type & 0xF) << 60) | (static_cast<unsigned long long>((OP)->Info.Register.Type & 0xFF) << 52) | (static_cast<unsigned long long>((op)->Info.Register.Size & 0xFFFF) << 36) | (static_cast<unsigned long long>((op)->Info.Register.Count & 0x3F) << 30) | (static_cast<unsigned long long>((OP)->Info.Register.IsHigh8 & 0x1) << 8) | (static_cast<unsigned long long>((OP)->Info.Register.Reg)))
+#define RD_OP_REG_ID(OP) ((static_cast<unsigned long long>((OP)->Type & 0xF) << 60) | (static_cast<unsigned long long>((OP)->Info.Register.Type & 0xFF) << 52) | (static_cast<unsigned long long>((OP)->Info.Register.Size & 0xFFFF) << 36) | (static_cast<unsigned long long>((OP)->Info.Register.Count & 0x3F) << 30) | (static_cast<unsigned long long>((OP)->Info.Register.IsHigh8 & 0x1) << 8) | (static_cast<unsigned long long>((OP)->Info.Register.Reg)))
 
 #define RD_IS_OP_REG(OP, T, S, R) (RD_OP_REG_ID(OP) == ((static_cast<unsigned long long>(RD_OP_REG) << 60) | (static_cast<unsigned long long>((T) & 0xFF) << 52) | (static_cast<unsigned long long>((S) & 0xFFFF) << 36) | (1ULL << 30) | (static_cast<unsigned long long>(R))))
 #define RD_IS_OP_REG_EX(OP, T, S, R, B, H) (RD_OP_REG_ID(OP) == ((static_cast<unsigned long long>(RD_OP_REG) << 60) | (static_cast<unsigned long long>((T) & 0xFF) << 52) | (static_cast<unsigned long long>((S) & 0xFFFF) << 36) | (static_cast<unsigned long long>((B) & 0x3F) << 30) | (static_cast<unsigned long long>((H) & 0x1) << 8) | (static_cast<unsigned long long>(R))))
@@ -2296,6 +2296,8 @@ namespace Detours {
 		public:
 			bool Suspend(bool bSweepThreads = true);
 			void Resume();
+			bool IsSuspended();
+			size_t GetSuspendDepth();
 			bool IsRegionExecuting(void* pAddress, size_t unSize);
 			bool IsRegionInCallStacks(void* pAddress, size_t unSize);
 			void FixExecutionAddress(void* pAddress, void* pNewAddress);
@@ -2319,6 +2321,28 @@ namespace Detours {
 			Mutex m_Mutex;
 			size_t m_unSuspendDepth;
 			std::unordered_set<DWORD> m_SuspendedTIDs;
+		};
+
+		class SuspendTransaction {
+		public:
+			explicit SuspendTransaction(Suspender& SuspenderReference, bool bSweepThreads = true);
+			~SuspendTransaction();
+			SuspendTransaction(const SuspendTransaction&) = delete;
+			SuspendTransaction& operator=(const SuspendTransaction&) = delete;
+			SuspendTransaction(SuspendTransaction&&) = delete;
+			SuspendTransaction& operator=(SuspendTransaction&&) = delete;
+
+		public:
+			bool Begin(bool bSweepThreads = true);
+			void End();
+			bool IsActive() const;
+
+		public:
+			operator bool() const;
+
+		private:
+			Suspender* m_pSuspender;
+			bool m_bActive;
 		};
 
 		extern Suspender g_Suspender;

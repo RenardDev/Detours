@@ -1435,7 +1435,7 @@ namespace Detours {
 			const auto& pNTHs = reinterpret_cast<PIMAGE_NT_HEADERS>(reinterpret_cast<char*>(hModule) + pDH->e_lfanew);
 			const auto& pOH = &(pNTHs->OptionalHeader);
 
-			return FindSignatureNative(reinterpret_cast<void*>(hModule), static_cast<size_t>(pOH->SizeOfImage) - 1, szSignature, unIgnoredByte, unOffset);
+			return FindSignatureNative(reinterpret_cast<void*>(hModule), static_cast<size_t>(pOH->SizeOfImage), szSignature, unIgnoredByte, unOffset);
 		}
 
 		void const* FindSignatureNative(const HMODULE hModule, const std::array<const unsigned char, 8>& SectionName, char const* const szSignature, const unsigned char unIgnoredByte, const size_t unOffset) noexcept {
@@ -1647,7 +1647,7 @@ namespace Detours {
 			const auto& pNTHs = reinterpret_cast<PIMAGE_NT_HEADERS>(reinterpret_cast<char*>(hModule) + pDH->e_lfanew);
 			const auto& pOH = &(pNTHs->OptionalHeader);
 
-			return FindSignatureSSE2(reinterpret_cast<void*>(hModule), static_cast<size_t>(pOH->SizeOfImage) - 1, szSignature, unIgnoredByte, unOffset);
+			return FindSignatureSSE2(reinterpret_cast<void*>(hModule), static_cast<size_t>(pOH->SizeOfImage), szSignature, unIgnoredByte, unOffset);
 		}
 
 		void const* FindSignatureSSE2(const HMODULE hModule, const std::array<const unsigned char, 8>& SectionName, char const* const szSignature, const unsigned char unIgnoredByte, const size_t unOffset) noexcept {
@@ -1859,7 +1859,7 @@ namespace Detours {
 			const auto& pNTHs = reinterpret_cast<PIMAGE_NT_HEADERS>(reinterpret_cast<char*>(hModule) + pDH->e_lfanew);
 			const auto& pOH = &(pNTHs->OptionalHeader);
 
-			return FindSignatureAVX2(reinterpret_cast<void*>(hModule), static_cast<size_t>(pOH->SizeOfImage) - 1, szSignature, unIgnoredByte, unOffset);
+			return FindSignatureAVX2(reinterpret_cast<void*>(hModule), static_cast<size_t>(pOH->SizeOfImage), szSignature, unIgnoredByte, unOffset);
 		}
 
 		void const* FindSignatureAVX2(const HMODULE hModule, const std::array<const unsigned char, 8>& SectionName, char const* const szSignature, const unsigned char unIgnoredByte, const size_t unOffset) noexcept {
@@ -2070,7 +2070,7 @@ namespace Detours {
 			const auto& pNTHs = reinterpret_cast<PIMAGE_NT_HEADERS>(reinterpret_cast<char*>(hModule) + pDH->e_lfanew);
 			const auto& pOH = &(pNTHs->OptionalHeader);
 
-			return FindSignatureAVX512(reinterpret_cast<void*>(hModule), static_cast<size_t>(pOH->SizeOfImage) - 1, szSignature, unIgnoredByte, unOffset);
+			return FindSignatureAVX512(reinterpret_cast<void*>(hModule), static_cast<size_t>(pOH->SizeOfImage), szSignature, unIgnoredByte, unOffset);
 		}
 
 		void const* FindSignatureAVX512(const HMODULE hModule, const std::array<const unsigned char, 8>& SectionName, char const* const szSignature, const unsigned char unIgnoredByte, const size_t unOffset) noexcept {
@@ -2252,7 +2252,7 @@ namespace Detours {
 			const auto& pNTHs = reinterpret_cast<PIMAGE_NT_HEADERS>(reinterpret_cast<char*>(hModule) + pDH->e_lfanew);
 			const auto& pOH = &(pNTHs->OptionalHeader);
 
-			return FindSignature(reinterpret_cast<void*>(hModule), static_cast<size_t>(pOH->SizeOfImage) - 1, szSignature, unIgnoredByte, unOffset);
+			return FindSignature(reinterpret_cast<void*>(hModule), static_cast<size_t>(pOH->SizeOfImage), szSignature, unIgnoredByte, unOffset);
 		}
 
 		void const* FindSignature(const HMODULE hModule, const std::array<const unsigned char, 8>& SectionName, char const* const szSignature, const unsigned char unIgnoredByte, const size_t unOffset) noexcept {
@@ -2426,7 +2426,7 @@ namespace Detours {
 			const auto& pNTHs = reinterpret_cast<PIMAGE_NT_HEADERS>(reinterpret_cast<char*>(hModule) + pDH->e_lfanew);
 			const auto& pOH = &(pNTHs->OptionalHeader);
 
-			return FindDataNative(reinterpret_cast<void*>(hModule), static_cast<size_t>(pOH->SizeOfImage) - 1, pData, unDataSize);
+			return FindDataNative(reinterpret_cast<void*>(hModule), static_cast<size_t>(pOH->SizeOfImage), pData, unDataSize);
 		}
 
 		void const* FindDataNative(const HMODULE hModule, const std::array<const unsigned char, 8>& SectionName, unsigned char const* const pData, const size_t unDataSize) noexcept {
@@ -2627,7 +2627,7 @@ namespace Detours {
 			const auto& pNTHs = reinterpret_cast<PIMAGE_NT_HEADERS>(reinterpret_cast<char*>(hModule) + pDH->e_lfanew);
 			const auto& pOH = &(pNTHs->OptionalHeader);
 
-			return FindDataSSE2(reinterpret_cast<void*>(hModule), static_cast<size_t>(pOH->SizeOfImage) - 1, pData, unDataSize);
+			return FindDataSSE2(reinterpret_cast<void*>(hModule), static_cast<size_t>(pOH->SizeOfImage), pData, unDataSize);
 		}
 
 		void const* FindDataSSE2(const HMODULE hModule, const std::array<const unsigned char, 8>& SectionName, unsigned char const* const pData, const size_t unDataSize) noexcept {
@@ -2828,7 +2828,7 @@ namespace Detours {
 			const auto& pNTHs = reinterpret_cast<PIMAGE_NT_HEADERS>(reinterpret_cast<char*>(hModule) + pDH->e_lfanew);
 			const auto& pOH = &(pNTHs->OptionalHeader);
 
-			return FindDataAVX2(reinterpret_cast<void*>(hModule), static_cast<size_t>(pOH->SizeOfImage) - 1, pData, unDataSize);
+			return FindDataAVX2(reinterpret_cast<void*>(hModule), static_cast<size_t>(pOH->SizeOfImage), pData, unDataSize);
 		}
 
 		void const* FindDataAVX2(const HMODULE hModule, const std::array<const unsigned char, 8>& SectionName, unsigned char const* const pData, const size_t unDataSize) noexcept {
@@ -3029,7 +3029,7 @@ namespace Detours {
 			const auto& pNTHs = reinterpret_cast<PIMAGE_NT_HEADERS>(reinterpret_cast<char*>(hModule) + pDH->e_lfanew);
 			const auto& pOH = &(pNTHs->OptionalHeader);
 
-			return FindDataAVX512(reinterpret_cast<void*>(hModule), static_cast<size_t>(pOH->SizeOfImage) - 1, pData, unDataSize);
+			return FindDataAVX512(reinterpret_cast<void*>(hModule), static_cast<size_t>(pOH->SizeOfImage), pData, unDataSize);
 		}
 
 		void const* FindDataAVX512(const HMODULE hModule, const std::array<const unsigned char, 8>& SectionName, unsigned char const* const pData, const size_t unDataSize) noexcept {
@@ -3206,7 +3206,7 @@ namespace Detours {
 			const auto& pNTHs = reinterpret_cast<PIMAGE_NT_HEADERS>(reinterpret_cast<char*>(hModule) + pDH->e_lfanew);
 			const auto& pOH = &(pNTHs->OptionalHeader);
 
-			return FindData(reinterpret_cast<void*>(hModule), static_cast<size_t>(pOH->SizeOfImage) - 1, pData, unDataSize);
+			return FindData(reinterpret_cast<void*>(hModule), static_cast<size_t>(pOH->SizeOfImage), pData, unDataSize);
 		}
 
 		void const* FindData(const HMODULE hModule, const std::array<const unsigned char, 8>& SectionName, unsigned char const* const pData, const size_t unDataSize) noexcept {
@@ -4604,7 +4604,7 @@ namespace Detours {
 			const auto& pNTHs = reinterpret_cast<PIMAGE_NT_HEADERS>(reinterpret_cast<char*>(hModule) + pDH->e_lfanew);
 			const auto& pOH = &(pNTHs->OptionalHeader);
 
-			return FindObject(reinterpret_cast<void*>(hModule), static_cast<size_t>(pOH->SizeOfImage) - 1, szName, szParentName, bCompleteObject, unOffset);
+			return FindObject(reinterpret_cast<void*>(hModule), static_cast<size_t>(pOH->SizeOfImage), szName, szParentName, bCompleteObject, unOffset);
 		}
 
 		std::unique_ptr<Object> FindObjectA(char const* const szModuleName, char const* const szName, const char* szParentName, bool bCompleteObject, unsigned int unOffset) {
@@ -4941,7 +4941,7 @@ namespace Detours {
 			const auto& pNTHs = reinterpret_cast<PIMAGE_NT_HEADERS>(reinterpret_cast<char*>(hModule) + pDH->e_lfanew);
 			const auto& pOH = &(pNTHs->OptionalHeader);
 
-			return DumpRTTI(reinterpret_cast<void*>(hModule), reinterpret_cast<void*>(hModule), static_cast<size_t>(pOH->SizeOfImage) - 1);
+			return DumpRTTI(reinterpret_cast<void*>(hModule), reinterpret_cast<void*>(hModule), static_cast<size_t>(pOH->SizeOfImage));
 		}
 
 		std::vector<std::unique_ptr<Object>> DumpRTTIA(char const* const szModulePath) {
@@ -5712,6 +5712,7 @@ namespace Detours {
 						}
 
 						m_Threads.emplace_back(te.th32ThreadID, hThread, ctx);
+						m_SuspendedTIDs.insert(te.th32ThreadID);
 					}
 				}
 			} while (Thread32Next(hSnap, &te));
@@ -5764,6 +5765,26 @@ namespace Detours {
 			m_SuspendedTIDs.clear();
 
 			m_Mutex.UnLock();
+		}
+
+		bool Suspender::IsSuspended() {
+			if (!m_Mutex.Lock()) {
+				return false;
+			}
+
+			const bool bSuspended = (m_unSuspendDepth > 0);
+			m_Mutex.UnLock();
+			return bSuspended;
+		}
+
+		size_t Suspender::GetSuspendDepth() {
+			if (!m_Mutex.Lock()) {
+				return 0;
+			}
+
+			const size_t unDepth = m_unSuspendDepth;
+			m_Mutex.UnLock();
+			return unDepth;
 		}
 
 		bool Suspender::IsRegionExecuting(void* pAddress, size_t unSize) {
@@ -5888,6 +5909,42 @@ namespace Detours {
 
 			CloseHandle(hSnap);
 			return unAdded;
+		}
+
+		SuspendTransaction::SuspendTransaction(Suspender& SuspenderReference, bool bSweepThreads) {
+			m_pSuspender = &SuspenderReference;
+			m_bActive = false;
+			m_bActive = m_pSuspender->Suspend(bSweepThreads);
+		}
+
+		SuspendTransaction::~SuspendTransaction() {
+			End();
+		}
+
+		bool SuspendTransaction::Begin(bool bSweepThreads) {
+			if (!m_pSuspender || m_bActive) {
+				return false;
+			}
+
+			m_bActive = m_pSuspender->Suspend(bSweepThreads);
+			return m_bActive;
+		}
+
+		void SuspendTransaction::End() {
+			if (!m_pSuspender || !m_bActive) {
+				return;
+			}
+
+			m_pSuspender->Resume();
+			m_bActive = false;
+		}
+
+		bool SuspendTransaction::IsActive() const {
+			return m_bActive;
+		}
+
+		SuspendTransaction::operator bool() const {
+			return m_bActive;
 		}
 
 		Suspender g_Suspender;
@@ -38642,9 +38699,9 @@ namespace Detours {
 			}
 
 			if (ins.IsRipRelative && ins.HasDisp) {
-				return reinterpret_cast<char*>(pAddress) + ins.Displacement + ins.Length;
+				return reinterpret_cast<char*>(pAddress) + static_cast<long long>(RD_SIGN_EX(ins.DispLength, ins.Displacement)) + ins.Length;
 			} else if (ins.HasRelOffs) {
-				return reinterpret_cast<char*>(pAddress) + ins.RelativeOffset + ins.Length;
+				return reinterpret_cast<char*>(pAddress) + static_cast<long long>(RD_SIGN_EX(ins.RelOffsLength, ins.RelativeOffset)) + ins.Length;
 			}
 
 			return nullptr;
@@ -38662,7 +38719,8 @@ namespace Detours {
 		// ----------------------------------------------------------------
 
 		bool HookHardware(DWORD unThreadID, HARDWARE_HOOK_REGISTER unRegister, const fnHardwareHookCallBack pCallBack, void* pAddress, HARDWARE_HOOK_TYPE unType, unsigned char unSize) {
-			if (!g_Suspender.Suspend()) {
+			Sync::SuspendTransaction SuspenderTransaction(g_Suspender);
+			if (!SuspenderTransaction) {
 				return false;
 			}
 
@@ -38881,7 +38939,8 @@ namespace Detours {
 		}
 
 		bool UnHookHardware(DWORD unThreadID, HARDWARE_HOOK_REGISTER unRegister) {
-			if (!g_Suspender.Suspend()) {
+			Sync::SuspendTransaction SuspenderTransaction(g_Suspender);
+			if (!SuspenderTransaction) {
 				return false;
 			}
 
@@ -39044,7 +39103,8 @@ namespace Detours {
 				return false;
 			}
 
-			if (!g_Suspender.Suspend()) {
+			Sync::SuspendTransaction SuspenderTransaction(g_Suspender);
+			if (!SuspenderTransaction) {
 				return false;
 			}
 
@@ -39189,8 +39249,10 @@ namespace Detours {
 			}
 			ReleaseSRWLockExclusive(&g_HandlerDepthLock);
 
+			std::unique_ptr<Sync::SuspendTransaction> pSuspenderTransaction;
 			if (!bInHandler) {
-				if (!g_Suspender.Suspend()) {
+				pSuspenderTransaction = std::make_unique<Sync::SuspendTransaction>(g_Suspender);
+				if (!pSuspenderTransaction || !(*pSuspenderTransaction)) {
 					return false;
 				}
 			}
@@ -39522,7 +39584,8 @@ namespace Detours {
 		}
 
 		bool InlineHook::Hook(void* pHookAddress, bool bSingleInstructionOnly, bool bWaitForHook) {
-			if (!g_Suspender.Suspend()) {
+			Sync::SuspendTransaction SuspenderTransaction(g_Suspender);
+			if (!SuspenderTransaction) {
 				return false;
 			}
 
@@ -39530,6 +39593,8 @@ namespace Detours {
 				g_Suspender.Resume();
 				return false;
 			}
+
+			const bool bCanYieldThreads = (g_Suspender.GetSuspendDepth() <= 1);
 
 			const size_t unJumpToHookOffset = __is_relative(pHookAddress, m_pAddress);
 			size_t unJumpToHookSize = 0;
@@ -39629,18 +39694,37 @@ namespace Detours {
 				const size_t unTrampolineAddress = reinterpret_cast<size_t>(m_pTrampoline) + unIndex + ins.Length;
 
 				if (ins.IsRipRelative && ins.HasDisp) {
-					const size_t unTargetAddress = unAddress + static_cast<size_t>(ins.Displacement);
-					const size_t unNewDisp = unTargetAddress - unTrampolineAddress;
+					const long long nDisplacement = static_cast<long long>(RD_SIGN_EX(ins.DispLength, ins.Displacement));
+					const size_t unTargetAddress = static_cast<size_t>(static_cast<long long>(unAddress) + nDisplacement);
+					const long long nNewDisp = static_cast<long long>(unTargetAddress) - static_cast<long long>(unTrampolineAddress);
 
 					switch (ins.DispLength) {
-						//case 1: // FIXME: Impossible to do. (FIX: Replace disp8 with disp32)
-						//	*reinterpret_cast<unsigned char*>(reinterpret_cast<size_t>(m_pTrampoline) + unIndex + ins.DispOffset) = static_cast<unsigned char>(unNewDisp & 0xFF);
-						//	break;
-						//case 2: // FIXME: Possible crash. (FIX: Same as with disp8)
-						//	*reinterpret_cast<unsigned short*>(reinterpret_cast<size_t>(m_pTrampoline) + unIndex + ins.DispOffset) = static_cast<unsigned short>(unNewDisp & 0xFFFF);
-						//	break;
+						case 1:
+							if ((nNewDisp < -0x80LL) || (nNewDisp > 0x7FLL)) {
+								g_HookStorage.DeAlloc(m_pTrampoline);
+								m_pTrampoline = nullptr;
+								g_Suspender.Resume();
+								return false;
+							}
+							*reinterpret_cast<signed char*>(reinterpret_cast<size_t>(m_pTrampoline) + unIndex + ins.DispOffset) = static_cast<signed char>(nNewDisp);
+							break;
+						case 2:
+							if ((nNewDisp < -0x8000LL) || (nNewDisp > 0x7FFFLL)) {
+								g_HookStorage.DeAlloc(m_pTrampoline);
+								m_pTrampoline = nullptr;
+								g_Suspender.Resume();
+								return false;
+							}
+							*reinterpret_cast<signed short*>(reinterpret_cast<size_t>(m_pTrampoline) + unIndex + ins.DispOffset) = static_cast<signed short>(nNewDisp);
+							break;
 						case 4:
-							*reinterpret_cast<unsigned int*>(reinterpret_cast<size_t>(m_pTrampoline) + unIndex + ins.DispOffset) = static_cast<unsigned int>(unNewDisp & 0xFFFFFFFF);
+							if ((nNewDisp < -2147483648LL) || (nNewDisp > 2147483647LL)) {
+								g_HookStorage.DeAlloc(m_pTrampoline);
+								m_pTrampoline = nullptr;
+								g_Suspender.Resume();
+								return false;
+							}
+							*reinterpret_cast<signed int*>(reinterpret_cast<size_t>(m_pTrampoline) + unIndex + ins.DispOffset) = static_cast<signed int>(nNewDisp);
 							break;
 						default:
 							g_HookStorage.DeAlloc(m_pTrampoline);
@@ -39649,18 +39733,37 @@ namespace Detours {
 							return false;
 					}
 				} else if (ins.HasRelOffs) {
-					const size_t unTargetAddress = unAddress + static_cast<size_t>(ins.RelativeOffset);
-					const size_t unNewOffset = unTargetAddress - unTrampolineAddress;
+					const long long nRelativeOffset = static_cast<long long>(RD_SIGN_EX(ins.RelOffsLength, ins.RelativeOffset));
+					const size_t unTargetAddress = static_cast<size_t>(static_cast<long long>(unAddress) + nRelativeOffset);
+					const long long nNewOffset = static_cast<long long>(unTargetAddress) - static_cast<long long>(unTrampolineAddress);
 
 					switch (ins.RelOffsLength) {
-						//case 1: // FIXME: Impossible to do. (FIX: Replace rel8 with rel32)
-						//	*reinterpret_cast<unsigned char*>(reinterpret_cast<size_t>(m_pTrampoline) + unIndex + ins.RelOffsOffset) = static_cast<unsigned char>(unNewOffset & 0xFF);
-						//	break;
-						//case 2: // FIXME: Possible crash. (FIX: Same as with rel8)
-						//	*reinterpret_cast<unsigned short*>(reinterpret_cast<size_t>(m_pTrampoline) + unIndex + ins.RelOffsOffset) = static_cast<unsigned short>(unNewOffset & 0xFFFF);
-						//	break;
+						case 1:
+							if ((nNewOffset < -0x80LL) || (nNewOffset > 0x7FLL)) {
+								g_HookStorage.DeAlloc(m_pTrampoline);
+								m_pTrampoline = nullptr;
+								g_Suspender.Resume();
+								return false;
+							}
+							*reinterpret_cast<signed char*>(reinterpret_cast<size_t>(m_pTrampoline) + unIndex + ins.RelOffsOffset) = static_cast<signed char>(nNewOffset);
+							break;
+						case 2:
+							if ((nNewOffset < -0x8000LL) || (nNewOffset > 0x7FFFLL)) {
+								g_HookStorage.DeAlloc(m_pTrampoline);
+								m_pTrampoline = nullptr;
+								g_Suspender.Resume();
+								return false;
+							}
+							*reinterpret_cast<signed short*>(reinterpret_cast<size_t>(m_pTrampoline) + unIndex + ins.RelOffsOffset) = static_cast<signed short>(nNewOffset);
+							break;
 						case 4:
-							*reinterpret_cast<unsigned int*>(reinterpret_cast<size_t>(m_pTrampoline) + unIndex + ins.RelOffsOffset) = static_cast<unsigned int>(unNewOffset & 0xFFFFFFFF);
+							if ((nNewOffset < -2147483648LL) || (nNewOffset > 2147483647LL)) {
+								g_HookStorage.DeAlloc(m_pTrampoline);
+								m_pTrampoline = nullptr;
+								g_Suspender.Resume();
+								return false;
+							}
+							*reinterpret_cast<signed int*>(reinterpret_cast<size_t>(m_pTrampoline) + unIndex + ins.RelOffsOffset) = static_cast<signed int>(nNewOffset);
 							break;
 						default:
 							g_HookStorage.DeAlloc(m_pTrampoline);
@@ -39742,7 +39845,7 @@ namespace Detours {
 
 			memcpy(m_pOriginalBytes.get(), m_pAddress, unCopyingSize);
 
-			if (bWaitForHook) {
+			if (bWaitForHook && bCanYieldThreads) {
 				while (true) {
 					if (!g_Suspender.IsRegionExecuting(m_pAddress, unCopyingSize)) {
 						break;
@@ -39826,7 +39929,9 @@ namespace Detours {
 				m_unOriginalBytes = 0;
 				g_HookStorage.DeAlloc(m_pTrampoline);
 				m_pTrampoline = nullptr;
+#ifdef _DEBUG
 				__debugbreak();
+#endif
 				g_Suspender.Resume();
 				return false;
 			}
@@ -39836,7 +39941,8 @@ namespace Detours {
 		}
 
 		bool InlineHook::UnHook(bool bWaitForUnHook) {
-			if (!g_Suspender.Suspend()) {
+			Sync::SuspendTransaction SuspenderTransaction(g_Suspender);
+			if (!SuspenderTransaction) {
 				return false;
 			}
 
@@ -39845,7 +39951,9 @@ namespace Detours {
 				return false;
 			}
 
-			if (bWaitForUnHook) {
+			const bool bCanYieldThreads = (g_Suspender.GetSuspendDepth() <= 1);
+
+			if (bWaitForUnHook && bCanYieldThreads) {
 				while (true) {
 					if (!g_Suspender.IsRegionExecuting(m_pAddress, m_unOriginalBytes) && !g_Suspender.IsRegionExecuting(m_pTrampoline, HOOK_INLINE_TRAMPOLINE_SIZE) && !g_Suspender.IsRegionInCallStacks(m_pTrampoline, HOOK_INLINE_TRAMPOLINE_SIZE)) {
 						break;
@@ -39872,7 +39980,9 @@ namespace Detours {
 			memcpy(m_pAddress, m_pOriginalBytes.get(), m_unOriginalBytes);
 
 			if (!HookProtection.Restore()) {
+#ifdef _DEBUG
 				__debugbreak();
+#endif
 				g_Suspender.Resume();
 				return false;
 			}
@@ -39949,7 +40059,8 @@ namespace Detours {
 		}
 
 		bool InlineWrapperHook::Hook(void* pHookAddress, bool bSingleInstructionOnly, bool bWaitForHook) {
-			if (!g_Suspender.Suspend()) {
+			Sync::SuspendTransaction SuspenderTransaction(g_Suspender);
+			if (!SuspenderTransaction) {
 				return false;
 			}
 
@@ -39957,6 +40068,8 @@ namespace Detours {
 				g_Suspender.Resume();
 				return false;
 			}
+
+			const bool bCanYieldThreads = (g_Suspender.GetSuspendDepth() <= 1);
 
 			m_pWrapper = g_HookStorage.Alloc(HOOK_INLINE_WRAPPER_SIZE, 1, alignof(void*), m_pAddress);
 			if (!m_pWrapper) {
@@ -40129,18 +40242,43 @@ namespace Detours {
 				const size_t unTrampolineAddress = reinterpret_cast<size_t>(m_pTrampoline) + unIndex + ins.Length;
 
 				if (ins.IsRipRelative && ins.HasDisp) {
-					const size_t unTargetAddress = unAddress + static_cast<size_t>(ins.Displacement);
-					const size_t unNewDisp = unTargetAddress - unTrampolineAddress;
+					const long long nDisplacement = static_cast<long long>(RD_SIGN_EX(ins.DispLength, ins.Displacement));
+					const size_t unTargetAddress = static_cast<size_t>(static_cast<long long>(unAddress) + nDisplacement);
+					const long long nNewDisp = static_cast<long long>(unTargetAddress) - static_cast<long long>(unTrampolineAddress);
 
 					switch (ins.DispLength) {
-						//case 1: // FIXME: Impossible to do. (FIX: Replace disp8 with disp32)
-						//	*reinterpret_cast<unsigned char*>(reinterpret_cast<size_t>(m_pTrampoline) + unIndex + ins.DispOffset) = static_cast<unsigned char>(unNewDisp & 0xFF);
-						//	break;
-						//case 2: // FIXME: Possible crash. (FIX: Same as with disp8)
-						//	*reinterpret_cast<unsigned short*>(reinterpret_cast<size_t>(m_pTrampoline) + unIndex + ins.DispOffset) = static_cast<unsigned short>(unNewDisp & 0xFFFF);
-						//	break;
+						case 1:
+							if ((nNewDisp < -0x80LL) || (nNewDisp > 0x7FLL)) {
+								g_HookStorage.DeAlloc(m_pTrampoline);
+								m_pTrampoline = nullptr;
+								g_HookStorage.DeAlloc(m_pWrapper);
+								m_pWrapper = nullptr;
+								g_Suspender.Resume();
+								return false;
+							}
+							*reinterpret_cast<signed char*>(reinterpret_cast<size_t>(m_pTrampoline) + unIndex + ins.DispOffset) = static_cast<signed char>(nNewDisp);
+							break;
+						case 2:
+							if ((nNewDisp < -0x8000LL) || (nNewDisp > 0x7FFFLL)) {
+								g_HookStorage.DeAlloc(m_pTrampoline);
+								m_pTrampoline = nullptr;
+								g_HookStorage.DeAlloc(m_pWrapper);
+								m_pWrapper = nullptr;
+								g_Suspender.Resume();
+								return false;
+							}
+							*reinterpret_cast<signed short*>(reinterpret_cast<size_t>(m_pTrampoline) + unIndex + ins.DispOffset) = static_cast<signed short>(nNewDisp);
+							break;
 						case 4:
-							*reinterpret_cast<unsigned int*>(reinterpret_cast<size_t>(m_pTrampoline) + unIndex + ins.DispOffset) = static_cast<unsigned int>(unNewDisp & 0xFFFFFFFF);
+							if ((nNewDisp < -2147483648LL) || (nNewDisp > 2147483647LL)) {
+								g_HookStorage.DeAlloc(m_pTrampoline);
+								m_pTrampoline = nullptr;
+								g_HookStorage.DeAlloc(m_pWrapper);
+								m_pWrapper = nullptr;
+								g_Suspender.Resume();
+								return false;
+							}
+							*reinterpret_cast<signed int*>(reinterpret_cast<size_t>(m_pTrampoline) + unIndex + ins.DispOffset) = static_cast<signed int>(nNewDisp);
 							break;
 						default:
 							g_HookStorage.DeAlloc(m_pTrampoline);
@@ -40151,18 +40289,43 @@ namespace Detours {
 							return false;
 					}
 				} else if (ins.HasRelOffs) {
-					const size_t unTargetAddress = unAddress + static_cast<size_t>(ins.RelativeOffset);
-					const size_t unNewOffset = unTargetAddress - unTrampolineAddress;
+					const long long nRelativeOffset = static_cast<long long>(RD_SIGN_EX(ins.RelOffsLength, ins.RelativeOffset));
+					const size_t unTargetAddress = static_cast<size_t>(static_cast<long long>(unAddress) + nRelativeOffset);
+					const long long nNewOffset = static_cast<long long>(unTargetAddress) - static_cast<long long>(unTrampolineAddress);
 
 					switch (ins.RelOffsLength) {
-						//case 1: // FIXME: Impossible to do. (FIX: Replace rel8 with rel32)
-						//	*reinterpret_cast<unsigned char*>(reinterpret_cast<size_t>(m_pTrampoline) + unIndex + ins.RelOffsOffset) = static_cast<unsigned char>(unNewOffset & 0xFF);
-						//	break;
-						//case 2: // FIXME: Possible crash. (FIX: Same as with rel8)
-						//	*reinterpret_cast<unsigned short*>(reinterpret_cast<size_t>(m_pTrampoline) + unIndex + ins.RelOffsOffset) = static_cast<unsigned short>(unNewOffset & 0xFFFF);
-						//	break;
+						case 1:
+							if ((nNewOffset < -0x80LL) || (nNewOffset > 0x7FLL)) {
+								g_HookStorage.DeAlloc(m_pTrampoline);
+								m_pTrampoline = nullptr;
+								g_HookStorage.DeAlloc(m_pWrapper);
+								m_pWrapper = nullptr;
+								g_Suspender.Resume();
+								return false;
+							}
+							*reinterpret_cast<signed char*>(reinterpret_cast<size_t>(m_pTrampoline) + unIndex + ins.RelOffsOffset) = static_cast<signed char>(nNewOffset);
+							break;
+						case 2:
+							if ((nNewOffset < -0x8000LL) || (nNewOffset > 0x7FFFLL)) {
+								g_HookStorage.DeAlloc(m_pTrampoline);
+								m_pTrampoline = nullptr;
+								g_HookStorage.DeAlloc(m_pWrapper);
+								m_pWrapper = nullptr;
+								g_Suspender.Resume();
+								return false;
+							}
+							*reinterpret_cast<signed short*>(reinterpret_cast<size_t>(m_pTrampoline) + unIndex + ins.RelOffsOffset) = static_cast<signed short>(nNewOffset);
+							break;
 						case 4:
-							*reinterpret_cast<unsigned int*>(reinterpret_cast<size_t>(m_pTrampoline) + unIndex + ins.RelOffsOffset) = static_cast<unsigned int>(unNewOffset & 0xFFFFFFFF);
+							if ((nNewOffset < -2147483648LL) || (nNewOffset > 2147483647LL)) {
+								g_HookStorage.DeAlloc(m_pTrampoline);
+								m_pTrampoline = nullptr;
+								g_HookStorage.DeAlloc(m_pWrapper);
+								m_pWrapper = nullptr;
+								g_Suspender.Resume();
+								return false;
+							}
+							*reinterpret_cast<signed int*>(reinterpret_cast<size_t>(m_pTrampoline) + unIndex + ins.RelOffsOffset) = static_cast<signed int>(nNewOffset);
 							break;
 						default:
 							g_HookStorage.DeAlloc(m_pTrampoline);
@@ -40250,7 +40413,7 @@ namespace Detours {
 
 			memcpy(m_pOriginalBytes.get(), m_pAddress, unCopyingSize);
 
-			if (bWaitForHook) {
+			if (bWaitForHook && bCanYieldThreads) {
 				while (true) {
 					if (!g_Suspender.IsRegionExecuting(m_pAddress, unCopyingSize)) {
 						break;
@@ -40340,7 +40503,9 @@ namespace Detours {
 				m_pTrampoline = nullptr;
 				g_HookStorage.DeAlloc(m_pWrapper);
 				m_pWrapper = nullptr;
+#ifdef _DEBUG
 				__debugbreak();
+#endif
 				g_Suspender.Resume();
 				return false;
 			}
@@ -40350,7 +40515,8 @@ namespace Detours {
 		}
 
 		bool InlineWrapperHook::UnHook(bool bWaitForUnHook) {
-			if (!g_Suspender.Suspend()) {
+			Sync::SuspendTransaction SuspenderTransaction(g_Suspender);
+			if (!SuspenderTransaction) {
 				return false;
 			}
 
@@ -40359,7 +40525,9 @@ namespace Detours {
 				return false;
 			}
 
-			if (bWaitForUnHook) {
+			const bool bCanYieldThreads = (g_Suspender.GetSuspendDepth() <= 1);
+
+			if (bWaitForUnHook && bCanYieldThreads) {
 				while (true) {
 					if (!g_Suspender.IsRegionExecuting(m_pAddress, m_unOriginalBytes) && !g_Suspender.IsRegionExecuting(m_pWrapper, HOOK_INLINE_WRAPPER_SIZE) && !g_Suspender.IsRegionExecuting(m_pTrampoline, HOOK_INLINE_TRAMPOLINE_SIZE) && !g_Suspender.IsRegionInCallStacks(m_pWrapper, HOOK_INLINE_WRAPPER_SIZE) && !g_Suspender.IsRegionInCallStacks(m_pTrampoline, HOOK_INLINE_TRAMPOLINE_SIZE)) {
 						break;
@@ -40390,7 +40558,9 @@ namespace Detours {
 			memcpy(m_pAddress, m_pOriginalBytes.get(), m_unOriginalBytes);
 
 			if (!HookProtection.Restore()) {
+#ifdef _DEBUG
 				__debugbreak();
+#endif
 				g_Suspender.Resume();
 				return false;
 			}
@@ -40473,7 +40643,8 @@ namespace Detours {
 		}
 
 		bool RawHook::Hook(const fnRawHookCallBack pCallBack, bool bNative, const unsigned int unReservedStackSize, bool bSingleInstructionOnly, bool bWaitForHook) {
-			if (!g_Suspender.Suspend()) {
+			Sync::SuspendTransaction SuspenderTransaction(g_Suspender);
+			if (!SuspenderTransaction) {
 				return false;
 			}
 
@@ -40481,6 +40652,8 @@ namespace Detours {
 				g_Suspender.Resume();
 				return false;
 			}
+
+			const bool bCanYieldThreads = (g_Suspender.GetSuspendDepth() <= 1);
 
 			m_pWrapper = g_HookStorage.Alloc(HOOK_RAW_WRAPPER_SIZE, 1, alignof(void*), m_pAddress);
 			if (!m_pWrapper) {
@@ -41686,18 +41859,46 @@ namespace Detours {
 				const size_t unTrampolineAddress = reinterpret_cast<size_t>(m_pTrampoline) + unIndex + ins.Length;
 
 				if (ins.IsRipRelative && ins.HasDisp) {
-					const size_t unTargetAddress = unAddress + static_cast<size_t>(ins.Displacement);
-					const size_t unNewDisp = unTargetAddress - unTrampolineAddress;
+					const long long nDisplacement = static_cast<long long>(RD_SIGN_EX(ins.DispLength, ins.Displacement));
+					const size_t unTargetAddress = static_cast<size_t>(static_cast<long long>(unAddress) + nDisplacement);
+					const long long nNewDisp = static_cast<long long>(unTargetAddress) - static_cast<long long>(unTrampolineAddress);
 
 					switch (ins.DispLength) {
-						//case 1: // FIXME: Impossible to do (FIX: Replace disp8 to disp32)
-						//	*reinterpret_cast<unsigned char*>(reinterpret_cast<size_t>(m_pTrampoline) + unIndex + ins.DispOffset) = static_cast<unsigned char>(unNewDisp & 0xFF);
-						//	break;
-						//case 2: // FIXME: Possible crash (FIX: Same as disp8)
-						//	*reinterpret_cast<unsigned short*>(reinterpret_cast<size_t>(m_pTrampoline) + unIndex + ins.DispOffset) = static_cast<unsigned short>(unNewDisp & 0xFFFF);
-						//	break;
+						case 1:
+							if ((nNewDisp < -0x80LL) || (nNewDisp > 0x7FLL)) {
+								g_HookStorage.DeAlloc(m_pTrampoline);
+								m_pTrampoline = nullptr;
+								m_unFirstInstructionSize = 0;
+								g_HookStorage.DeAlloc(m_pWrapper);
+								m_pWrapper = nullptr;
+								g_Suspender.Resume();
+								return false;
+							}
+							*reinterpret_cast<signed char*>(reinterpret_cast<size_t>(m_pTrampoline) + unIndex + ins.DispOffset) = static_cast<signed char>(nNewDisp);
+							break;
+						case 2:
+							if ((nNewDisp < -0x8000LL) || (nNewDisp > 0x7FFFLL)) {
+								g_HookStorage.DeAlloc(m_pTrampoline);
+								m_pTrampoline = nullptr;
+								m_unFirstInstructionSize = 0;
+								g_HookStorage.DeAlloc(m_pWrapper);
+								m_pWrapper = nullptr;
+								g_Suspender.Resume();
+								return false;
+							}
+							*reinterpret_cast<signed short*>(reinterpret_cast<size_t>(m_pTrampoline) + unIndex + ins.DispOffset) = static_cast<signed short>(nNewDisp);
+							break;
 						case 4:
-							*reinterpret_cast<unsigned int*>(reinterpret_cast<size_t>(m_pTrampoline) + unIndex + ins.DispOffset) = static_cast<unsigned int>(unNewDisp & 0xFFFFFFFF);
+							if ((nNewDisp < -2147483648LL) || (nNewDisp > 2147483647LL)) {
+								g_HookStorage.DeAlloc(m_pTrampoline);
+								m_pTrampoline = nullptr;
+								m_unFirstInstructionSize = 0;
+								g_HookStorage.DeAlloc(m_pWrapper);
+								m_pWrapper = nullptr;
+								g_Suspender.Resume();
+								return false;
+							}
+							*reinterpret_cast<signed int*>(reinterpret_cast<size_t>(m_pTrampoline) + unIndex + ins.DispOffset) = static_cast<signed int>(nNewDisp);
 							break;
 						default:
 							g_HookStorage.DeAlloc(m_pTrampoline);
@@ -41709,18 +41910,46 @@ namespace Detours {
 							return false;
 					}
 				} else if (ins.HasRelOffs) {
-					const size_t unTargetAddress = unAddress + static_cast<size_t>(ins.RelativeOffset);
-					const size_t unNewOffset = unTargetAddress - unTrampolineAddress;
+					const long long nRelativeOffset = static_cast<long long>(RD_SIGN_EX(ins.RelOffsLength, ins.RelativeOffset));
+					const size_t unTargetAddress = static_cast<size_t>(static_cast<long long>(unAddress) + nRelativeOffset);
+					const long long nNewOffset = static_cast<long long>(unTargetAddress) - static_cast<long long>(unTrampolineAddress);
 
 					switch (ins.RelOffsLength) {
-						//case 1: // FIXME: Impossible to do (FIX: Replace rel8 to rel32)
-						//	*reinterpret_cast<unsigned char*>(reinterpret_cast<size_t>(m_pTrampoline) + unIndex + ins.RelOffsOffset) = static_cast<unsigned char>(unNewOffset & 0xFF);
-						//	break;
-						//case 2: // FIXME: Possible error (FIX: Same as rel8)
-						//	*reinterpret_cast<unsigned short*>(reinterpret_cast<size_t>(m_pTrampoline) + unIndex + ins.RelOffsOffset) = static_cast<unsigned short>(unNewOffset & 0xFFFF);
-						//	break;
+						case 1:
+							if ((nNewOffset < -0x80LL) || (nNewOffset > 0x7FLL)) {
+								g_HookStorage.DeAlloc(m_pTrampoline);
+								m_pTrampoline = nullptr;
+								m_unFirstInstructionSize = 0;
+								g_HookStorage.DeAlloc(m_pWrapper);
+								m_pWrapper = nullptr;
+								g_Suspender.Resume();
+								return false;
+							}
+							*reinterpret_cast<signed char*>(reinterpret_cast<size_t>(m_pTrampoline) + unIndex + ins.RelOffsOffset) = static_cast<signed char>(nNewOffset);
+							break;
+						case 2:
+							if ((nNewOffset < -0x8000LL) || (nNewOffset > 0x7FFFLL)) {
+								g_HookStorage.DeAlloc(m_pTrampoline);
+								m_pTrampoline = nullptr;
+								m_unFirstInstructionSize = 0;
+								g_HookStorage.DeAlloc(m_pWrapper);
+								m_pWrapper = nullptr;
+								g_Suspender.Resume();
+								return false;
+							}
+							*reinterpret_cast<signed short*>(reinterpret_cast<size_t>(m_pTrampoline) + unIndex + ins.RelOffsOffset) = static_cast<signed short>(nNewOffset);
+							break;
 						case 4:
-							*reinterpret_cast<unsigned int*>(reinterpret_cast<size_t>(m_pTrampoline) + unIndex + ins.RelOffsOffset) = static_cast<unsigned int>(unNewOffset & 0xFFFFFFFF);
+							if ((nNewOffset < -2147483648LL) || (nNewOffset > 2147483647LL)) {
+								g_HookStorage.DeAlloc(m_pTrampoline);
+								m_pTrampoline = nullptr;
+								m_unFirstInstructionSize = 0;
+								g_HookStorage.DeAlloc(m_pWrapper);
+								m_pWrapper = nullptr;
+								g_Suspender.Resume();
+								return false;
+							}
+							*reinterpret_cast<signed int*>(reinterpret_cast<size_t>(m_pTrampoline) + unIndex + ins.RelOffsOffset) = static_cast<signed int>(nNewOffset);
 							break;
 						default:
 							g_HookStorage.DeAlloc(m_pTrampoline);
@@ -41813,7 +42042,7 @@ namespace Detours {
 
 			memcpy(m_pOriginalBytes.get(), m_pAddress, unCopyingSize);
 
-			if (bWaitForHook) {
+			if (bWaitForHook && bCanYieldThreads) {
 				while (true) {
 					if (!g_Suspender.IsRegionExecuting(m_pAddress, unCopyingSize)) {
 						break;
@@ -41907,7 +42136,9 @@ namespace Detours {
 				m_unFirstInstructionSize = 0;
 				g_HookStorage.DeAlloc(m_pWrapper);
 				m_pWrapper = nullptr;
+#ifdef _DEBUG
 				__debugbreak();
+#endif
 				g_Suspender.Resume();
 				return false;
 			}
@@ -41917,7 +42148,8 @@ namespace Detours {
 		}
 
 		bool RawHook::UnHook(bool bWaitForUnHook) {
-			if (!g_Suspender.Suspend()) {
+			Sync::SuspendTransaction SuspenderTransaction(g_Suspender);
+			if (!SuspenderTransaction) {
 				return false;
 			}
 
@@ -41926,7 +42158,9 @@ namespace Detours {
 				return false;
 			}
 
-			if (bWaitForUnHook) {
+			const bool bCanYieldThreads = (g_Suspender.GetSuspendDepth() <= 1);
+
+			if (bWaitForUnHook && bCanYieldThreads) {
 				while (true) {
 					if (!g_Suspender.IsRegionExecuting(m_pAddress, m_unOriginalBytes) && !g_Suspender.IsRegionExecuting(m_pWrapper, HOOK_RAW_WRAPPER_SIZE) && !g_Suspender.IsRegionExecuting(m_pTrampoline, HOOK_RAW_TRAMPOLINE_SIZE) && !g_Suspender.IsRegionInCallStacks(m_pWrapper, HOOK_RAW_WRAPPER_SIZE) && !g_Suspender.IsRegionInCallStacks(m_pTrampoline, HOOK_RAW_TRAMPOLINE_SIZE)) {
 						break;
@@ -41957,7 +42191,9 @@ namespace Detours {
 			memcpy(m_pAddress, m_pOriginalBytes.get(), m_unOriginalBytes);
 
 			if (!HookProtection.Restore()) {
+#ifdef _DEBUG
 				__debugbreak();
+#endif
 				g_Suspender.Resume();
 				return false;
 			}
