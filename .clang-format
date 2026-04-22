@@ -12,7 +12,7 @@ IndentWidth: 4
 TabWidth: 4
 ContinuationIndentWidth: 4
 ColumnLimit: 0
-LineEnding: DeriveLF
+LineEnding: CRLF
 InsertNewlineAtEOF: false
 
 NamespaceIndentation: All

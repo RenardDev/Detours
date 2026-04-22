@@ -8089,7 +8089,7 @@ namespace Detours {
 			unsigned int m_unRTM : 1; // Bit 15: Restricted Transactional Memory
 			unsigned int : 16;        // Bit 16-31: Reserved
 #ifdef _M_X64
-			unsigned int : 32;        // Bit 32-63: Reserved (x64 upper bits)
+			unsigned int : 32; // Bit 32-63: Reserved (x64 upper bits)
 #endif
 		};
 
@@ -8116,7 +8116,7 @@ namespace Detours {
 			unsigned int m_unRW3 : 2;  // Bit 28-29: Breakpoint 3 condition
 			unsigned int m_unLEN3 : 2; // Bit 30-31: Breakpoint 3 length
 #ifdef _M_X64
-			unsigned int : 32;         // Bit 32-63: Reserved
+			unsigned int : 32; // Bit 32-63: Reserved
 #endif
 		};
 
@@ -8144,7 +8144,7 @@ namespace Detours {
 			unsigned int m_unID : 1;   // Bit 21: ID Flag
 			unsigned int : 10;         // Bit 22-31: Reserved
 #ifdef _M_X64
-			unsigned int : 32;         // Bit 32-63: Reserved
+			unsigned int : 32; // Bit 32-63: Reserved
 #endif
 		};
 
