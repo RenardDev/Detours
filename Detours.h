@@ -3,6 +3,7 @@
 #ifndef _DETOURS_H_
 #define _DETOURS_H_
 
+#if defined(_WIN32)
 #pragma warning(push)
 #pragma warning(disable : 4201)
 
@@ -21,20 +22,44 @@
 #include <smmintrin.h> // SSE4.1
 #include <nmmintrin.h> // SSE4.2
 #include <immintrin.h> // AVX, AVX2, AVX-512, AMX, SVML
+#elif defined(__linux__)
+#ifndef _GNU_SOURCE
+#define _GNU_SOURCE
+#endif
+
+#include <pthread.h>
+#include <semaphore.h>
+#include <signal.h>
+#include <sys/mman.h>
+#include <sys/types.h>
+#include <ucontext.h>
+#else
+#error Unsupported platform. Detours supports Windows and Linux only.
+#endif
+
+// C++
+#include <cstddef>
+#include <cwchar>
 
 // STL
 #include <array>
-#include <set>
-#include <list>
+#include <atomic>
+#include <condition_variable>
 #include <deque>
-#include <mutex>
-#include <vector>
+#include <list>
 #include <memory>
+#include <mutex>
+#include <set>
+#include <string>
+#include <thread>
 #include <unordered_set>
+#include <vector>
 
 // ----------------------------------------------------------------
 // General definitions
 // ----------------------------------------------------------------
+
+#if defined(_WIN32)
 
 // MSVC - Linker
 
@@ -102,13 +127,28 @@
 #ifndef GDI_BATCH_BUFFER_SIZE
 #define GDI_BATCH_BUFFER_SIZE 310
 #endif // !GDI_BATCH_BUFFER_SIZE
+#endif // defined(_WIN32)
 
-#ifdef _M_X64
-#define GDI_HANDLE_BUFFER_SIZE GDI_HANDLE_BUFFER_SIZE32
-#elif _M_IX86
-#define GDI_HANDLE_BUFFER_SIZE GDI_HANDLE_BUFFER_SIZE64
+#if defined(_M_X64) || defined(__x86_64__)
+#define DETOURS_ARCH_X64 1
+#elif defined(_M_IX86) || defined(__i386__)
+#define DETOURS_ARCH_X86 1
 #else
 #error Only x86 and x86_64 platforms are supported.
+#endif
+
+#if defined(_WIN32)
+#if defined(DETOURS_ARCH_X64)
+#define GDI_HANDLE_BUFFER_SIZE GDI_HANDLE_BUFFER_SIZE32
+#elif defined(DETOURS_ARCH_X86)
+#define GDI_HANDLE_BUFFER_SIZE GDI_HANDLE_BUFFER_SIZE64
+#endif
+#endif // defined(_WIN32)
+
+#if defined(__GNUC__) || defined(__clang__)
+#define DETOURS_NOINLINE __attribute__((noinline))
+#else
+#define DETOURS_NOINLINE
 #endif
 
 // rddisasm
@@ -649,20 +689,20 @@
 #endif // !HOOK_INLINE_TRAMPOLINE_SIZE
 
 #ifndef HOOK_INLINE_WRAPPER_SIZE
-#ifdef _M_X64
+#if defined(DETOURS_ARCH_X64)
 // Max wrapper size.
 #define HOOK_INLINE_WRAPPER_SIZE 0x18
-#elif _M_IX86
+#elif defined(DETOURS_ARCH_X86)
 // Max wrapper size.
 #define HOOK_INLINE_WRAPPER_SIZE 0x18
 #endif
 #endif // !HOOK_INLINE_WRAPPER_SIZE
 
 #ifndef HOOK_RAW_WRAPPER_SIZE
-#ifdef _M_X64
+#if defined(DETOURS_ARCH_X64)
 // Max wrapper size.
 #define HOOK_RAW_WRAPPER_SIZE 0x500
-#elif _M_IX86
+#elif defined(DETOURS_ARCH_X86)
 // Max wrapper size.
 #define HOOK_RAW_WRAPPER_SIZE 0x300
 #endif
@@ -683,7 +723,7 @@
 // ----------------------------------------------------------------
 
 namespace Detours {
-
+#if defined(_WIN32)
 	// ----------------------------------------------------------------
 	// KUSER_SHARED_DATA
 	// ----------------------------------------------------------------
@@ -1476,6 +1516,7 @@ namespace Detours {
 
 	PTEB GetTEB();
 	PTEB GetTEB(HANDLE hThread);
+#endif // defined(_WIN32)
 
 	// ----------------------------------------------------------------
 	// CallStack
@@ -1487,6 +1528,7 @@ namespace Detours {
 		// GetCallStack
 		// ----------------------------------------------------------------
 
+#if defined(_WIN32)
 		std::vector<void*> GetCallStack(HANDLE hThread, size_t unMaxEntries = CALLSTACK_MAX_ENTRIES);
 
 		// ----------------------------------------------------------------
@@ -1500,8 +1542,12 @@ namespace Detours {
 		// ----------------------------------------------------------------
 
 		std::vector<void*> GetShadowCallStack(HANDLE hThread, size_t unMaxEntries = CALLSTACK_MAX_ENTRIES);
+#elif defined(__linux__)
+		std::vector<void*> GetCallStack(size_t unMaxEntries = CALLSTACK_MAX_ENTRIES);
+#endif
 	} // namespace CallStack
 
+#if defined(_WIN32)
 	// ----------------------------------------------------------------
 	// LDR
 	// ----------------------------------------------------------------
@@ -1570,6 +1616,7 @@ namespace Detours {
 
 		void ReLinkModule(LINK_DATA LinkData);
 	} // namespace LDR
+#endif // defined(_WIN32)
 
 	// ----------------------------------------------------------------
 	// Codec
@@ -1643,20 +1690,28 @@ namespace Detours {
 		// FindSection
 		// ----------------------------------------------------------------
 
-		bool FindSection(const HMODULE hModule, const std::array<const unsigned char, 8>& SectionName, void** pAddress, size_t* pSize) noexcept;
-		bool FindSectionA(char const* const szModuleName, const std::array<const unsigned char, 8>& SectionName, void** pAddress, size_t* pSize) noexcept;
-		bool FindSectionW(wchar_t const* const szModuleName, const std::array<const unsigned char, 8>& SectionName, void** pAddress, size_t* pSize) noexcept;
+#if defined(_WIN32)
+		bool FindSection(const HMODULE hModule, const std::array<const unsigned char, 8>& arrSectionName, void** pAddress, size_t* pSize) noexcept;
+#elif defined(__linux__)
+		bool FindSection(void* const hModule, const std::array<const unsigned char, 8>& arrSectionName, void** pAddress, size_t* pSize) noexcept;
+#endif
+		bool FindSectionA(char const* const szModuleName, const std::array<const unsigned char, 8>& arrSectionName, void** pAddress, size_t* pSize) noexcept;
+		bool FindSectionW(wchar_t const* const szModuleName, const std::array<const unsigned char, 8>& arrSectionName, void** pAddress, size_t* pSize) noexcept;
 #ifdef _UNICODE
-		bool FindSection(wchar_t const* const szModuleName, const std::array<const unsigned char, 8>& SectionName, void** pAddress, size_t* pSize) noexcept;
+		bool FindSection(wchar_t const* const szModuleName, const std::array<const unsigned char, 8>& arrSectionName, void** pAddress, size_t* pSize) noexcept;
 #else
-		bool FindSection(char const* const szModuleName, const std::array<const unsigned char, 8>& SectionName, void** pAddress, size_t* pSize) noexcept;
+		bool FindSection(char const* const szModuleName, const std::array<const unsigned char, 8>& arrSectionName, void** pAddress, size_t* pSize) noexcept;
 #endif
 
 		// ----------------------------------------------------------------
 		// FindSectionPOGO
 		// ----------------------------------------------------------------
 
+#if defined(_WIN32)
 		bool FindSectionPOGO(const HMODULE hModule, char const* const szSectionName, void** pAddress, size_t* pSize) noexcept;
+#elif defined(__linux__)
+		bool FindSectionPOGO(void* const hModule, char const* const szSectionName, void** pAddress, size_t* pSize) noexcept;
+#endif
 		bool FindSectionPOGOA(char const* const szModuleName, char const* const szSectionName, void** pAddress, size_t* pSize) noexcept;
 		bool FindSectionPOGOW(wchar_t const* const szModuleName, char const* const szSectionName, void** pAddress, size_t* pSize) noexcept;
 #ifdef _UNICODE
@@ -1670,22 +1725,34 @@ namespace Detours {
 		// ----------------------------------------------------------------
 
 		void const* FindSignatureNative(void const* const pAddress, const size_t unSize, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const size_t unOffset = 0) noexcept;
+#if defined(_WIN32)
 		void const* FindSignatureNative(const HMODULE hModule, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const size_t unOffset = 0) noexcept;
-		void const* FindSignatureNative(const HMODULE hModule, const std::array<const unsigned char, 8>& SectionName, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const size_t unOffset = 0) noexcept;
+#elif defined(__linux__)
+		void const* FindSignatureNative(void* const hModule, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const size_t unOffset = 0) noexcept;
+#endif
+#if defined(_WIN32)
+		void const* FindSignatureNative(const HMODULE hModule, const std::array<const unsigned char, 8>& arrSectionName, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const size_t unOffset = 0) noexcept;
+#elif defined(__linux__)
+		void const* FindSignatureNative(void* const hModule, const std::array<const unsigned char, 8>& arrSectionName, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const size_t unOffset = 0) noexcept;
+#endif
+#if defined(_WIN32)
 		void const* FindSignatureNative(const HMODULE hModule, char const* const szSectionName, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const size_t unOffset = 0) noexcept;
+#elif defined(__linux__)
+		void const* FindSignatureNative(void* const hModule, char const* const szSectionName, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const size_t unOffset = 0) noexcept;
+#endif
 		void const* FindSignatureNativeA(char const* const szModuleName, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const size_t unOffset = 0) noexcept;
-		void const* FindSignatureNativeA(char const* const szModuleName, const std::array<const unsigned char, 8>& SectionName, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const size_t unOffset = 0) noexcept;
+		void const* FindSignatureNativeA(char const* const szModuleName, const std::array<const unsigned char, 8>& arrSectionName, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const size_t unOffset = 0) noexcept;
 		void const* FindSignatureNativeA(char const* const szModuleName, char const* const szSectionName, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const size_t unOffset = 0) noexcept;
 		void const* FindSignatureNativeW(wchar_t const* const szModuleName, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const size_t unOffset = 0) noexcept;
-		void const* FindSignatureNativeW(wchar_t const* const szModuleName, const std::array<const unsigned char, 8>& SectionName, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const size_t unOffset = 0) noexcept;
+		void const* FindSignatureNativeW(wchar_t const* const szModuleName, const std::array<const unsigned char, 8>& arrSectionName, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const size_t unOffset = 0) noexcept;
 		void const* FindSignatureNativeW(wchar_t const* const szModuleName, char const* const szSectionName, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const size_t unOffset = 0) noexcept;
 #ifdef _UNICODE
 		void const* FindSignatureNative(wchar_t const* const szModuleName, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const size_t unOffset = 0) noexcept;
-		void const* FindSignatureNative(wchar_t const* const szModuleName, const std::array<const unsigned char, 8>& SectionName, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const size_t unOffset = 0) noexcept;
+		void const* FindSignatureNative(wchar_t const* const szModuleName, const std::array<const unsigned char, 8>& arrSectionName, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const size_t unOffset = 0) noexcept;
 		void const* FindSignatureNative(wchar_t const* const szModuleName, char const* const szSectionName, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const size_t unOffset = 0) noexcept;
 #else
 		void const* FindSignatureNative(char const* const szModuleName, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const size_t unOffset = 0) noexcept;
-		void const* FindSignatureNative(char const* const szModuleName, const std::array<const unsigned char, 8>& SectionName, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const size_t unOffset = 0) noexcept;
+		void const* FindSignatureNative(char const* const szModuleName, const std::array<const unsigned char, 8>& arrSectionName, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const size_t unOffset = 0) noexcept;
 		void const* FindSignatureNative(char const* const szModuleName, char const* const szSectionName, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const size_t unOffset = 0) noexcept;
 #endif
 
@@ -1694,22 +1761,34 @@ namespace Detours {
 		// ----------------------------------------------------------------
 
 		void const* FindSignatureSSE2(void const* const pAddress, const size_t unSize, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const size_t unOffset = 0) noexcept;
+#if defined(_WIN32)
 		void const* FindSignatureSSE2(const HMODULE hModule, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const size_t unOffset = 0) noexcept;
-		void const* FindSignatureSSE2(const HMODULE hModule, const std::array<const unsigned char, 8>& SectionName, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const size_t unOffset = 0) noexcept;
+#elif defined(__linux__)
+		void const* FindSignatureSSE2(void* const hModule, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const size_t unOffset = 0) noexcept;
+#endif
+#if defined(_WIN32)
+		void const* FindSignatureSSE2(const HMODULE hModule, const std::array<const unsigned char, 8>& arrSectionName, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const size_t unOffset = 0) noexcept;
+#elif defined(__linux__)
+		void const* FindSignatureSSE2(void* const hModule, const std::array<const unsigned char, 8>& arrSectionName, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const size_t unOffset = 0) noexcept;
+#endif
+#if defined(_WIN32)
 		void const* FindSignatureSSE2(const HMODULE hModule, char const* const szSectionName, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const size_t unOffset = 0) noexcept;
+#elif defined(__linux__)
+		void const* FindSignatureSSE2(void* const hModule, char const* const szSectionName, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const size_t unOffset = 0) noexcept;
+#endif
 		void const* FindSignatureSSE2A(char const* const szModuleName, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const size_t unOffset = 0) noexcept;
-		void const* FindSignatureSSE2A(char const* const szModuleName, const std::array<const unsigned char, 8>& SectionName, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const size_t unOffset = 0) noexcept;
+		void const* FindSignatureSSE2A(char const* const szModuleName, const std::array<const unsigned char, 8>& arrSectionName, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const size_t unOffset = 0) noexcept;
 		void const* FindSignatureSSE2A(char const* const szModuleName, char const* const szSectionName, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const size_t unOffset = 0) noexcept;
 		void const* FindSignatureSSE2W(wchar_t const* const szModuleName, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const size_t unOffset = 0) noexcept;
-		void const* FindSignatureSSE2W(wchar_t const* const szModuleName, const std::array<const unsigned char, 8>& SectionName, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const size_t unOffset = 0) noexcept;
+		void const* FindSignatureSSE2W(wchar_t const* const szModuleName, const std::array<const unsigned char, 8>& arrSectionName, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const size_t unOffset = 0) noexcept;
 		void const* FindSignatureSSE2W(wchar_t const* const szModuleName, char const* const szSectionName, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const size_t unOffset = 0) noexcept;
 #ifdef _UNICODE
 		void const* FindSignatureSSE2(wchar_t const* const szModuleName, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const size_t unOffset = 0) noexcept;
-		void const* FindSignatureSSE2(wchar_t const* const szModuleName, const std::array<const unsigned char, 8>& SectionName, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const size_t unOffset = 0) noexcept;
+		void const* FindSignatureSSE2(wchar_t const* const szModuleName, const std::array<const unsigned char, 8>& arrSectionName, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const size_t unOffset = 0) noexcept;
 		void const* FindSignatureSSE2(wchar_t const* const szModuleName, char const* const szSectionName, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const size_t unOffset = 0) noexcept;
 #else
 		void const* FindSignatureSSE2(char const* const szModuleName, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const size_t unOffset = 0) noexcept;
-		void const* FindSignatureSSE2(char const* const szModuleName, const std::array<const unsigned char, 8>& SectionName, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const size_t unOffset = 0) noexcept;
+		void const* FindSignatureSSE2(char const* const szModuleName, const std::array<const unsigned char, 8>& arrSectionName, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const size_t unOffset = 0) noexcept;
 		void const* FindSignatureSSE2(char const* const szModuleName, char const* const szSectionName, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const size_t unOffset = 0) noexcept;
 #endif
 
@@ -1718,22 +1797,34 @@ namespace Detours {
 		// ----------------------------------------------------------------
 
 		void const* FindSignatureAVX2(void const* const pAddress, const size_t unSize, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const size_t unOffset = 0) noexcept;
+#if defined(_WIN32)
 		void const* FindSignatureAVX2(const HMODULE hModule, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const size_t unOffset = 0) noexcept;
-		void const* FindSignatureAVX2(const HMODULE hModule, const std::array<const unsigned char, 8>& SectionName, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const size_t unOffset = 0) noexcept;
+#elif defined(__linux__)
+		void const* FindSignatureAVX2(void* const hModule, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const size_t unOffset = 0) noexcept;
+#endif
+#if defined(_WIN32)
+		void const* FindSignatureAVX2(const HMODULE hModule, const std::array<const unsigned char, 8>& arrSectionName, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const size_t unOffset = 0) noexcept;
+#elif defined(__linux__)
+		void const* FindSignatureAVX2(void* const hModule, const std::array<const unsigned char, 8>& arrSectionName, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const size_t unOffset = 0) noexcept;
+#endif
+#if defined(_WIN32)
 		void const* FindSignatureAVX2(const HMODULE hModule, char const* const szSectionName, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const size_t unOffset = 0) noexcept;
+#elif defined(__linux__)
+		void const* FindSignatureAVX2(void* const hModule, char const* const szSectionName, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const size_t unOffset = 0) noexcept;
+#endif
 		void const* FindSignatureAVX2A(char const* const szModuleName, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const size_t unOffset = 0) noexcept;
-		void const* FindSignatureAVX2A(char const* const szModuleName, const std::array<const unsigned char, 8>& SectionName, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const size_t unOffset = 0) noexcept;
+		void const* FindSignatureAVX2A(char const* const szModuleName, const std::array<const unsigned char, 8>& arrSectionName, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const size_t unOffset = 0) noexcept;
 		void const* FindSignatureAVX2A(char const* const szModuleName, char const* const szSectionName, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const size_t unOffset = 0) noexcept;
 		void const* FindSignatureAVX2W(wchar_t const* const szModuleName, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const size_t unOffset = 0) noexcept;
-		void const* FindSignatureAVX2W(wchar_t const* const szModuleName, const std::array<const unsigned char, 8>& SectionName, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const size_t unOffset = 0) noexcept;
+		void const* FindSignatureAVX2W(wchar_t const* const szModuleName, const std::array<const unsigned char, 8>& arrSectionName, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const size_t unOffset = 0) noexcept;
 		void const* FindSignatureAVX2W(wchar_t const* const szModuleName, char const* const szSectionName, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const size_t unOffset = 0) noexcept;
 #ifdef _UNICODE
 		void const* FindSignatureAVX2(wchar_t const* const szModuleName, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const size_t unOffset = 0) noexcept;
-		void const* FindSignatureAVX2(wchar_t const* const szModuleName, const std::array<const unsigned char, 8>& SectionName, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const size_t unOffset = 0) noexcept;
+		void const* FindSignatureAVX2(wchar_t const* const szModuleName, const std::array<const unsigned char, 8>& arrSectionName, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const size_t unOffset = 0) noexcept;
 		void const* FindSignatureAVX2(wchar_t const* const szModuleName, char const* const szSectionName, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const size_t unOffset = 0) noexcept;
 #else
 		void const* FindSignatureAVX2(char const* const szModuleName, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const size_t unOffset = 0) noexcept;
-		void const* FindSignatureAVX2(char const* const szModuleName, const std::array<const unsigned char, 8>& SectionName, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const size_t unOffset = 0) noexcept;
+		void const* FindSignatureAVX2(char const* const szModuleName, const std::array<const unsigned char, 8>& arrSectionName, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const size_t unOffset = 0) noexcept;
 		void const* FindSignatureAVX2(char const* const szModuleName, char const* const szSectionName, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const size_t unOffset = 0) noexcept;
 #endif
 
@@ -1742,22 +1833,34 @@ namespace Detours {
 		// ----------------------------------------------------------------
 
 		void const* FindSignatureAVX512(void const* const pAddress, const size_t unSize, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const size_t unOffset = 0) noexcept;
+#if defined(_WIN32)
 		void const* FindSignatureAVX512(const HMODULE hModule, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const size_t unOffset = 0) noexcept;
-		void const* FindSignatureAVX512(const HMODULE hModule, const std::array<const unsigned char, 8>& SectionName, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const size_t unOffset = 0) noexcept;
+#elif defined(__linux__)
+		void const* FindSignatureAVX512(void* const hModule, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const size_t unOffset = 0) noexcept;
+#endif
+#if defined(_WIN32)
+		void const* FindSignatureAVX512(const HMODULE hModule, const std::array<const unsigned char, 8>& arrSectionName, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const size_t unOffset = 0) noexcept;
+#elif defined(__linux__)
+		void const* FindSignatureAVX512(void* const hModule, const std::array<const unsigned char, 8>& arrSectionName, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const size_t unOffset = 0) noexcept;
+#endif
+#if defined(_WIN32)
 		void const* FindSignatureAVX512(const HMODULE hModule, char const* const szSectionName, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const size_t unOffset = 0) noexcept;
+#elif defined(__linux__)
+		void const* FindSignatureAVX512(void* const hModule, char const* const szSectionName, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const size_t unOffset = 0) noexcept;
+#endif
 		void const* FindSignatureAVX512A(char const* const szModuleName, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const size_t unOffset = 0) noexcept;
-		void const* FindSignatureAVX512A(char const* const szModuleName, const std::array<const unsigned char, 8>& SectionName, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const size_t unOffset = 0) noexcept;
+		void const* FindSignatureAVX512A(char const* const szModuleName, const std::array<const unsigned char, 8>& arrSectionName, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const size_t unOffset = 0) noexcept;
 		void const* FindSignatureAVX512A(char const* const szModuleName, char const* const szSectionName, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const size_t unOffset = 0) noexcept;
 		void const* FindSignatureAVX512W(wchar_t const* const szModuleName, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const size_t unOffset = 0) noexcept;
-		void const* FindSignatureAVX512W(wchar_t const* const szModuleName, const std::array<const unsigned char, 8>& SectionName, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const size_t unOffset = 0) noexcept;
+		void const* FindSignatureAVX512W(wchar_t const* const szModuleName, const std::array<const unsigned char, 8>& arrSectionName, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const size_t unOffset = 0) noexcept;
 		void const* FindSignatureAVX512W(wchar_t const* const szModuleName, char const* const szSectionName, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const size_t unOffset = 0) noexcept;
 #ifdef _UNICODE
 		void const* FindSignatureAVX512(wchar_t const* const szModuleName, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const size_t unOffset = 0) noexcept;
-		void const* FindSignatureAVX512(wchar_t const* const szModuleName, const std::array<const unsigned char, 8>& SectionName, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const size_t unOffset = 0) noexcept;
+		void const* FindSignatureAVX512(wchar_t const* const szModuleName, const std::array<const unsigned char, 8>& arrSectionName, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const size_t unOffset = 0) noexcept;
 		void const* FindSignatureAVX512(wchar_t const* const szModuleName, char const* const szSectionName, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const size_t unOffset = 0) noexcept;
 #else
 		void const* FindSignatureAVX512(char const* const szModuleName, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const size_t unOffset = 0) noexcept;
-		void const* FindSignatureAVX512(char const* const szModuleName, const std::array<const unsigned char, 8>& SectionName, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const size_t unOffset = 0) noexcept;
+		void const* FindSignatureAVX512(char const* const szModuleName, const std::array<const unsigned char, 8>& arrSectionName, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const size_t unOffset = 0) noexcept;
 		void const* FindSignatureAVX512(char const* const szModuleName, char const* const szSectionName, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const size_t unOffset = 0) noexcept;
 #endif
 
@@ -1766,22 +1869,34 @@ namespace Detours {
 		// ----------------------------------------------------------------
 
 		void const* FindSignature(void const* const pAddress, const size_t unSize, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const size_t unOffset = 0) noexcept;
+#if defined(_WIN32)
 		void const* FindSignature(const HMODULE hModule, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const size_t unOffset = 0) noexcept;
-		void const* FindSignature(const HMODULE hModule, const std::array<const unsigned char, 8>& SectionName, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const size_t unOffset = 0) noexcept;
+#elif defined(__linux__)
+		void const* FindSignature(void* const hModule, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const size_t unOffset = 0) noexcept;
+#endif
+#if defined(_WIN32)
+		void const* FindSignature(const HMODULE hModule, const std::array<const unsigned char, 8>& arrSectionName, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const size_t unOffset = 0) noexcept;
+#elif defined(__linux__)
+		void const* FindSignature(void* const hModule, const std::array<const unsigned char, 8>& arrSectionName, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const size_t unOffset = 0) noexcept;
+#endif
+#if defined(_WIN32)
 		void const* FindSignature(const HMODULE hModule, char const* const szSectionName, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const size_t unOffset = 0) noexcept;
+#elif defined(__linux__)
+		void const* FindSignature(void* const hModule, char const* const szSectionName, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const size_t unOffset = 0) noexcept;
+#endif
 		void const* FindSignatureA(char const* const szModuleName, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const size_t unOffset = 0) noexcept;
-		void const* FindSignatureA(char const* const szModuleName, const std::array<const unsigned char, 8>& SectionName, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const size_t unOffset = 0) noexcept;
+		void const* FindSignatureA(char const* const szModuleName, const std::array<const unsigned char, 8>& arrSectionName, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const size_t unOffset = 0) noexcept;
 		void const* FindSignatureA(char const* const szModuleName, char const* const szSectionName, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const size_t unOffset = 0) noexcept;
 		void const* FindSignatureW(wchar_t const* const szModuleName, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const size_t unOffset = 0) noexcept;
-		void const* FindSignatureW(wchar_t const* const szModuleName, const std::array<const unsigned char, 8>& SectionName, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const size_t unOffset = 0) noexcept;
+		void const* FindSignatureW(wchar_t const* const szModuleName, const std::array<const unsigned char, 8>& arrSectionName, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const size_t unOffset = 0) noexcept;
 		void const* FindSignatureW(wchar_t const* const szModuleName, char const* const szSectionName, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const size_t unOffset = 0) noexcept;
 #ifdef _UNICODE
 		void const* FindSignature(wchar_t const* const szModuleName, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const size_t unOffset = 0) noexcept;
-		void const* FindSignature(wchar_t const* const szModuleName, const std::array<const unsigned char, 8>& SectionName, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const size_t unOffset = 0) noexcept;
+		void const* FindSignature(wchar_t const* const szModuleName, const std::array<const unsigned char, 8>& arrSectionName, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const size_t unOffset = 0) noexcept;
 		void const* FindSignature(wchar_t const* const szModuleName, char const* const szSectionName, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const size_t unOffset = 0) noexcept;
 #else
 		void const* FindSignature(char const* const szModuleName, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const size_t unOffset = 0) noexcept;
-		void const* FindSignature(char const* const szModuleName, const std::array<const unsigned char, 8>& SectionName, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const size_t unOffset = 0) noexcept;
+		void const* FindSignature(char const* const szModuleName, const std::array<const unsigned char, 8>& arrSectionName, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const size_t unOffset = 0) noexcept;
 		void const* FindSignature(char const* const szModuleName, char const* const szSectionName, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const size_t unOffset = 0) noexcept;
 #endif
 
@@ -1790,22 +1905,34 @@ namespace Detours {
 		// ----------------------------------------------------------------
 
 		void const* FindDataNative(void const* const pAddress, const size_t unSize, unsigned char const* const pData, const size_t unDataSize) noexcept;
+#if defined(_WIN32)
 		void const* FindDataNative(const HMODULE hModule, unsigned char const* const pData, const size_t unDataSize) noexcept;
-		void const* FindDataNative(const HMODULE hModule, const std::array<const unsigned char, 8>& SectionName, unsigned char const* const pData, const size_t unDataSize) noexcept;
+#elif defined(__linux__)
+		void const* FindDataNative(void* const hModule, unsigned char const* const pData, const size_t unDataSize) noexcept;
+#endif
+#if defined(_WIN32)
+		void const* FindDataNative(const HMODULE hModule, const std::array<const unsigned char, 8>& arrSectionName, unsigned char const* const pData, const size_t unDataSize) noexcept;
+#elif defined(__linux__)
+		void const* FindDataNative(void* const hModule, const std::array<const unsigned char, 8>& arrSectionName, unsigned char const* const pData, const size_t unDataSize) noexcept;
+#endif
+#if defined(_WIN32)
 		void const* FindDataNative(const HMODULE hModule, char const* const szSectionName, unsigned char const* const pData, const size_t unDataSize) noexcept;
+#elif defined(__linux__)
+		void const* FindDataNative(void* const hModule, char const* const szSectionName, unsigned char const* const pData, const size_t unDataSize) noexcept;
+#endif
 		void const* FindDataNativeA(char const* const szModuleName, unsigned char const* const pData, const size_t unDataSize) noexcept;
-		void const* FindDataNativeA(char const* const szModuleName, const std::array<const unsigned char, 8>& SectionName, unsigned char const* const pData, const size_t unDataSize) noexcept;
+		void const* FindDataNativeA(char const* const szModuleName, const std::array<const unsigned char, 8>& arrSectionName, unsigned char const* const pData, const size_t unDataSize) noexcept;
 		void const* FindDataNativeA(char const* const szModuleName, char const* const szSectionName, unsigned char const* const pData, const size_t unDataSize) noexcept;
 		void const* FindDataNativeW(wchar_t const* const szModuleName, unsigned char const* const pData, const size_t unDataSize) noexcept;
-		void const* FindDataNativeW(wchar_t const* const szModuleName, const std::array<const unsigned char, 8>& SectionName, unsigned char const* const pData, const size_t unDataSize) noexcept;
+		void const* FindDataNativeW(wchar_t const* const szModuleName, const std::array<const unsigned char, 8>& arrSectionName, unsigned char const* const pData, const size_t unDataSize) noexcept;
 		void const* FindDataNativeW(wchar_t const* const szModuleName, char const* const szSectionName, unsigned char const* const pData, const size_t unDataSize) noexcept;
 #ifdef _UNICODE
 		void const* FindDataNative(wchar_t const* const szModuleName, unsigned char const* const pData, const size_t unDataSize) noexcept;
-		void const* FindDataNative(wchar_t const* const szModuleName, const std::array<const unsigned char, 8>& SectionName, unsigned char const* const pData, const size_t unDataSize) noexcept;
+		void const* FindDataNative(wchar_t const* const szModuleName, const std::array<const unsigned char, 8>& arrSectionName, unsigned char const* const pData, const size_t unDataSize) noexcept;
 		void const* FindDataNative(wchar_t const* const szModuleName, char const* const szSectionName, unsigned char const* const pData, const size_t unDataSize) noexcept;
 #else
 		void const* FindDataNative(char const* const szModuleName, unsigned char const* const pData, const size_t unDataSize) noexcept;
-		void const* FindDataNative(char const* const szModuleName, const std::array<const unsigned char, 8>& SectionName, unsigned char const* const pData, const size_t unDataSize) noexcept;
+		void const* FindDataNative(char const* const szModuleName, const std::array<const unsigned char, 8>& arrSectionName, unsigned char const* const pData, const size_t unDataSize) noexcept;
 		void const* FindDataNative(char const* const szModuleName, char const* const szSectionName, unsigned char const* const pData, const size_t unDataSize) noexcept;
 #endif
 
@@ -1814,22 +1941,34 @@ namespace Detours {
 		// ----------------------------------------------------------------
 
 		void const* FindDataSSE2(void const* const pAddress, const size_t unSize, unsigned char const* const pData, const size_t unDataSize) noexcept;
+#if defined(_WIN32)
 		void const* FindDataSSE2(const HMODULE hModule, unsigned char const* const pData, const size_t unDataSize) noexcept;
-		void const* FindDataSSE2(const HMODULE hModule, const std::array<const unsigned char, 8>& SectionName, unsigned char const* const pData, const size_t unDataSize) noexcept;
+#elif defined(__linux__)
+		void const* FindDataSSE2(void* const hModule, unsigned char const* const pData, const size_t unDataSize) noexcept;
+#endif
+#if defined(_WIN32)
+		void const* FindDataSSE2(const HMODULE hModule, const std::array<const unsigned char, 8>& arrSectionName, unsigned char const* const pData, const size_t unDataSize) noexcept;
+#elif defined(__linux__)
+		void const* FindDataSSE2(void* const hModule, const std::array<const unsigned char, 8>& arrSectionName, unsigned char const* const pData, const size_t unDataSize) noexcept;
+#endif
+#if defined(_WIN32)
 		void const* FindDataSSE2(const HMODULE hModule, char const* const szSectionName, unsigned char const* const pData, const size_t unDataSize) noexcept;
+#elif defined(__linux__)
+		void const* FindDataSSE2(void* const hModule, char const* const szSectionName, unsigned char const* const pData, const size_t unDataSize) noexcept;
+#endif
 		void const* FindDataSSE2A(char const* const szModuleName, unsigned char const* const pData, const size_t unDataSize) noexcept;
-		void const* FindDataSSE2A(char const* const szModuleName, const std::array<const unsigned char, 8>& SectionName, unsigned char const* const pData, const size_t unDataSize) noexcept;
+		void const* FindDataSSE2A(char const* const szModuleName, const std::array<const unsigned char, 8>& arrSectionName, unsigned char const* const pData, const size_t unDataSize) noexcept;
 		void const* FindDataSSE2A(char const* const szModuleName, char const* const szSectionName, unsigned char const* const pData, const size_t unDataSize) noexcept;
 		void const* FindDataSSE2W(wchar_t const* const szModuleName, unsigned char const* const pData, const size_t unDataSize) noexcept;
-		void const* FindDataSSE2W(wchar_t const* const szModuleName, const std::array<const unsigned char, 8>& SectionName, unsigned char const* const pData, const size_t unDataSize) noexcept;
+		void const* FindDataSSE2W(wchar_t const* const szModuleName, const std::array<const unsigned char, 8>& arrSectionName, unsigned char const* const pData, const size_t unDataSize) noexcept;
 		void const* FindDataSSE2W(wchar_t const* const szModuleName, char const* const szSectionName, unsigned char const* const pData, const size_t unDataSize) noexcept;
 #ifdef _UNICODE
 		void const* FindDataSSE2(wchar_t const* const szModuleName, unsigned char const* const pData, const size_t unDataSize) noexcept;
-		void const* FindDataSSE2(wchar_t const* const szModuleName, const std::array<const unsigned char, 8>& SectionName, unsigned char const* const pData, const size_t unDataSize) noexcept;
+		void const* FindDataSSE2(wchar_t const* const szModuleName, const std::array<const unsigned char, 8>& arrSectionName, unsigned char const* const pData, const size_t unDataSize) noexcept;
 		void const* FindDataSSE2(wchar_t const* const szModuleName, char const* const szSectionName, unsigned char const* const pData, const size_t unDataSize) noexcept;
 #else
 		void const* FindDataSSE2(char const* const szModuleName, unsigned char const* const pData, const size_t unDataSize) noexcept;
-		void const* FindDataSSE2(char const* const szModuleName, const std::array<const unsigned char, 8>& SectionName, unsigned char const* const pData, const size_t unDataSize) noexcept;
+		void const* FindDataSSE2(char const* const szModuleName, const std::array<const unsigned char, 8>& arrSectionName, unsigned char const* const pData, const size_t unDataSize) noexcept;
 		void const* FindDataSSE2(char const* const szModuleName, char const* const szSectionName, unsigned char const* const pData, const size_t unDataSize) noexcept;
 #endif
 
@@ -1838,22 +1977,34 @@ namespace Detours {
 		// ----------------------------------------------------------------
 
 		void const* FindDataAVX2(void const* const pAddress, const size_t unSize, unsigned char const* const pData, const size_t unDataSize) noexcept;
+#if defined(_WIN32)
 		void const* FindDataAVX2(const HMODULE hModule, unsigned char const* const pData, const size_t unDataSize) noexcept;
-		void const* FindDataAVX2(const HMODULE hModule, const std::array<const unsigned char, 8>& SectionName, unsigned char const* const pData, const size_t unDataSize) noexcept;
+#elif defined(__linux__)
+		void const* FindDataAVX2(void* const hModule, unsigned char const* const pData, const size_t unDataSize) noexcept;
+#endif
+#if defined(_WIN32)
+		void const* FindDataAVX2(const HMODULE hModule, const std::array<const unsigned char, 8>& arrSectionName, unsigned char const* const pData, const size_t unDataSize) noexcept;
+#elif defined(__linux__)
+		void const* FindDataAVX2(void* const hModule, const std::array<const unsigned char, 8>& arrSectionName, unsigned char const* const pData, const size_t unDataSize) noexcept;
+#endif
+#if defined(_WIN32)
 		void const* FindDataAVX2(const HMODULE hModule, char const* const szSectionName, unsigned char const* const pData, const size_t unDataSize) noexcept;
+#elif defined(__linux__)
+		void const* FindDataAVX2(void* const hModule, char const* const szSectionName, unsigned char const* const pData, const size_t unDataSize) noexcept;
+#endif
 		void const* FindDataAVX2A(char const* const szModuleName, unsigned char const* const pData, const size_t unDataSize) noexcept;
-		void const* FindDataAVX2A(char const* const szModuleName, const std::array<const unsigned char, 8>& SectionName, unsigned char const* const pData, const size_t unDataSize) noexcept;
+		void const* FindDataAVX2A(char const* const szModuleName, const std::array<const unsigned char, 8>& arrSectionName, unsigned char const* const pData, const size_t unDataSize) noexcept;
 		void const* FindDataAVX2A(char const* const szModuleName, char const* const szSectionName, unsigned char const* const pData, const size_t unDataSize) noexcept;
 		void const* FindDataAVX2W(wchar_t const* const szModuleName, unsigned char const* const pData, const size_t unDataSize) noexcept;
-		void const* FindDataAVX2W(wchar_t const* const szModuleName, const std::array<const unsigned char, 8>& SectionName, unsigned char const* const pData, const size_t unDataSize) noexcept;
+		void const* FindDataAVX2W(wchar_t const* const szModuleName, const std::array<const unsigned char, 8>& arrSectionName, unsigned char const* const pData, const size_t unDataSize) noexcept;
 		void const* FindDataAVX2W(wchar_t const* const szModuleName, char const* const szSectionName, unsigned char const* const pData, const size_t unDataSize) noexcept;
 #ifdef _UNICODE
 		void const* FindDataAVX2(wchar_t const* const szModuleName, unsigned char const* const pData, const size_t unDataSize) noexcept;
-		void const* FindDataAVX2(wchar_t const* const szModuleName, const std::array<const unsigned char, 8>& SectionName, unsigned char const* const pData, const size_t unDataSize) noexcept;
+		void const* FindDataAVX2(wchar_t const* const szModuleName, const std::array<const unsigned char, 8>& arrSectionName, unsigned char const* const pData, const size_t unDataSize) noexcept;
 		void const* FindDataAVX2(wchar_t const* const szModuleName, char const* const szSectionName, unsigned char const* const pData, const size_t unDataSize) noexcept;
 #else
 		void const* FindDataAVX2(char const* const szModuleName, unsigned char const* const pData, const size_t unDataSize) noexcept;
-		void const* FindDataAVX2(char const* const szModuleName, const std::array<const unsigned char, 8>& SectionName, unsigned char const* const pData, const size_t unDataSize) noexcept;
+		void const* FindDataAVX2(char const* const szModuleName, const std::array<const unsigned char, 8>& arrSectionName, unsigned char const* const pData, const size_t unDataSize) noexcept;
 		void const* FindDataAVX2(char const* const szModuleName, char const* const szSectionName, unsigned char const* const pData, const size_t unDataSize) noexcept;
 #endif
 
@@ -1862,22 +2013,34 @@ namespace Detours {
 		// ----------------------------------------------------------------
 
 		void const* FindDataAVX512(void const* const pAddress, const size_t unSize, unsigned char const* const pData, const size_t unDataSize) noexcept;
+#if defined(_WIN32)
 		void const* FindDataAVX512(const HMODULE hModule, unsigned char const* const pData, const size_t unDataSize) noexcept;
-		void const* FindDataAVX512(const HMODULE hModule, const std::array<const unsigned char, 8>& SectionName, unsigned char const* const pData, const size_t unDataSize) noexcept;
+#elif defined(__linux__)
+		void const* FindDataAVX512(void* const hModule, unsigned char const* const pData, const size_t unDataSize) noexcept;
+#endif
+#if defined(_WIN32)
+		void const* FindDataAVX512(const HMODULE hModule, const std::array<const unsigned char, 8>& arrSectionName, unsigned char const* const pData, const size_t unDataSize) noexcept;
+#elif defined(__linux__)
+		void const* FindDataAVX512(void* const hModule, const std::array<const unsigned char, 8>& arrSectionName, unsigned char const* const pData, const size_t unDataSize) noexcept;
+#endif
+#if defined(_WIN32)
 		void const* FindDataAVX512(const HMODULE hModule, char const* const szSectionName, unsigned char const* const pData, const size_t unDataSize) noexcept;
+#elif defined(__linux__)
+		void const* FindDataAVX512(void* const hModule, char const* const szSectionName, unsigned char const* const pData, const size_t unDataSize) noexcept;
+#endif
 		void const* FindDataAVX512A(char const* const szModuleName, unsigned char const* const pData, const size_t unDataSize) noexcept;
-		void const* FindDataAVX512A(char const* const szModuleName, const std::array<const unsigned char, 8>& SectionName, unsigned char const* const pData, const size_t unDataSize) noexcept;
+		void const* FindDataAVX512A(char const* const szModuleName, const std::array<const unsigned char, 8>& arrSectionName, unsigned char const* const pData, const size_t unDataSize) noexcept;
 		void const* FindDataAVX512A(char const* const szModuleName, char const* const szSectionName, unsigned char const* const pData, const size_t unDataSize) noexcept;
 		void const* FindDataAVX512W(wchar_t const* const szModuleName, unsigned char const* const pData, const size_t unDataSize) noexcept;
-		void const* FindDataAVX512W(wchar_t const* const szModuleName, const std::array<const unsigned char, 8>& SectionName, unsigned char const* const pData, const size_t unDataSize) noexcept;
+		void const* FindDataAVX512W(wchar_t const* const szModuleName, const std::array<const unsigned char, 8>& arrSectionName, unsigned char const* const pData, const size_t unDataSize) noexcept;
 		void const* FindDataAVX512W(wchar_t const* const szModuleName, char const* const szSectionName, unsigned char const* const pData, const size_t unDataSize) noexcept;
 #ifdef _UNICODE
 		void const* FindDataAVX512(wchar_t const* const szModuleName, unsigned char const* const pData, const size_t unDataSize) noexcept;
-		void const* FindDataAVX512(wchar_t const* const szModuleName, const std::array<const unsigned char, 8>& SectionName, unsigned char const* const pData, const size_t unDataSize) noexcept;
+		void const* FindDataAVX512(wchar_t const* const szModuleName, const std::array<const unsigned char, 8>& arrSectionName, unsigned char const* const pData, const size_t unDataSize) noexcept;
 		void const* FindDataAVX512(wchar_t const* const szModuleName, char const* const szSectionName, unsigned char const* const pData, const size_t unDataSize) noexcept;
 #else
 		void const* FindDataAVX512(char const* const szModuleName, unsigned char const* const pData, const size_t unDataSize) noexcept;
-		void const* FindDataAVX512(char const* const szModuleName, const std::array<const unsigned char, 8>& SectionName, unsigned char const* const pData, const size_t unDataSize) noexcept;
+		void const* FindDataAVX512(char const* const szModuleName, const std::array<const unsigned char, 8>& arrSectionName, unsigned char const* const pData, const size_t unDataSize) noexcept;
 		void const* FindDataAVX512(char const* const szModuleName, char const* const szSectionName, unsigned char const* const pData, const size_t unDataSize) noexcept;
 #endif
 
@@ -1886,26 +2049,39 @@ namespace Detours {
 		// ----------------------------------------------------------------
 
 		void const* FindData(void const* const pAddress, const size_t unSize, unsigned char const* const pData, const size_t unDataSize) noexcept;
+#if defined(_WIN32)
 		void const* FindData(const HMODULE hModule, unsigned char const* const pData, const size_t unDataSize) noexcept;
-		void const* FindData(const HMODULE hModule, const std::array<const unsigned char, 8>& SectionName, unsigned char const* const pData, const size_t unDataSize) noexcept;
+#elif defined(__linux__)
+		void const* FindData(void* const hModule, unsigned char const* const pData, const size_t unDataSize) noexcept;
+#endif
+#if defined(_WIN32)
+		void const* FindData(const HMODULE hModule, const std::array<const unsigned char, 8>& arrSectionName, unsigned char const* const pData, const size_t unDataSize) noexcept;
+#elif defined(__linux__)
+		void const* FindData(void* const hModule, const std::array<const unsigned char, 8>& arrSectionName, unsigned char const* const pData, const size_t unDataSize) noexcept;
+#endif
+#if defined(_WIN32)
 		void const* FindData(const HMODULE hModule, char const* const szSectionName, unsigned char const* const pData, const size_t unDataSize) noexcept;
+#elif defined(__linux__)
+		void const* FindData(void* const hModule, char const* const szSectionName, unsigned char const* const pData, const size_t unDataSize) noexcept;
+#endif
 		void const* FindDataA(char const* const szModuleName, unsigned char const* const pData, const size_t unDataSize) noexcept;
-		void const* FindDataA(char const* const szModuleName, const std::array<const unsigned char, 8>& SectionName, unsigned char const* const pData, const size_t unDataSize) noexcept;
+		void const* FindDataA(char const* const szModuleName, const std::array<const unsigned char, 8>& arrSectionName, unsigned char const* const pData, const size_t unDataSize) noexcept;
 		void const* FindDataA(char const* const szModuleName, char const* const szSectionName, unsigned char const* const pData, const size_t unDataSize) noexcept;
 		void const* FindDataW(wchar_t const* const szModuleName, unsigned char const* const pData, const size_t unDataSize) noexcept;
-		void const* FindDataW(wchar_t const* const szModuleName, const std::array<const unsigned char, 8>& SectionName, unsigned char const* const pData, const size_t unDataSize) noexcept;
+		void const* FindDataW(wchar_t const* const szModuleName, const std::array<const unsigned char, 8>& arrSectionName, unsigned char const* const pData, const size_t unDataSize) noexcept;
 		void const* FindDataW(wchar_t const* const szModuleName, char const* const szSectionName, unsigned char const* const pData, const size_t unDataSize) noexcept;
 #ifdef _UNICODE
 		void const* FindData(wchar_t const* const szModuleName, unsigned char const* const pData, const size_t unDataSize) noexcept;
-		void const* FindData(wchar_t const* const szModuleName, const std::array<const unsigned char, 8>& SectionName, unsigned char const* const pData, const size_t unDataSize) noexcept;
+		void const* FindData(wchar_t const* const szModuleName, const std::array<const unsigned char, 8>& arrSectionName, unsigned char const* const pData, const size_t unDataSize) noexcept;
 		void const* FindData(wchar_t const* const szModuleName, char const* const szSectionName, unsigned char const* const pData, const size_t unDataSize) noexcept;
 #else
 		void const* FindData(char const* const szModuleName, unsigned char const* const pData, const size_t unDataSize) noexcept;
-		void const* FindData(char const* const szModuleName, const std::array<const unsigned char, 8>& SectionName, unsigned char const* const pData, const size_t unDataSize) noexcept;
+		void const* FindData(char const* const szModuleName, const std::array<const unsigned char, 8>& arrSectionName, unsigned char const* const pData, const size_t unDataSize) noexcept;
 		void const* FindData(char const* const szModuleName, char const* const szSectionName, unsigned char const* const pData, const size_t unDataSize) noexcept;
 #endif
 	} // namespace Scan
 
+#if defined(_WIN32)
 	// ----------------------------------------------------------------
 	// Run-Time Type Information (RTTI)
 	// ----------------------------------------------------------------
@@ -2059,6 +2235,7 @@ namespace Detours {
 		std::vector<std::unique_ptr<Object>> DumpRTTI(char const* const szModulePath);
 #endif
 	} // namespace RTTI
+#endif // defined(_WIN32)
 
 	// ----------------------------------------------------------------
 	// Sync
@@ -2076,18 +2253,32 @@ namespace Detours {
 			~Event();
 
 		public:
+#if defined(_WIN32)
 			HANDLE GetEvent() const;
+#elif defined(__linux__)
+			void* GetEvent() const;
+#endif
 
 		public:
 			bool Signal();
 			bool Reset();
+#if defined(_WIN32)
 			bool Pulse();
+#endif
 
 		public:
+#if defined(_WIN32)
 			bool Wait(DWORD unMilliseconds = INFINITE);
+#elif defined(__linux__)
+			bool Wait(unsigned int unMilliseconds = 0xFFFFFFFFu);
+#endif
 
 		private:
+#if defined(_WIN32)
 			HANDLE m_hEvent;
+#elif defined(__linux__)
+			void* m_hEvent;
+#endif
 		};
 
 		// ----------------------------------------------------------------
@@ -2100,20 +2291,42 @@ namespace Detours {
 			~EventServer();
 
 		public:
+#if defined(_WIN32)
 			bool GetEventName(TCHAR szEventName[64]);
+#elif defined(__linux__)
+			bool GetEventName(char szEventName[64]);
+#endif
+#if defined(_WIN32)
 			HANDLE GetEvent() const;
+#elif defined(__linux__)
+			void* GetEvent() const;
+#endif
 
 		public:
 			bool Signal();
 			bool Reset();
+#if defined(_WIN32)
 			bool Pulse();
+#endif
 
 		public:
+#if defined(_WIN32)
 			bool Wait(DWORD unMilliseconds = INFINITE);
+#elif defined(__linux__)
+			bool Wait(unsigned int unMilliseconds = 0xFFFFFFFFu);
+#endif
 
 		private:
+#if defined(_WIN32)
 			TCHAR m_szEventName[64];
+#elif defined(__linux__)
+			char m_szEventName[64];
+#endif
+#if defined(_WIN32)
 			HANDLE m_hEvent;
+#elif defined(__linux__)
+			void* m_hEvent;
+#endif
 		};
 
 		// ----------------------------------------------------------------
@@ -2122,22 +2335,40 @@ namespace Detours {
 
 		class EventClient {
 		public:
+#if defined(_WIN32)
 			EventClient(TCHAR szEventName[64], bool bIsGlobal = false);
+#elif defined(__linux__)
+			EventClient(char szEventName[64], bool bIsGlobal = false);
+#endif
 			~EventClient();
 
 		public:
+#if defined(_WIN32)
 			HANDLE GetEvent() const;
+#elif defined(__linux__)
+			void* GetEvent() const;
+#endif
 
 		public:
 			bool Signal();
 			bool Reset();
+#if defined(_WIN32)
 			bool Pulse();
+#endif
 
 		public:
+#if defined(_WIN32)
 			bool Wait(DWORD unMilliseconds = INFINITE);
+#elif defined(__linux__)
+			bool Wait(unsigned int unMilliseconds = 0xFFFFFFFFu);
+#endif
 
 		private:
+#if defined(_WIN32)
 			HANDLE m_hEvent;
+#elif defined(__linux__)
+			void* m_hEvent;
+#endif
 		};
 
 		// ----------------------------------------------------------------
@@ -2150,14 +2381,26 @@ namespace Detours {
 			~Mutex();
 
 		public:
+#if defined(_WIN32)
 			HANDLE GetMutex() const;
+#elif defined(__linux__)
+			void* GetMutex() const;
+#endif
 
 		public:
+#if defined(_WIN32)
 			bool Lock(DWORD unMilliseconds = INFINITE);
+#elif defined(__linux__)
+			bool Lock(unsigned int unMilliseconds = 0xFFFFFFFFu);
+#endif
 			bool UnLock();
 
 		private:
+#if defined(_WIN32)
 			HANDLE m_hMutex;
+#elif defined(__linux__)
+			void* m_hMutex;
+#endif
 		};
 
 		// ----------------------------------------------------------------
@@ -2170,16 +2413,36 @@ namespace Detours {
 			~MutexServer();
 
 		public:
+#if defined(_WIN32)
 			bool GetMutexName(TCHAR szMutexName[64]);
+#elif defined(__linux__)
+			bool GetMutexName(char szMutexName[64]);
+#endif
+#if defined(_WIN32)
 			HANDLE GetMutex() const;
+#elif defined(__linux__)
+			void* GetMutex() const;
+#endif
 
 		public:
+#if defined(_WIN32)
 			bool Lock(DWORD unMilliseconds = INFINITE);
+#elif defined(__linux__)
+			bool Lock(unsigned int unMilliseconds = 0xFFFFFFFFu);
+#endif
 			bool UnLock();
 
 		private:
+#if defined(_WIN32)
 			TCHAR m_szMutexName[64];
+#elif defined(__linux__)
+			char m_szMutexName[64];
+#endif
+#if defined(_WIN32)
 			HANDLE m_hMutex;
+#elif defined(__linux__)
+			void* m_hMutex;
+#endif
 		};
 
 		// ----------------------------------------------------------------
@@ -2188,18 +2451,34 @@ namespace Detours {
 
 		class MutexClient {
 		public:
+#if defined(_WIN32)
 			MutexClient(TCHAR szMutexName[64], bool bIsGlobal = false);
+#elif defined(__linux__)
+			MutexClient(char szMutexName[64], bool bIsGlobal = false);
+#endif
 			~MutexClient();
 
 		public:
+#if defined(_WIN32)
 			HANDLE GetMutex() const;
+#elif defined(__linux__)
+			void* GetMutex() const;
+#endif
 
 		public:
+#if defined(_WIN32)
 			bool Lock(DWORD unMilliseconds = INFINITE);
+#elif defined(__linux__)
+			bool Lock(unsigned int unMilliseconds = 0xFFFFFFFFu);
+#endif
 			bool UnLock();
 
 		private:
+#if defined(_WIN32)
 			HANDLE m_hMutex;
+#elif defined(__linux__)
+			void* m_hMutex;
+#endif
 		};
 
 		// ----------------------------------------------------------------
@@ -2208,18 +2487,30 @@ namespace Detours {
 
 		class Semaphore {
 		public:
-			Semaphore(LONG nInitialCount = 1, LONG nMaximumCount = 1);
+			Semaphore(int nInitialCount = 1, int nMaximumCount = 1);
 			~Semaphore();
 
 		public:
+#if defined(_WIN32)
 			HANDLE GetSemaphore() const;
+#elif defined(__linux__)
+			void* GetSemaphore() const;
+#endif
 
 		public:
+#if defined(_WIN32)
 			bool Enter(DWORD unMilliseconds = 0);
-			bool Leave(LONG nReleaseCount = 1);
+#elif defined(__linux__)
+			bool Enter(unsigned int unMilliseconds = 0);
+#endif
+			bool Leave(int nReleaseCount = 1);
 
 		private:
+#if defined(_WIN32)
 			HANDLE m_hSemaphore;
+#elif defined(__linux__)
+			void* m_hSemaphore;
+#endif
 		};
 
 		// ----------------------------------------------------------------
@@ -2228,20 +2519,40 @@ namespace Detours {
 
 		class SemaphoreServer {
 		public:
-			SemaphoreServer(bool bIsGlobal = false, LONG nInitialCount = 1, LONG nMaximumCount = 1);
+			SemaphoreServer(bool bIsGlobal = false, int nInitialCount = 1, int nMaximumCount = 1);
 			~SemaphoreServer();
 
 		public:
+#if defined(_WIN32)
 			bool GetSemaphoreName(TCHAR szSemaphoreName[64]);
+#elif defined(__linux__)
+			bool GetSemaphoreName(char szSemaphoreName[64]);
+#endif
+#if defined(_WIN32)
 			HANDLE GetSemaphore() const;
+#elif defined(__linux__)
+			void* GetSemaphore() const;
+#endif
 
 		public:
+#if defined(_WIN32)
 			bool Enter(DWORD unMilliseconds = 0);
-			bool Leave(LONG nReleaseCount = 1);
+#elif defined(__linux__)
+			bool Enter(unsigned int unMilliseconds = 0);
+#endif
+			bool Leave(int nReleaseCount = 1);
 
 		private:
+#if defined(_WIN32)
 			TCHAR m_szSemaphoreName[64];
+#elif defined(__linux__)
+			char m_szSemaphoreName[64];
+#endif
+#if defined(_WIN32)
 			HANDLE m_hSemaphore;
+#elif defined(__linux__)
+			void* m_hSemaphore;
+#endif
 		};
 
 		// ----------------------------------------------------------------
@@ -2250,18 +2561,34 @@ namespace Detours {
 
 		class SemaphoreClient {
 		public:
+#if defined(_WIN32)
 			SemaphoreClient(TCHAR szSemaphoreName[64], bool bIsGlobal = false);
+#elif defined(__linux__)
+			SemaphoreClient(char szSemaphoreName[64], bool bIsGlobal = false);
+#endif
 			~SemaphoreClient();
 
 		public:
+#if defined(_WIN32)
 			HANDLE GetSemaphore() const;
+#elif defined(__linux__)
+			void* GetSemaphore() const;
+#endif
 
 		public:
+#if defined(_WIN32)
 			bool Enter(DWORD unMilliseconds = 0);
-			bool Leave(LONG nReleaseCount = 1);
+#elif defined(__linux__)
+			bool Enter(unsigned int unMilliseconds = 0);
+#endif
+			bool Leave(int nReleaseCount = 1);
 
 		private:
+#if defined(_WIN32)
 			HANDLE m_hSemaphore;
+#elif defined(__linux__)
+			void* m_hSemaphore;
+#endif
 		};
 
 		// ----------------------------------------------------------------
@@ -2270,18 +2597,30 @@ namespace Detours {
 
 		class CriticalSection {
 		public:
+#if defined(_WIN32)
 			CriticalSection(DWORD unSpinCount = 0);
+#elif defined(__linux__)
+			CriticalSection(unsigned int unSpinCount = 0);
+#endif
 			~CriticalSection();
 
 		public:
-			PCRITICAL_SECTION GetCriticalSection();
+#if defined(_WIN32)
+			CRITICAL_SECTION* GetCriticalSection();
+#elif defined(__linux__)
+			pthread_mutex_t* GetCriticalSection();
+#endif
 
 		public:
 			void Enter();
 			void Leave();
 
 		private:
+#if defined(_WIN32)
 			CRITICAL_SECTION m_CriticalSection;
+#elif defined(__linux__)
+			pthread_mutex_t m_CriticalSection;
+#endif
 		};
 
 		// ----------------------------------------------------------------
@@ -2303,6 +2642,7 @@ namespace Detours {
 			void FixExecutionAddress(void* pAddress, void* pNewAddress);
 
 		private:
+#if defined(_WIN32)
 			typedef struct _SUSPENDER_DATA {
 				_SUSPENDER_DATA(DWORD unThreadID, HANDLE hHandle, CONTEXT CTX) {
 					m_unThreadID = unThreadID;
@@ -2321,6 +2661,13 @@ namespace Detours {
 			Mutex m_Mutex;
 			size_t m_unSuspendDepth;
 			std::unordered_set<DWORD> m_SuspendedTIDs;
+#elif defined(__linux__)
+			size_t SuspendNewThreadsSnapshot();
+
+			Mutex m_Mutex;
+			size_t m_unSuspendDepth;
+			std::unordered_set<unsigned int> m_SuspendedTIDs;
+#endif
 		};
 
 		class SuspendTransaction {
@@ -2364,8 +2711,16 @@ namespace Detours {
 			~PipeServer();
 
 		public:
+#if defined(_WIN32)
 			bool GetPipeName(TCHAR szPipeName[64]);
+#elif defined(__linux__)
+			bool GetPipeName(char szPipeName[64]);
+#endif
+#if defined(_WIN32)
 			HANDLE GetPipe() const;
+#elif defined(__linux__)
+			void* GetPipe() const;
+#endif
 
 		public:
 			bool Open();
@@ -2377,8 +2732,16 @@ namespace Detours {
 
 		private:
 			size_t m_unBufferSize;
+#if defined(_WIN32)
 			TCHAR m_szPipeName[64];
+#elif defined(__linux__)
+			char m_szPipeName[64];
+#endif
+#if defined(_WIN32)
 			HANDLE m_hPipe;
+#elif defined(__linux__)
+			void* m_hPipe;
+#endif
 		};
 
 		// ----------------------------------------------------------------
@@ -2391,10 +2754,18 @@ namespace Detours {
 			~PipeClient();
 
 		public:
+#if defined(_WIN32)
 			HANDLE GetPipe() const;
+#elif defined(__linux__)
+			void* GetPipe() const;
+#endif
 
 		public:
+#if defined(_WIN32)
 			bool Open(TCHAR szPipeName[64]);
+#elif defined(__linux__)
+			bool Open(char szPipeName[64]);
+#endif
 			bool Close();
 
 		public:
@@ -2403,7 +2774,11 @@ namespace Detours {
 
 		private:
 			size_t m_unBufferSize;
+#if defined(_WIN32)
 			HANDLE m_hPipe;
+#elif defined(__linux__)
+			void* m_hPipe;
+#endif
 		};
 	} // namespace Pipe
 
@@ -2447,7 +2822,11 @@ namespace Detours {
 		private:
 			fnThreadCallBack m_pCallBack;
 			void* m_pData;
+#if defined(_WIN32)
 			HANDLE m_hThread;
+#elif defined(__linux__)
+			void* m_hThread;
+#endif
 		};
 
 		// ----------------------------------------------------------------
@@ -2499,11 +2878,19 @@ namespace Detours {
 			~Shared();
 
 		public:
+#if defined(_WIN32)
 			HANDLE GetShared() const;
+#elif defined(__linux__)
+			void* GetShared() const;
+#endif
 			void* GetAddress() const;
 
 		private:
+#if defined(_WIN32)
 			HANDLE m_hMap;
+#elif defined(__linux__)
+			void* m_hMap;
+#endif
 			void* m_pAddress;
 		};
 
@@ -2517,13 +2904,29 @@ namespace Detours {
 			~SharedServer();
 
 		public:
+#if defined(_WIN32)
 			bool GetSharedName(TCHAR szSharedName[64]);
+#elif defined(__linux__)
+			bool GetSharedName(char szSharedName[64]);
+#endif
+#if defined(_WIN32)
 			HANDLE GetShared() const;
+#elif defined(__linux__)
+			void* GetShared() const;
+#endif
 			void* GetAddress() const;
 
 		private:
+#if defined(_WIN32)
 			TCHAR m_szSharedName[64];
+#elif defined(__linux__)
+			char m_szSharedName[64];
+#endif
+#if defined(_WIN32)
 			HANDLE m_hMap;
+#elif defined(__linux__)
+			void* m_hMap;
+#endif
 			void* m_pAddress;
 		};
 
@@ -2533,15 +2936,27 @@ namespace Detours {
 
 		class SharedClient {
 		public:
+#if defined(_WIN32)
 			SharedClient(TCHAR szSharedName[64], bool bIsGlobal = false);
+#elif defined(__linux__)
+			SharedClient(char szSharedName[64], bool bIsGlobal = false);
+#endif
 			~SharedClient();
 
 		public:
+#if defined(_WIN32)
 			HANDLE GetShared() const;
+#elif defined(__linux__)
+			void* GetShared() const;
+#endif
 			void* GetAddress() const;
 
 		private:
+#if defined(_WIN32)
 			HANDLE m_hMap;
+#elif defined(__linux__)
+			void* m_hMap;
+#endif
 			void* m_pAddress;
 		};
 
@@ -2556,9 +2971,21 @@ namespace Detours {
 			~Page();
 
 		public:
-			bool GetProtection(const PDWORD pProtection);
-			bool GetOriginalProtection(const PDWORD pProtection);
+#if defined(_WIN32)
+			bool GetProtection(DWORD* const pProtection);
+#elif defined(__linux__)
+			bool GetProtection(int* const pProtection);
+#endif
+#if defined(_WIN32)
+			bool GetOriginalProtection(DWORD* const pProtection);
+#elif defined(__linux__)
+			bool GetOriginalProtection(int* const pProtection);
+#endif
+#if defined(_WIN32)
 			bool ChangeProtection(const DWORD unNewProtection);
+#elif defined(__linux__)
+			bool ChangeProtection(const int unNewProtection);
+#endif
 			bool RestoreProtection();
 
 		public:
@@ -2597,7 +3024,11 @@ namespace Detours {
 			void* m_pPageAddress;
 			bool m_bAutoRestore;
 			bool m_bCommitted;
+#if defined(_WIN32)
 			DWORD m_unOriginalProtection;
+#elif defined(__linux__)
+			int m_unOriginalProtection;
+#endif
 			std::set<Block> m_FreeBlocks;
 			std::set<Block> m_ActiveBlocks;
 		};
@@ -2613,9 +3044,21 @@ namespace Detours {
 			~Region();
 
 		public:
-			bool GetProtection(const PDWORD pProtection);
-			bool GetOriginalProtection(const PDWORD pProtection);
+#if defined(_WIN32)
+			bool GetProtection(DWORD* const pProtection);
+#elif defined(__linux__)
+			bool GetProtection(int* const pProtection);
+#endif
+#if defined(_WIN32)
+			bool GetOriginalProtection(DWORD* const pProtection);
+#elif defined(__linux__)
+			bool GetOriginalProtection(int* const pProtection);
+#endif
+#if defined(_WIN32)
 			bool ChangeProtection(const DWORD unNewProtection);
+#elif defined(__linux__)
+			bool ChangeProtection(const int unNewProtection);
+#endif
 			bool RestoreProtection();
 
 		public:
@@ -2635,7 +3078,11 @@ namespace Detours {
 			size_t m_unRegionCapacity;
 			void* m_pRegionAddress;
 			bool m_bAutoRestore;
+#if defined(_WIN32)
 			DWORD m_unOriginalProtection;
+#elif defined(__linux__)
+			int m_unOriginalProtection;
+#endif
 			size_t m_unUsedSpace;
 			std::list<Page> m_Pages;
 		};
@@ -2677,7 +3124,11 @@ namespace Detours {
 			~Protection();
 
 		public:
+#if defined(_WIN32)
 			bool Change(const DWORD unNewProtection);
+#elif defined(__linux__)
+			bool Change(const int unNewProtection);
+#endif
 			bool Restore();
 
 		private:
@@ -2724,11 +3175,25 @@ namespace Detours {
 
 	namespace Exception {
 
+#if defined(__linux__)
+		typedef struct _SIGNAL_EXCEPTION_RECORD {
+			int m_nSignal;
+			int m_nSignalCode;
+			void* m_pSignalAddress;
+			void* m_pExceptionAddress;
+			size_t m_ExceptionInformation[4];
+		} SIGNAL_EXCEPTION_RECORD, *PSIGNAL_EXCEPTION_RECORD;
+#endif
+
 		// ----------------------------------------------------------------
 		// Exception CallBack
 		// ----------------------------------------------------------------
 
-		using fnExceptionCallBack = bool (*)(const EXCEPTION_RECORD& Exception, const PCONTEXT pCTX);
+#if defined(_WIN32)
+		using fnExceptionCallBack = bool (*)(const EXCEPTION_RECORD& Exception, CONTEXT* const pCTX);
+#elif defined(__linux__)
+		using fnExceptionCallBack = bool (*)(const SIGNAL_EXCEPTION_RECORD& Exception, ucontext_t* const pCTX);
+#endif
 
 		// ----------------------------------------------------------------
 		// Exception Listener
@@ -2750,7 +3215,11 @@ namespace Detours {
 			std::deque<fnExceptionCallBack>& GetCallBacks();
 
 		private:
-			PVOID m_pVEH;
+#if defined(_WIN32)
+			HANDLE m_pVEH;
+#elif defined(__linux__)
+			void* m_pVEH;
+#endif
 			std::deque<fnExceptionCallBack> m_CallBacks;
 		};
 
@@ -5734,14 +6203,33 @@ namespace Detours {
 		// Hardware Hook CallBack
 		// ----------------------------------------------------------------
 
-		using fnHardwareHookCallBack = void (*)(const PCONTEXT pCTX);
+		using fnHardwareHookCallBack = void (*)(
+#if defined(_WIN32)
+			CONTEXT* const pCTX
+#elif defined(__linux__)
+			ucontext_t* const pCTX
+#endif
+		);
 
 		// ----------------------------------------------------------------
 		// Hardware Hook
 		// ----------------------------------------------------------------
 
-		bool HookHardware(DWORD unThreadID, HARDWARE_HOOK_REGISTER unRegister, const fnHardwareHookCallBack pCallBack, void* pAddress, HARDWARE_HOOK_TYPE unType, unsigned char unSize = 1);
-		bool UnHookHardware(DWORD unThreadID, HARDWARE_HOOK_REGISTER unRegister);
+		bool HookHardware(
+#if defined(_WIN32)
+			DWORD unThreadID,
+#elif defined(__linux__)
+			unsigned int unThreadID,
+#endif
+			HARDWARE_HOOK_REGISTER unRegister, const fnHardwareHookCallBack pCallBack, void* pAddress, HARDWARE_HOOK_TYPE unType, unsigned char unSize = 1);
+
+		bool UnHookHardware(
+#if defined(_WIN32)
+			DWORD unThreadID,
+#elif defined(__linux__)
+			unsigned int unThreadID,
+#endif
+			HARDWARE_HOOK_REGISTER unRegister);
 
 		// ----------------------------------------------------------------
 		// Memory Hook Operation
@@ -5757,7 +6245,13 @@ namespace Detours {
 		// Memory Hook CallBack
 		// ----------------------------------------------------------------
 
-		using fnMemoryHookCallBack = void (*)(const PCONTEXT pCTX, const void* pExceptionAddress, MEMORY_HOOK_OPERATION unOperation, const void* pAddress, const void* pAccessAddress);
+		using fnMemoryHookCallBack = void (*)(
+#if defined(_WIN32)
+			CONTEXT* const pCTX,
+#elif defined(__linux__)
+			ucontext_t* const pCTX,
+#endif
+			const void* pExceptionAddress, MEMORY_HOOK_OPERATION unOperation, const void* pAddress, const void* pAccessAddress);
 
 		// ----------------------------------------------------------------
 		// Memory Hook
@@ -5770,7 +6264,13 @@ namespace Detours {
 		// Interrupt Hook CallBack
 		// ----------------------------------------------------------------
 
-		using fnInterruptHookCallBack = bool (*)(const PCONTEXT pCTX, const unsigned char unInterrupt);
+		using fnInterruptHookCallBack = bool (*)(
+#if defined(_WIN32)
+			CONTEXT* const pCTX,
+#elif defined(__linux__)
+			ucontext_t* const pCTX,
+#endif
+			const unsigned char unInterrupt);
 
 		// ----------------------------------------------------------------
 		// Interrupt Hook
@@ -5898,7 +6398,11 @@ namespace Detours {
 		// RAW_CONTEXT
 		// ----------------------------------------------------------------
 
+#if defined(_WIN32)
 #pragma pack(push, r1, 1)
+#elif defined(__linux__)
+#pragma pack(push, 1)
+#endif
 
 		typedef struct _RAW_CONTEXT_STACK {
 			template <typename T = void*>
@@ -6022,7 +6526,11 @@ namespace Detours {
 			float m_f32[16];
 		} RAW_CONTEXT_M512, *PRAW_CONTEXT_M512;
 
+#if defined(_WIN32)
 #pragma pack(pop, r1)
+#elif defined(__linux__)
+#pragma pack(pop)
+#endif
 
 		typedef struct _RAW_NATIVE_CONTEXT32 {
 
@@ -6642,11 +7150,11 @@ namespace Detours {
 			RAW_CONTEXT_FPU m_FPU;
 		} RAW_CONTEXT64, *PRAW_CONTEXT64;
 
-#ifdef _M_X64
+#if defined(DETOURS_ARCH_X64)
 		typedef RAW_NATIVE_CONTEXT64 RAW_NATIVE_CONTEXT;
 		typedef RAW_CONTEXT64 RAW_CONTEXT;
 		typedef PRAW_CONTEXT64 PRAW_CONTEXT;
-#elif _M_IX86
+#elif defined(DETOURS_ARCH_X86)
 		typedef RAW_NATIVE_CONTEXT32 RAW_NATIVE_CONTEXT;
 		typedef RAW_CONTEXT32 RAW_CONTEXT;
 		typedef PRAW_CONTEXT32 PRAW_CONTEXT;
@@ -6656,10 +7164,12 @@ namespace Detours {
 		// Raw Hook CallBack
 		// ----------------------------------------------------------------
 
-#ifdef _M_X64
+#if defined(_WIN32) && defined(DETOURS_ARCH_X64)
 		using fnRawHookCallBack = bool(__fastcall*)(PRAW_CONTEXT pCTX);
-#elif _M_IX86
+#elif defined(_WIN32) && defined(DETOURS_ARCH_X86)
 		using fnRawHookCallBack = bool(__cdecl*)(PRAW_CONTEXT pCTX);
+#elif defined(__linux__)
+		using fnRawHookCallBack = bool (*)(PRAW_CONTEXT pCTX);
 #endif
 
 		// ----------------------------------------------------------------
@@ -6696,6 +7206,8 @@ namespace Detours {
 	} // namespace Hook
 } // namespace Detours
 
+#if defined(_WIN32)
 #pragma warning(pop)
+#endif
 
 #endif // !_DETOURS_H_
