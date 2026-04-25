@@ -6205,9 +6205,9 @@ namespace Detours {
 
 		using fnHardwareHookCallBack = void (*)(
 #if defined(_WIN32)
-			CONTEXT* const pCTX
+		    CONTEXT* const pCTX
 #elif defined(__linux__)
-			ucontext_t* const pCTX
+		    ucontext_t* const pCTX
 #endif
 		);
 
@@ -6217,19 +6217,19 @@ namespace Detours {
 
 		bool HookHardware(
 #if defined(_WIN32)
-			DWORD unThreadID,
+		    DWORD unThreadID,
 #elif defined(__linux__)
-			unsigned int unThreadID,
+		    unsigned int unThreadID,
 #endif
-			HARDWARE_HOOK_REGISTER unRegister, const fnHardwareHookCallBack pCallBack, void* pAddress, HARDWARE_HOOK_TYPE unType, unsigned char unSize = 1);
+		    HARDWARE_HOOK_REGISTER unRegister, const fnHardwareHookCallBack pCallBack, void* pAddress, HARDWARE_HOOK_TYPE unType, unsigned char unSize = 1);
 
 		bool UnHookHardware(
 #if defined(_WIN32)
-			DWORD unThreadID,
+		    DWORD unThreadID,
 #elif defined(__linux__)
-			unsigned int unThreadID,
+		    unsigned int unThreadID,
 #endif
-			HARDWARE_HOOK_REGISTER unRegister);
+		    HARDWARE_HOOK_REGISTER unRegister);
 
 		// ----------------------------------------------------------------
 		// Memory Hook Operation
@@ -6247,11 +6247,11 @@ namespace Detours {
 
 		using fnMemoryHookCallBack = void (*)(
 #if defined(_WIN32)
-			CONTEXT* const pCTX,
+		    CONTEXT* const pCTX,
 #elif defined(__linux__)
-			ucontext_t* const pCTX,
+		    ucontext_t* const pCTX,
 #endif
-			const void* pExceptionAddress, MEMORY_HOOK_OPERATION unOperation, const void* pAddress, const void* pAccessAddress);
+		    const void* pExceptionAddress, MEMORY_HOOK_OPERATION unOperation, const void* pAddress, const void* pAccessAddress);
 
 		// ----------------------------------------------------------------
 		// Memory Hook
@@ -6266,11 +6266,11 @@ namespace Detours {
 
 		using fnInterruptHookCallBack = bool (*)(
 #if defined(_WIN32)
-			CONTEXT* const pCTX,
+		    CONTEXT* const pCTX,
 #elif defined(__linux__)
-			ucontext_t* const pCTX,
+		    ucontext_t* const pCTX,
 #endif
-			const unsigned char unInterrupt);
+		    const unsigned char unInterrupt);
 
 		// ----------------------------------------------------------------
 		// Interrupt Hook

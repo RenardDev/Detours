@@ -511,7 +511,7 @@ namespace {
 
 			const size_t unStart = static_cast<size_t>(pInfo->dlpi_addr) + static_cast<size_t>(phdr.p_vaddr);
 			const size_t unEnd = unStart + static_cast<size_t>(phdr.p_memsz);
-			mi.m_vecSegments.push_back({unStart, unEnd, static_cast<int>(phdr.p_flags)});
+			mi.m_vecSegments.push_back({ unStart, unEnd, static_cast<int>(phdr.p_flags) });
 			unMinimumStart = std::min(unMinimumStart, unStart);
 		}
 
@@ -644,7 +644,7 @@ namespace {
 		bool bOK = false;
 		ElfW(Ehdr) ehdr {};
 		if ((::pread(nFD, &ehdr, sizeof(ehdr), 0) == static_cast<ssize_t>(sizeof(ehdr))) &&
-			(std::memcmp(ehdr.e_ident, ELFMAG, SELFMAG) == 0) && ehdr.e_shoff && ehdr.e_shnum && (ehdr.e_shstrndx != SHN_UNDEF)) {
+		    (std::memcmp(ehdr.e_ident, ELFMAG, SELFMAG) == 0) && ehdr.e_shoff && ehdr.e_shnum && (ehdr.e_shstrndx != SHN_UNDEF)) {
 			std::vector<ElfW(Shdr)> vecSectionHeaders(ehdr.e_shnum);
 			if (::pread(nFD, vecSectionHeaders.data(), vecSectionHeaders.size() * sizeof(ElfW(Shdr)), static_cast<off_t>(ehdr.e_shoff)) == static_cast<ssize_t>(vecSectionHeaders.size() * sizeof(ElfW(Shdr)))) {
 				const auto& shdrStringTable = vecSectionHeaders[ehdr.e_shstrndx];
@@ -1143,7 +1143,7 @@ namespace {
 				return SuspendedContext.m_nThreadID == nThreadID;
 			});
 			if (it == g_SuspendedThreadContexts.end()) {
-				g_SuspendedThreadContexts.push_back({nThreadID, GetContextInstructionPointer(pCTX), GetContextStackPointer(pCTX)});
+				g_SuspendedThreadContexts.push_back({ nThreadID, GetContextInstructionPointer(pCTX), GetContextStackPointer(pCTX) });
 			} else {
 				it->m_unInstructionPointer = GetContextInstructionPointer(pCTX);
 				it->m_unStackPointer = GetContextStackPointer(pCTX);
@@ -1404,7 +1404,7 @@ namespace {
 				continue;
 			}
 
-			vecRanges.push_back({unStart, unEnd});
+			vecRanges.push_back({ unStart, unEnd });
 		}
 
 		std::fclose(pFile);
@@ -2060,7 +2060,7 @@ namespace {
 		return false;
 	}
 
-}
+} // namespace
 #endif // defined(__linux__)
 
 // ----------------------------------------------------------------
@@ -12108,7 +12108,7 @@ namespace Detours {
 			if (nFD < 0) {
 				return;
 			}
-			struct stat Status{};
+			struct stat Status {};
 			if (::fstat(nFD, &Status) != 0 || Status.st_size <= 0) {
 				::close(nFD);
 				return;
@@ -12145,7 +12145,7 @@ namespace Detours {
 		}
 
 		Page::Page(void* pBaseAddress, bool bAutoRestore, bool bCommitPage)
-			: m_bIsManualPage(true), m_unPageCapacity(LinuxPageSize()), m_pPageAddress(nullptr), m_bAutoRestore(bAutoRestore), m_bCommitted(false), m_unOriginalProtection((PROT_READ | PROT_WRITE)) {
+		    : m_bIsManualPage(true), m_unPageCapacity(LinuxPageSize()), m_pPageAddress(nullptr), m_bAutoRestore(bAutoRestore), m_bCommitted(false), m_unOriginalProtection((PROT_READ | PROT_WRITE)) {
 			if (pBaseAddress) {
 				m_pPageAddress = reinterpret_cast<void*>(__align_down<size_t>(reinterpret_cast<size_t>(pBaseAddress), LinuxPageSize()));
 				QueryMemoryRegion(m_pPageAddress, nullptr, nullptr, &m_unOriginalProtection);
@@ -12163,7 +12163,7 @@ namespace Detours {
 		}
 
 		Page::Page(void* pDesiredAddress)
-			: m_bIsManualPage(false), m_unPageCapacity(LinuxPageSize()), m_pPageAddress(nullptr), m_bAutoRestore(false), m_bCommitted(false), m_unOriginalProtection((PROT_READ | PROT_WRITE | PROT_EXEC)) {
+		    : m_bIsManualPage(false), m_unPageCapacity(LinuxPageSize()), m_pPageAddress(nullptr), m_bAutoRestore(false), m_bCommitted(false), m_unOriginalProtection((PROT_READ | PROT_WRITE | PROT_EXEC)) {
 			void* const pAddress = pDesiredAddress ? AllocateExecutableBlockNear(pDesiredAddress, m_unPageCapacity) : AllocateExecutableBlock(m_unPageCapacity);
 			if (!pAddress) {
 				return;
@@ -12310,7 +12310,7 @@ namespace Detours {
 		}
 
 		Region::Region(void* pBaseAddress, bool bAutoRestore)
-			: m_bIsManualRegion(true), m_unRegionCapacity(0), m_pRegionAddress(nullptr), m_bAutoRestore(bAutoRestore), m_unOriginalProtection((PROT_READ | PROT_WRITE)), m_unUsedSpace(0) {
+		    : m_bIsManualRegion(true), m_unRegionCapacity(0), m_pRegionAddress(nullptr), m_bAutoRestore(bAutoRestore), m_unOriginalProtection((PROT_READ | PROT_WRITE)), m_unUsedSpace(0) {
 			size_t unStart = 0;
 			size_t unEnd = 0;
 			if (QueryMemoryRegion(pBaseAddress, &unStart, &unEnd, &m_unOriginalProtection)) {
@@ -12320,7 +12320,7 @@ namespace Detours {
 		}
 
 		Region::Region(void* pDesiredAddress, size_t unCapacity)
-			: m_bIsManualRegion(false), m_unRegionCapacity(unCapacity ? unCapacity : LinuxPageSize() * 16), m_pRegionAddress(pDesiredAddress), m_bAutoRestore(false), m_unOriginalProtection((PROT_READ | PROT_WRITE | PROT_EXEC)), m_unUsedSpace(0) {
+		    : m_bIsManualRegion(false), m_unRegionCapacity(unCapacity ? unCapacity : LinuxPageSize() * 16), m_pRegionAddress(pDesiredAddress), m_bAutoRestore(false), m_unOriginalProtection((PROT_READ | PROT_WRITE | PROT_EXEC)), m_unUsedSpace(0) {
 		}
 
 		Region::~Region() {
@@ -12444,7 +12444,7 @@ namespace Detours {
 		}
 
 		Storage::Storage(size_t unTotalCapacity, size_t unRegionCapacity)
-			: m_unTotalCapacity(unTotalCapacity ? unTotalCapacity : HOOK_STORAGE_CAPACITY), m_unRegionCapacity(unRegionCapacity ? unRegionCapacity : LinuxPageSize() * 16), m_unUsedSpace(0) {
+		    : m_unTotalCapacity(unTotalCapacity ? unTotalCapacity : HOOK_STORAGE_CAPACITY), m_unRegionCapacity(unRegionCapacity ? unRegionCapacity : LinuxPageSize() * 16), m_unUsedSpace(0) {
 		}
 
 		void* Storage::Alloc(size_t unSize, size_t unSizeAlign, size_t unAddressAlign, void* pDesiredAddress, Page** pUsedPage, Region** pUsedRegion) {
@@ -13509,6 +13509,7 @@ namespace Detours {
 			struct sigaction g_OldSigIll {};
 			struct sigaction g_OldSigFpe {};
 			struct sigaction g_OldSigBus {};
+
 			void* ContextInstructionPointer(ucontext_t* pCTX) {
 #if defined(__x86_64__)
 				return pCTX ? reinterpret_cast<void*>(pCTX->uc_mcontext.gregs[REG_RIP]) : nullptr;
@@ -13595,7 +13596,7 @@ namespace Detours {
 				g_SignalsInstalled = false;
 				return true;
 			}
-		}
+		} // namespace
 
 		ExceptionListener g_ExceptionListener;
 
@@ -43515,11 +43516,11 @@ namespace Detours {
 
 		bool HookHardware(
 #if defined(_WIN32)
-			DWORD unThreadID,
+		    DWORD unThreadID,
 #elif defined(__linux__)
-			unsigned int unThreadID,
+		    unsigned int unThreadID,
 #endif
-			HARDWARE_HOOK_REGISTER unRegister, const fnHardwareHookCallBack pCallBack, void* pAddress, HARDWARE_HOOK_TYPE unType, unsigned char unSize) {
+		    HARDWARE_HOOK_REGISTER unRegister, const fnHardwareHookCallBack pCallBack, void* pAddress, HARDWARE_HOOK_TYPE unType, unsigned char unSize) {
 #if defined(_WIN32)
 			Sync::SuspendTransaction SuspenderTransaction(g_Suspender);
 			if (!SuspenderTransaction) {
@@ -43580,6 +43581,7 @@ namespace Detours {
 			}
 
 			unsigned char unDRIndex = 0;
+
 			switch (unRegister) {
 				case HARDWARE_HOOK_REGISTER::REGISTER_DR0:
 #if defined(DETOURS_ARCH_X64)
@@ -43619,6 +43621,7 @@ namespace Detours {
 			}
 
 			unsigned char unTypeValue = 0;
+
 			switch (unType) {
 				case HARDWARE_HOOK_TYPE::TYPE_EXECUTE:
 					unTypeValue = 0;
@@ -43634,6 +43637,7 @@ namespace Detours {
 			}
 
 			unsigned char unSizeValue = 0;
+
 			switch (unSize) {
 				case 1:
 					unSizeValue = 0;
@@ -43790,11 +43794,11 @@ namespace Detours {
 
 		bool UnHookHardware(
 #if defined(_WIN32)
-			DWORD unThreadID,
+		    DWORD unThreadID,
 #elif defined(__linux__)
-			unsigned int unThreadID,
+		    unsigned int unThreadID,
 #endif
-			HARDWARE_HOOK_REGISTER unRegister) {
+		    HARDWARE_HOOK_REGISTER unRegister) {
 #if defined(_WIN32)
 			Sync::SuspendTransaction SuspenderTransaction(g_Suspender);
 			if (!SuspenderTransaction) {
@@ -44152,7 +44156,7 @@ namespace Detours {
 					bOwnedMapping = true;
 				}
 
-				pRecord->m_vecPages.push_back({unPage, unPageSize, nProtection, bOwnedMapping});
+				pRecord->m_vecPages.push_back({ unPage, unPageSize, nProtection, bOwnedMapping });
 			}
 
 			{
@@ -46895,45 +46899,45 @@ namespace Detours {
 			// Registers
 
 			*reinterpret_cast<int*>(pJumpToTrampoline + 0x04) =
-				nContextBase + static_cast<int>(offsetof(RAW_CONTEXT, m_unRAX));
+			    nContextBase + static_cast<int>(offsetof(RAW_CONTEXT, m_unRAX));
 			*reinterpret_cast<int*>(pJumpToTrampoline + 0x0C) =
-				nContextBase + static_cast<int>(offsetof(RAW_CONTEXT, m_unRCX));
+			    nContextBase + static_cast<int>(offsetof(RAW_CONTEXT, m_unRCX));
 			*reinterpret_cast<int*>(pJumpToTrampoline + 0x14) =
-				nContextBase + static_cast<int>(offsetof(RAW_CONTEXT, m_unRDX));
+			    nContextBase + static_cast<int>(offsetof(RAW_CONTEXT, m_unRDX));
 			*reinterpret_cast<int*>(pJumpToTrampoline + 0x1C) =
-				nContextBase + static_cast<int>(offsetof(RAW_CONTEXT, m_unRBX));
+			    nContextBase + static_cast<int>(offsetof(RAW_CONTEXT, m_unRBX));
 			*reinterpret_cast<int*>(pJumpToTrampoline + 0x24) =
-				nContextBase + static_cast<int>(offsetof(RAW_CONTEXT, m_unRBP));
+			    nContextBase + static_cast<int>(offsetof(RAW_CONTEXT, m_unRBP));
 			*reinterpret_cast<int*>(pJumpToTrampoline + 0x2C) =
-				nContextBase + static_cast<int>(offsetof(RAW_CONTEXT, m_unRSI));
+			    nContextBase + static_cast<int>(offsetof(RAW_CONTEXT, m_unRSI));
 			*reinterpret_cast<int*>(pJumpToTrampoline + 0x34) =
-				nContextBase + static_cast<int>(offsetof(RAW_CONTEXT, m_unRDI));
+			    nContextBase + static_cast<int>(offsetof(RAW_CONTEXT, m_unRDI));
 			*reinterpret_cast<int*>(pJumpToTrampoline + 0x3C) =
-				nContextBase + static_cast<int>(offsetof(RAW_CONTEXT, m_unR8));
+			    nContextBase + static_cast<int>(offsetof(RAW_CONTEXT, m_unR8));
 			*reinterpret_cast<int*>(pJumpToTrampoline + 0x44) =
-				nContextBase + static_cast<int>(offsetof(RAW_CONTEXT, m_unR9));
+			    nContextBase + static_cast<int>(offsetof(RAW_CONTEXT, m_unR9));
 			*reinterpret_cast<int*>(pJumpToTrampoline + 0x4C) =
-				nContextBase + static_cast<int>(offsetof(RAW_CONTEXT, m_unR10));
+			    nContextBase + static_cast<int>(offsetof(RAW_CONTEXT, m_unR10));
 			*reinterpret_cast<int*>(pJumpToTrampoline + 0x54) =
-				nContextBase + static_cast<int>(offsetof(RAW_CONTEXT, m_unR11));
+			    nContextBase + static_cast<int>(offsetof(RAW_CONTEXT, m_unR11));
 			*reinterpret_cast<int*>(pJumpToTrampoline + 0x5C) =
-				nContextBase + static_cast<int>(offsetof(RAW_CONTEXT, m_unR12));
+			    nContextBase + static_cast<int>(offsetof(RAW_CONTEXT, m_unR12));
 			*reinterpret_cast<int*>(pJumpToTrampoline + 0x64) =
-				nContextBase + static_cast<int>(offsetof(RAW_CONTEXT, m_unR13));
+			    nContextBase + static_cast<int>(offsetof(RAW_CONTEXT, m_unR13));
 			*reinterpret_cast<int*>(pJumpToTrampoline + 0x6C) =
-				nContextBase + static_cast<int>(offsetof(RAW_CONTEXT, m_unR14));
+			    nContextBase + static_cast<int>(offsetof(RAW_CONTEXT, m_unR14));
 			*reinterpret_cast<int*>(pJumpToTrampoline + 0x74) =
-				nContextBase + static_cast<int>(offsetof(RAW_CONTEXT, m_unR15));
+			    nContextBase + static_cast<int>(offsetof(RAW_CONTEXT, m_unR15));
 
 			// Flags
 
 			*reinterpret_cast<int*>(pJumpToTrampoline + 0x7B) =
-				nContextBase + static_cast<int>(offsetof(RAW_CONTEXT, m_unRFLAGS));
+			    nContextBase + static_cast<int>(offsetof(RAW_CONTEXT, m_unRFLAGS));
 
 			// Trampoline
 
 			*reinterpret_cast<unsigned long long*>(pJumpToTrampoline + 0x86) =
-				reinterpret_cast<unsigned long long>(m_pTrampoline);
+			    reinterpret_cast<unsigned long long>(m_pTrampoline);
 #else
 			const size_t unToTrampolineJumpOffset = __is_relative(m_pTrampoline, pJumpToTrampoline);
 			if (unToTrampolineJumpOffset) { // E9 00 00 00 00 - jmp rel32
