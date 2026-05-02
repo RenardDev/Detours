@@ -223,7 +223,7 @@ Hooking primitives:
 - `InlineWrapperHook` - inline hook with wrapper/trampoline support.
 - `RawHook` - raw hook with direct access to a saved `RAW_CONTEXT` containing GPR, flags, stack, and optional FPU/SIMD state.
 
-`RawHook` callbacks can either redirect execution manually through `ctx->Stack.push(...)` and return `true`, or return `false` to continue the original code through the trampoline using the restore path.
+`RawHook` callbacks can either redirect execution manually through `pCTX->Stack.push(...)` and return `true`, or return `false` to continue the original code through the trampoline using the restore path.
 
 ## Minimal examples
 
