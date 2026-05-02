@@ -261,14 +261,14 @@ int main() {
 ```cpp
 Detours::Hook::RawHook g_RawHook;
 
-bool RawCallback(Detours::Hook::PRAW_CONTEXT ctx) {
+bool RawCallback(Detours::Hook::PRAW_CONTEXT pCTX) {
 #if defined(DETOURS_ARCH_X64)
-    ctx->m_unRDI += 100; // first integer argument on SysV Linux x64
+    pCTX->m_unRDI += 100; // first integer argument on SysV Linux x64
 #elif defined(DETOURS_ARCH_X86)
     // Adjust stack/registers as needed for the active calling convention.
 #endif
 
-    ctx->Stack.push(g_RawHook.GetTrampoline());
+    pCTX->Stack.push(g_RawHook.GetTrampoline());
     return true;
 }
 ```
