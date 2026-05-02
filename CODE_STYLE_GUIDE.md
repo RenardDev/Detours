@@ -134,17 +134,28 @@ Example:
 
 ### 4.3. Declaration and Dependency Order
 
-Inside a file, declarations and definitions should follow a visible dependency order.
+Inside a file, declarations and definitions must follow a strict dependency order.
 
 The goal is not to satisfy the compiler in the narrowest possible way. C++ can often tolerate forward declarations and cross-references. The goal is to make the file readable from top to bottom and to make dependencies discoverable without mental backtracking.
 
+Canonical order after the file header / include guard:
+
+1. `#include` directives.
+2. `#define` values and compile-time constants.
+3. Global and static objects.
+4. Functions ordered from lower-level to higher-level.
+
 Rules:
 
-1. `#define` values and compile-time constants must appear before their first use.
-2. This includes uses in array sizes, template arguments, static assertions, masks, offsets, and other compile-time contexts.
-3. Global and static objects should appear before the functions that depend on them.
-4. Functions should be ordered from lower-level to higher-level whenever practical.
-5. Place leaf-level functions first, then mid-level helper functions, and only then higher-level orchestration functions.
+1. Includes always come before local constants, globals, and function definitions.
+2. `#define` values and compile-time constants must appear before their first use.
+3. This includes uses in array sizes, template arguments, static assertions, masks, offsets, and other compile-time contexts.
+4. Global and static objects must appear before the functions that depend on them.
+5. Functions must be ordered by dependency level whenever practical:
+   - leaf-level functions first;
+   - mid-level helper functions after leaf-level functions;
+   - high-level orchestration functions after mid-level functions;
+   - entry points last.
 6. A reader should be able to move downward through the file and understand who depends on whom without repeated jumping.
 
 Benefits:
@@ -402,6 +413,7 @@ szModuleName
 | --- | --- | --- |
 | `m_` | class/struct member | `m_pAddress`, `m_bActive` |
 | `g_` | global or static entity | `g_Storage`, `g_Suspender` |
+| `k` | `constexpr` constant only | `kPageSize`, `kMaxRecords` |
 | `p` | pointer | `pAddress`, `pBuffer`, `pData` |
 | `un` | unsigned / size / id / count | `unSize`, `unOffset`, `unIndex` |
 | `n` | signed integer | `nResult`, `nBufferSize` |
@@ -461,7 +473,30 @@ Typical families:
 
 Historical forms such as `UnHook`, `UnLock`, `DeAlloc`, and `ReLink` are acceptable if they are part of a project's established convention.
 
-### 8.6. Macros
+### 8.6. Compile-Time Constants
+
+`constexpr` constants use the `k` prefix with a `PascalCase` tail.
+
+The `k` prefix is reserved only for `constexpr` constants. Do not use `k` for ordinary variables, non-`constexpr` `const` objects, macros, enum values, globals, members, or function parameters.
+
+Correct:
+
+```cpp
+constexpr size_t kMaxRecords = 64;
+constexpr unsigned int kPageSize = 0x1000;
+
+char szBuffer[kMaxRecords];
+```
+
+Incorrect:
+
+```cpp
+const size_t kRuntimeSize = GetRuntimeSize();
+#define kMaxRecords 64
+unsigned int kIndex = 0;
+```
+
+### 8.7. Macros
 
 Macros use `UPPER_SNAKE_CASE`.
 
@@ -474,7 +509,7 @@ DISABLE_OPTIMIZATION_BEGIN
 RD_FLAG_MODRM
 ```
 
-### 8.7. Acronyms
+### 8.8. Acronyms
 
 Keep acronyms uppercase where that improves recognizability:
 
@@ -1148,6 +1183,8 @@ typedef struct _SOME_RECORD {
 - Use braces for all branches.
 - Use tabs as the primary indentation unit.
 - Use semantic prefixes in names.
+- Keep file-level declarations in strict dependency order: includes, constants, globals, leaf-level functions, mid-level functions, high-level functions, entry points.
+- Use the `k` prefix only for `constexpr` constants.
 - Start functions with guard clauses.
 - Return explicit success/failure values.
 - Keep cleanup close to the failure point.

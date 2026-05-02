@@ -10,7 +10,8 @@ Always follow [CODE_STYLE_GUIDE.md](CODE_STYLE_GUIDE.md) when generating, modify
 
 ## Expected Behavior
 
-- Use the naming, brace style, spacing, declaration style, and function structure defined in [CODE_STYLE_GUIDE.md](CODE_STYLE_GUIDE.md).
+- Use the naming, brace style, spacing, declaration style, dependency order, and function structure defined in [CODE_STYLE_GUIDE.md](CODE_STYLE_GUIDE.md).
+- Keep new code ordered as includes, constants, globals, leaf-level functions, mid-level functions, high-level functions, and entry points.
 - When adding new code, match the repository style first and avoid introducing unrelated stylistic rewrites.
 - When reviewing code, treat deviations from [CODE_STYLE_GUIDE.md](CODE_STYLE_GUIDE.md) as style issues unless the file has a well-established local exception.
 - If a rule in the guide conflicts with correctness, safety, build requirements, or a stronger repository convention, prefer the safer and more specific constraint.
