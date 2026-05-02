@@ -713,6 +713,16 @@
 #define HOOK_RAW_TRAMPOLINE_SIZE 0x30
 #endif // !HOOK_RAW_TRAMPOLINE_SIZE
 
+#ifndef HOOK_RAW_RESTORE_SIZE
+#if defined(DETOURS_ARCH_X64)
+// Max size for the standalone RawHook false-path restore stub.
+#define HOOK_RAW_RESTORE_SIZE 0x500
+#elif defined(DETOURS_ARCH_X86)
+// Max size for the standalone RawHook false-path restore stub.
+#define HOOK_RAW_RESTORE_SIZE 0x300
+#endif
+#endif // !HOOK_RAW_RESTORE_SIZE
+
 #ifndef CALLSTACK_MAX_ENTRIES
 // Max entries for callstack
 #define CALLSTACK_MAX_ENTRIES 8
@@ -2600,7 +2610,7 @@ namespace Detours {
 #if defined(_WIN32)
 			CriticalSection(DWORD unSpinCount = 0);
 #elif defined(__linux__)
-			CriticalSection(unsigned int unSpinCount = 0);
+			CriticalSection();
 #endif
 			~CriticalSection();
 
@@ -2689,6 +2699,7 @@ namespace Detours {
 
 		private:
 			Suspender* m_pSuspender;
+			size_t m_unBeginDepth;
 			bool m_bActive;
 		};
 
@@ -7198,6 +7209,7 @@ namespace Detours {
 			bool m_bInitialized;
 			void* m_pAddress;
 			void* m_pWrapper;
+			void* m_pRestore;
 			unsigned char m_unFirstInstructionSize;
 			void* m_pTrampoline;
 			size_t m_unOriginalBytes;
