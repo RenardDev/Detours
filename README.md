@@ -1,107 +1,294 @@
 # Detours
-A set of `Windows 10+`/`VS2022`/`C++14` tools for working with software modifications in two files (Detours.h, Detours.cpp).
 
-# Definitions
-* `LINKER_OPTION(OPTION)` - Macro for passing a parameter to the MSVC linker.
-* `INCLUDE(SYMBOL_NAME)` - Macro for forcing the inclusion of a symbol in the build.
-* `SELF_INCLUDE` - Macro for self-inclusion in the build, equivalent to `INCLUDE(FUNCDNAME)`.
-* `EXPORT(SYMBOL_NAME, ALIAS_NAME)` - Macro for exporting a symbol with an alias in MSVC.
-* `SELF_EXPORT(ALIAS_NAME)` - Macro for self-exporting a symbol with an alias, equivalent to `EXPORT(FUNCDNAME, ALIAS_NAME)`.
-* `DECLARE_SECTION(NAME)` - Macro for declaring a section for use with `DEFINE_IN_SECTION`.
-* `DEFINE_SECTION(NAME, ATTRIBUTES)` - Macro for defining or redefining a section with specified attributes.
-* `DEFINE_IN_SECTION(NAME)` - Macro for defining data in a section specified by its name.
-* `DEFINE_IN_CODE_SECTION(NAME)` - Macro for defining code in a section not declared by `DECLARE_SECTION` but defined by `DEFINE_SECTION`.
+Detours is a compact C++ runtime instrumentation library for x86/x86-64 Windows and Linux.  The core library is intentionally kept in two files:
 
-# Detours
-* KUserSharedData - A data area structure that the kernel allocates for sharing with user-mode software.
-* GetPEB - Gets *Process Environment Block* (PEB) of the currently running process.
-* GetTEB - Gets *Thread Environment Block* (TEB) of the current thread or thread from a handle.
+```text
+Detours.h
+Detours.cpp
+```
 
-# Detours::CallStack
-* GetCallStack - Returns the call stack for a specific thread.
-* GetShadowStack - Returns the shadow stack for a specific thread.
-* GetShadowCallStack - Returns the shadow call stack for a specific thread.
+It provides tools for code patching, inline hooks, raw register-level hooks, memory hooks, interrupt hooks, section and signature scanning, memory management, synchronization primitives, named pipes, shared memory, lightweight threading helpers, exception/signal handling, and an embedded x86/x86-64 disassembler.
 
-# Detours::LDR
-* FindModuleListEntry - Finds a module list entry.
-* FindModuleDataTableEntry - Finds a module data table entry.
-* LINK_DATA - A structure containing pointers to various linked lists related to module loading.
-* UnLinkModule - Unlinks a module from linked lists using the base address, module handle, or module name. It takes a LINK_DATA structure as an additional parameter.
-* ReLinkModule - Relinks a module back into the linked lists using a provided LINK_DATA structure.
+## Platform support
 
-# Detours::Codec
-* Encode - Converts a sequence of characters from a specified character encoding to another.
-* Decode - Converts a sequence of characters from a specified wide-character encoding to another.
+| Platform | Status | Toolchain | Notes |
+|---|---:|---|---|
+| Windows x86 | Supported | Visual Studio 2022 / MSVC | PE, PEB/TEB, LDR, VEH, WinAPI synchronization, MSVC RTTI. |
+| Windows x64 | Supported | Visual Studio 2022 / MSVC | Same as Windows x86, with x64-specific hook wrappers. |
+| Linux x86 | Supported by code paths | GCC or Clang | POSIX/Linux primitives, ELF scanning, signals, `mmap`/`mprotect`. |
+| Linux x64 | Tested | GCC or Clang | Current Linux test harness passes on x86_64. |
 
-# Detours::Hexadecimal
-* Encode - Converts binary data into a hexadecimal representation with an optional ignored byte.
-* Decode - Converts a hexadecimal string back to binary data with an optional ignored byte.
+Only x86 and x86-64 are supported. Other architectures currently fail at compile time.
 
-# Detours::Scan
-* FindSection - Locates a section within the specified module based on the provided section name.
-* FindSectionPOGO - Locates a POGO section within the specified module based on the provided section name.
-* FindSignature - Searches for a signature pattern.
-* FindData - Searches for a specified data pattern.
+## Requirements
 
-# Detours::RTTI
-* Object - Represents an object in memory with rich type information, including its base classes, type descriptor, class hierarchy descriptor, complete object locator, and virtual function table (VTable). The class supports dynamic casting for polymorphic objects.
-* FindObject - Locates an object in memory based on specified parameters, including module information, object name, and whether to search for the complete object.
+### Windows
 
-# Detours::Sync
-* Event - Represents an event synchronization object, providing functionalities for signaling, resetting, pulsing, and waiting on events.
-* EventServer - Specialized version of the Event class designed for server-side usage. Includes functionalities for obtaining the event name.
-* EventClient - Specialized version of the Event class designed for client-side usage. Supports synchronization with server events.
-* Mutex - Represents a mutex synchronization object, providing functionalities for locking and unlocking.
-* MutexServer - Specialized version of the Mutex class designed for server-side usage. Includes functionalities for obtaining the mutex name.
-* MutexClient - Specialized version of the Mutex class designed for client-side usage. Supports synchronization with server mutexes.
-* Semaphore - Represents a semaphore synchronization object, providing functionalities for entering and leaving.
-* SemaphoreServer - Specialized version of the Semaphore class designed for server-side usage. Includes functionalities for obtaining the semaphore name.
-* SemaphoreClient - Specialized version of the Semaphore class designed for client-side usage. Supports synchronization with server semaphores.
-* CriticalSection - Represents a critical section synchronization object, providing functionalities for entering and leaving.
-* SRWLock - Represents a slim reader/writer (SRW) lock synchronization object, providing functionalities for acquiring and releasing.
-* ConditionVariable - Represents a condition variable synchronization object, providing functionalities for sleeping, waking, and waking all.
-* Suspender - Manages the suspension and resumption of threads. Supports fixing the execution address of suspended threads.
-* g_Suspender - Global instance of the *Suspender*.
+- Windows 10 or newer.
+- Visual Studio 2022 or a compatible MSVC toolchain.
+- C++17 or newer is recommended for the current cross-platform codebase.
+- Optional MASM files are used only by some tests/examples, such as interrupt-call helpers.
 
-# Detours::Pipe
-* PipeServer - Represents a server-side named pipe, facilitating communication with a client using a specified buffer size.
-* PipeClient - Represents a client-side connection to a named pipe server, supporting communication with a specified buffer size.
+### Linux
 
-# Detours::Parallel
-* Thread - Represents a lightweight thread with a callback function and associated data.
-* Fiber - Represents a lightweight fiber with a callback function and associated data.
+- GCC or Clang with C++17 or newer.
+- `pthread` support.
+- `dl` support for module/symbol helpers.
+- x86 or x86-64 CPU.
 
-# Detours::Memory
-* Shared - Represents a shared memory region.
-* SharedServer - Represents a server-side shared memory region.
-* SharedClient - Represents a client-side connection to a shared memory region.
-* Page - Manages a memory page with allocation and deallocation capabilities.
-* NearPage - Manages a memory page with near allocations to a desired address.
-* Storage - Manages a collection of pages to provide a storage space for allocations.
-* NearStorage - Manages a collection of near pages to provide storage with near allocations.
-* Protection - Manages memory protection for a specified range of memory.
+The Linux port uses POSIX/Linux APIs such as `pthread`, `semaphore`, `signal`, `ucontext`, `mmap`, `mprotect`, shared memory, and named FIFO files.
 
-# Detours::Exception
-* ExceptionListener - Manages exception handling through a vectored exception handler (VEH) and provides a mechanism for adding and removing callback functions to handle exceptions.
-* g_ExceptionListener - Global instance of the *ExceptionListener*.
+## Build
 
-# Detours::rddiaasm
-* RdInitContext - Initializes the decoding context structure.
-* RdDecodeWithContext - Decodes an instruction using the specified decoding context.
-* RdDecodeEx - Decodes an instruction with extended options.
-* RdDecode - Decodes an instruction.
-* RdIsInstruxRipRelative - Checks if the decoded instruction is RIP-relative.
-* RdGetFullAccessMap - Retrieves the full access map for the decoded instruction.
-* RdGetOperandRlut - Retrieves the operand register lookup table for the decoded instruction.
-* RdGetAddressFromRelOrDisp - Retrieves the rel/disp address from the decoded instruction.
+### Windows example
 
-# Detours::Hook
-* HookHardware - Hooks the specified debug register (DRx) with the given access type (execute, write, read) and callback.
-* UnHookHardware - Unhooks the specified debug register.
-* HookMemory - Hooks the specified address range for operations (read, write, execute) with the given callback.
-* UnHookMemory - Unhooks the specified address range.
-* HookInterrupt - Hooks the specified interrupt with the given callback.
-* UnHookInterrupt - Unhooks the specified interrupt.
-* InlineHook - Class for hooking functions using inline hooking technique. (Has support for checking Return Address to avoid crashes after unhook)
-* InlineWrapperHook - Class for hooking functions using inline hooking with a wrapper function. (Has support for checking Return Address to avoid crashes after unhook)
-* RawHook - Class for raw hooking functions with full control over registers and the stack. (Has support for checking Return Address to avoid crashes after unhook)
+```bat
+cl /std:c++17 /EHsc /O2 your_code.cpp Detours.cpp
+```
+
+For test programs that use the provided assembly helpers, build the matching assembly file too:
+
+```bat
+ml64 /c interrupts64.asm
+cl /std:c++17 /EHsc main.cpp Detours.cpp interrupts64.obj
+```
+
+Use `interrupts32.asm` for 32-bit builds.
+
+### Linux example
+
+```bash
+g++ -std=c++17 -O2 -pthread your_code.cpp Detours.cpp -ldl -o your_app
+```
+
+## Feature matrix
+
+| Component | Windows | Linux | Notes |
+|---|---:|---:|---|
+| MSVC linker/export/section macros | Yes | No | `LINKER_OPTION`, `EXPORT`, `DEFINE_SECTION`, etc. are MSVC/PE-specific. |
+| `KUserSharedData` | Yes | No | Windows shared user/kernel page. |
+| `GetPEB`, `GetTEB` | Yes | No | Windows process/thread internals. |
+| `CallStack` | Yes | Partial | Linux supports current call-stack collection; Windows also exposes thread/shadow-stack helpers. |
+| `LDR` | Yes | No | Windows loader linked-list helpers. |
+| `Codec` | Yes | Yes | Character conversion helpers. |
+| `Hexadecimal` | Yes | Yes | Binary-to-hex and hex-to-binary conversion. |
+| `Scan` | Yes | Yes | PE scanning on Windows, ELF/module scanning on Linux. |
+| `RTTI` | Yes | No | Current `Detours::RTTI` implementation targets MSVC RTTI metadata. |
+| `Sync` | Yes | Yes | Events, mutexes, semaphores, critical sections, suspender utilities. |
+| `Pipe` | Yes | Yes | Windows named pipes; Linux FIFO-backed implementation. |
+| `Parallel::Thread` | Yes | Yes | Thread wrapper around WinAPI or `std::thread`/Linux thread IDs. |
+| `Parallel::Fiber` | Yes | Partial | Windows uses real fibers; Linux currently executes the callback directly. |
+| `Memory` | Yes | Yes | Pages, regions, storage, shared memory, protection changes. |
+| `Exception` | Yes | Yes | VEH on Windows; signal/ucontext-based listener on Linux. |
+| `rddisasm` | Yes | Yes | Embedded x86/x86-64 instruction decoder. |
+| `Hook` | Yes | Yes | Inline, wrapper, raw, vtable, memory, interrupt, and hardware hook APIs. Some Linux hardware-hook paths require suitable privileges/environment. |
+
+## API overview
+
+### Platform and build macros
+
+Windows/MSVC-only helpers:
+
+- `LINKER_OPTION(OPTION)` - passes an option to the MSVC linker.
+- `INCLUDE(SYMBOL_NAME)` / `SELF_INCLUDE` - force symbol inclusion.
+- `EXPORT(SYMBOL_NAME, ALIAS_NAME)` / `SELF_EXPORT(ALIAS_NAME)` - export symbols with aliases.
+- `DECLARE_SECTION(NAME)`, `DEFINE_SECTION(NAME, ATTRIBUTES)`, `MERGE_SECTION(FROM, TO)` - PE section control.
+- `DEFINE_DATA_IN_SECTION(NAME)`, `DEFINE_CODE_IN_SECTION(NAME)` - place data/code into custom sections.
+- `DISABLE_OPTIMIZATION_*` / `ENABLE_OPTIMIZATION` - MSVC optimization pragmas.
+
+Architecture detection:
+
+- `DETOURS_ARCH_X64` for x86-64.
+- `DETOURS_ARCH_X86` for x86.
+
+### `Detours`
+
+Windows-only process/thread internals:
+
+- `KUserSharedData` - access to the Windows `KUSER_SHARED_DATA` page.
+- `GetPEB()` - returns the current process PEB.
+- `GetTEB()` - returns the current or selected thread TEB.
+
+### `Detours::CallStack`
+
+- `GetCallStack(...)` - captures a call stack.
+- `GetShadowStack(...)` - Windows-only shadow-stack helper.
+- `GetShadowCallStack(...)` - Windows-only shadow-call-stack helper.
+
+### `Detours::LDR`
+
+Windows-only loader helpers:
+
+- `FindModuleListEntry(...)` - finds loader list entries.
+- `FindModuleDataTableEntry(...)` - finds `LDR_DATA_TABLE_ENTRY` records.
+- `UnLinkModule(...)` - removes a module from loader lists while saving link data.
+- `ReLinkModule(...)` - restores a previously unlinked module.
+
+### `Detours::Codec`
+
+- `UpperCase(...)` and `LowerCase(...)` - in-place ASCII case conversion.
+- `Encode(...)` - converts multibyte text to wide text.
+- `Decode(...)` - converts wide text to multibyte text.
+
+### `Detours::Hexadecimal`
+
+- `EncodeA(...)`, `EncodeW(...)`, `Encode(...)` - encode binary data as hexadecimal text.
+- `DecodeA(...)`, `DecodeW(...)`, `Decode(...)` - decode hexadecimal text back into bytes.
+
+### `Detours::Scan`
+
+- `FindSection(...)` - locates a section in a module/image.
+- `FindSectionPOGO(...)` - locates a POGO section when available.
+- `FindSignatureNative/SSE2/AVX2/AVX512(...)` - searches for byte signatures with wildcard support.
+- `FindSignature(...)` - chooses an appropriate signature scanner.
+- `FindDataNative/SSE2/AVX2/AVX512(...)` - searches for raw byte sequences.
+- `FindData(...)` - chooses an appropriate data scanner.
+
+On Windows the scanner works with PE modules. On Linux it works with ELF/module mappings exposed by the Linux port.
+
+### `Detours::RTTI`
+
+Windows/MSVC-only RTTI helpers:
+
+- `RTDynamicCast(...)` - runtime dynamic cast implementation against MSVC RTTI metadata.
+- `RTCastToVoid(...)` - resolves the complete object pointer.
+- `RTtypeid(...)` - resolves the dynamic type descriptor.
+- `Object` - describes discovered RTTI objects, base classes, complete object locators, and vtables.
+- `FindObject(...)` - locates RTTI objects by type name and optional parent filter.
+- `DumpRTTI(...)` - enumerates RTTI metadata from a module/image.
+
+The current Linux port does not expose `Detours::RTTI`; use normal compiler RTTI such as `typeid` and `dynamic_cast` on Linux.
+
+### `Detours::Sync`
+
+- `Event`, `EventServer`, `EventClient` - signal/reset/wait event wrappers.
+- `Mutex`, `MutexServer`, `MutexClient` - mutex wrappers.
+- `Semaphore`, `SemaphoreServer`, `SemaphoreClient` - semaphore wrappers.
+- `CriticalSection` - critical-section/mutex wrapper.
+- `Suspender` - suspends/resumes process threads and can adjust execution addresses.
+- `SuspendTransaction` - RAII wrapper around `Suspender` with nested-depth handling.
+- `g_Suspender` - global suspender instance.
+
+### `Detours::Pipe`
+
+- `PipeServer` - server-side named pipe/FIFO endpoint.
+- `PipeClient` - client-side named pipe/FIFO endpoint.
+
+### `Detours::Parallel`
+
+- `Thread` - simple callback-based thread wrapper.
+- `Fiber` - callback-based fiber abstraction. On Windows this maps to WinAPI fibers; on Linux it currently invokes the callback directly.
+
+### `Detours::Memory`
+
+- `Shared`, `SharedServer`, `SharedClient` - shared memory helpers.
+- `Page` - single-page allocator with protection support.
+- `Region` - multi-page/region allocator.
+- `Storage` - collection of regions/pages for hook/trampoline allocation.
+- `Protection` - RAII-style memory protection changes.
+- `MemoryManager` - creates and destroys page/storage objects.
+
+### `Detours::Exception`
+
+- `ExceptionListener` - exception/signal callback manager.
+- `g_ExceptionListener` - global listener instance.
+
+Windows uses vectored exception handling. Linux uses signal handlers with `ucontext_t`-based context access.
+
+### `Detours::rddisasm`
+
+Embedded instruction decoder:
+
+- `RdInitContext(...)`
+- `RdDecodeWithContext(...)`
+- `RdDecodeEx(...)`
+- `RdDecode(...)`
+- `RdIsInstruxRipRelative(...)`
+- `RdGetFullAccessMap(...)`
+- `RdGetOperandRlut(...)`
+- `RdGetAddressFromRelOrDisp(...)`
+
+The decoder is used internally by hook/trampoline logic and can also be used directly.
+
+### `Detours::Hook`
+
+Hooking primitives:
+
+- `HookHardware(...)` / `UnHookHardware(...)` - debug-register hardware hooks.
+- `HookMemory(...)` / `UnHookMemory(...)` - page-protection memory hooks for read/write/execute detection.
+- `HookInterrupt(...)` / `UnHookInterrupt(...)` - interrupt instruction hooks.
+- `VTableFunctionHook` - patches one vtable slot.
+- `VTableHook` - patches multiple vtable slots.
+- `InlineHook` - overwrites function prologues and creates trampolines.
+- `InlineWrapperHook` - inline hook with wrapper/trampoline support.
+- `RawHook` - raw hook with direct access to a saved `RAW_CONTEXT` containing GPR, flags, stack, and optional FPU/SIMD state.
+
+`RawHook` callbacks can either redirect execution manually through `ctx->Stack.push(...)` and return `true`, or return `false` to continue the original code through the trampoline using the restore path.
+
+## Minimal examples
+
+### Inline wrapper hook
+
+```cpp
+#include "Detours.h"
+
+int Target(int x) {
+    return x + 1;
+}
+
+Detours::Hook::InlineWrapperHook g_Hook;
+
+int HookedTarget(int x) {
+    using Fn = int(*)(int);
+    auto original = reinterpret_cast<Fn>(g_Hook.GetTrampoline());
+    return original(x) + 10;
+}
+
+int main() {
+    g_Hook.Set(reinterpret_cast<void*>(&Target));
+    g_Hook.Hook(reinterpret_cast<void*>(&HookedTarget));
+
+    int value = Target(1); // expected: 12
+
+    g_Hook.UnHook();
+    g_Hook.Release();
+    return value;
+}
+```
+
+### Raw hook callback shape
+
+```cpp
+Detours::Hook::RawHook g_RawHook;
+
+bool RawCallback(Detours::Hook::PRAW_CONTEXT ctx) {
+#if defined(DETOURS_ARCH_X64)
+    ctx->m_unRDI += 100; // first integer argument on SysV Linux x64
+#elif defined(DETOURS_ARCH_X86)
+    // Adjust stack/registers as needed for the active calling convention.
+#endif
+
+    ctx->Stack.push(g_RawHook.GetTrampoline());
+    return true;
+}
+```
+
+## Notes and limitations
+
+- This library performs low-level code patching. Use it only in processes you own or are authorized to inspect and modify.
+- Windows-only internals such as PEB/TEB/LDR/MSVC RTTI are intentionally not exposed on Linux.
+- Hardware debug-register hooks may require specific privileges or kernel/debugging settings and can be unavailable in restricted containers.
+- Inline/raw hooks depend on instruction decoding, writable code pages, executable trampoline memory, and safe thread suspension. Compiler optimizations, W^X policy, PIE/ASLR, and concurrent execution can affect hookability.
+- `RawHook` can save native GPR state only or extended FPU/SIMD state depending on the `bNative` argument and detected CPU/OS support.
+
+## Repository layout
+
+```text
+Detours.h          Public API and declarations
+Detours.cpp        Implementation
+README.md          Project documentation
+main.cpp           Windows-oriented doctest harness
+doctest.h          Test framework
+interrupts32.asm   Optional 32-bit interrupt helper for tests
+interrupts64.asm   Optional 64-bit interrupt helper for tests
+```
