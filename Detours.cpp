@@ -45960,7 +45960,13 @@ namespace Detours {
 			bool bHaveYMMState = true;
 			bool bHaveZMMState = true;
 
-#if defined(__linux__) && (defined(DETOURS_ARCH_X64) || defined(DETOURS_ARCH_X86))
+#if defined(_WIN32) && (defined(DETOURS_ARCH_X64) || defined(DETOURS_ARCH_X86))
+			const bool bHaveOSXSAVE = (pIDs[2] & (1 << 27)) != 0;
+			const bool bHaveAVXHardware = (pIDs[2] & (1 << 28)) != 0;
+			const unsigned long long unXCR0 = (bHaveOSXSAVE && bHaveAVXHardware) ? _xgetbv(0) : 0;
+			bHaveYMMState = (unXCR0 & 0x6) == 0x6;
+			bHaveZMMState = (unXCR0 & 0xE6) == 0xE6;
+#elif defined(__linux__) && (defined(DETOURS_ARCH_X64) || defined(DETOURS_ARCH_X86))
 			const bool bHaveOSXSAVE = (pIDs[2] & (1 << 27)) != 0;
 			const bool bHaveAVXHardware = (pIDs[2] & (1 << 28)) != 0;
 			const unsigned long long unXCR0 = (bHaveOSXSAVE && bHaveAVXHardware) ? GetLinuxXCR0() : 0;
