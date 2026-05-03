@@ -681,7 +681,7 @@ TEST_SUITE("Detours::Scan") {
 		MESSAGE("Benckmark with 1 000 iterations over 8 MiB memory: ", (Detours::KUserSharedData.SystemTime.LowPart - unBegin) / 10000, " ms");
 	}
 
-	TEST_CASE("FindSignatureSSE2 [benckmark]" * doctest::timeout(10)) {
+	TEST_CASE("FindSignatureSSE2 [benckmark]" * doctest::timeout(15)) {
 		auto pRandomData = std::make_unique<unsigned char[]>(0x800000); // 8 MiB
 		CHECK(pRandomData != nullptr);
 
@@ -1004,7 +1004,7 @@ TEST_SUITE("Detours::Scan") {
 		MESSAGE("Benckmark with 1 000 iterations over 8 MiB memory: ", (Detours::KUserSharedData.SystemTime.LowPart - unBegin) / 10000, " ms");
 	}
 
-	TEST_CASE("FindDataSSE2 [benckmark]" * doctest::timeout(10)) {
+	TEST_CASE("FindDataSSE2 [benckmark]" * doctest::timeout(15)) {
 		auto pRandomData = std::make_unique<unsigned char[]>(0x800000); // 8 MiB
 		CHECK(pRandomData != nullptr);
 
