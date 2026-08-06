@@ -2522,7 +2522,6 @@ TEST_SUITE("Detours::Hook") {
 		CHECK(Region.GetRegionAddress() != nullptr);
 		void* pAddress = Region.Alloc(1);
 		CHECK(pAddress != nullptr);
-		srand(time(nullptr) & 0xffffffff);
 		ULONG unBegin = Detours::KUserSharedData.SystemTime.LowPart;
 		for (size_t i = 0; i < 1'000'000; ++i) {
 			reinterpret_cast<unsigned char*>(pAddress)[0] = 1;
