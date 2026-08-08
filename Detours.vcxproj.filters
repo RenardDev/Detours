@@ -39,6 +39,18 @@
     </MASM>
   </ItemGroup>
   <ItemGroup>
+    <None Include="asm.asm">
+      <Filter>Исходные файлы</Filter>
+    </None>
+    <None Include="asm64.asm">
+      <Filter>Исходные файлы</Filter>
+    </None>
+    <None Include="call.asm">
+      <Filter>Исходные файлы</Filter>
+    </None>
+    <None Include="call64.asm">
+      <Filter>Исходные файлы</Filter>
+    </None>
     <None Include="SuppressionFile.suppress">
       <Filter>Исходные файлы</Filter>
     </None>

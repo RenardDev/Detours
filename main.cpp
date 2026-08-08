@@ -7,10 +7,13 @@
 #include <intrin.h>
 
 // C++
+#include <atomic>
 #include <cstdio>
 #include <typeinfo>
 #include <iostream>
+#include <thread>
 #include <unordered_map>
+#include <vector>
 
 // Detours
 #include "Detours.h"
@@ -2236,19 +2239,45 @@ TEST_SUITE("Detours::Hook") {
 	bool __cdecl Sleep_RawHook(Detours::Hook::PRAW_CONTEXT pCTX) {
 #endif
 		g_bRawSleepHookCalled = true;
+		RawSleepHook.CallTrampoline(pCTX);
+		return true;
+	}
 
+	std::atomic<unsigned int> g_unRawSleepConcurrentCalls = 0;
+	Detours::Hook::RawHook RawSleepConcurrentHook;
 #ifdef _M_X64
-		pCTX->Stack.push(RawSleepHook.GetTrampoline());
+	bool __fastcall Sleep_RawHookConcurrent(Detours::Hook::PRAW_CONTEXT pCTX) {
 #elif _M_IX86
-		void* pReturnAddress = pCTX->Stack.pop();
-		pCTX->Stack.pop();
-		pCTX->Stack.push(pReturnAddress);
+	bool __cdecl Sleep_RawHookConcurrent(Detours::Hook::PRAW_CONTEXT pCTX) {
 #endif
-
+		g_unRawSleepConcurrentCalls.fetch_add(1, std::memory_order_relaxed);
+		RawSleepConcurrentHook.CallTrampoline(pCTX);
 		return true;
 	}
 
 	Detours::Hook::RAW_CONTEXT_M128 g_LastXMM7;
+
+#ifdef _M_X64
+	__declspec(noinline) unsigned long long __fastcall CallAddressStandaloneTarget(unsigned long long unValue) {
+		// Exercise the complete Windows x64 home area. A context captured by
+		// GetCurrentContext must describe the caller's ABI entry stack, not the
+		// already-returned internal capture-code frame.
+		volatile unsigned long long* pShadowSpace = reinterpret_cast<volatile unsigned long long*>(_AddressOfReturnAddress()) + 1;
+		pShadowSpace[0] = unValue;
+		pShadowSpace[1] = unValue + 1;
+		pShadowSpace[2] = unValue + 2;
+		pShadowSpace[3] = unValue + 3;
+		return unValue + 0x1234;
+	}
+#elif _M_IX86
+	__declspec(noinline) unsigned int __fastcall CallAddressStandaloneTarget(unsigned int unValue) {
+		return unValue + 0x1234;
+	}
+#endif
+
+	DWORD WINAPI GetContextThreadTarget(void*) {
+		return 0;
+	}
 
 #ifdef _M_X64
 	bool __fastcall Sleep_RawHookMod(Detours::Hook::PRAW_CONTEXT pCTX) {
@@ -2261,14 +2290,7 @@ TEST_SUITE("Detours::Hook") {
 		pCTX->m_XMM7.m_un64[0] = 0x1122334455667788;
 		pCTX->m_XMM7.m_un64[1] = 0x1122334455667788;
 
-#ifdef _M_X64
-		pCTX->Stack.push(RawSleepHook.GetTrampoline());
-#elif _M_IX86
-		void* pReturnAddress = pCTX->Stack.pop();
-		pCTX->Stack.pop();
-		pCTX->Stack.push(pReturnAddress);
-#endif
-
+		Detours::Hook::CallAddress(RawSleepHook.GetTrampoline(), pCTX);
 		return true;
 	}
 
@@ -2297,12 +2319,12 @@ TEST_SUITE("Detours::Hook") {
 		// Converting __thiscall to __fastcall/__stdcall and redirect it
 
 #ifdef _M_X64
-		pCTX->Stack.push(new_foo);
+		pCTX->m_Stack.Push(new_foo);
 #elif _M_IX86
-		void* pReturnAddress = pCTX->Stack.pop();
-		pCTX->Stack.push(pCTX->m_unECX);
-		pCTX->Stack.push(pReturnAddress);
-		pCTX->Stack.push(new_foo);
+		void* pReturnAddress = pCTX->m_Stack.Pop();
+		pCTX->m_Stack.Push(pCTX->m_unECX);
+		pCTX->m_Stack.Push(pReturnAddress);
+		pCTX->m_Stack.Push(new_foo);
 #endif
 
 		return true;
@@ -2319,7 +2341,7 @@ TEST_SUITE("Detours::Hook") {
 		pCTX->m_unEBX = 0x11223344;
 		pCTX->m_unECX = 0x00000003;
 		pCTX->m_unEDX = 0x00000004;
-		pCTX->Stack.push(reinterpret_cast<char*>(RawCPUIDHook.GetTrampoline()) + RawCPUIDHook.GetFirstInstructionSize());
+		pCTX->m_Stack.Push(reinterpret_cast<char*>(RawCPUIDHook.GetTrampoline()) + RawCPUIDHook.GetFirstInstructionSize());
 
 		return true;
 	}
@@ -2522,6 +2544,7 @@ TEST_SUITE("Detours::Hook") {
 		CHECK(Region.GetRegionAddress() != nullptr);
 		void* pAddress = Region.Alloc(1);
 		CHECK(pAddress != nullptr);
+		srand(time(nullptr) & 0xffffffff);
 		ULONG unBegin = Detours::KUserSharedData.SystemTime.LowPart;
 		for (size_t i = 0; i < 1'000'000; ++i) {
 			reinterpret_cast<unsigned char*>(pAddress)[0] = 1;
@@ -2712,6 +2735,179 @@ TEST_SUITE("Detours::Hook") {
 		CHECK(InlineSleepHook.Release() == true);
 	}
 
+	TEST_CASE("GetContext, GetCurrentContext and CallAddress") {
+		Detours::Hook::RAW_CONTEXT Context{};
+		Detours::Hook::GetCurrentContext(&Context);
+#ifdef _M_IX86
+		unsigned int unCurrentStackAddress = 0;
+		__asm mov unCurrentStackAddress, esp
+#endif
+		CHECK(Context.m_Stack.GetAddress() != nullptr);
+#ifdef _M_X64
+		CHECK(Context.m_unRFLAGS != 0);
+		CHECK((reinterpret_cast<size_t>(Context.m_Stack.GetAddress()) & 0xF) == 0x8);
+		Context.m_unRCX = 0x300;
+#elif _M_IX86
+		CHECK(Context.m_unEFLAGS != 0);
+		// MSVC may retain the cdecl outgoing argument slot or reclaim it
+		// immediately after GetCurrentContext returns.
+		const bool bOutgoingStackSlotRetained = Context.m_unESP == unCurrentStackAddress;
+		const bool bOutgoingStackSlotReleased = (Context.m_unESP + sizeof(void*)) == unCurrentStackAddress;
+		CHECK((bOutgoingStackSlotRetained || bOutgoingStackSlotReleased));
+		Context.m_unECX = 0x300;
+#endif
+
+		Detours::Hook::CallAddress(reinterpret_cast<void*>(CallAddressStandaloneTarget), &Context);
+#ifdef _M_X64
+		CHECK(Context.m_unRAX == 0x1534);
+#elif _M_IX86
+		CHECK(Context.m_unEAX == 0x1534);
+#endif
+
+		Detours::Hook::RAW_CONTEXT CurrentThreadContext{};
+		Detours::Hook::GetContext(GetCurrentThread(), &CurrentThreadContext);
+		CHECK(CurrentThreadContext.m_Stack.GetAddress() != nullptr);
+#ifdef _M_X64
+		CHECK(CurrentThreadContext.m_unRFLAGS != 0);
+		CurrentThreadContext.m_unRCX = 0x400;
+#elif _M_IX86
+		CHECK(CurrentThreadContext.m_unEFLAGS != 0);
+		CurrentThreadContext.m_unECX = 0x400;
+#endif
+		Detours::Hook::CallAddress(reinterpret_cast<void*>(CallAddressStandaloneTarget), &CurrentThreadContext);
+#ifdef _M_X64
+		CHECK(CurrentThreadContext.m_unRAX == 0x1634);
+#elif _M_IX86
+		CHECK(CurrentThreadContext.m_unEAX == 0x1634);
+#endif
+	}
+
+	TEST_CASE("GetContext suspended thread") {
+		DWORD unThreadID = 0;
+		HANDLE hThread = CreateThread(nullptr, 0, GetContextThreadTarget, nullptr, CREATE_SUSPENDED, &unThreadID);
+		REQUIRE(hThread != nullptr);
+		REQUIRE(hThread != INVALID_HANDLE_VALUE);
+
+		Detours::Hook::RAW_CONTEXT Context{};
+		Detours::Hook::GetContext(hThread, &Context);
+		CHECK(Context.m_Stack.GetAddress() != nullptr);
+#ifdef _M_X64
+		CHECK(Context.m_unRFLAGS != 0);
+#elif _M_IX86
+		CHECK(Context.m_unEFLAGS != 0);
+#endif
+
+		// GetContext must not change the suspend count. The only suspension is
+		// CREATE_SUSPENDED above, so ResumeThread must observe a count of one.
+		CHECK(ResumeThread(hThread) == 1);
+		CHECK(WaitForSingleObject(hThread, INFINITE) == WAIT_OBJECT_0);
+		CHECK(CloseHandle(hThread) != FALSE);
+	}
+
+	TEST_CASE("CallAddress standalone RAW_CONTEXT") {
+		Detours::Hook::RAW_CONTEXT Context{};
+		Context.m_unEFLAGS = 0x202;
+		Context.m_unMXCSR = 0x1F80;
+		Context.m_FPU.m_unControlWord = 0x037F;
+		Context.m_FPU.m_unTagWord = 0xFFFF;
+#ifdef _M_X64
+		Context.m_unRCX = 0x100;
+#elif _M_IX86
+		Context.m_unECX = 0x100;
+#endif
+
+		CHECK(Context.m_Stack.GetAddress() == nullptr);
+		Detours::Hook::CallAddress(reinterpret_cast<void*>(CallAddressStandaloneTarget), &Context);
+		CHECK(Context.m_Stack.GetAddress() == nullptr);
+#ifdef _M_X64
+		CHECK(Context.m_unRAX == 0x1334);
+#elif _M_IX86
+		CHECK(Context.m_unEAX == 0x1334);
+#endif
+	}
+
+	TEST_CASE("CallAddress standalone custom stack") {
+		constexpr size_t kStackSize = 0x10000;
+		void* pStack = VirtualAlloc(nullptr, kStackSize, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
+		REQUIRE(pStack != nullptr);
+
+		Detours::Hook::RAW_CONTEXT Context{};
+		Context.m_unEFLAGS = 0x202;
+		Context.m_unMXCSR = 0x1F80;
+		Context.m_FPU.m_unControlWord = 0x037F;
+		Context.m_FPU.m_unTagWord = 0xFFFF;
+#ifdef _M_X64
+		Context.m_unRCX = 0x200;
+		size_t unStackAddress = (reinterpret_cast<size_t>(pStack) + kStackSize - 0x100) & ~static_cast<size_t>(0xF);
+		unStackAddress -= 8;
+#elif _M_IX86
+		Context.m_unECX = 0x200;
+		size_t unStackAddress = (reinterpret_cast<size_t>(pStack) + kStackSize - 0x100) & ~static_cast<size_t>(0xF);
+		unStackAddress -= 4;
+#endif
+		Context.m_Stack.SetAddress(reinterpret_cast<void*>(unStackAddress));
+		*reinterpret_cast<size_t*>(Context.m_Stack.GetAddress()) = 0;
+
+		Detours::Hook::CallAddress(reinterpret_cast<void*>(CallAddressStandaloneTarget), &Context);
+#ifdef _M_X64
+		CHECK(Context.m_unRAX == 0x1434);
+#elif _M_IX86
+		CHECK(Context.m_unEAX == 0x1434);
+#endif
+		CHECK(reinterpret_cast<size_t>(Context.m_Stack.GetAddress()) >= reinterpret_cast<size_t>(pStack));
+		CHECK(reinterpret_cast<size_t>(Context.m_Stack.GetAddress()) < (reinterpret_cast<size_t>(pStack) + kStackSize));
+		CHECK(VirtualFree(pStack, 0, MEM_RELEASE) != FALSE);
+	}
+
+	TEST_CASE("CallAddress concurrent contexts") {
+		constexpr unsigned int unThreadCount = 8;
+		constexpr unsigned int unIterations = 128;
+		std::atomic<unsigned int> unFailures = 0;
+		std::vector<std::thread> Threads;
+		Threads.reserve(unThreadCount);
+
+		for (unsigned int unThread = 0; unThread < unThreadCount; ++unThread) {
+			Threads.emplace_back([unThread, &unFailures]() {
+				for (unsigned int unIteration = 0; unIteration < unIterations; ++unIteration) {
+#ifdef _M_X64
+					const unsigned long long unInput = (static_cast<unsigned long long>(unThread) << 32) | unIteration;
+#elif _M_IX86
+					const unsigned int unInput = (unThread << 16) | unIteration;
+#endif
+					Detours::Hook::RAW_CONTEXT Context{};
+#ifdef _M_X64
+					Context.m_unRFLAGS = 0x202;
+#elif _M_IX86
+					Context.m_unEFLAGS = 0x202;
+#endif
+					Context.m_unMXCSR = 0x1F80;
+					Context.m_FPU.m_unControlWord = 0x037F;
+					Context.m_FPU.m_unTagWord = 0xFFFF;
+#ifdef _M_X64
+					Context.m_unRCX = unInput;
+#elif _M_IX86
+					Context.m_unECX = unInput;
+#endif
+
+					Detours::Hook::CallAddress(reinterpret_cast<void*>(CallAddressStandaloneTarget), &Context);
+#ifdef _M_X64
+					if (Context.m_Stack.GetAddress() || (Context.m_unRAX != (unInput + 0x1234))) {
+#elif _M_IX86
+					if (Context.m_Stack.GetAddress() || (Context.m_unEAX != (unInput + 0x1234))) {
+#endif
+						unFailures.fetch_add(1, std::memory_order_relaxed);
+					}
+				}
+			});
+		}
+
+		for (std::thread& Thread : Threads) {
+			Thread.join();
+		}
+
+		CHECK(unFailures.load(std::memory_order_relaxed) == 0);
+	}
+
 	TEST_CASE("RawHook") {
 		HMODULE hKernel32 = GetModuleHandle(_T("kernel32.dll"));
 		CHECK(hKernel32 != nullptr);
@@ -2719,7 +2915,9 @@ TEST_SUITE("Detours::Hook") {
 		CHECK(RawSleepHook.Set(reinterpret_cast<void*>(GetProcAddress(hKernel32, "Sleep"))) == true);
 		CHECK(RawSleepHook.Hook(Sleep_RawHook, false, 0x16, true) == true);
 		CHECK(g_bRawSleepHookCalled == false);
+
 		Sleep(1000);
+
 		CHECK(g_bRawSleepHookCalled == true);
 		CHECK(RawSleepHook.UnHook() == true);
 		CHECK(RawSleepHook.Release() == true);
@@ -2743,6 +2941,37 @@ TEST_SUITE("Detours::Hook") {
 		CHECK(g_bRawSleepHookCalled == true);
 		CHECK(RawSleepHook.UnHook() == true);
 		CHECK(RawSleepHook.Release() == true);
+	}
+
+
+	TEST_CASE("RawHook CallTrampoline concurrent") {
+		g_unRawSleepConcurrentCalls.store(0, std::memory_order_relaxed);
+
+		HMODULE hKernel32 = GetModuleHandle(_T("kernel32.dll"));
+		REQUIRE(hKernel32 != nullptr);
+		REQUIRE(hKernel32 != INVALID_HANDLE_VALUE);
+		REQUIRE(RawSleepConcurrentHook.Set(reinterpret_cast<void*>(GetProcAddress(hKernel32, "Sleep"))) == true);
+		REQUIRE(RawSleepConcurrentHook.Hook(Sleep_RawHookConcurrent, false, 0x16, true) == true);
+
+		constexpr unsigned int unThreadCount = 8;
+		constexpr unsigned int unIterations = 64;
+		std::vector<std::thread> Threads;
+		Threads.reserve(unThreadCount);
+		for (unsigned int unThread = 0; unThread < unThreadCount; ++unThread) {
+			Threads.emplace_back([]() {
+				for (unsigned int unIteration = 0; unIteration < unIterations; ++unIteration) {
+					Sleep(0);
+				}
+			});
+		}
+
+		for (std::thread& Thread : Threads) {
+			Thread.join();
+		}
+
+		CHECK(g_unRawSleepConcurrentCalls.load(std::memory_order_relaxed) == (unThreadCount * unIterations));
+		CHECK(RawSleepConcurrentHook.UnHook() == true);
+		CHECK(RawSleepConcurrentHook.Release() == true);
 	}
 
 #pragma optimize("", off)

@@ -222,8 +222,13 @@ Hooking primitives:
 - `InlineHook` - overwrites function prologues and creates trampolines.
 - `InlineWrapperHook` - inline hook with wrapper/trampoline support.
 - `RawHook` - raw hook with direct access to a saved `RAW_CONTEXT` containing GPR, flags, stack, and optional FPU/SIMD state.
+- `GetContext(...)` - copies an already suspended thread into `RAW_CONTEXT` without suspending or resuming it.
+- `GetCurrentContext(...)` - captures the calling thread into `RAW_CONTEXT`.
+- `CallAddress(...)` - synchronously invokes an arbitrary address from `RAW_CONTEXT` and writes the returned state back.
 
-`RawHook` callbacks can either redirect execution manually through `pCTX->Stack.push(...)` and return `true`, or return `false` to continue the original code through the trampoline using the restore path.
+`RawHook` callbacks can either redirect execution manually through `pCTX->Stack.push(...)` and return `true`, or return `false` to continue the original code through the trampoline using the restore path. The wrapper and restore paths now use the same monolithic ISA matrix as `CallTrampoline` and `CallAddress`: Native, SSE, AVX/AVX2, and AVX-512 each have independent x87 FPU and no-FPU variants. Every higher ISA variant contains every lower state level: AVX-512 includes AVX/AVX2/YMM, SSE/XMM, and native state; AVX/AVX2/YMM includes SSE/XMM and native state; SSE/XMM includes native state.
+
+`RawHook::CallTrampoline(pCTX)` is the synchronous `void` form: the selected machine-code block restores `RAW_CONTEXT`, performs a real `call` to the trampoline, captures the returned GPR/flags/stack/FPU/SIMD state represented by `RAW_CONTEXT`, and then resumes the callback. `Detours::Hook::CallAddress(pAddress, pCTX)` performs the same operation for an arbitrary function address. The called function runs on a mirrored stack so its stack frame cannot overwrite the live context. Machine-code blocks are embedded as one-line byte arrays in `Detours.cpp`, and every operand is patched directly as `instruction address + operand offset` with `sizeof(...)` and `offsetof(...)` before execution. When preconditions or stack-mirror preparation fail, the `void` API returns without invoking the address or changing `pCTX`.
 
 ## Minimal examples
 
@@ -262,16 +267,93 @@ int main() {
 Detours::Hook::RawHook g_RawHook;
 
 bool RawCallback(Detours::Hook::PRAW_CONTEXT pCTX) {
-#if defined(DETOURS_ARCH_X64)
-    pCTX->m_unRDI += 100; // first integer argument on SysV Linux x64
+#if defined(_WIN32) && defined(DETOURS_ARCH_X64)
+    pCTX->m_unRCX += 100; // first integer argument on Windows x64
+#elif defined(__linux__) && defined(DETOURS_ARCH_X64)
+    pCTX->m_unRDI += 100; // first integer argument on System V AMD64
 #elif defined(DETOURS_ARCH_X86)
-    // Adjust stack/registers as needed for the active calling convention.
+    // Adjust the active register or stack argument for the x86 calling convention.
 #endif
 
-    pCTX->Stack.push(g_RawHook.GetTrampoline());
+    // Call the hook trampoline. To call another ABI-compatible address instead:
+    // Detours::Hook::CallAddress(pAddress, pCTX);
+    g_RawHook.CallTrampoline(pCTX);
+
+#if defined(DETOURS_ARCH_X64)
+    pCTX->m_unRAX += 10;
+#elif defined(DETOURS_ARCH_X86)
+    pCTX->m_unEAX += 10;
+#endif
+
     return true;
 }
 ```
+
+
+### Capturing a `RAW_CONTEXT`
+
+`GetCurrentContext` captures the calling thread and produces a complete context that can be edited and passed directly to `CallAddress`. Its `Stack` value is the API caller's ABI return-address slot, not the temporary stack of the internal capture routine. On Windows x64, `CallAddress` preserves the active call's four home slots while still propagating stack arguments from `RSP + 0x28` and above:
+
+```cpp
+Detours::Hook::RAW_CONTEXT Context {};
+Detours::Hook::GetCurrentContext(&Context);
+
+#if defined(_WIN32) && defined(DETOURS_ARCH_X64)
+Context.m_unRCX = 100;
+#elif defined(__linux__) && defined(DETOURS_ARCH_X64)
+Context.m_unRDI = 100;
+#elif defined(DETOURS_ARCH_X86)
+Context.m_unECX = 100;
+#endif
+
+Detours::Hook::CallAddress(reinterpret_cast<void*>(&Target), &Context);
+```
+
+`GetContext` reads an existing thread context but deliberately does not change the thread's suspend count. The caller is responsible for making the target thread stable before the read and resuming it afterwards:
+
+```cpp
+#if defined(_WIN32)
+Detours::Hook::RAW_CONTEXT Context {};
+
+const DWORD PreviousSuspendCount = SuspendThread(hThread);
+if (PreviousSuspendCount != static_cast<DWORD>(-1)) {
+    Detours::Hook::GetContext(hThread, &Context);
+    ResumeThread(hThread);
+}
+#endif
+```
+
+On Windows, `RAW_THREAD_HANDLE` is `HANDLE`; on Linux it is the native thread ID type `pid_t`. Passing the calling thread is supported and is routed to `GetCurrentContext`, because an operating-system thread-context query is not a valid way to capture the running caller. `CallAddress` always executes synchronously on the thread that calls it; supplying another thread's captured context does not schedule execution in that other thread.
+
+### Calling a function from an independent `RAW_CONTEXT`
+
+`CallAddress` is not tied to a `RawHook` callback. A complete context can be initialized manually, captured with `GetCurrentContext` / `GetContext`, and used to invoke any ABI-compatible address:
+
+```cpp
+Detours::Hook::RAW_CONTEXT Context {};
+Context.m_unRFLAGS = 0x202;
+Context.m_unMXCSR = 0x1F80;
+Context.m_FPU.m_unControlWord = 0x037F;
+Context.m_FPU.m_unTagWord = 0xFFFF;
+
+#if defined(_WIN32) && defined(DETOURS_ARCH_X64)
+Context.m_unRCX = 100; // first integer argument
+#elif defined(__linux__) && defined(DETOURS_ARCH_X64)
+Context.m_unRDI = 100; // first integer argument
+#elif defined(DETOURS_ARCH_X86)
+Context.m_unECX = 100; // example for __fastcall
+#endif
+
+Detours::Hook::CallAddress(reinterpret_cast<void*>(&Target), &Context);
+
+#if defined(DETOURS_ARCH_X64)
+auto Result = Context.m_unRAX;
+#else
+auto Result = Context.m_unEAX;
+#endif
+```
+
+When `Context.Stack` is null, `CallAddress` supplies a temporary ABI-aligned stack and resets `Stack` to null after the call. This mode is intended for register-only arguments. For stack arguments, allocate a dedicated readable/writable stack mapping, place the return slot and arguments using the target ABI, and assign its entry address with `Context.Stack.SetAddress(...)`. The returned stack pointer and stack-side changes are then written back into that mapping.
 
 ## Notes and limitations
 
@@ -279,16 +361,21 @@ bool RawCallback(Detours::Hook::PRAW_CONTEXT pCTX) {
 - Windows-only internals such as PEB/TEB/LDR/MSVC RTTI are intentionally not exposed on Linux.
 - Hardware debug-register hooks may require specific privileges or kernel/debugging settings and can be unavailable in restricted containers.
 - Inline/raw hooks depend on instruction decoding, writable code pages, executable trampoline memory, and safe thread suspension. Compiler optimizations, W^X policy, PIE/ASLR, and concurrent execution can affect hookability.
-- `RawHook` can save native GPR state only or extended FPU/SIMD state depending on the `bNative` argument and detected CPU/OS support.
+- `RawHook` can save native GPR state only or extended FPU/SIMD state depending on the `bNative` argument and detected CPU/OS support. Its wrapper and restore paths, as well as `CallTrampoline`, use monolithic cumulative variants: AVX-512 contains AVX/AVX2/YMM + SSE/XMM + native, AVX/AVX2/YMM contains SSE/XMM + native, and SSE/XMM contains native; every tier has an independent x87 FPU/no-FPU variant.
+- `GetContext` never suspends or resumes a thread. On Windows, the caller must provide a handle with context-query access and suspend a non-current target before reading it. `GetCurrentContext` must be used for the calling thread.
+- `CallTrampoline` and `CallAddress` mirror the selected stack, preserve stack arguments and callee stack cleanup, and support nested and concurrent calls without global or thread-local frame state. Every invocation owns an independent internal frame outside the mirrored stack; each mirror has guard pages and an internal header from which the post-call code recovers that exact frame. The header is validated through its self-pointer, allocation address, stack bounds, and owning frame; no numeric signature is used. Win64 home slots are snapshotted before the target call and restored in the mirror before stack write-back, preventing target shadow-space stores from overwriting the active `CallAddress` frame. The generated machine code is immutable and may be entered concurrently. `CallAddress` accepts a caller-owned `RAW_CONTEXT` outside `RawHook`; it must not receive storage created by a native-only `RawHook`.
+- `RAW_CONTEXT` models AVX-512 ZMM vector state but does not currently expose or preserve the AVX-512 `k0`-`k7` opmask registers.
+- Generated machine-code blocks have no platform unwind metadata. The trampoline must return normally; exceptions, `longjmp`, and other non-local unwinds must not cross generated code.
 
 ## Repository layout
 
 ```text
 Detours.h          Public API and declarations
-Detours.cpp        Implementation
+Detours.cpp        Implementation and embedded machine-code byte arrays
 README.md          Project documentation
 main.cpp           Windows-oriented doctest harness
 doctest.h          Test framework
-interrupts32.asm   Optional 32-bit interrupt helper for tests
-interrupts64.asm   Optional 64-bit interrupt helper for tests
+asm.asm / asm64.asm                 Readable RawHook wrapper/restore and GetCurrentContext machine code
+call.asm / call64.asm               Readable sources for embedded CallTrampoline/CallAddress machine code
+interrupts32.asm / interrupts64.asm Optional interrupt helpers for tests
 ```

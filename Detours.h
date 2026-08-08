@@ -145,7 +145,9 @@
 #endif
 #endif // defined(_WIN32)
 
-#if defined(__GNUC__) || defined(__clang__)
+#if defined(_MSC_VER)
+#define DETOURS_NOINLINE __declspec(noinline)
+#elif defined(__GNUC__) || defined(__clang__)
 #define DETOURS_NOINLINE __attribute__((noinline))
 #else
 #define DETOURS_NOINLINE
@@ -701,7 +703,7 @@
 #ifndef HOOK_RAW_WRAPPER_SIZE
 #if defined(DETOURS_ARCH_X64)
 // Max wrapper size.
-#define HOOK_RAW_WRAPPER_SIZE 0x500
+#define HOOK_RAW_WRAPPER_SIZE 0x800
 #elif defined(DETOURS_ARCH_X86)
 // Max wrapper size.
 #define HOOK_RAW_WRAPPER_SIZE 0x300
@@ -712,6 +714,59 @@
 // Max trampoline size.
 #define HOOK_RAW_TRAMPOLINE_SIZE 0x30
 #endif // !HOOK_RAW_TRAMPOLINE_SIZE
+
+#ifndef HOOK_RAW_CALL_SIZE
+#if defined(DETOURS_ARCH_X64)
+// Max size for one monolithic CallTrampoline/CallAddress block.
+#define HOOK_RAW_CALL_SIZE 0x1000
+#elif defined(DETOURS_ARCH_X86)
+// Max size for one monolithic CallTrampoline/CallAddress block.
+#define HOOK_RAW_CALL_SIZE 0x800
+#endif
+#endif // !HOOK_RAW_CALL_SIZE
+
+#ifndef HOOK_RAW_CALL_MAXIMUM_STACK_SIZE
+// Maximum working stack size used by CallAddress and CallTrampoline.
+#define HOOK_RAW_CALL_MAXIMUM_STACK_SIZE 0x1000
+#endif // !HOOK_RAW_CALL_MAXIMUM_STACK_SIZE
+
+#ifndef HOOK_RAW_CALL_STACK_HEADER_SIZE
+// Reserved space for the internal mirrored-stack header.
+#define HOOK_RAW_CALL_STACK_HEADER_SIZE 0x40
+#endif // !HOOK_RAW_CALL_STACK_HEADER_SIZE
+
+#ifndef HOOK_RAW_CALL_PROTECTED_STACK_CAPACITY
+// Maximum ABI-private stack prefix preserved around a raw address call.
+#define HOOK_RAW_CALL_PROTECTED_STACK_CAPACITY 0x20
+#endif // !HOOK_RAW_CALL_PROTECTED_STACK_CAPACITY
+
+#ifndef HOOK_RAW_CALL_PROTECTED_STACK_OFFSET
+#if defined(_WIN32) && defined(DETOURS_ARCH_X64)
+// Win64 home slots begin immediately after the return address.
+#define HOOK_RAW_CALL_PROTECTED_STACK_OFFSET 0x8
+#else
+#define HOOK_RAW_CALL_PROTECTED_STACK_OFFSET 0x0
+#endif
+#endif // !HOOK_RAW_CALL_PROTECTED_STACK_OFFSET
+
+#ifndef HOOK_RAW_CALL_PROTECTED_STACK_SIZE
+#if defined(_WIN32) && defined(DETOURS_ARCH_X64)
+// Preserve all four Win64 home slots.
+#define HOOK_RAW_CALL_PROTECTED_STACK_SIZE HOOK_RAW_CALL_PROTECTED_STACK_CAPACITY
+#else
+#define HOOK_RAW_CALL_PROTECTED_STACK_SIZE 0x0
+#endif
+#endif // !HOOK_RAW_CALL_PROTECTED_STACK_SIZE
+
+#ifndef HOOK_RAW_CONTEXT_SIZE
+#if defined(DETOURS_ARCH_X64)
+// Max size for one GetCurrentContext capture block.
+#define HOOK_RAW_CONTEXT_SIZE 0x400
+#elif defined(DETOURS_ARCH_X86)
+// Max size for one GetCurrentContext capture block.
+#define HOOK_RAW_CONTEXT_SIZE 0x200
+#endif
+#endif // !HOOK_RAW_CONTEXT_SIZE
 
 #ifndef HOOK_RAW_RESTORE_SIZE
 #if defined(DETOURS_ARCH_X64)
@@ -724,8 +779,8 @@
 #endif // !HOOK_RAW_RESTORE_SIZE
 
 #ifndef CALLSTACK_MAX_ENTRIES
-// Max entries for callstack
-#define CALLSTACK_MAX_ENTRIES 8
+// Maximum number of call-stack entries inspected for active generated code.
+#define CALLSTACK_MAX_ENTRIES 64
 #endif // !CALLSTACK_MAX_ENTRIES
 
 // ----------------------------------------------------------------
@@ -6299,6 +6354,10 @@ namespace Detours {
 			VTableFunctionHook();
 			VTableFunctionHook(void** pVTable, size_t unIndex);
 			~VTableFunctionHook();
+			VTableFunctionHook(const VTableFunctionHook&) = delete;
+			VTableFunctionHook(VTableFunctionHook&&) = delete;
+			VTableFunctionHook& operator=(const VTableFunctionHook&) = delete;
+			VTableFunctionHook& operator=(VTableFunctionHook&&) = delete;
 
 		public:
 			bool Set(void** pVTable, size_t unIndex);
@@ -6309,10 +6368,12 @@ namespace Detours {
 			bool UnHook();
 
 		public:
-			void* GetOriginal() const;
+			void* GetOriginal() const noexcept;
+			bool IsHooked() const noexcept;
 
 		private:
 			bool m_bInitialized;
+			bool m_bHooked;
 			void** m_pVTable;
 			size_t m_unIndex;
 			void* m_pOriginal;
@@ -6327,6 +6388,10 @@ namespace Detours {
 			VTableHook();
 			VTableHook(void** pVTable, size_t unCount);
 			~VTableHook();
+			VTableHook(const VTableHook&) = delete;
+			VTableHook(VTableHook&&) = delete;
+			VTableHook& operator=(const VTableHook&) = delete;
+			VTableHook& operator=(VTableHook&&) = delete;
 
 		public:
 			bool Set(void** pVTable, size_t unCount);
@@ -6337,7 +6402,7 @@ namespace Detours {
 			bool UnHook();
 
 		public:
-			std::vector<std::unique_ptr<VTableFunctionHook>>& GetHookingFunctions();
+			std::vector<std::unique_ptr<VTableFunctionHook>>& GetHookingFunctions() noexcept;
 
 		private:
 			bool m_bInitialized;
@@ -6355,6 +6420,10 @@ namespace Detours {
 			InlineHook();
 			InlineHook(void* pAddress);
 			~InlineHook();
+			InlineHook(const InlineHook&) = delete;
+			InlineHook(InlineHook&&) = delete;
+			InlineHook& operator=(const InlineHook&) = delete;
+			InlineHook& operator=(InlineHook&&) = delete;
 
 		public:
 			bool Set(void* pAddress);
@@ -6365,7 +6434,7 @@ namespace Detours {
 			bool UnHook(bool bWaitForUnHook = true);
 
 		public:
-			void* GetTrampoline() const;
+			void* GetTrampoline() const noexcept;
 
 		private:
 			bool m_bInitialized;
@@ -6384,6 +6453,10 @@ namespace Detours {
 			InlineWrapperHook();
 			InlineWrapperHook(void* pAddress);
 			~InlineWrapperHook();
+			InlineWrapperHook(const InlineWrapperHook&) = delete;
+			InlineWrapperHook(InlineWrapperHook&&) = delete;
+			InlineWrapperHook& operator=(const InlineWrapperHook&) = delete;
+			InlineWrapperHook& operator=(InlineWrapperHook&&) = delete;
 
 		public:
 			bool Set(void* pAddress);
@@ -6394,7 +6467,7 @@ namespace Detours {
 			bool UnHook(bool bWaitForUnHook = true);
 
 		public:
-			void* GetTrampoline() const;
+			void* GetTrampoline() const noexcept;
 
 		private:
 			bool m_bInitialized;
@@ -6417,50 +6490,58 @@ namespace Detours {
 
 		typedef struct _RAW_CONTEXT_STACK {
 			template <typename T = void*>
-			inline void push(const T Value) {
+			inline void Push(const T Value) {
 				m_pAddress = reinterpret_cast<void*>(reinterpret_cast<size_t>(m_pAddress) - sizeof(T));
 				*reinterpret_cast<T*>(m_pAddress) = Value;
 			}
 
 			template <typename T = void*>
-			inline T& pop() {
+			inline T& Pop() {
 				T& Value = *reinterpret_cast<T*>(m_pAddress);
 				m_pAddress = reinterpret_cast<void*>(reinterpret_cast<size_t>(m_pAddress) + sizeof(T));
 				return Value;
 			}
 
-			inline void* GetAddress() const {
+			inline void* GetAddress() const noexcept {
 				return m_pAddress;
+			}
+
+			inline void SetAddress(void* pAddress) noexcept {
+				m_pAddress = pAddress;
 			}
 
 		private:
 			void* m_pAddress;
 		} RAW_CONTEXT_STACK, *PRAW_CONTEXT_STACK;
 
+		static_assert(sizeof(RAW_CONTEXT_STACK) == sizeof(void*), "RAW_CONTEXT_STACK must contain exactly one native pointer");
+
 		typedef union _RAW_CONTEXT_FPU_REGISTER {
-			unsigned char m_pRAW[10];
+			unsigned char m_unRAW[10];
 			double m_f64;
 			float m_f32;
 		} RAW_CONTEXT_FPU_REGISTER, *PRAW_CONTEXT_FPU_REGISTER;
+
+		static_assert(sizeof(RAW_CONTEXT_FPU_REGISTER) == 10, "RAW_CONTEXT_FPU_REGISTER must match the x87 register format");
 
 		typedef struct _RAW_CONTEXT_FPU {
 			union {
 				unsigned short m_unControlWord;
 
 				struct {
-					unsigned int m_unInvalidOperation : 1;
-					unsigned int m_unDenormalizedOperand : 1;
-					unsigned int m_unDivideByZero : 1;
-					unsigned int m_unOverflow : 1;
-					unsigned int m_unUnderflow : 1;
-					unsigned int m_unPrecision : 1;
-					unsigned int m_unReserved6 : 1;
-					unsigned int m_unReserved7 : 1;
-					unsigned int m_unPrecisionControl0 : 1;
-					unsigned int m_unPrecisionControl1 : 1;
-					unsigned int m_unRoundingControl0 : 1;
-					unsigned int m_unRoundingControl1 : 1;
-					unsigned int m_unInfinityControl : 1;
+					unsigned short m_unInvalidOperation : 1;
+					unsigned short m_unDenormalizedOperand : 1;
+					unsigned short m_unDivideByZero : 1;
+					unsigned short m_unOverflow : 1;
+					unsigned short m_unUnderflow : 1;
+					unsigned short m_unPrecision : 1;
+					unsigned short m_unReserved6 : 1;
+					unsigned short m_unReserved7 : 1;
+					unsigned short m_unPrecisionControl0 : 1;
+					unsigned short m_unPrecisionControl1 : 1;
+					unsigned short m_unRoundingControl0 : 1;
+					unsigned short m_unRoundingControl1 : 1;
+					unsigned short m_unInfinityControl : 1;
 				} ControlWord;
 			};
 
@@ -6470,19 +6551,20 @@ namespace Detours {
 				unsigned short m_unStatusWord;
 
 				struct {
-					unsigned int m_unInvalidOperation : 1;
-					unsigned int m_unDenormalizedOperand : 1;
-					unsigned int m_unDivideByZero : 1;
-					unsigned int m_unOverflow : 1;
-					unsigned int m_unUnderflow : 1;
-					unsigned int m_unPrecision : 1;
-					unsigned int m_unStackFault : 1;
-					unsigned int m_unExceptionSummary : 1;
-					unsigned int m_unCondition0 : 1;
-					unsigned int m_unCondition1 : 1;
-					unsigned int m_unCondition2 : 1;
-					unsigned int m_unCondition3 : 1;
-					unsigned int m_unFPUBusy : 1;
+					unsigned short m_unInvalidOperation : 1;
+					unsigned short m_unDenormalizedOperand : 1;
+					unsigned short m_unDivideByZero : 1;
+					unsigned short m_unOverflow : 1;
+					unsigned short m_unUnderflow : 1;
+					unsigned short m_unPrecision : 1;
+					unsigned short m_unStackFault : 1;
+					unsigned short m_unExceptionSummary : 1;
+					unsigned short m_unCondition0 : 1;
+					unsigned short m_unCondition1 : 1;
+					unsigned short m_unCondition2 : 1;
+					unsigned short m_unTop : 3;
+					unsigned short m_unCondition3 : 1;
+					unsigned short m_unFPUBusy : 1;
 				} StatusWord;
 			};
 
@@ -6497,6 +6579,13 @@ namespace Detours {
 			unsigned short m_unReserved4;
 			RAW_CONTEXT_FPU_REGISTER m_Registers[8];
 		} RAW_CONTEXT_FPU, *PRAW_CONTEXT_FPU;
+
+		static_assert(offsetof(RAW_CONTEXT_FPU, m_unControlWord) == 0, "RAW_CONTEXT_FPU control-word offset is invalid");
+		static_assert(offsetof(RAW_CONTEXT_FPU, m_unStatusWord) == 4, "RAW_CONTEXT_FPU status-word offset is invalid");
+		static_assert(offsetof(RAW_CONTEXT_FPU, m_unTagWord) == 8, "RAW_CONTEXT_FPU tag-word offset is invalid");
+		static_assert(offsetof(RAW_CONTEXT_FPU, m_unIP) == 12, "RAW_CONTEXT_FPU instruction-pointer offset is invalid");
+		static_assert(offsetof(RAW_CONTEXT_FPU, m_Registers) == 28, "RAW_CONTEXT_FPU register offset is invalid");
+		static_assert(sizeof(RAW_CONTEXT_FPU) == 108, "RAW_CONTEXT_FPU must match the 32-bit FSAVE format");
 
 		typedef union _RAW_CONTEXT_M128 {
 			unsigned long long m_un64[2];
@@ -6536,6 +6625,10 @@ namespace Detours {
 			double m_f64[8];
 			float m_f32[16];
 		} RAW_CONTEXT_M512, *PRAW_CONTEXT_M512;
+
+		static_assert(sizeof(RAW_CONTEXT_M128) == 16, "RAW_CONTEXT_M128 must contain 128 bits");
+		static_assert(sizeof(RAW_CONTEXT_M256) == 32, "RAW_CONTEXT_M256 must contain 256 bits");
+		static_assert(sizeof(RAW_CONTEXT_M512) == 64, "RAW_CONTEXT_M512 must contain 512 bits");
 
 #if defined(_WIN32)
 #pragma pack(pop, r1)
@@ -6631,7 +6724,7 @@ namespace Detours {
 
 			// ESP
 			union {
-				RAW_CONTEXT_STACK Stack;
+				RAW_CONTEXT_STACK m_Stack;
 				unsigned int m_unESP;
 				unsigned short m_unSP;
 				unsigned char m_unSPL;
@@ -6837,7 +6930,7 @@ namespace Detours {
 
 			// RSP
 			union {
-				RAW_CONTEXT_STACK Stack;
+				RAW_CONTEXT_STACK m_Stack;
 				unsigned long long m_unRSP;
 				unsigned int m_unESP;
 				unsigned short m_unSP;
@@ -7192,29 +7285,70 @@ namespace Detours {
 			RawHook();
 			RawHook(void* pAddress);
 			~RawHook();
+			RawHook(const RawHook&) = delete;
+			RawHook(RawHook&&) = delete;
+			RawHook& operator=(const RawHook&) = delete;
+			RawHook& operator=(RawHook&&) = delete;
 
 		public:
 			bool Set(void* pAddress);
 			bool Release();
 
 		public:
-			bool Hook(const fnRawHookCallBack pCallBack, bool bNative = false, const unsigned int unReserveStackSize = 0, bool bSingleInstructionOnly = false, bool bWaitForHook = true);
+			bool Hook(const fnRawHookCallBack pCallBack, bool bNative = false, const unsigned int unReservedStackSize = 0, bool bSingleInstructionOnly = false, bool bWaitForHook = true);
 			bool UnHook(bool bWaitForUnHook = true);
 
 		public:
-			void* GetTrampoline() const;
-			unsigned char GetFirstInstructionSize() const;
+			void* GetTrampoline() const noexcept;
+			void CallTrampoline(PRAW_CONTEXT pCTX) const;
+			unsigned char GetFirstInstructionSize() const noexcept;
 
 		private:
 			bool m_bInitialized;
 			void* m_pAddress;
 			void* m_pWrapper;
 			void* m_pRestore;
+			void* m_pCallTrampoline;
 			unsigned char m_unFirstInstructionSize;
 			void* m_pTrampoline;
+			size_t m_unContextSize;
+			size_t m_unContextCopySize;
 			size_t m_unOriginalBytes;
 			std::unique_ptr<unsigned char[]> m_pOriginalBytes;
 		};
+
+		// ----------------------------------------------------------------
+		// Raw Context
+		// ----------------------------------------------------------------
+
+#if defined(_WIN32)
+		using RAW_THREAD_HANDLE = HANDLE;
+#elif defined(__linux__)
+		using RAW_THREAD_HANDLE = pid_t;
+#endif
+
+		// Copies the requested thread context into pCTX. A non-current thread must
+		// already be suspended; this function never suspends or resumes it. On
+		// failure pCTX is zeroed.
+		DETOURS_NOINLINE void GetContext(RAW_THREAD_HANDLE hThread, PRAW_CONTEXT pCTX);
+
+		// Captures the context of the calling thread into pCTX. On failure pCTX is
+		// zeroed. Stack is converted to a caller-owned slot suitable for a later
+		// CallAddress call; use a separate writable stack for stack arguments.
+		DETOURS_NOINLINE void GetCurrentContext(PRAW_CONTEXT pCTX);
+
+#undef DETOURS_NOINLINE
+
+		// ----------------------------------------------------------------
+		// Call Address
+		// ----------------------------------------------------------------
+
+		// Calls pAddress with the state represented by pCTX and writes the returned
+		// state back to the same RAW_CONTEXT. This function may be used outside a
+		// RawHook callback. If Stack is null, a temporary ABI-aligned stack is used;
+		// provide a writable Stack mapping when passing arguments on the stack.
+		// pCTX must not be a native-only context.
+		void CallAddress(void* pAddress, PRAW_CONTEXT pCTX);
 	} // namespace Hook
 } // namespace Detours
 

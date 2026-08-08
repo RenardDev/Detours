@@ -246,6 +246,10 @@
     </MASM>
   </ItemGroup>
   <ItemGroup>
+    <None Include="asm.asm" />
+    <None Include="asm64.asm" />
+    <None Include="call.asm" />
+    <None Include="call64.asm" />
     <None Include="SuppressionFile.suppress" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
