@@ -166,6 +166,8 @@ constexpr unsigned int kCHDVirtualInheritance = 0x00000002;
 // Common helpers
 // ----------------------------------------------------------------
 
+constexpr size_t kMaximumRelativeJumpDistance = 0x7FFFFFFB;
+
 template <typename T>
 static const T inline AlignUp(const T unValue, const T unAlignment) {
 	static_assert(std::is_integral<T>::value, "Template argument must be an integral type");
@@ -216,7 +218,7 @@ static const T inline BitScanForward(const T unValue) {
 	return sizeof(T) * CHAR_BIT;
 }
 
-static size_t inline IsRelative(void const* const pSourceAddress, void const* const pDestinationAddress, const size_t unMaxDistance = 0x7FFFFFFF) {
+static size_t inline IsRelative(void const* const pSourceAddress, void const* const pDestinationAddress, const size_t unMaxDistance = kMaximumRelativeJumpDistance) {
 	const size_t unRelativeOffset = reinterpret_cast<size_t>(pSourceAddress) - reinterpret_cast<size_t>(pDestinationAddress);
 	const size_t unDistance = (pSourceAddress > pDestinationAddress) ? unRelativeOffset : reinterpret_cast<size_t>(pDestinationAddress) - reinterpret_cast<size_t>(pSourceAddress);
 	if (unDistance <= unMaxDistance) {
@@ -11228,6 +11230,94 @@ namespace Detours {
 		}
 
 		// ----------------------------------------------------------------
+		// Near allocation
+		// ----------------------------------------------------------------
+
+		static void* AllocFromFreeRegionNearAddress(const REGION_INFO& RegionInfo, void* pDesiredAddress, size_t unCapacity, DWORD unAllocationType, bool bBackward) {
+			if (!pDesiredAddress || !unCapacity || !g_unAllocationGranularity || (RegionInfo.m_unState != MEM_FREE) || !RegionInfo.m_pBaseAddress || !RegionInfo.m_unSize) {
+				return nullptr;
+			}
+
+			const size_t unRegionBegin = reinterpret_cast<size_t>(RegionInfo.m_pBaseAddress);
+			if (RegionInfo.m_unSize > (SIZE_MAX - unRegionBegin)) {
+				return nullptr;
+			}
+
+			const size_t unRegionEnd = unRegionBegin + RegionInfo.m_unSize;
+			if (unCapacity > RegionInfo.m_unSize) {
+				return nullptr;
+			}
+
+			const size_t unDesiredAddress = reinterpret_cast<size_t>(pDesiredAddress);
+			size_t unCandidateAddress = 0;
+			if (bBackward) {
+				const size_t unLatestAddress = unRegionEnd - unCapacity;
+				unCandidateAddress = AlignDown((unLatestAddress < unDesiredAddress) ? unLatestAddress : unDesiredAddress, static_cast<size_t>(g_unAllocationGranularity));
+			} else {
+				const size_t unEarliestAddress = (unRegionBegin > unDesiredAddress) ? unRegionBegin : unDesiredAddress;
+				if (unEarliestAddress > (SIZE_MAX - (static_cast<size_t>(g_unAllocationGranularity) - 1))) {
+					return nullptr;
+				}
+
+				unCandidateAddress = AlignUp(unEarliestAddress, static_cast<size_t>(g_unAllocationGranularity));
+			}
+
+			if ((unCandidateAddress < unRegionBegin) || (unCandidateAddress > unRegionEnd) || (unCapacity > (unRegionEnd - unCandidateAddress))) {
+				return nullptr;
+			}
+
+			const size_t unCandidateEndAddress = unCandidateAddress + unCapacity - 1;
+			const size_t unBeginDistance = (unDesiredAddress > unCandidateAddress) ? (unDesiredAddress - unCandidateAddress) : (unCandidateAddress - unDesiredAddress);
+			const size_t unEndDistance = (unDesiredAddress > unCandidateEndAddress) ? (unDesiredAddress - unCandidateEndAddress) : (unCandidateEndAddress - unDesiredAddress);
+			if ((unBeginDistance > kMaximumRelativeJumpDistance) || (unEndDistance > kMaximumRelativeJumpDistance)) {
+				return nullptr;
+			}
+
+			void* const pCandidateAddress = reinterpret_cast<void*>(unCandidateAddress);
+			void* const pAllocatedAddress = VirtualAlloc(pCandidateAddress, unCapacity, unAllocationType, PAGE_READWRITE);
+			if (!pAllocatedAddress) {
+				return nullptr;
+			}
+
+			if (pAllocatedAddress != pCandidateAddress) {
+				VirtualFree(pAllocatedAddress, 0, MEM_RELEASE);
+				return nullptr;
+			}
+
+			return pAllocatedAddress;
+		}
+
+		static void* AllocNearAddress(void* pDesiredAddress, size_t unCapacity, DWORD unAllocationType) {
+			if (!pDesiredAddress || !unCapacity) {
+				return nullptr;
+			}
+
+			const size_t unDesiredAddress = reinterpret_cast<size_t>(pDesiredAddress);
+			const size_t unBackwardDistance = (unDesiredAddress < kMaximumRelativeJumpDistance) ? unDesiredAddress : kMaximumRelativeJumpDistance;
+			const size_t unBackwardBegin = unDesiredAddress - unBackwardDistance;
+			const size_t unBackwardSize = unBackwardDistance + 1;
+
+			auto vecBackwardRegions = GetRegionsInfo(reinterpret_cast<void*>(unBackwardBegin), unBackwardSize);
+			std::reverse(vecBackwardRegions.begin(), vecBackwardRegions.end());
+			for (const REGION_INFO& RegionInfo : vecBackwardRegions) {
+				void* const pAllocatedAddress = AllocFromFreeRegionNearAddress(RegionInfo, pDesiredAddress, unCapacity, unAllocationType, true);
+				if (pAllocatedAddress) {
+					return pAllocatedAddress;
+				}
+			}
+
+			auto vecForwardRegions = GetRegionsInfo(pDesiredAddress, kMaximumRelativeJumpDistance);
+			for (const REGION_INFO& RegionInfo : vecForwardRegions) {
+				void* const pAllocatedAddress = AllocFromFreeRegionNearAddress(RegionInfo, pDesiredAddress, unCapacity, unAllocationType, false);
+				if (pAllocatedAddress) {
+					return pAllocatedAddress;
+				}
+			}
+
+			return nullptr;
+		}
+
+		// ----------------------------------------------------------------
 		// Shared
 		// ----------------------------------------------------------------
 
@@ -11474,44 +11564,7 @@ namespace Detours {
 
 			m_unPageCapacity = g_unPageSize;
 			if (pDesiredAddress) {
-				auto vecBackwardPages = GetPagesInfo(reinterpret_cast<char*>(pDesiredAddress) - 0x7FFFFFFF + 1, 0x7FFFFFFF);
-				std::reverse(vecBackwardPages.begin(), vecBackwardPages.end());
-				for (auto& PageInfo : vecBackwardPages) { // [unAddress; unBegin] - From unAddress to unBegin (Backward)
-					if (!IsRelative(pDesiredAddress, PageInfo.m_pBaseAddress)) {
-						continue;
-					}
-
-					if (PageInfo.m_unState == MEM_FREE) {
-						void* pPageAddress = VirtualAlloc(reinterpret_cast<void*>(PageInfo.m_pBaseAddress), PageInfo.m_unSize, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
-						if (pPageAddress) {
-							if (IsRelative(pDesiredAddress, pPageAddress)) {
-								m_pPageAddress = pPageAddress;
-								break;
-							} else {
-								VirtualFree(pPageAddress, 0, MEM_RELEASE);
-							}
-						}
-					}
-				}
-
-				auto vecForwardPages = GetPagesInfo(pDesiredAddress, 0x7FFFFFFF);
-				for (auto& PageInfo : vecForwardPages) { // [unAddress; unEnd] - From unAddress to unEnd(Forward)
-					if (!IsRelative(pDesiredAddress, PageInfo.m_pBaseAddress)) {
-						continue;
-					}
-
-					if (PageInfo.m_unState == MEM_FREE) {
-						void* pPageAddress = VirtualAlloc(reinterpret_cast<void*>(PageInfo.m_pBaseAddress), PageInfo.m_unSize, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
-						if (pPageAddress) {
-							if (IsRelative(pDesiredAddress, pPageAddress)) {
-								m_pPageAddress = pPageAddress;
-								break;
-							} else {
-								VirtualFree(pPageAddress, 0, MEM_RELEASE);
-							}
-						}
-					}
-				}
+				m_pPageAddress = AllocNearAddress(pDesiredAddress, static_cast<size_t>(g_unPageSize), MEM_COMMIT | MEM_RESERVE);
 			} else {
 				m_pPageAddress = VirtualAlloc(nullptr, g_unPageSize, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
 			}
@@ -11803,44 +11856,7 @@ namespace Detours {
 
 			m_unRegionCapacity = unCapacity;
 			if (pDesiredAddress) {
-				auto vecBackwardRegions = GetRegionsInfo(reinterpret_cast<char*>(pDesiredAddress) - 0x7FFFFFFF + 1, 0x7FFFFFFF);
-				std::reverse(vecBackwardRegions.begin(), vecBackwardRegions.end());
-				for (auto& Region : vecBackwardRegions) { // [unAddress; unBegin] - From unAddress to unBegin (Backward)
-					if (!IsRelative(pDesiredAddress, Region.m_pBaseAddress)) {
-						continue;
-					}
-
-					if (Region.m_unState == MEM_FREE) {
-						void* pRegionAddress = VirtualAlloc(reinterpret_cast<void*>(Region.m_pBaseAddress), Region.m_unSize, MEM_RESERVE, PAGE_READWRITE);
-						if (pRegionAddress) {
-							if (IsRelative(pDesiredAddress, pRegionAddress)) {
-								m_pRegionAddress = pRegionAddress;
-								break;
-							} else {
-								VirtualFree(pRegionAddress, 0, MEM_RELEASE);
-							}
-						}
-					}
-				}
-
-				auto vecForwardRegions = GetRegionsInfo(pDesiredAddress, 0x7FFFFFFF);
-				for (auto& Region : vecForwardRegions) { // [unAddress; unEnd] - From unAddress to unEnd(Forward)
-					if (!IsRelative(pDesiredAddress, Region.m_pBaseAddress)) {
-						continue;
-					}
-
-					if (Region.m_unState == MEM_FREE) {
-						void* pRegionAddress = VirtualAlloc(reinterpret_cast<void*>(Region.m_pBaseAddress), Region.m_unSize, MEM_RESERVE, PAGE_READWRITE);
-						if (pRegionAddress) {
-							if (IsRelative(pDesiredAddress, pRegionAddress)) {
-								m_pRegionAddress = pRegionAddress;
-								break;
-							} else {
-								VirtualFree(pRegionAddress, 0, MEM_RELEASE);
-							}
-						}
-					}
-				}
+				m_pRegionAddress = AllocNearAddress(pDesiredAddress, unCapacity, MEM_RESERVE);
 			} else {
 				m_pRegionAddress = VirtualAlloc(nullptr, unCapacity, MEM_RESERVE, PAGE_READWRITE);
 			}

@@ -2122,6 +2122,48 @@ TEST_SUITE("Detours::Memory") {
 		CHECK(Page.Alloc(1, 0, 0) == nullptr);
 	}
 
+	TEST_CASE("Page and Region near address") {
+		constexpr size_t kMaximumRelativeJumpDistance = 0x7FFFFFFB;
+
+		SYSTEM_INFO SystemInfo {};
+		GetSystemInfo(&SystemInfo);
+
+		HMODULE const hKernel32 = GetModuleHandle(_T("kernel32.dll"));
+		REQUIRE(hKernel32 != nullptr);
+		REQUIRE(hKernel32 != INVALID_HANDLE_VALUE);
+		if (!hKernel32 || (hKernel32 == INVALID_HANDLE_VALUE)) {
+			return;
+		}
+
+		void* const pDesiredAddress = reinterpret_cast<void*>(GetProcAddress(hKernel32, "Sleep"));
+		REQUIRE(pDesiredAddress != nullptr);
+
+		auto const IsWithinRelativeDistance = [](void const* const pFirstAddress, void const* const pSecondAddress) -> bool {
+			const size_t unFirstAddress = reinterpret_cast<size_t>(pFirstAddress);
+			const size_t unSecondAddress = reinterpret_cast<size_t>(pSecondAddress);
+			const size_t unDistance = (unFirstAddress > unSecondAddress) ? (unFirstAddress - unSecondAddress) : (unSecondAddress - unFirstAddress);
+			return unDistance <= kMaximumRelativeJumpDistance;
+		};
+
+		{
+			Detours::Memory::Page NearPage(pDesiredAddress);
+			void* const pPageAddress = NearPage.GetPageAddress();
+			REQUIRE(pPageAddress != nullptr);
+			CHECK((reinterpret_cast<size_t>(pPageAddress) % SystemInfo.dwAllocationGranularity) == 0);
+			CHECK(IsWithinRelativeDistance(pDesiredAddress, pPageAddress));
+		}
+
+		{
+			const size_t unRegionCapacity = static_cast<size_t>(SystemInfo.dwPageSize) * 2;
+			Detours::Memory::Region NearRegion(pDesiredAddress, unRegionCapacity);
+			void* const pRegionAddress = NearRegion.GetRegionAddress();
+			REQUIRE(pRegionAddress != nullptr);
+			CHECK(NearRegion.GetRegionCapacity() == unRegionCapacity);
+			CHECK((reinterpret_cast<size_t>(pRegionAddress) % SystemInfo.dwAllocationGranularity) == 0);
+			CHECK(IsWithinRelativeDistance(pDesiredAddress, pRegionAddress));
+		}
+	}
+
 	TEST_CASE("Region") {
 		Detours::Memory::Region Region;
 		CHECK(Region.Alloc(SIZE_MAX, 2) == nullptr);
