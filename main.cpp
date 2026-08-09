@@ -1,17 +1,34 @@
 
-// Default
+// Platform
+#if defined(_WIN32)
 #include <Windows.h>
 #include <tchar.h>
+#elif defined(__linux__)
+#include <fcntl.h>
+#include <sys/mman.h>
+#include <sys/types.h>
+#include <unistd.h>
+#endif
 
 // Advanced
+#if defined(_WIN32)
 #include <intrin.h>
+#endif
 
 // C++
+#include <algorithm>
 #include <atomic>
+#include <cerrno>
+#include <cstdint>
+#include <cstring>
 #include <cstdio>
-#include <typeinfo>
+#include <fstream>
 #include <iostream>
+#include <limits>
+#include <sstream>
+#include <string>
 #include <thread>
+#include <typeinfo>
 #include <unordered_map>
 #include <vector>
 
@@ -23,7 +40,12 @@
 #undef max
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
 #define DOCTEST_CONFIG_SUPER_FAST_ASSERTS
+#if defined(__linux__)
+#define DOCTEST_CONFIG_NO_POSIX_SIGNALS
+#endif
 #include "doctest.h"
+
+#if defined(_WIN32)
 
 // interrupts32.asm/interrupts64.asm
 #ifdef _M_X64
@@ -391,6 +413,14 @@ TEST_SUITE("Detours::Hexadecimal") {
 		memset(szData, 0, sizeof(szData));
 		CHECK(Detours::Hexadecimal::Decode(_T("48656C6C6F2C20576F726C642100"), reinterpret_cast<void*>(szData), 0x00) == true);
 		CHECK(memcmp(szData, "Hello, World!", 14) == 0);
+	}
+
+	TEST_CASE("Decode validates input and preserves ignored bytes") {
+		char szData[] = { 'x', 'y', 'z' };
+		CHECK(Detours::Hexadecimal::Decode(_T("412A42"), reinterpret_cast<void*>(szData), 0x2A) == true);
+		CHECK(memcmp(szData, "AyB", sizeof(szData)) == 0);
+		CHECK(Detours::Hexadecimal::Decode(_T("A"), reinterpret_cast<void*>(szData), 0x2A) == false);
+		CHECK(Detours::Hexadecimal::Decode(_T("GG"), reinterpret_cast<void*>(szData), 0x2A) == false);
 	}
 }
 
@@ -1781,11 +1811,225 @@ TEST_SUITE("Detours::Parallel") {
 }
 
 TEST_SUITE("Detours::Memory") {
+	constexpr size_t kProcessScannerChunkSize = 1024 * 1024;
+
+	typedef struct _TEST_PROCESS_SCAN_RESULT {
+		_TEST_PROCESS_SCAN_RESULT() {
+			m_bCompleted = false;
+			m_unBytesScanned = 0;
+			m_unReadFailures = 0;
+		}
+
+		bool m_bCompleted;
+		size_t m_unBytesScanned;
+		size_t m_unReadFailures;
+		std::vector<void*> m_vecMatches;
+	} TEST_PROCESS_SCAN_RESULT, *PTEST_PROCESS_SCAN_RESULT;
 
 	typedef struct _SHAREDCLIENT_DATA {
 		Detours::Sync::Event* m_pEvent;
 		TCHAR m_szSharedName[64];
 	} SHAREDCLIENT_DATA, *PSHAREDCLIENT_DATA;
+
+	class TestProcessScanner {
+	public:
+		explicit TestProcessScanner(HANDLE hProcess = GetCurrentProcess()) {
+			m_hProcess = hProcess;
+		}
+
+	public:
+		bool Find(const void* pData, size_t unDataSize, PTEST_PROCESS_SCAN_RESULT pResult, const void* pBeginAddress = nullptr, size_t unRangeSize = 0) const;
+
+	private:
+		HANDLE m_hProcess;
+	};
+
+	void CollectProcessScannerMatches(
+	    const unsigned char* pBuffer,
+	    size_t unBufferSize,
+	    const unsigned char* pData,
+	    size_t unDataSize,
+	    size_t unBaseAddress,
+	    size_t unCandidateCount,
+	    std::vector<void*>& vecMatches) {
+		if (!pBuffer || !pData || !unDataSize || (unBufferSize < unDataSize)) {
+			return;
+		}
+
+		const size_t unAvailableCandidates = unBufferSize - unDataSize + 1;
+		const size_t unCandidates = std::min(unCandidateCount, unAvailableCandidates);
+		for (size_t unIndex = 0; unIndex < unCandidates; ++unIndex) {
+			if (std::memcmp(pBuffer + unIndex, pData, unDataSize) == 0) {
+				vecMatches.push_back(reinterpret_cast<void*>(unBaseAddress + unIndex));
+			}
+		}
+	}
+
+	size_t CollectProcessScannerChunk(
+	    std::vector<unsigned char> & vecBuffer,
+	    size_t unCarrySize,
+	    size_t unBytesRead,
+	    const unsigned char* pData,
+	    size_t unDataSize,
+	    size_t unReadAddress,
+	    std::vector<void*>& vecMatches) {
+		if (!unBytesRead) {
+			return unCarrySize;
+		}
+
+		const size_t unBufferSize = unCarrySize + unBytesRead;
+		CollectProcessScannerMatches(vecBuffer.data(), unBufferSize, pData, unDataSize, unReadAddress - unCarrySize, unBytesRead, vecMatches);
+
+		const size_t unNewCarrySize = std::min(unDataSize - 1, unBufferSize);
+		if (unNewCarrySize) {
+			std::memmove(vecBuffer.data(), vecBuffer.data() + unBufferSize - unNewCarrySize, unNewCarrySize);
+		}
+
+		return unNewCarrySize;
+	}
+
+	bool IsProcessScannerProtectionReadable(DWORD unProtection) {
+		if ((unProtection & PAGE_GUARD) || (unProtection & PAGE_NOACCESS)) {
+			return false;
+		}
+
+		switch (unProtection & 0xFF) {
+			case PAGE_READONLY:
+			case PAGE_READWRITE:
+			case PAGE_WRITECOPY:
+			case PAGE_EXECUTE_READ:
+			case PAGE_EXECUTE_READWRITE:
+			case PAGE_EXECUTE_WRITECOPY:
+				return true;
+		}
+
+		return false;
+	}
+
+	bool TestProcessScanner::Find(const void* pData, size_t unDataSize, PTEST_PROCESS_SCAN_RESULT pResult, const void* pBeginAddress, size_t unRangeSize) const {
+		if (!pResult) {
+			return false;
+		}
+
+		*pResult = {};
+		auto& vecMatches = pResult->m_vecMatches;
+		if (!pData || !unDataSize || (unDataSize > (SIZE_MAX - kProcessScannerChunkSize + 1)) || !m_hProcess) {
+			return false;
+		}
+
+		std::vector<unsigned char> vecData(unDataSize);
+		std::memcpy(vecData.data(), pData, unDataSize);
+		std::vector<unsigned char> vecBuffer(kProcessScannerChunkSize + unDataSize - 1);
+
+		SYSTEM_INFO SystemInfo {};
+		GetSystemInfo(&SystemInfo);
+		const size_t unMinimumAddress = reinterpret_cast<size_t>(SystemInfo.lpMinimumApplicationAddress);
+		const size_t unMaximumAddress = reinterpret_cast<size_t>(SystemInfo.lpMaximumApplicationAddress);
+		const size_t unSystemEnd = (unMaximumAddress == SIZE_MAX) ? SIZE_MAX : unMaximumAddress + 1;
+		const size_t unBeginAddress = pBeginAddress ? reinterpret_cast<size_t>(pBeginAddress) : unMinimumAddress;
+		size_t unEndAddress = unSystemEnd;
+		if (unRangeSize) {
+			unEndAddress = (unRangeSize > (SIZE_MAX - unBeginAddress)) ? SIZE_MAX : unBeginAddress + unRangeSize;
+		}
+
+		if ((unBeginAddress >= unEndAddress) || (unEndAddress <= unMinimumAddress)) {
+			return false;
+		}
+
+		size_t unCarrySize = 0;
+		size_t unNextAddress = std::max(unBeginAddress, unMinimumAddress);
+		size_t unCursor = std::max(unBeginAddress, unMinimumAddress);
+		unEndAddress = std::min(unEndAddress, unSystemEnd);
+		if (unCursor >= unEndAddress) {
+			return false;
+		}
+
+		while (unCursor < unEndAddress) {
+			MEMORY_BASIC_INFORMATION MemoryInfo {};
+			if (VirtualQueryEx(m_hProcess, reinterpret_cast<void*>(unCursor), &MemoryInfo, sizeof(MemoryInfo)) != sizeof(MemoryInfo)) {
+				++pResult->m_unReadFailures;
+				return false;
+			}
+
+			const size_t unRegionBase = reinterpret_cast<size_t>(MemoryInfo.BaseAddress);
+			const size_t unRegionEnd = (MemoryInfo.RegionSize > (SIZE_MAX - unRegionBase)) ? SIZE_MAX : unRegionBase + MemoryInfo.RegionSize;
+			const size_t unScanBegin = std::max(unCursor, unRegionBase);
+			const size_t unScanEnd = std::min(unEndAddress, unRegionEnd);
+			if ((MemoryInfo.State == MEM_COMMIT) && IsProcessScannerProtectionReadable(MemoryInfo.Protect) && (unScanBegin < unScanEnd)) {
+				if (unScanBegin != unNextAddress) {
+					unCarrySize = 0;
+				}
+
+				size_t unChunkAddress = unScanBegin;
+				while (unChunkAddress < unScanEnd) {
+					const size_t unReadSize = std::min(kProcessScannerChunkSize, unScanEnd - unChunkAddress);
+					SIZE_T unBytesRead = 0;
+					const bool bRead = ReadProcessMemory(m_hProcess, reinterpret_cast<void*>(unChunkAddress), vecBuffer.data() + unCarrySize, unReadSize, &unBytesRead) != FALSE;
+					pResult->m_unBytesScanned += static_cast<size_t>(unBytesRead);
+					if (unBytesRead) {
+						unCarrySize = CollectProcessScannerChunk(vecBuffer, unCarrySize, static_cast<size_t>(unBytesRead), vecData.data(), unDataSize, unChunkAddress, vecMatches);
+					}
+
+					if (!bRead || (unBytesRead != unReadSize)) {
+						++pResult->m_unReadFailures;
+						unCarrySize = 0;
+					}
+
+					unChunkAddress += unReadSize;
+					unNextAddress = unChunkAddress;
+				}
+			} else {
+				unCarrySize = 0;
+				unNextAddress = unScanEnd;
+			}
+
+			if (unRegionEnd <= unCursor) {
+				++pResult->m_unReadFailures;
+				return false;
+			}
+
+			unCursor = unRegionEnd;
+		}
+
+		pResult->m_bCompleted = true;
+		return true;
+	}
+
+	bool FreeScannerTestMemory(void* pAddress) {
+		return pAddress && (VirtualFree(pAddress, 0, MEM_RELEASE) != FALSE);
+	}
+
+	bool CopyProtectedTestMemory(void* pAddress, size_t unSize, std::vector<unsigned char>* pData) {
+		if (!pAddress || !unSize || !pData) {
+			return false;
+		}
+
+		DWORD unOldProtection = 0;
+		if (!VirtualProtect(pAddress, unSize, PAGE_READONLY, &unOldProtection)) {
+			return false;
+		}
+
+		pData->resize(unSize);
+		std::memcpy(pData->data(), pAddress, unSize);
+		DWORD unTemporaryProtection = 0;
+		return VirtualProtect(pAddress, unSize, unOldProtection, &unTemporaryProtection) != FALSE;
+	}
+
+	bool TamperProtectedTestMemory(void* pAddress, size_t unSize) {
+		if (!pAddress || !unSize) {
+			return false;
+		}
+
+		DWORD unOldProtection = 0;
+		if (!VirtualProtect(pAddress, unSize, PAGE_EXECUTE_READWRITE, &unOldProtection)) {
+			return false;
+		}
+
+		unsigned char* const pData = static_cast<unsigned char*>(pAddress);
+		pData[0] = static_cast<unsigned char>(pData[0] ^ 1);
+		DWORD unTemporaryProtection = 0;
+		return VirtualProtect(pAddress, unSize, unOldProtection, &unTemporaryProtection) != FALSE;
+	}
 
 	void OnSharedClientThread(void* pData) {
 		PSHAREDCLIENT_DATA pSCD = reinterpret_cast<PSHAREDCLIENT_DATA>(pData);
@@ -1833,6 +2077,7 @@ TEST_SUITE("Detours::Memory") {
 
 	TEST_CASE("Page") {
 		Detours::Memory::Page Page;
+		CHECK(Page.Alloc(SIZE_MAX, 2) == nullptr);
 		CHECK(Page.Alloc(Page.GetPageCapacity()) != nullptr);
 		CHECK(Page.Alloc(1) == nullptr);
 		CHECK(Page.Alloc(1, 2) == nullptr);
@@ -1879,6 +2124,7 @@ TEST_SUITE("Detours::Memory") {
 
 	TEST_CASE("Region") {
 		Detours::Memory::Region Region;
+		CHECK(Region.Alloc(SIZE_MAX, 2) == nullptr);
 		CHECK(Region.Alloc(Region.GetRegionCapacity()) != nullptr);
 		CHECK(Region.Alloc(1) == nullptr);
 		CHECK(Region.Alloc(1, 2) == nullptr);
@@ -1936,6 +2182,635 @@ TEST_SUITE("Detours::Memory") {
 		using fnType = bool(__cdecl*)();
 		CHECK(reinterpret_cast<fnType>(pCodeMemory)() == true);
 		CHECK(Storage.DeAlloc(pCodeMemory) == true);
+	}
+
+	TEST_CASE("ProcessScanner chunk boundary") {
+		constexpr size_t kScannerChunkSize = 1024 * 1024;
+		constexpr size_t kNeedleSize = sizeof(unsigned long long);
+		constexpr size_t kNeedleSplit = kNeedleSize / 2;
+		const size_t unAllocationSize = kScannerChunkSize + kNeedleSize;
+		unsigned char* const pMemory = static_cast<unsigned char*>(VirtualAlloc(nullptr, unAllocationSize, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE));
+		REQUIRE(pMemory != nullptr);
+		if (!pMemory) {
+			return;
+		}
+
+		const unsigned long long unNeedle = __rdtsc() ^ reinterpret_cast<size_t>(pMemory);
+		unsigned char* const pNeedleAddress = pMemory + kScannerChunkSize - kNeedleSplit;
+		const unsigned char* const pNeedleData = reinterpret_cast<const unsigned char*>(&unNeedle);
+		for (size_t i = 0; i < sizeof(unNeedle); ++i) {
+			pNeedleAddress[i] = pNeedleData[i];
+		}
+
+		TestProcessScanner Scanner;
+		TEST_PROCESS_SCAN_RESULT ScanResult {};
+		REQUIRE(Scanner.Find(&unNeedle, sizeof(unNeedle), &ScanResult, pMemory, unAllocationSize) == true);
+		CHECK(ScanResult.m_bCompleted == true);
+		CHECK(ScanResult.m_unBytesScanned == unAllocationSize);
+		CHECK(ScanResult.m_unReadFailures == 0);
+		CHECK(std::find(ScanResult.m_vecMatches.begin(), ScanResult.m_vecMatches.end(), pNeedleAddress) != ScanResult.m_vecMatches.end());
+
+		CHECK(FreeScannerTestMemory(pMemory) == true);
+	}
+
+	TEST_CASE("ProcessScanner readable region boundary") {
+		SYSTEM_INFO SystemInfo {};
+		GetSystemInfo(&SystemInfo);
+		const size_t unPageSize = static_cast<size_t>(SystemInfo.dwPageSize);
+		const size_t unAllocationSize = unPageSize * 2;
+		unsigned char* const pMemory = static_cast<unsigned char*>(VirtualAlloc(nullptr, unAllocationSize, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE));
+		REQUIRE(pMemory != nullptr);
+		if (!pMemory) {
+			return;
+		}
+
+		const unsigned long long unNeedle = __rdtsc() ^ reinterpret_cast<size_t>(pMemory);
+		unsigned char* const pNeedleAddress = pMemory + unPageSize - (sizeof(unNeedle) / 2);
+		const unsigned char* const pNeedleData = reinterpret_cast<const unsigned char*>(&unNeedle);
+		for (size_t i = 0; i < sizeof(unNeedle); ++i) {
+			pNeedleAddress[i] = pNeedleData[i];
+		}
+
+		DWORD unOldProtection = 0;
+		REQUIRE(VirtualProtect(pMemory + unPageSize, unPageSize, PAGE_READONLY, &unOldProtection) != FALSE);
+
+		MEMORY_BASIC_INFORMATION FirstMemoryInfo {};
+		MEMORY_BASIC_INFORMATION SecondMemoryInfo {};
+		REQUIRE(VirtualQuery(pMemory, &FirstMemoryInfo, sizeof(FirstMemoryInfo)) == sizeof(FirstMemoryInfo));
+		REQUIRE(VirtualQuery(pMemory + unPageSize, &SecondMemoryInfo, sizeof(SecondMemoryInfo)) == sizeof(SecondMemoryInfo));
+		REQUIRE(FirstMemoryInfo.BaseAddress == pMemory);
+		REQUIRE(FirstMemoryInfo.RegionSize == unPageSize);
+		REQUIRE(SecondMemoryInfo.BaseAddress == (pMemory + unPageSize));
+		REQUIRE(SecondMemoryInfo.RegionSize == unPageSize);
+
+		TestProcessScanner Scanner;
+		TEST_PROCESS_SCAN_RESULT ScanResult {};
+		REQUIRE(Scanner.Find(&unNeedle, sizeof(unNeedle), &ScanResult, pMemory, unAllocationSize) == true);
+		CHECK(ScanResult.m_bCompleted == true);
+		CHECK(ScanResult.m_unBytesScanned == unAllocationSize);
+		CHECK(ScanResult.m_unReadFailures == 0);
+		CHECK(std::find(ScanResult.m_vecMatches.begin(), ScanResult.m_vecMatches.end(), pNeedleAddress) != ScanResult.m_vecMatches.end());
+
+		CHECK(FreeScannerTestMemory(pMemory) == true);
+	}
+
+	TEST_CASE("ProtectedPage") {
+		Detours::Memory::ProtectedPage ProtectedPage;
+		void* const pPageAddress = ProtectedPage.GetPageAddress();
+		REQUIRE(pPageAddress != nullptr);
+		CHECK(ProtectedPage.GetPageCapacity() != 0);
+		CHECK(ProtectedPage.IsProtected() == true);
+		CHECK(ProtectedPage.IsCompromised() == false);
+		CHECK(ProtectedPage.IsPageEmpty() == true);
+
+		volatile unsigned long long* const pData = static_cast<volatile unsigned long long*>(ProtectedPage.Alloc(sizeof(unsigned long long)));
+		REQUIRE(reinterpret_cast<size_t>(pData) != 0);
+		const unsigned long long unValue = __rdtsc() ^ reinterpret_cast<size_t>(pPageAddress);
+		*pData = unValue;
+		CHECK(*pData == unValue);
+		CHECK(ProtectedPage.GetDataSize() == sizeof(unValue));
+		CHECK(ProtectedPage.IsPageEmpty() == false);
+		CHECK(ProtectedPage.IsProtected() == true);
+		CHECK(ProtectedPage.IsCompromised() == false);
+
+		TestProcessScanner Scanner;
+		TEST_PROCESS_SCAN_RESULT ScanResult {};
+		REQUIRE(Scanner.Find(&unValue, sizeof(unValue), &ScanResult, pPageAddress, ProtectedPage.GetPageCapacity()) == true);
+		CHECK(ScanResult.m_vecMatches.empty());
+
+		CHECK(ProtectedPage.DeAlloc(const_cast<unsigned long long*>(pData)) == true);
+		CHECK(ProtectedPage.IsPageEmpty() == true);
+		CHECK(ProtectedPage.Release() == true);
+		CHECK(ProtectedPage.Release() == false);
+	}
+
+	TEST_CASE("Protected and Secure pages use exactly one system page") {
+		SYSTEM_INFO SystemInfo {};
+		GetSystemInfo(&SystemInfo);
+		const size_t unPageSize = static_cast<size_t>(SystemInfo.dwPageSize);
+
+		Detours::Memory::ProtectedPage ProtectedPage;
+		REQUIRE(ProtectedPage.GetPageAddress() != nullptr);
+		CHECK(ProtectedPage.GetPageCapacity() == unPageSize);
+		void* const pProtectedData = ProtectedPage.Alloc(unPageSize);
+		REQUIRE(pProtectedData != nullptr);
+		CHECK(ProtectedPage.Alloc(1) == nullptr);
+
+		Detours::Memory::SecurePage SecurePage;
+		REQUIRE(SecurePage.GetPageAddress() != nullptr);
+		CHECK(SecurePage.GetPageCapacity() == unPageSize);
+		void* const pSecureData = SecurePage.Alloc(unPageSize);
+		REQUIRE(pSecureData != nullptr);
+		CHECK(SecurePage.Alloc(1) == nullptr);
+
+		void* const pMultiPageAddress = VirtualAlloc(nullptr, unPageSize * 2, MEM_COMMIT | MEM_RESERVE, PAGE_EXECUTE_READWRITE);
+		REQUIRE(pMultiPageAddress != nullptr);
+		if (pMultiPageAddress) {
+			Detours::Memory::ProtectedPage InvalidProtectedPage(pMultiPageAddress, unPageSize * 2);
+			Detours::Memory::SecurePage InvalidSecurePage(pMultiPageAddress, unPageSize * 2);
+			CHECK(InvalidProtectedPage.GetPageAddress() == nullptr);
+			CHECK(InvalidSecurePage.GetPageAddress() == nullptr);
+			const BOOL bMultiPageFreed = VirtualFree(pMultiPageAddress, 0, MEM_RELEASE);
+			CHECK(bMultiPageFreed != FALSE);
+		}
+	}
+
+	TEST_CASE("ProtectedRange and ProtectedStorage") {
+		SYSTEM_INFO SystemInfo {};
+		GetSystemInfo(&SystemInfo);
+		const size_t unRangeSize = static_cast<size_t>(SystemInfo.dwPageSize) + 64;
+		Detours::Memory::ProtectedRange ProtectedRange(unRangeSize);
+		void* const pRangeAddress = ProtectedRange.GetRangeAddress();
+		REQUIRE(pRangeAddress != nullptr);
+		CHECK(ProtectedRange.GetRangeSize() == unRangeSize);
+		CHECK(ProtectedRange.IsProtected() == true);
+		volatile unsigned long long* const pLastValue = reinterpret_cast<volatile unsigned long long*>(static_cast<unsigned char*>(pRangeAddress) + unRangeSize - sizeof(unsigned long long));
+		const unsigned long long unValue = __rdtsc() ^ reinterpret_cast<size_t>(pRangeAddress);
+		*pLastValue = unValue;
+		CHECK(*pLastValue == unValue);
+		CHECK(ProtectedRange.IsCompromised() == false);
+
+		Detours::Memory::ProtectedStorage ProtectedStorage(128);
+		void* const pFirst = ProtectedStorage.Alloc(64);
+		void* const pSecond = ProtectedStorage.ZeroAlloc(64);
+		REQUIRE(pFirst != nullptr);
+		REQUIRE(pSecond != nullptr);
+		CHECK(ProtectedStorage.GetDataSize() == 128);
+		CHECK(ProtectedStorage.IsStorageEmpty() == false);
+		CHECK(ProtectedStorage.IsProtected() == true);
+		CHECK(ProtectedStorage.IsCompromised() == false);
+		*static_cast<volatile unsigned long long*>(pFirst) = unValue;
+		CHECK(*static_cast<volatile unsigned long long*>(pFirst) == unValue);
+		CHECK(*static_cast<volatile unsigned long long*>(pSecond) == 0);
+		CHECK(ProtectedStorage.DeAllocAll() == true);
+		CHECK(ProtectedStorage.IsStorageEmpty() == true);
+	}
+
+	TEST_CASE("External ProtectedRange and SecureRange reject partial pages") {
+		constexpr unsigned char kFirstValue = 0x5A;
+		constexpr unsigned char kNeighborValue = 0xA5;
+
+		SYSTEM_INFO SystemInfo {};
+		GetSystemInfo(&SystemInfo);
+		const size_t unPageSize = static_cast<size_t>(SystemInfo.dwPageSize);
+		REQUIRE(unPageSize > 1);
+
+		unsigned char* const pMemory = static_cast<unsigned char*>(VirtualAlloc(nullptr, unPageSize, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE));
+		REQUIRE(pMemory != nullptr);
+		if (!pMemory) {
+			return;
+		}
+
+		pMemory[0] = kFirstValue;
+		pMemory[unPageSize - 1] = kNeighborValue;
+		{
+			Detours::Memory::ProtectedRange InvalidProtectedRange(pMemory, unPageSize - 1);
+			CHECK(InvalidProtectedRange.GetRangeAddress() == nullptr);
+			CHECK(InvalidProtectedRange.GetRangeSize() == 0);
+			CHECK(InvalidProtectedRange.IsProtected() == false);
+			CHECK(InvalidProtectedRange.Release() == false);
+		}
+
+		MEMORY_BASIC_INFORMATION MemoryInfo {};
+		REQUIRE(VirtualQuery(pMemory, &MemoryInfo, sizeof(MemoryInfo)) == sizeof(MemoryInfo));
+		CHECK((MemoryInfo.Protect & 0xFF) == PAGE_READWRITE);
+		CHECK(pMemory[0] == kFirstValue);
+		CHECK(pMemory[unPageSize - 1] == kNeighborValue);
+
+		{
+			Detours::Memory::SecureRange InvalidSecureRange(pMemory, unPageSize - 1);
+			CHECK(InvalidSecureRange.GetRangeAddress() == nullptr);
+			CHECK(InvalidSecureRange.GetRangeSize() == 0);
+			CHECK(InvalidSecureRange.IsSecured() == false);
+			CHECK(InvalidSecureRange.Release() == false);
+		}
+
+		MemoryInfo = {};
+		REQUIRE(VirtualQuery(pMemory, &MemoryInfo, sizeof(MemoryInfo)) == sizeof(MemoryInfo));
+		CHECK((MemoryInfo.Protect & 0xFF) == PAGE_READWRITE);
+		CHECK(pMemory[0] == kFirstValue);
+		CHECK(pMemory[unPageSize - 1] == kNeighborValue);
+		CHECK(FreeScannerTestMemory(pMemory) == true);
+	}
+
+	TEST_CASE("ProtectedPage detects bypass tampering") {
+		Detours::Memory::Page Page;
+		void* const pPageAddress = Page.GetPageAddress();
+		REQUIRE(pPageAddress != nullptr);
+
+		Detours::Memory::ProtectedPage ProtectedPage(pPageAddress, Page.GetPageCapacity());
+		volatile unsigned long long* const pData = static_cast<volatile unsigned long long*>(ProtectedPage.Alloc(sizeof(unsigned long long)));
+		REQUIRE(reinterpret_cast<size_t>(pData) != 0);
+		*pData = __rdtsc() ^ reinterpret_cast<size_t>(pData);
+		CHECK(ProtectedPage.IsCompromised() == false);
+		REQUIRE(TamperProtectedTestMemory(const_cast<unsigned long long*>(pData), sizeof(*pData)) == true);
+		CHECK(ProtectedPage.IsCompromised() == true);
+		CHECK(ProtectedPage.Release() == true);
+	}
+
+	TEST_CASE("Secure and Protected exact-range composition") {
+		Detours::Memory::Page Page;
+		void* const pPageAddress = Page.GetPageAddress();
+		const size_t unPageCapacity = Page.GetPageCapacity();
+		REQUIRE(pPageAddress != nullptr);
+
+		void* pValueAddress = nullptr;
+		const unsigned long long unValue = __rdtsc() ^ reinterpret_cast<size_t>(pPageAddress);
+		{
+			Detours::Memory::SecurePage SecurePage(Page.GetPageAddress(), Page.GetPageCapacity());
+			REQUIRE(SecurePage.GetPageAddress() == pPageAddress);
+			REQUIRE(SecurePage.IsSecured() == true);
+
+			Detours::Memory::ProtectedPage ProtectedPage(SecurePage.GetPageAddress(), SecurePage.GetPageCapacity());
+			REQUIRE(ProtectedPage.GetPageAddress() == SecurePage.GetPageAddress());
+			CHECK(ProtectedPage.IsProtected() == true);
+			pValueAddress = ProtectedPage.Alloc(sizeof(unValue));
+			REQUIRE(pValueAddress != nullptr);
+			*static_cast<volatile unsigned long long*>(pValueAddress) = unValue;
+			CHECK(*static_cast<volatile unsigned long long*>(pValueAddress) == unValue);
+			CHECK(ProtectedPage.GetDataSize() == sizeof(unValue));
+			CHECK(SecurePage.GetDataSize() == sizeof(unValue));
+
+			std::vector<unsigned char> vecCiphertext;
+			REQUIRE(CopyProtectedTestMemory(pPageAddress, unPageCapacity, &vecCiphertext) == true);
+			const unsigned char* const pValueBytes = reinterpret_cast<const unsigned char*>(&unValue);
+			CHECK(std::search(vecCiphertext.begin(), vecCiphertext.end(), pValueBytes, pValueBytes + sizeof(unValue)) == vecCiphertext.end());
+			CHECK(SecurePage.IsCompromised() == false);
+			CHECK(ProtectedPage.IsCompromised() == false);
+
+			TestProcessScanner Scanner;
+			TEST_PROCESS_SCAN_RESULT ScanResult {};
+			REQUIRE(Scanner.Find(&unValue, sizeof(unValue), &ScanResult, pPageAddress, unPageCapacity) == true);
+			CHECK(ScanResult.m_vecMatches.empty());
+		}
+
+		REQUIRE(pValueAddress != nullptr);
+		CHECK(*static_cast<unsigned long long*>(pValueAddress) == unValue);
+	}
+
+	TEST_CASE("SecureRange and ProtectedRange exact-range composition") {
+		SYSTEM_INFO SystemInfo {};
+		GetSystemInfo(&SystemInfo);
+		const size_t unRangeSize = static_cast<size_t>(SystemInfo.dwPageSize) + 64;
+
+		Detours::Memory::SecureRange SecureRange(unRangeSize);
+		REQUIRE(SecureRange.GetRangeAddress() != nullptr);
+		REQUIRE(SecureRange.IsSecured() == true);
+
+		Detours::Memory::ProtectedRange ProtectedRange(SecureRange.GetRangeAddress(), SecureRange.GetRangeSize());
+		REQUIRE(ProtectedRange.GetRangeAddress() == SecureRange.GetRangeAddress());
+		REQUIRE(ProtectedRange.IsProtected() == true);
+
+		volatile unsigned char* const pData = static_cast<volatile unsigned char*>(ProtectedRange.Alloc(unRangeSize));
+		REQUIRE(reinterpret_cast<size_t>(pData) != 0);
+		pData[unRangeSize - 1] = 0xA5;
+		CHECK(pData[unRangeSize - 1] == 0xA5);
+		CHECK(ProtectedRange.GetDataSize() == unRangeSize);
+		CHECK(SecureRange.GetDataSize() == unRangeSize);
+		CHECK(ProtectedRange.IsCompromised() == false);
+		CHECK(SecureRange.IsCompromised() == false);
+	}
+
+	TEST_CASE("SecurePage uses independent encryption metadata") {
+		Detours::Memory::SecurePage FirstSecurePage;
+		Detours::Memory::SecurePage SecondSecurePage;
+		void* const pFirstAddress = FirstSecurePage.GetPageAddress();
+		void* const pSecondAddress = SecondSecurePage.GetPageAddress();
+		REQUIRE(pFirstAddress != nullptr);
+		REQUIRE(pSecondAddress != nullptr);
+		REQUIRE(pFirstAddress != pSecondAddress);
+		REQUIRE(FirstSecurePage.GetPageCapacity() == SecondSecurePage.GetPageCapacity());
+
+		volatile unsigned long long* const pFirstValue = static_cast<volatile unsigned long long*>(FirstSecurePage.Alloc(sizeof(unsigned long long)));
+		volatile unsigned long long* const pSecondValue = static_cast<volatile unsigned long long*>(SecondSecurePage.Alloc(sizeof(unsigned long long)));
+		REQUIRE(reinterpret_cast<size_t>(pFirstValue) != 0);
+		REQUIRE(reinterpret_cast<size_t>(pSecondValue) != 0);
+		const unsigned long long unValue = __rdtsc() ^ reinterpret_cast<size_t>(pFirstAddress);
+		*pFirstValue = unValue;
+		*pSecondValue = unValue;
+
+		std::vector<unsigned char> vecFirstCiphertext;
+		std::vector<unsigned char> vecSecondCiphertext;
+		REQUIRE(CopyProtectedTestMemory(pFirstAddress, FirstSecurePage.GetPageCapacity(), &vecFirstCiphertext) == true);
+		REQUIRE(CopyProtectedTestMemory(pSecondAddress, SecondSecurePage.GetPageCapacity(), &vecSecondCiphertext) == true);
+		CHECK(vecFirstCiphertext != vecSecondCiphertext);
+		CHECK(*pFirstValue == unValue);
+		std::vector<unsigned char> vecFirstResealedCiphertext;
+		REQUIRE(CopyProtectedTestMemory(pFirstAddress, FirstSecurePage.GetPageCapacity(), &vecFirstResealedCiphertext) == true);
+		CHECK(vecFirstCiphertext != vecFirstResealedCiphertext);
+
+		for (size_t unIndex = 0; unIndex < 8; ++unIndex) {
+			const unsigned long long unCurrentValue = unValue + unIndex;
+			*pFirstValue = unCurrentValue;
+			CHECK(*pFirstValue == unCurrentValue);
+			CHECK(FirstSecurePage.IsCompromised() == false);
+		}
+
+		CHECK(SecondSecurePage.IsCompromised() == false);
+	}
+
+	TEST_CASE("SecurePage only reports decrypted hash mismatches") {
+		Detours::Memory::SecurePage SecurePage;
+		void* const pAddress = SecurePage.GetPageAddress();
+		const size_t unCapacity = SecurePage.GetPageCapacity();
+		REQUIRE(pAddress != nullptr);
+		REQUIRE(unCapacity != 0);
+
+		volatile unsigned long long* const pValue = static_cast<volatile unsigned long long*>(SecurePage.Alloc(sizeof(unsigned long long)));
+		REQUIRE(reinterpret_cast<size_t>(pValue) != 0);
+		*pValue = __rdtsc() ^ reinterpret_cast<size_t>(pValue);
+		CHECK(SecurePage.IsCompromised() == false);
+
+		DWORD unOldProtection = 0;
+		REQUIRE(VirtualProtect(pAddress, unCapacity, PAGE_READONLY, &unOldProtection) != FALSE);
+		CHECK(SecurePage.IsCompromised() == false);
+		CHECK(SecurePage.IsSecured() == false);
+
+		DWORD unTemporaryProtection = 0;
+		CHECK(VirtualProtect(pAddress, unCapacity, unOldProtection, &unTemporaryProtection) != FALSE);
+	}
+
+	TEST_CASE("SecurePage detects encrypted payload tampering") {
+		Detours::Memory::Page Page;
+		Detours::Memory::SecurePage SecurePage(Page.GetPageAddress(), Page.GetPageCapacity());
+		void* const pData = SecurePage.Alloc(sizeof(unsigned long long));
+		REQUIRE(pData != nullptr);
+		*static_cast<volatile unsigned long long*>(pData) = __rdtsc() ^ reinterpret_cast<size_t>(pData);
+		CHECK(SecurePage.IsCompromised() == false);
+		REQUIRE(TamperProtectedTestMemory(Page.GetPageAddress(), Page.GetPageCapacity()) == true);
+		CHECK(SecurePage.IsCompromised() == true);
+
+		Detours::Memory::ProtectedPage ProtectedPage(SecurePage.GetPageAddress(), SecurePage.GetPageCapacity());
+		CHECK(ProtectedPage.IsCompromised() == true);
+		CHECK(ProtectedPage.Release() == true);
+		CHECK(SecurePage.Release() == true);
+		CHECK(*static_cast<unsigned long long*>(pData) == 0);
+	}
+
+	TEST_CASE("ProtectedPage preserves SecurePage compromise state") {
+		Detours::Memory::Page Page;
+		Detours::Memory::SecurePage SecurePage(Page.GetPageAddress(), Page.GetPageCapacity());
+		Detours::Memory::ProtectedPage ProtectedPage(SecurePage.GetPageAddress(), SecurePage.GetPageCapacity());
+		void* const pData = ProtectedPage.Alloc(sizeof(unsigned long long));
+		REQUIRE(pData != nullptr);
+		*static_cast<volatile unsigned long long*>(pData) = __rdtsc() ^ reinterpret_cast<size_t>(pData);
+		REQUIRE(TamperProtectedTestMemory(Page.GetPageAddress(), Page.GetPageCapacity()) == true);
+		CHECK(SecurePage.Release() == true);
+		CHECK(ProtectedPage.IsCompromised() == true);
+		CHECK(ProtectedPage.Release() == true);
+	}
+
+	TEST_CASE("SecurePage") {
+		Detours::Memory::SecurePage SecurePage;
+		void* const pAddress = SecurePage.GetPageAddress();
+		REQUIRE(pAddress != nullptr);
+		CHECK(SecurePage.GetPageCapacity() != 0);
+		CHECK((reinterpret_cast<size_t>(pAddress) % SecurePage.GetPageCapacity()) == 0);
+		CHECK(SecurePage.IsSecured() == true);
+
+		MEMORY_BASIC_INFORMATION MemoryInfo {};
+		REQUIRE(VirtualQuery(pAddress, &MemoryInfo, sizeof(MemoryInfo)) == sizeof(MemoryInfo));
+		CHECK(MemoryInfo.State == MEM_COMMIT);
+		CHECK((MemoryInfo.Protect & 0xFF) == PAGE_NOACCESS);
+
+		const unsigned long long unNeedle = __rdtsc() ^ reinterpret_cast<size_t>(pAddress);
+		unsigned long long unControl = unNeedle;
+		volatile unsigned long long* const pData = static_cast<volatile unsigned long long*>(pAddress);
+		*pData = unNeedle;
+
+		MemoryInfo = {};
+		REQUIRE(VirtualQuery(pAddress, &MemoryInfo, sizeof(MemoryInfo)) == sizeof(MemoryInfo));
+		CHECK((MemoryInfo.Protect & 0xFF) == PAGE_NOACCESS);
+
+		CHECK(*pData == unNeedle);
+
+		MemoryInfo = {};
+		REQUIRE(VirtualQuery(pAddress, &MemoryInfo, sizeof(MemoryInfo)) == sizeof(MemoryInfo));
+		CHECK((MemoryInfo.Protect & 0xFF) == PAGE_NOACCESS);
+
+		TestProcessScanner Scanner;
+		TEST_PROCESS_SCAN_RESULT ControlResult {};
+		REQUIRE(Scanner.Find(&unNeedle, sizeof(unNeedle), &ControlResult, &unControl, sizeof(unControl)) == true);
+		CHECK(ControlResult.m_bCompleted == true);
+		CHECK(ControlResult.m_unReadFailures == 0);
+		CHECK(std::find(ControlResult.m_vecMatches.begin(), ControlResult.m_vecMatches.end(), &unControl) != ControlResult.m_vecMatches.end());
+
+		TEST_PROCESS_SCAN_RESULT SecureResult {};
+		REQUIRE(Scanner.Find(&unNeedle, sizeof(unNeedle), &SecureResult, pAddress, SecurePage.GetPageCapacity()) == true);
+		CHECK(SecureResult.m_bCompleted == true);
+		CHECK(SecureResult.m_unReadFailures == 0);
+		CHECK(SecureResult.m_vecMatches.empty());
+
+		TEST_PROCESS_SCAN_RESULT FullResult {};
+		REQUIRE(Scanner.Find(&unNeedle, sizeof(unNeedle), &FullResult) == true);
+		CHECK(FullResult.m_bCompleted == true);
+		CHECK(std::find(FullResult.m_vecMatches.begin(), FullResult.m_vecMatches.end(), &unControl) != FullResult.m_vecMatches.end());
+		CHECK(std::find(FullResult.m_vecMatches.begin(), FullResult.m_vecMatches.end(), pAddress) == FullResult.m_vecMatches.end());
+		MESSAGE("ProcessScanner full scan: matches = " << FullResult.m_vecMatches.size() << ", protected address was not found");
+
+		MemoryInfo = {};
+		REQUIRE(VirtualQuery(pAddress, &MemoryInfo, sizeof(MemoryInfo)) == sizeof(MemoryInfo));
+		CHECK((MemoryInfo.Protect & 0xFF) == PAGE_NOACCESS);
+
+		CHECK(SecurePage.Release() == true);
+		CHECK(SecurePage.GetPageAddress() == nullptr);
+		CHECK(SecurePage.GetPageCapacity() == 0);
+		CHECK(SecurePage.IsSecured() == false);
+		CHECK(SecurePage.Release() == false);
+	}
+
+	TEST_CASE("SecureRange") {
+		Detours::Memory::SecureRange EmptyRange(0);
+		CHECK(EmptyRange.GetRangeAddress() == nullptr);
+		CHECK(EmptyRange.GetRangeSize() == 0);
+		CHECK(EmptyRange.IsSecured() == false);
+		CHECK(EmptyRange.Release() == false);
+
+		SYSTEM_INFO SystemInfo {};
+		GetSystemInfo(&SystemInfo);
+		const size_t unRangeSize = static_cast<size_t>(SystemInfo.dwPageSize) + 64;
+		Detours::Memory::SecureRange SecureRange(unRangeSize);
+		void* const pAddress = SecureRange.GetRangeAddress();
+		REQUIRE(pAddress != nullptr);
+		CHECK(SecureRange.GetRangeSize() == unRangeSize);
+		CHECK(SecureRange.IsSecured() == true);
+
+		MEMORY_BASIC_INFORMATION MemoryInfo {};
+		REQUIRE(VirtualQuery(pAddress, &MemoryInfo, sizeof(MemoryInfo)) == sizeof(MemoryInfo));
+		CHECK((MemoryInfo.Protect & 0xFF) == PAGE_NOACCESS);
+
+		unsigned char* const pCode = static_cast<unsigned char*>(pAddress);
+		pCode[0] = 0xB8;
+		pCode[1] = 0x2A;
+		pCode[2] = 0;
+		pCode[3] = 0;
+		pCode[4] = 0;
+		pCode[5] = 0xC3;
+		REQUIRE(FlushInstructionCache(GetCurrentProcess(), pCode, 6) != FALSE);
+
+		using fnSecureRange = int(__cdecl*)();
+		CHECK(reinterpret_cast<fnSecureRange>(pCode)() == 42);
+
+		MemoryInfo = {};
+		REQUIRE(VirtualQuery(pAddress, &MemoryInfo, sizeof(MemoryInfo)) == sizeof(MemoryInfo));
+		CHECK((MemoryInfo.Protect & 0xFF) == PAGE_NOACCESS);
+
+		const unsigned long long unNeedle = __rdtsc() ^ reinterpret_cast<size_t>(pAddress);
+		*static_cast<volatile unsigned long long*>(pAddress) = unNeedle;
+		TestProcessScanner Scanner;
+		TEST_PROCESS_SCAN_RESULT ScanResult {};
+		REQUIRE(Scanner.Find(&unNeedle, sizeof(unNeedle), &ScanResult, pAddress, SecureRange.GetRangeSize()) == true);
+		CHECK(ScanResult.m_bCompleted == true);
+		CHECK(ScanResult.m_unReadFailures == 0);
+		CHECK(ScanResult.m_vecMatches.empty());
+
+		volatile unsigned long long* const pLastValue = reinterpret_cast<volatile unsigned long long*>(static_cast<unsigned char*>(pAddress) + unRangeSize - sizeof(unsigned long long));
+		*pLastValue = unNeedle;
+		CHECK(*pLastValue == unNeedle);
+
+		MemoryInfo = {};
+		REQUIRE(VirtualQuery(const_cast<const unsigned long long*>(pLastValue), &MemoryInfo, sizeof(MemoryInfo)) == sizeof(MemoryInfo));
+		CHECK((MemoryInfo.Protect & 0xFF) == PAGE_NOACCESS);
+
+		CHECK(SecureRange.Release() == true);
+		CHECK(SecureRange.GetRangeAddress() == nullptr);
+		CHECK(SecureRange.GetRangeSize() == 0);
+		CHECK(SecureRange.IsSecured() == false);
+		CHECK(SecureRange.Release() == false);
+	}
+
+	TEST_CASE("SecureRange authenticates partial logical tail") {
+		constexpr size_t kRangeSize = 31;
+		Detours::Memory::SecureRange SecureRange(kRangeSize);
+		volatile unsigned char* const pData = static_cast<volatile unsigned char*>(SecureRange.Alloc(kRangeSize));
+		REQUIRE(reinterpret_cast<size_t>(pData) != 0);
+		CHECK(SecureRange.GetRangeSize() == kRangeSize);
+		CHECK(SecureRange.IsSecured() == true);
+
+		unsigned char pPlaintext[kRangeSize] {};
+		for (size_t unIndex = 0; unIndex < kRangeSize; ++unIndex) {
+			pPlaintext[unIndex] = static_cast<unsigned char>(unIndex + 1);
+			pData[unIndex] = pPlaintext[unIndex];
+		}
+
+		volatile unsigned char* const pTail = pData + (kRangeSize - 1);
+		CHECK(*pTail == pPlaintext[kRangeSize - 1]);
+		std::vector<unsigned char> vecCiphertext;
+		REQUIRE(CopyProtectedTestMemory(const_cast<unsigned char*>(pData), kRangeSize, &vecCiphertext) == true);
+		CHECK(std::equal(pPlaintext + 16, pPlaintext + kRangeSize, vecCiphertext.begin() + 16) == false);
+		CHECK(SecureRange.IsCompromised() == false);
+		REQUIRE(TamperProtectedTestMemory(const_cast<unsigned char*>(pTail), 1) == true);
+		CHECK(SecureRange.IsCompromised() == true);
+		CHECK(SecureRange.Release() == true);
+	}
+
+	TEST_CASE("SecureStorage") {
+		Detours::Memory::SecureStorage SecureStorage(128);
+		CHECK(SecureStorage.GetStorageCapacity() == 128);
+		CHECK(SecureStorage.GetDataSize() == 0);
+		CHECK(SecureStorage.IsStorageEmpty() == true);
+		CHECK(SecureStorage.Alloc(0) == nullptr);
+		CHECK(SecureStorage.DeAlloc(nullptr) == false);
+		CHECK(SecureStorage.GetDataSize() == 0);
+
+		void* const pFirst = SecureStorage.Alloc(64);
+		REQUIRE(pFirst != nullptr);
+		CHECK(SecureStorage.GetDataSize() == 64);
+
+		void* const pSecond = SecureStorage.ZeroAlloc(64);
+		REQUIRE(pSecond != nullptr);
+		CHECK(SecureStorage.GetDataSize() == 128);
+		CHECK(SecureStorage.IsStorageEmpty() == false);
+		CHECK(*static_cast<volatile unsigned long long*>(pSecond) == 0);
+
+		MEMORY_BASIC_INFORMATION ZeroMemoryInfo {};
+		REQUIRE(VirtualQuery(pSecond, &ZeroMemoryInfo, sizeof(ZeroMemoryInfo)) == sizeof(ZeroMemoryInfo));
+		CHECK((ZeroMemoryInfo.Protect & 0xFF) == PAGE_NOACCESS);
+
+		CHECK(SecureStorage.Alloc(1) == nullptr);
+		CHECK(SecureStorage.Alloc(SIZE_MAX) == nullptr);
+		CHECK(SecureStorage.GetDataSize() == 128);
+
+		const unsigned long long unNeedle = __rdtsc() ^ reinterpret_cast<size_t>(pFirst);
+		*static_cast<volatile unsigned long long*>(pFirst) = unNeedle;
+
+		TestProcessScanner Scanner;
+		TEST_PROCESS_SCAN_RESULT ScanResult {};
+		REQUIRE(Scanner.Find(&unNeedle, sizeof(unNeedle), &ScanResult, pFirst, 64) == true);
+		CHECK(ScanResult.m_bCompleted == true);
+		CHECK(ScanResult.m_unReadFailures == 0);
+		CHECK(ScanResult.m_vecMatches.empty());
+
+		MEMORY_BASIC_INFORMATION MemoryInfo {};
+		REQUIRE(VirtualQuery(pFirst, &MemoryInfo, sizeof(MemoryInfo)) == sizeof(MemoryInfo));
+		CHECK((MemoryInfo.Protect & 0xFF) == PAGE_NOACCESS);
+
+		CHECK(SecureStorage.DeAlloc(pSecond) == true);
+		CHECK(SecureStorage.GetDataSize() == 64);
+		CHECK(SecureStorage.DeAllocAll() == true);
+		CHECK(SecureStorage.GetDataSize() == 0);
+		CHECK(SecureStorage.IsStorageEmpty() == true);
+		CHECK(SecureStorage.DeAlloc(pFirst) == false);
+	}
+
+	TEST_CASE("ProtectedMemoryManager") {
+		Detours::Memory::ProtectedMemoryManager Manager;
+		CHECK(Manager.DestroyPage(nullptr) == false);
+		CHECK(Manager.DestroyStorage(nullptr) == false);
+
+		Detours::Memory::ProtectedPage UnmanagedPage;
+		Detours::Memory::ProtectedStorage UnmanagedStorage;
+		CHECK(Manager.DestroyPage(&UnmanagedPage) == false);
+		CHECK(Manager.DestroyStorage(&UnmanagedStorage) == false);
+
+		Detours::Memory::ProtectedPage* const pPage = Manager.CreatePage();
+		REQUIRE(pPage != nullptr);
+		CHECK(pPage->IsProtected() == true);
+		volatile unsigned long long* const pPageData = static_cast<volatile unsigned long long*>(pPage->Alloc(sizeof(unsigned long long)));
+		REQUIRE(reinterpret_cast<size_t>(pPageData) != 0);
+		*pPageData = 0x123456789ABCDEF0;
+		CHECK(*pPageData == 0x123456789ABCDEF0);
+
+		Detours::Memory::ProtectedStorage* const pStorage = Manager.CreateStorage(64);
+		REQUIRE(pStorage != nullptr);
+		volatile unsigned long long* const pStorageData = static_cast<volatile unsigned long long*>(pStorage->Alloc(64));
+		REQUIRE(reinterpret_cast<size_t>(pStorageData) != 0);
+		*pStorageData = 0x0FEDCBA987654321;
+		CHECK(*pStorageData == 0x0FEDCBA987654321);
+		CHECK(pStorage->IsProtected() == true);
+
+		CHECK(Manager.DestroyStorage(pStorage) == true);
+		CHECK(Manager.DestroyPage(pPage) == true);
+	}
+
+	TEST_CASE("SecureMemoryManager") {
+		Detours::Memory::SecureMemoryManager Manager;
+		CHECK(Manager.DestroyPage(nullptr) == false);
+		CHECK(Manager.DestroyStorage(nullptr) == false);
+
+		Detours::Memory::SecurePage UnmanagedPage;
+		Detours::Memory::SecureStorage UnmanagedStorage;
+		CHECK(Manager.DestroyPage(&UnmanagedPage) == false);
+		CHECK(Manager.DestroyStorage(&UnmanagedStorage) == false);
+
+		Detours::Memory::SecurePage* const pPage = Manager.CreatePage();
+		REQUIRE(pPage != nullptr);
+		CHECK(pPage->IsSecured() == true);
+		volatile unsigned long long* const pPageData = static_cast<volatile unsigned long long*>(pPage->Alloc(sizeof(unsigned long long)));
+		REQUIRE(reinterpret_cast<size_t>(pPageData) != 0);
+		*pPageData = 0x123456789ABCDEF0;
+		CHECK(*pPageData == 0x123456789ABCDEF0);
+
+		Detours::Memory::SecureStorage* const pStorage = Manager.CreateStorage(64);
+		REQUIRE(pStorage != nullptr);
+		volatile unsigned long long* const pStorageData = static_cast<volatile unsigned long long*>(pStorage->Alloc(64));
+		REQUIRE(reinterpret_cast<size_t>(pStorageData) != 0);
+		*pStorageData = 0x0FEDCBA987654321;
+		CHECK(*pStorageData == 0x0FEDCBA987654321);
+		CHECK(pStorage->IsSecured() == true);
+
+		CHECK(Manager.DestroyStorage(pStorage) == true);
+		CHECK(Manager.DestroyPage(pPage) == true);
 	}
 }
 
@@ -2274,10 +3149,6 @@ TEST_SUITE("Detours::Hook") {
 		return unValue + 0x1234;
 	}
 #endif
-
-	DWORD WINAPI GetContextThreadTarget(void*) {
-		return 0;
-	}
 
 #ifdef _M_X64
 	bool __fastcall Sleep_RawHookMod(Detours::Hook::PRAW_CONTEXT pCTX) {
@@ -2735,7 +3606,7 @@ TEST_SUITE("Detours::Hook") {
 		CHECK(InlineSleepHook.Release() == true);
 	}
 
-	TEST_CASE("GetContext, GetCurrentContext and CallAddress") {
+	TEST_CASE("GetCurrentContext and CallAddress") {
 		Detours::Hook::RAW_CONTEXT Context{};
 		Detours::Hook::GetCurrentContext(&Context);
 #ifdef _M_IX86
@@ -2763,45 +3634,6 @@ TEST_SUITE("Detours::Hook") {
 #elif _M_IX86
 		CHECK(Context.m_unEAX == 0x1534);
 #endif
-
-		Detours::Hook::RAW_CONTEXT CurrentThreadContext{};
-		Detours::Hook::GetContext(GetCurrentThread(), &CurrentThreadContext);
-		CHECK(CurrentThreadContext.m_Stack.GetAddress() != nullptr);
-#ifdef _M_X64
-		CHECK(CurrentThreadContext.m_unRFLAGS != 0);
-		CurrentThreadContext.m_unRCX = 0x400;
-#elif _M_IX86
-		CHECK(CurrentThreadContext.m_unEFLAGS != 0);
-		CurrentThreadContext.m_unECX = 0x400;
-#endif
-		Detours::Hook::CallAddress(reinterpret_cast<void*>(CallAddressStandaloneTarget), &CurrentThreadContext);
-#ifdef _M_X64
-		CHECK(CurrentThreadContext.m_unRAX == 0x1634);
-#elif _M_IX86
-		CHECK(CurrentThreadContext.m_unEAX == 0x1634);
-#endif
-	}
-
-	TEST_CASE("GetContext suspended thread") {
-		DWORD unThreadID = 0;
-		HANDLE hThread = CreateThread(nullptr, 0, GetContextThreadTarget, nullptr, CREATE_SUSPENDED, &unThreadID);
-		REQUIRE(hThread != nullptr);
-		REQUIRE(hThread != INVALID_HANDLE_VALUE);
-
-		Detours::Hook::RAW_CONTEXT Context{};
-		Detours::Hook::GetContext(hThread, &Context);
-		CHECK(Context.m_Stack.GetAddress() != nullptr);
-#ifdef _M_X64
-		CHECK(Context.m_unRFLAGS != 0);
-#elif _M_IX86
-		CHECK(Context.m_unEFLAGS != 0);
-#endif
-
-		// GetContext must not change the suspend count. The only suspension is
-		// CREATE_SUSPENDED above, so ResumeThread must observe a count of one.
-		CHECK(ResumeThread(hThread) == 1);
-		CHECK(WaitForSingleObject(hThread, INFINITE) == WAIT_OBJECT_0);
-		CHECK(CloseHandle(hThread) != FALSE);
 	}
 
 	TEST_CASE("CallAddress standalone RAW_CONTEXT") {
@@ -2830,6 +3662,9 @@ TEST_SUITE("Detours::Hook") {
 		constexpr size_t kStackSize = 0x10000;
 		void* pStack = VirtualAlloc(nullptr, kStackSize, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
 		REQUIRE(pStack != nullptr);
+		if (!pStack) {
+			return;
+		}
 
 		Detours::Hook::RAW_CONTEXT Context{};
 		Context.m_unEFLAGS = 0x202;
@@ -2856,6 +3691,7 @@ TEST_SUITE("Detours::Hook") {
 #endif
 		CHECK(reinterpret_cast<size_t>(Context.m_Stack.GetAddress()) >= reinterpret_cast<size_t>(pStack));
 		CHECK(reinterpret_cast<size_t>(Context.m_Stack.GetAddress()) < (reinterpret_cast<size_t>(pStack) + kStackSize));
+#pragma warning(suppress : 6001) // Custom stack transfer obscures pStack lifetime from code analysis.
 		CHECK(VirtualFree(pStack, 0, MEM_RELEASE) != FALSE);
 	}
 
@@ -2921,6 +3757,20 @@ TEST_SUITE("Detours::Hook") {
 		CHECK(g_bRawSleepHookCalled == true);
 		CHECK(RawSleepHook.UnHook() == true);
 		CHECK(RawSleepHook.Release() == true);
+	}
+
+	TEST_CASE("RawHook rejects oversized reserved stack") {
+		HMODULE hKernel32 = GetModuleHandle(_T("kernel32.dll"));
+		REQUIRE(hKernel32 != nullptr);
+		REQUIRE(hKernel32 != INVALID_HANDLE_VALUE);
+
+		void* pSleep = reinterpret_cast<void*>(GetProcAddress(hKernel32, "Sleep"));
+		REQUIRE(pSleep != nullptr);
+
+		Detours::Hook::RawHook OversizedRawHook;
+		REQUIRE(OversizedRawHook.Set(pSleep) == true);
+		CHECK(OversizedRawHook.Hook(Sleep_RawHook, true, std::numeric_limits<unsigned int>::max(), true) == false);
+		CHECK(OversizedRawHook.Release() == true);
 	}
 
 	TEST_CASE("RawHook 2") {
@@ -3056,3 +3906,551 @@ TEST_SUITE("Detours::Hook") {
 		CHECK(RawCPUIDHook.Release() == true);
 	}
 }
+
+#elif defined(__linux__)
+
+TEST_SUITE("Detours::Hexadecimal") {
+	TEST_CASE("Decode validates input and preserves ignored bytes") {
+		char szData[] = { 'x', 'y', 'z' };
+		CHECK(Detours::Hexadecimal::DecodeA("412A42", szData, 0x2A) == true);
+		CHECK(std::memcmp(szData, "AyB", sizeof(szData)) == 0);
+		CHECK(Detours::Hexadecimal::DecodeA("A", szData, 0x2A) == false);
+		CHECK(Detours::Hexadecimal::DecodeA("GG", szData, 0x2A) == false);
+
+		szData[0] = 'x';
+		szData[1] = 'y';
+		szData[2] = 'z';
+		CHECK(Detours::Hexadecimal::DecodeW(L"412A42", szData, 0x2A) == true);
+		CHECK(std::memcmp(szData, "AyB", sizeof(szData)) == 0);
+		CHECK(Detours::Hexadecimal::DecodeW(L"A", szData, 0x2A) == false);
+		CHECK(Detours::Hexadecimal::DecodeW(L"GG", szData, 0x2A) == false);
+	}
+}
+
+TEST_SUITE("Detours::Sync") {
+	TEST_CASE("Named infinite waits ignore stale errno") {
+		Detours::Sync::EventServer EventServer(false, true, true);
+		errno = EINVAL;
+		CHECK(EventServer.Wait() == true);
+
+		Detours::Sync::MutexServer MutexServer;
+		errno = EINVAL;
+		CHECK(MutexServer.Lock() == true);
+		CHECK(MutexServer.UnLock() == true);
+
+		Detours::Sync::SemaphoreServer SemaphoreServer;
+		errno = EINVAL;
+		CHECK(SemaphoreServer.Enter(0xFFFFFFFF) == true);
+		CHECK(SemaphoreServer.Leave() == true);
+	}
+}
+
+constexpr size_t kProcessScannerChunkSize = 1024 * 1024;
+
+typedef struct _TEST_PROCESS_SCAN_RESULT {
+	_TEST_PROCESS_SCAN_RESULT() {
+		m_bCompleted = false;
+		m_unBytesScanned = 0;
+		m_unReadFailures = 0;
+	}
+
+	bool m_bCompleted;
+	size_t m_unBytesScanned;
+	size_t m_unReadFailures;
+	std::vector<void*> m_vecMatches;
+} TEST_PROCESS_SCAN_RESULT, *PTEST_PROCESS_SCAN_RESULT;
+
+typedef struct _TEST_PROCESS_MEMORY_REGION {
+	size_t m_unBeginAddress;
+	size_t m_unEndAddress;
+	bool m_bReadable;
+} TEST_PROCESS_MEMORY_REGION, *PTEST_PROCESS_MEMORY_REGION;
+
+static size_t GetTestPageSize() {
+	const long nPageSize = ::sysconf(_SC_PAGESIZE);
+	return (nPageSize > 0) ? static_cast<size_t>(nPageSize) : 0;
+}
+
+static void CollectProcessScannerMatches(
+	const unsigned char* pBuffer,
+	size_t unBufferSize,
+	const unsigned char* pData,
+	size_t unDataSize,
+	size_t unBaseAddress,
+	size_t unCandidateCount,
+	std::vector<void*>& vecMatches) {
+	if (!pBuffer || !pData || !unDataSize || (unBufferSize < unDataSize)) {
+		return;
+	}
+
+	const size_t unAvailableCandidates = unBufferSize - unDataSize + 1;
+	const size_t unCandidates = std::min(unCandidateCount, unAvailableCandidates);
+	for (size_t unIndex = 0; unIndex < unCandidates; ++unIndex) {
+		if (std::memcmp(pBuffer + unIndex, pData, unDataSize) == 0) {
+			vecMatches.push_back(reinterpret_cast<void*>(unBaseAddress + unIndex));
+		}
+	}
+}
+
+static size_t CollectProcessScannerChunk(
+	std::vector<unsigned char>& vecBuffer,
+	size_t unCarrySize,
+	size_t unBytesRead,
+	const unsigned char* pData,
+	size_t unDataSize,
+	size_t unReadAddress,
+	std::vector<void*>& vecMatches) {
+	if (!unBytesRead) {
+		return unCarrySize;
+	}
+
+	const size_t unBufferSize = unCarrySize + unBytesRead;
+	CollectProcessScannerMatches(vecBuffer.data(), unBufferSize, pData, unDataSize, unReadAddress - unCarrySize, unBytesRead, vecMatches);
+
+	const size_t unNewCarrySize = std::min(unDataSize - 1, unBufferSize);
+	if (unNewCarrySize) {
+		std::memmove(vecBuffer.data(), vecBuffer.data() + unBufferSize - unNewCarrySize, unNewCarrySize);
+	}
+
+	return unNewCarrySize;
+}
+
+static bool CollectProcessScannerRegions(std::vector<TEST_PROCESS_MEMORY_REGION>* pRegions) {
+	if (!pRegions) {
+		return false;
+	}
+
+	pRegions->clear();
+	std::ifstream Maps("/proc/self/maps");
+	if (!Maps.is_open()) {
+		return false;
+	}
+
+	std::string sLine;
+	while (std::getline(Maps, sLine)) {
+		unsigned long long unBeginAddress = 0;
+		unsigned long long unEndAddress = 0;
+		char szProtection[5] {};
+		if (std::sscanf(sLine.c_str(), "%llx-%llx %4s", &unBeginAddress, &unEndAddress, szProtection) != 3) {
+			continue;
+		}
+
+		if ((unBeginAddress >= unEndAddress) || (unBeginAddress > static_cast<unsigned long long>(SIZE_MAX)) || (unEndAddress > static_cast<unsigned long long>(SIZE_MAX))) {
+			continue;
+		}
+
+		TEST_PROCESS_MEMORY_REGION Region {};
+		Region.m_unBeginAddress = static_cast<size_t>(unBeginAddress);
+		Region.m_unEndAddress = static_cast<size_t>(unEndAddress);
+		Region.m_bReadable = szProtection[0] == 'r';
+		pRegions->emplace_back(Region);
+	}
+
+	return !pRegions->empty();
+}
+
+class TestProcessScanner {
+public:
+	bool Find(const void* pData, size_t unDataSize, PTEST_PROCESS_SCAN_RESULT pResult, const void* pBeginAddress = nullptr, size_t unRangeSize = 0) const {
+		if (!pResult) {
+			return false;
+		}
+
+		*pResult = {};
+		if (!pData || !unDataSize || (unDataSize > (SIZE_MAX - kProcessScannerChunkSize + 1))) {
+			return false;
+		}
+
+		std::vector<TEST_PROCESS_MEMORY_REGION> vecRegions;
+		if (!CollectProcessScannerRegions(&vecRegions)) {
+			return false;
+		}
+
+		std::vector<unsigned char> vecData(unDataSize);
+		std::memcpy(vecData.data(), pData, unDataSize);
+		std::vector<unsigned char> vecBuffer(kProcessScannerChunkSize + unDataSize - 1);
+
+		const size_t unBeginAddress = pBeginAddress ? reinterpret_cast<size_t>(pBeginAddress) : 0;
+		size_t unEndAddress = SIZE_MAX;
+		if (unRangeSize) {
+			unEndAddress = (unRangeSize > (SIZE_MAX - unBeginAddress)) ? SIZE_MAX : unBeginAddress + unRangeSize;
+		}
+
+		if (unBeginAddress >= unEndAddress) {
+			return false;
+		}
+
+		const int nMemoryFile = ::open("/proc/self/mem", O_RDONLY | O_CLOEXEC);
+		if (nMemoryFile < 0) {
+			return false;
+		}
+
+		size_t unCarrySize = 0;
+		size_t unNextAddress = unBeginAddress;
+		for (const TEST_PROCESS_MEMORY_REGION& Region : vecRegions) {
+			if (Region.m_unEndAddress <= unBeginAddress) {
+				continue;
+			}
+
+			if (Region.m_unBeginAddress >= unEndAddress) {
+				break;
+			}
+
+			const size_t unScanBegin = std::max(unBeginAddress, Region.m_unBeginAddress);
+			const size_t unScanEnd = std::min(unEndAddress, Region.m_unEndAddress);
+			if (!Region.m_bReadable || (unScanBegin >= unScanEnd)) {
+				unCarrySize = 0;
+				unNextAddress = unScanEnd;
+				continue;
+			}
+
+			if (unScanBegin != unNextAddress) {
+				unCarrySize = 0;
+			}
+
+			size_t unChunkAddress = unScanBegin;
+			while (unChunkAddress < unScanEnd) {
+				const size_t unReadSize = std::min(kProcessScannerChunkSize, unScanEnd - unChunkAddress);
+				if (unChunkAddress > static_cast<size_t>(std::numeric_limits<off_t>::max())) {
+					++pResult->m_unReadFailures;
+					unCarrySize = 0;
+					break;
+				}
+
+				const ssize_t nBytesRead = ::pread(nMemoryFile, vecBuffer.data() + unCarrySize, unReadSize, static_cast<off_t>(unChunkAddress));
+				const size_t unBytesRead = (nBytesRead > 0) ? static_cast<size_t>(nBytesRead) : 0;
+				pResult->m_unBytesScanned += unBytesRead;
+				if (unBytesRead) {
+					unCarrySize = CollectProcessScannerChunk(vecBuffer, unCarrySize, unBytesRead, vecData.data(), unDataSize, unChunkAddress, pResult->m_vecMatches);
+				}
+
+				if (unBytesRead != unReadSize) {
+					++pResult->m_unReadFailures;
+					unCarrySize = 0;
+				}
+
+				unChunkAddress += unReadSize;
+				unNextAddress = unChunkAddress;
+			}
+		}
+
+		::close(nMemoryFile);
+		pResult->m_bCompleted = true;
+		return true;
+	}
+};
+
+static bool ChangeProtectedTestMemoryProtection(void* pAddress, size_t unSize, int nProtection) {
+	const size_t unPageSize = GetTestPageSize();
+	const size_t unAddress = reinterpret_cast<size_t>(pAddress);
+	if (!pAddress || !unSize || !unPageSize || (unSize > (SIZE_MAX - unAddress))) {
+		return false;
+	}
+
+	const size_t unAlignedAddress = unAddress - (unAddress % unPageSize);
+	size_t unAlignedEnd = unAddress + unSize;
+	const size_t unEndRemainder = unAlignedEnd % unPageSize;
+	if (unEndRemainder) {
+		const size_t unEndPadding = unPageSize - unEndRemainder;
+		if (unEndPadding > (SIZE_MAX - unAlignedEnd)) {
+			return false;
+		}
+
+		unAlignedEnd += unEndPadding;
+	}
+
+	return ::mprotect(reinterpret_cast<void*>(unAlignedAddress), unAlignedEnd - unAlignedAddress, nProtection) == 0;
+}
+
+static bool CopyProtectedTestMemory(void* pAddress, size_t unSize, std::vector<unsigned char>* pData) {
+	if (!pAddress || !unSize || !pData || !ChangeProtectedTestMemoryProtection(pAddress, unSize, PROT_READ)) {
+		return false;
+	}
+
+	pData->resize(unSize);
+	std::memcpy(pData->data(), pAddress, unSize);
+	return ChangeProtectedTestMemoryProtection(pAddress, unSize, PROT_NONE);
+}
+
+static bool TamperProtectedTestMemory(void* pAddress, size_t unSize) {
+	if (!pAddress || !unSize || !ChangeProtectedTestMemoryProtection(pAddress, unSize, PROT_READ | PROT_WRITE)) {
+		return false;
+	}
+
+	unsigned char* const pData = static_cast<unsigned char*>(pAddress);
+	pData[unSize - 1] = static_cast<unsigned char>(pData[unSize - 1] ^ 1);
+	return ChangeProtectedTestMemoryProtection(pAddress, unSize, PROT_NONE);
+}
+
+TEST_SUITE("Detours::Memory") {
+	TEST_CASE("Page, Region and Storage") {
+		const size_t unPageSize = GetTestPageSize();
+		REQUIRE(unPageSize != 0);
+
+		Detours::Memory::Page Page;
+		REQUIRE(Page.GetPageAddress() != nullptr);
+		CHECK(Page.GetPageCapacity() == unPageSize);
+		CHECK(Page.Alloc(SIZE_MAX, 2) == nullptr);
+		CHECK(Page.Alloc(1, 0, 1) == nullptr);
+		volatile std::uint64_t* const pPageValue = static_cast<volatile std::uint64_t*>(Page.ZeroAlloc(sizeof(std::uint64_t)));
+		REQUIRE(reinterpret_cast<size_t>(pPageValue) != 0);
+		CHECK(*pPageValue == 0);
+		*pPageValue = 11;
+		CHECK(*pPageValue == 11);
+		CHECK(Page.DeAlloc(const_cast<std::uint64_t*>(pPageValue)) == true);
+		CHECK(Page.IsPageEmpty() == true);
+
+		Detours::Memory::Region Region(nullptr, unPageSize * 2);
+		CHECK(Region.Alloc(SIZE_MAX, 2) == nullptr);
+		CHECK(Region.Alloc(1, 0, 1) == nullptr);
+		volatile std::uint64_t* const pRegionValue = static_cast<volatile std::uint64_t*>(Region.ZeroAlloc(sizeof(std::uint64_t)));
+		REQUIRE(reinterpret_cast<size_t>(pRegionValue) != 0);
+		CHECK(*pRegionValue == 0);
+		*pRegionValue = 13;
+		CHECK(*pRegionValue == 13);
+		CHECK(Region.GetDataSize() == sizeof(std::uint64_t));
+		CHECK(Region.DeAlloc(const_cast<std::uint64_t*>(pRegionValue)) == true);
+
+		Detours::Memory::Storage Storage(128, unPageSize);
+		volatile std::uint64_t* const pStorageValue = static_cast<volatile std::uint64_t*>(Storage.ZeroAlloc(sizeof(std::uint64_t)));
+		REQUIRE(reinterpret_cast<size_t>(pStorageValue) != 0);
+		CHECK(*pStorageValue == 0);
+		*pStorageValue = 17;
+		CHECK(*pStorageValue == 17);
+		CHECK(Storage.DeAlloc(const_cast<std::uint64_t*>(pStorageValue)) == true);
+		CHECK(Storage.IsStorageEmpty() == true);
+	}
+
+	TEST_CASE("Storage enforces and reuses total capacity") {
+		const size_t unPageSize = GetTestPageSize();
+		REQUIRE(unPageSize != 0);
+
+		Detours::Memory::Storage LimitedStorage(16, unPageSize);
+		void* const pLimitedAllocation = LimitedStorage.Alloc(16);
+		REQUIRE(pLimitedAllocation != nullptr);
+		CHECK(LimitedStorage.Alloc(1) == nullptr);
+		CHECK(LimitedStorage.DeAlloc(pLimitedAllocation) == true);
+
+		Detours::Memory::Storage ReusedStorage(unPageSize * 2, unPageSize);
+		void* const pFirstAllocation = ReusedStorage.Alloc(unPageSize);
+		REQUIRE(pFirstAllocation != nullptr);
+		CHECK(ReusedStorage.DeAlloc(pFirstAllocation) == true);
+
+		void* const pReusedAllocation = ReusedStorage.Alloc(unPageSize);
+		void* const pSecondAllocation = ReusedStorage.Alloc(unPageSize);
+		REQUIRE(pReusedAllocation != nullptr);
+		REQUIRE(pSecondAllocation != nullptr);
+		CHECK(ReusedStorage.DeAlloc(pReusedAllocation) == true);
+		CHECK(ReusedStorage.DeAlloc(pSecondAllocation) == true);
+	}
+
+	TEST_CASE("External ProtectedRange and SecureRange reject partial pages") {
+		constexpr unsigned char kFirstValue = 0x5A;
+		constexpr unsigned char kNeighborValue = 0xA5;
+
+		const size_t unPageSize = GetTestPageSize();
+		REQUIRE(unPageSize > 1);
+
+		void* const pMapping = ::mmap(nullptr, unPageSize, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+		REQUIRE(pMapping != MAP_FAILED);
+		if (pMapping == MAP_FAILED) {
+			return;
+		}
+
+		unsigned char* const pMemory = static_cast<unsigned char*>(pMapping);
+		pMemory[0] = kFirstValue;
+		pMemory[unPageSize - 1] = kNeighborValue;
+		{
+			Detours::Memory::ProtectedRange InvalidProtectedRange(pMemory, unPageSize - 1);
+			CHECK(InvalidProtectedRange.GetRangeAddress() == nullptr);
+			CHECK(InvalidProtectedRange.GetRangeSize() == 0);
+			CHECK(InvalidProtectedRange.IsProtected() == false);
+			CHECK(InvalidProtectedRange.Release() == false);
+		}
+
+		CHECK(pMemory[0] == kFirstValue);
+		CHECK(pMemory[unPageSize - 1] == kNeighborValue);
+
+		{
+			Detours::Memory::SecureRange InvalidSecureRange(pMemory, unPageSize - 1);
+			CHECK(InvalidSecureRange.GetRangeAddress() == nullptr);
+			CHECK(InvalidSecureRange.GetRangeSize() == 0);
+			CHECK(InvalidSecureRange.IsSecured() == false);
+			CHECK(InvalidSecureRange.Release() == false);
+		}
+
+		CHECK(pMemory[0] == kFirstValue);
+		CHECK(pMemory[unPageSize - 1] == kNeighborValue);
+		CHECK(::munmap(pMemory, unPageSize) == 0);
+	}
+
+	TEST_CASE("ProtectedPage and process scanner") {
+		Detours::Memory::ProtectedPage ProtectedPage;
+		void* const pPageAddress = ProtectedPage.GetPageAddress();
+		REQUIRE(pPageAddress != nullptr);
+		CHECK(ProtectedPage.GetPageCapacity() == GetTestPageSize());
+		CHECK(ProtectedPage.IsProtected() == true);
+
+		const std::uint64_t unValue = 0x123456789ABCDEF0;
+		std::uint64_t unControl = unValue;
+		volatile std::uint64_t* const pData = static_cast<volatile std::uint64_t*>(ProtectedPage.Alloc(sizeof(std::uint64_t)));
+		REQUIRE(reinterpret_cast<size_t>(pData) != 0);
+		*pData = unValue;
+		CHECK(*pData == unValue);
+		CHECK(ProtectedPage.IsProtected() == true);
+
+		TestProcessScanner Scanner;
+		TEST_PROCESS_SCAN_RESULT ControlResult {};
+		REQUIRE(Scanner.Find(&unValue, sizeof(unValue), &ControlResult, &unControl, sizeof(unControl)) == true);
+		CHECK(ControlResult.m_bCompleted == true);
+		CHECK(ControlResult.m_unReadFailures == 0);
+		CHECK(std::find(ControlResult.m_vecMatches.begin(), ControlResult.m_vecMatches.end(), &unControl) != ControlResult.m_vecMatches.end());
+
+		TEST_PROCESS_SCAN_RESULT ProtectedResult {};
+		REQUIRE(Scanner.Find(&unValue, sizeof(unValue), &ProtectedResult, pPageAddress, ProtectedPage.GetPageCapacity()) == true);
+		CHECK(ProtectedResult.m_bCompleted == true);
+		CHECK(ProtectedResult.m_unReadFailures == 0);
+		CHECK(ProtectedResult.m_vecMatches.empty());
+		CHECK(ProtectedPage.IsCompromised() == false);
+
+		REQUIRE(TamperProtectedTestMemory(pPageAddress, ProtectedPage.GetPageCapacity()) == true);
+		CHECK(ProtectedPage.IsCompromised() == true);
+	}
+
+	TEST_CASE("SecurePage and ProtectedPage composition") {
+		Detours::Memory::Page Page;
+		void* const pPageAddress = Page.GetPageAddress();
+		const size_t unPageCapacity = Page.GetPageCapacity();
+		REQUIRE(pPageAddress != nullptr);
+
+		void* pValueAddress = nullptr;
+		const std::uint64_t unValue = 0x0FEDCBA987654321;
+		{
+			Detours::Memory::SecurePage SecurePage(pPageAddress, unPageCapacity);
+			Detours::Memory::ProtectedPage ProtectedPage(SecurePage.GetPageAddress(), SecurePage.GetPageCapacity());
+			REQUIRE(SecurePage.GetPageAddress() == pPageAddress);
+			REQUIRE(ProtectedPage.GetPageAddress() == pPageAddress);
+			CHECK(SecurePage.IsSecured() == true);
+			CHECK(ProtectedPage.IsProtected() == true);
+
+			pValueAddress = ProtectedPage.Alloc(sizeof(unValue));
+			REQUIRE(pValueAddress != nullptr);
+			*static_cast<volatile std::uint64_t*>(pValueAddress) = unValue;
+			CHECK(*static_cast<volatile std::uint64_t*>(pValueAddress) == unValue);
+			CHECK(ProtectedPage.GetDataSize() == sizeof(unValue));
+			CHECK(SecurePage.GetDataSize() == sizeof(unValue));
+
+			std::vector<unsigned char> vecCiphertext;
+			REQUIRE(CopyProtectedTestMemory(pPageAddress, unPageCapacity, &vecCiphertext) == true);
+			const unsigned char* const pValueBytes = reinterpret_cast<const unsigned char*>(&unValue);
+			CHECK(std::search(vecCiphertext.begin(), vecCiphertext.end(), pValueBytes, pValueBytes + sizeof(unValue)) == vecCiphertext.end());
+
+			TestProcessScanner Scanner;
+			TEST_PROCESS_SCAN_RESULT ScanResult {};
+			REQUIRE(Scanner.Find(&unValue, sizeof(unValue), &ScanResult, pPageAddress, unPageCapacity) == true);
+			CHECK(ScanResult.m_bCompleted == true);
+			CHECK(ScanResult.m_unReadFailures == 0);
+			CHECK(ScanResult.m_vecMatches.empty());
+			CHECK(SecurePage.IsCompromised() == false);
+			CHECK(ProtectedPage.IsCompromised() == false);
+		}
+
+		REQUIRE(pValueAddress != nullptr);
+		CHECK(*static_cast<std::uint64_t*>(pValueAddress) == unValue);
+	}
+
+	TEST_CASE("SecureRange and ProtectedRange composition") {
+		const size_t unRangeSize = GetTestPageSize() + 37;
+		REQUIRE(unRangeSize > 37);
+
+		Detours::Memory::SecureRange SecureRange(unRangeSize);
+		REQUIRE(SecureRange.GetRangeAddress() != nullptr);
+		Detours::Memory::ProtectedRange ProtectedRange(SecureRange.GetRangeAddress(), SecureRange.GetRangeSize());
+		REQUIRE(ProtectedRange.GetRangeAddress() == SecureRange.GetRangeAddress());
+		CHECK(SecureRange.IsSecured() == true);
+		CHECK(ProtectedRange.IsProtected() == true);
+
+		volatile unsigned char* const pData = static_cast<volatile unsigned char*>(ProtectedRange.Alloc(unRangeSize));
+		REQUIRE(reinterpret_cast<size_t>(pData) != 0);
+		pData[0] = 0x5A;
+		pData[unRangeSize - 1] = 0xA5;
+		CHECK(pData[0] == 0x5A);
+		CHECK(pData[unRangeSize - 1] == 0xA5);
+		CHECK(ProtectedRange.GetDataSize() == unRangeSize);
+		CHECK(SecureRange.GetDataSize() == unRangeSize);
+		CHECK(ProtectedRange.IsCompromised() == false);
+		CHECK(SecureRange.IsCompromised() == false);
+	}
+
+	TEST_CASE("SecurePage executes protected code") {
+		Detours::Memory::SecurePage SecurePage;
+		volatile unsigned char* const pCode = static_cast<volatile unsigned char*>(SecurePage.Alloc(6));
+		REQUIRE(reinterpret_cast<size_t>(pCode) != 0);
+
+		pCode[0] = 0xB8;
+		pCode[1] = 0x2A;
+		pCode[2] = 0;
+		pCode[3] = 0;
+		pCode[4] = 0;
+		pCode[5] = 0xC3;
+		unsigned char* const pExecutableCode = const_cast<unsigned char*>(pCode);
+		__builtin___clear_cache(reinterpret_cast<char*>(pExecutableCode), reinterpret_cast<char*>(pExecutableCode + 6));
+
+		using fnSecurePage = int (*)();
+		CHECK(reinterpret_cast<fnSecurePage>(pExecutableCode)() == 42);
+		CHECK(SecurePage.IsSecured() == true);
+		CHECK(SecurePage.IsCompromised() == false);
+	}
+
+	TEST_CASE("ProtectedMemoryManager and SecureMemoryManager") {
+		Detours::Memory::ProtectedMemoryManager ProtectedManager;
+		CHECK(ProtectedManager.DestroyPage(nullptr) == false);
+		CHECK(ProtectedManager.DestroyStorage(nullptr) == false);
+
+		Detours::Memory::ProtectedPage* const pProtectedPage = ProtectedManager.CreatePage();
+		Detours::Memory::ProtectedStorage* const pProtectedStorage = ProtectedManager.CreateStorage(64);
+		REQUIRE(pProtectedPage != nullptr);
+		REQUIRE(pProtectedStorage != nullptr);
+		volatile std::uint64_t* const pProtectedValue = static_cast<volatile std::uint64_t*>(pProtectedStorage->Alloc(sizeof(std::uint64_t)));
+		REQUIRE(reinterpret_cast<size_t>(pProtectedValue) != 0);
+		*pProtectedValue = 19;
+		CHECK(*pProtectedValue == 19);
+		CHECK(pProtectedStorage->IsProtected() == true);
+		CHECK(ProtectedManager.DestroyStorage(pProtectedStorage) == true);
+		CHECK(ProtectedManager.DestroyPage(pProtectedPage) == true);
+
+		Detours::Memory::SecureMemoryManager SecureManager;
+		CHECK(SecureManager.DestroyPage(nullptr) == false);
+		CHECK(SecureManager.DestroyStorage(nullptr) == false);
+
+		Detours::Memory::SecurePage* const pSecurePage = SecureManager.CreatePage();
+		Detours::Memory::SecureStorage* const pSecureStorage = SecureManager.CreateStorage(64);
+		REQUIRE(pSecurePage != nullptr);
+		REQUIRE(pSecureStorage != nullptr);
+		volatile std::uint64_t* const pSecureValue = static_cast<volatile std::uint64_t*>(pSecureStorage->Alloc(sizeof(std::uint64_t)));
+		REQUIRE(reinterpret_cast<size_t>(pSecureValue) != 0);
+		*pSecureValue = 23;
+		CHECK(*pSecureValue == 23);
+		CHECK(pSecureStorage->IsSecured() == true);
+		CHECK(pSecureStorage->IsCompromised() == false);
+		CHECK(SecureManager.DestroyStorage(pSecureStorage) == true);
+		CHECK(SecureManager.DestroyPage(pSecurePage) == true);
+	}
+
+	TEST_CASE("SecureRange detects encrypted tail tampering") {
+		constexpr size_t kRangeSize = 37;
+		Detours::Memory::SecureRange SecureRange(kRangeSize);
+		volatile unsigned char* const pData = static_cast<volatile unsigned char*>(SecureRange.Alloc(kRangeSize));
+		REQUIRE(reinterpret_cast<size_t>(pData) != 0);
+
+		for (size_t unIndex = 0; unIndex < kRangeSize; ++unIndex) {
+			pData[unIndex] = static_cast<unsigned char>(unIndex + 1);
+		}
+
+		CHECK(SecureRange.IsCompromised() == false);
+		REQUIRE(TamperProtectedTestMemory(SecureRange.GetRangeAddress(), SecureRange.GetRangeSize()) == true);
+		CHECK(SecureRange.IsCompromised() == true);
+	}
+}
+
+#endif

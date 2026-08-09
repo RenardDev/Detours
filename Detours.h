@@ -139,19 +139,11 @@
 
 #if defined(_WIN32)
 #if defined(DETOURS_ARCH_X64)
-#define GDI_HANDLE_BUFFER_SIZE GDI_HANDLE_BUFFER_SIZE32
-#elif defined(DETOURS_ARCH_X86)
 #define GDI_HANDLE_BUFFER_SIZE GDI_HANDLE_BUFFER_SIZE64
+#elif defined(DETOURS_ARCH_X86)
+#define GDI_HANDLE_BUFFER_SIZE GDI_HANDLE_BUFFER_SIZE32
 #endif
 #endif // defined(_WIN32)
-
-#if defined(_MSC_VER)
-#define DETOURS_NOINLINE __declspec(noinline)
-#elif defined(__GNUC__) || defined(__clang__)
-#define DETOURS_NOINLINE __attribute__((noinline))
-#else
-#define DETOURS_NOINLINE
-#endif
 
 // rddisasm
 
@@ -627,7 +619,7 @@
 	                                          : (S) == 4   ? ((X) >> 31) & 1 \
 	                                                       : ((X) >> 63) & 1)
 #define RD_LSB(S, X) ((X) & 1)
-#define RD_SIZE_TO_MASK(S) (((S) < 8) ? ((1ULL << ((S) * 8)) - 1) : (0xFFFFFFFFFFFFFFFF))
+#define RD_SIZE_TO_MASK(S) (((S) < 8) ? ((static_cast<unsigned long long>(1) << ((S) * 8)) - 1) : (0xFFFFFFFFFFFFFFFF))
 #define RD_GET_BIT(BIT, X) (((X) >> (BIT)) & 1)
 #define RD_GET_SIGN(S, X) RD_MSB(S, X)
 #define RD_SET_SIGN(S, X) RD_SIGN_EX(S, X)
@@ -670,7 +662,7 @@
 
 #define RD_OP_REG_ID(OP) ((static_cast<unsigned long long>((OP)->Type & 0xF) << 60) | (static_cast<unsigned long long>((OP)->Info.Register.Type & 0xFF) << 52) | (static_cast<unsigned long long>((OP)->Info.Register.Size & 0xFFFF) << 36) | (static_cast<unsigned long long>((OP)->Info.Register.Count & 0x3F) << 30) | (static_cast<unsigned long long>((OP)->Info.Register.IsHigh8 & 0x1) << 8) | (static_cast<unsigned long long>((OP)->Info.Register.Reg)))
 
-#define RD_IS_OP_REG(OP, T, S, R) (RD_OP_REG_ID(OP) == ((static_cast<unsigned long long>(RD_OP_REG) << 60) | (static_cast<unsigned long long>((T) & 0xFF) << 52) | (static_cast<unsigned long long>((S) & 0xFFFF) << 36) | (1ULL << 30) | (static_cast<unsigned long long>(R))))
+#define RD_IS_OP_REG(OP, T, S, R) (RD_OP_REG_ID(OP) == ((static_cast<unsigned long long>(RD_OP_REG) << 60) | (static_cast<unsigned long long>((T) & 0xFF) << 52) | (static_cast<unsigned long long>((S) & 0xFFFF) << 36) | (static_cast<unsigned long long>(1) << 30) | (static_cast<unsigned long long>(R))))
 #define RD_IS_OP_REG_EX(OP, T, S, R, B, H) (RD_OP_REG_ID(OP) == ((static_cast<unsigned long long>(RD_OP_REG) << 60) | (static_cast<unsigned long long>((T) & 0xFF) << 52) | (static_cast<unsigned long long>((S) & 0xFFFF) << 36) | (static_cast<unsigned long long>((B) & 0x3F) << 30) | (static_cast<unsigned long long>((H) & 0x1) << 8) | (static_cast<unsigned long long>(R))))
 #define RD_IS_OP_STACK(OP) (((OP)->Type == RD_OP_MEM) && (OP)->Info.Memory.IsStack)
 
@@ -1210,11 +1202,17 @@ namespace Detours {
 		ULONG HashFactor;
 	} API_SET_NAMESPACE, *PAPI_SET_NAMESPACE;
 
-	using GDI_HANDLE_BUFFER = ULONG[GDI_HANDLE_BUFFER_SIZE];
-	using GDI_HANDLE_BUFFER32 = ULONG[GDI_HANDLE_BUFFER_SIZE32];
-	using GDI_HANDLE_BUFFER64 = ULONG[GDI_HANDLE_BUFFER_SIZE64];
+using GDI_HANDLE_BUFFER = ULONG[GDI_HANDLE_BUFFER_SIZE];
+using GDI_HANDLE_BUFFER32 = ULONG[GDI_HANDLE_BUFFER_SIZE32];
+using GDI_HANDLE_BUFFER64 = ULONG[GDI_HANDLE_BUFFER_SIZE64];
 
-	typedef struct _PEB {
+#if defined(DETOURS_ARCH_X64)
+static_assert(sizeof(GDI_HANDLE_BUFFER) == sizeof(GDI_HANDLE_BUFFER64), "x64 GDI handle buffer layout mismatch");
+#elif defined(DETOURS_ARCH_X86)
+static_assert(sizeof(GDI_HANDLE_BUFFER) == sizeof(GDI_HANDLE_BUFFER32), "x86 GDI handle buffer layout mismatch");
+#endif
+
+typedef struct _PEB {
 		BOOLEAN InheritedAddressSpace;
 		BOOLEAN ReadImageFileExecOptions;
 		BOOLEAN BeingDebugged;
@@ -2335,7 +2333,7 @@ namespace Detours {
 #if defined(_WIN32)
 			bool Wait(DWORD unMilliseconds = INFINITE);
 #elif defined(__linux__)
-			bool Wait(unsigned int unMilliseconds = 0xFFFFFFFFu);
+			bool Wait(unsigned int unMilliseconds = 0xFFFFFFFF);
 #endif
 
 		private:
@@ -2378,7 +2376,7 @@ namespace Detours {
 #if defined(_WIN32)
 			bool Wait(DWORD unMilliseconds = INFINITE);
 #elif defined(__linux__)
-			bool Wait(unsigned int unMilliseconds = 0xFFFFFFFFu);
+			bool Wait(unsigned int unMilliseconds = 0xFFFFFFFF);
 #endif
 
 		private:
@@ -2425,7 +2423,7 @@ namespace Detours {
 #if defined(_WIN32)
 			bool Wait(DWORD unMilliseconds = INFINITE);
 #elif defined(__linux__)
-			bool Wait(unsigned int unMilliseconds = 0xFFFFFFFFu);
+			bool Wait(unsigned int unMilliseconds = 0xFFFFFFFF);
 #endif
 
 		private:
@@ -2456,7 +2454,7 @@ namespace Detours {
 #if defined(_WIN32)
 			bool Lock(DWORD unMilliseconds = INFINITE);
 #elif defined(__linux__)
-			bool Lock(unsigned int unMilliseconds = 0xFFFFFFFFu);
+			bool Lock(unsigned int unMilliseconds = 0xFFFFFFFF);
 #endif
 			bool UnLock();
 
@@ -2493,7 +2491,7 @@ namespace Detours {
 #if defined(_WIN32)
 			bool Lock(DWORD unMilliseconds = INFINITE);
 #elif defined(__linux__)
-			bool Lock(unsigned int unMilliseconds = 0xFFFFFFFFu);
+			bool Lock(unsigned int unMilliseconds = 0xFFFFFFFF);
 #endif
 			bool UnLock();
 
@@ -2534,7 +2532,7 @@ namespace Detours {
 #if defined(_WIN32)
 			bool Lock(DWORD unMilliseconds = INFINITE);
 #elif defined(__linux__)
-			bool Lock(unsigned int unMilliseconds = 0xFFFFFFFFu);
+			bool Lock(unsigned int unMilliseconds = 0xFFFFFFFF);
 #endif
 			bool UnLock();
 
@@ -2722,16 +2720,16 @@ namespace Detours {
 
 			size_t SuspendNewThreadsSnapshot();
 
-			std::deque<SUSPENDER_DATA> m_Threads;
+			std::deque<SUSPENDER_DATA> m_vecThreads;
 			Mutex m_Mutex;
 			size_t m_unSuspendDepth;
-			std::unordered_set<DWORD> m_SuspendedTIDs;
+			std::unordered_set<DWORD> m_setSuspendedTIDs;
 #elif defined(__linux__)
 			size_t SuspendNewThreadsSnapshot();
 
 			Mutex m_Mutex;
 			size_t m_unSuspendDepth;
-			std::unordered_set<unsigned int> m_SuspendedTIDs;
+			std::unordered_set<unsigned int> m_setSuspendedTIDs;
 #endif
 		};
 
@@ -3050,7 +3048,7 @@ namespace Detours {
 #if defined(_WIN32)
 			bool ChangeProtection(const DWORD unNewProtection);
 #elif defined(__linux__)
-			bool ChangeProtection(const int unNewProtection);
+			bool ChangeProtection(const int nNewProtection);
 #endif
 			bool RestoreProtection();
 
@@ -3078,7 +3076,7 @@ namespace Detours {
 
 				bool operator<(const Block& block) const {
 					return m_pAddress < block.m_pAddress;
-				};
+				}
 
 				void* m_pAddress;
 				size_t m_unSize;
@@ -3093,10 +3091,10 @@ namespace Detours {
 #if defined(_WIN32)
 			DWORD m_unOriginalProtection;
 #elif defined(__linux__)
-			int m_unOriginalProtection;
+			int m_nOriginalProtection;
 #endif
-			std::set<Block> m_FreeBlocks;
-			std::set<Block> m_ActiveBlocks;
+			std::set<Block> m_setFreeBlocks;
+			std::set<Block> m_setActiveBlocks;
 		};
 
 		// ----------------------------------------------------------------
@@ -3123,7 +3121,7 @@ namespace Detours {
 #if defined(_WIN32)
 			bool ChangeProtection(const DWORD unNewProtection);
 #elif defined(__linux__)
-			bool ChangeProtection(const int unNewProtection);
+			bool ChangeProtection(const int nNewProtection);
 #endif
 			bool RestoreProtection();
 
@@ -3147,10 +3145,10 @@ namespace Detours {
 #if defined(_WIN32)
 			DWORD m_unOriginalProtection;
 #elif defined(__linux__)
-			int m_unOriginalProtection;
+			int m_nOriginalProtection;
 #endif
 			size_t m_unUsedSpace;
-			std::list<Page> m_Pages;
+			std::list<Page> m_vecPages;
 		};
 
 		// ----------------------------------------------------------------
@@ -3177,7 +3175,7 @@ namespace Detours {
 			size_t m_unTotalCapacity;
 			size_t m_unRegionCapacity;
 			size_t m_unUsedSpace;
-			std::list<Region> m_Regions;
+			std::list<Region> m_vecRegions;
 		};
 
 		// ----------------------------------------------------------------
@@ -3193,15 +3191,15 @@ namespace Detours {
 #if defined(_WIN32)
 			bool Change(const DWORD unNewProtection);
 #elif defined(__linux__)
-			bool Change(const int unNewProtection);
+			bool Change(const int nNewProtection);
 #endif
 			bool Restore();
 
 		private:
 			bool m_bAutoRestore;
 			bool m_bUseRegions;
-			std::deque<Page> m_Pages;
-			std::deque<Region> m_Regions;
+			std::deque<Page> m_vecPages;
+			std::deque<Region> m_vecRegions;
 		};
 
 		// ----------------------------------------------------------------
@@ -3215,7 +3213,7 @@ namespace Detours {
 
 		public:
 			Page* CreatePage();
-			Storage* CreateStorage(size_t unTotalCapacity = 0, size_t unPageCapacity = 0);
+			Storage* CreateStorage(size_t unTotalCapacity = 0, size_t unRegionCapacity = 0);
 
 		public:
 			bool DestroyPage(Page* pPage);
@@ -3230,8 +3228,255 @@ namespace Detours {
 			std::vector<Region> CollectRegions(void* pAddress, size_t unSize);
 
 		private:
-			std::deque<std::unique_ptr<Page>> m_Pages;
-			std::deque<std::unique_ptr<Storage>> m_Storages;
+			std::deque<std::unique_ptr<Page>> m_vecPages;
+			std::deque<std::unique_ptr<Storage>> m_vecStorages;
+		};
+
+		// ----------------------------------------------------------------
+		// ProtectedPage
+		// ----------------------------------------------------------------
+
+		// All protected payload access and owner lifetime require external synchronization.
+		// An externally owned range must outlive every wrapper attached to it.
+		// On Linux, one machine instruction cannot access multiple protected ranges.
+		struct _PROTECTED_MEMORY_STATE;
+
+		class ProtectedPage {
+		public:
+			ProtectedPage();
+			ProtectedPage(void* pAddress, size_t unSize);
+			~ProtectedPage();
+			ProtectedPage(const ProtectedPage&) = delete;
+			ProtectedPage(ProtectedPage&&) = delete;
+			ProtectedPage& operator=(const ProtectedPage&) = delete;
+			ProtectedPage& operator=(ProtectedPage&&) = delete;
+
+		public:
+			void* Alloc(size_t unSize, size_t unSizeAlign = 1, size_t unAddressAlign = alignof(void*));
+			void* ZeroAlloc(size_t unSize, size_t unSizeAlign = 1, size_t unAddressAlign = alignof(void*));
+			bool DeAlloc(void* pAddress);
+			bool DeAllocAll();
+			bool Release();
+
+		public:
+			void* GetPageAddress() const noexcept;
+			size_t GetPageCapacity() const noexcept;
+			size_t GetDataSize() const noexcept;
+			bool IsPageEmpty() const noexcept;
+			bool IsProtected() const noexcept;
+			bool IsCompromised() const;
+
+		private:
+			friend struct _PROTECTED_MEMORY_STATE;
+			std::shared_ptr<void> m_pState;
+		};
+
+		// ----------------------------------------------------------------
+		// ProtectedRange
+		// ----------------------------------------------------------------
+
+		class ProtectedRange {
+		public:
+			explicit ProtectedRange(size_t unSize);
+			ProtectedRange(void* pAddress, size_t unSize);
+			~ProtectedRange();
+			ProtectedRange(const ProtectedRange&) = delete;
+			ProtectedRange(ProtectedRange&&) = delete;
+			ProtectedRange& operator=(const ProtectedRange&) = delete;
+			ProtectedRange& operator=(ProtectedRange&&) = delete;
+
+		public:
+			void* Alloc(size_t unSize, size_t unSizeAlign = 1, size_t unAddressAlign = alignof(void*));
+			void* ZeroAlloc(size_t unSize, size_t unSizeAlign = 1, size_t unAddressAlign = alignof(void*));
+			bool DeAlloc(void* pAddress);
+			bool DeAllocAll();
+			bool Release();
+
+		public:
+			void* GetRangeAddress() const noexcept;
+			size_t GetRangeSize() const noexcept;
+			size_t GetDataSize() const noexcept;
+			bool IsRangeEmpty() const noexcept;
+			bool IsProtected() const noexcept;
+			bool IsCompromised() const;
+
+		private:
+			friend struct _PROTECTED_MEMORY_STATE;
+			std::shared_ptr<void> m_pState;
+		};
+
+		// ----------------------------------------------------------------
+		// ProtectedStorage
+		// ----------------------------------------------------------------
+
+		class ProtectedStorage {
+		public:
+			explicit ProtectedStorage(size_t unTotalCapacity = 0);
+			~ProtectedStorage();
+			ProtectedStorage(const ProtectedStorage&) = delete;
+			ProtectedStorage(ProtectedStorage&&) = delete;
+			ProtectedStorage& operator=(const ProtectedStorage&) = delete;
+			ProtectedStorage& operator=(ProtectedStorage&&) = delete;
+
+		public:
+			void* Alloc(size_t unSize);
+			void* ZeroAlloc(size_t unSize);
+			bool DeAlloc(void* pAddress);
+			bool DeAllocAll();
+
+		public:
+			size_t GetStorageCapacity() const noexcept;
+			size_t GetDataSize() const noexcept;
+			bool IsStorageEmpty() const noexcept;
+			bool IsProtected() const noexcept;
+			bool IsCompromised() const;
+
+		private:
+			size_t m_unTotalCapacity;
+			size_t m_unUsedSpace;
+			std::list<std::unique_ptr<ProtectedRange>> m_vecRanges;
+		};
+
+		// ----------------------------------------------------------------
+		// ProtectedMemoryManager
+		// ----------------------------------------------------------------
+
+		class ProtectedMemoryManager {
+		public:
+			ProtectedMemoryManager() = default;
+			~ProtectedMemoryManager() = default;
+
+		public:
+			ProtectedPage* CreatePage();
+			ProtectedStorage* CreateStorage(size_t unTotalCapacity = 0);
+
+		public:
+			bool DestroyPage(ProtectedPage* pPage);
+			bool DestroyStorage(ProtectedStorage* pStorage);
+
+		private:
+			std::deque<std::unique_ptr<ProtectedPage>> m_vecPages;
+			std::deque<std::unique_ptr<ProtectedStorage>> m_vecStorages;
+		};
+
+		// ----------------------------------------------------------------
+		// SecurePage
+		// ----------------------------------------------------------------
+
+		class SecurePage {
+		public:
+			SecurePage();
+			SecurePage(void* pAddress, size_t unSize);
+			~SecurePage();
+			SecurePage(const SecurePage&) = delete;
+			SecurePage(SecurePage&&) = delete;
+			SecurePage& operator=(const SecurePage&) = delete;
+			SecurePage& operator=(SecurePage&&) = delete;
+
+		public:
+			void* Alloc(size_t unSize, size_t unSizeAlign = 1, size_t unAddressAlign = alignof(void*));
+			void* ZeroAlloc(size_t unSize, size_t unSizeAlign = 1, size_t unAddressAlign = alignof(void*));
+			bool DeAlloc(void* pAddress);
+			bool DeAllocAll();
+			bool Release();
+
+		public:
+			void* GetPageAddress() const noexcept;
+			size_t GetPageCapacity() const noexcept;
+			size_t GetDataSize() const noexcept;
+			bool IsPageEmpty() const noexcept;
+			bool IsSecured() const noexcept;
+			bool IsCompromised() const;
+
+		private:
+			std::shared_ptr<void> m_pState;
+		};
+
+		// ----------------------------------------------------------------
+		// SecureRange
+		// ----------------------------------------------------------------
+
+		class SecureRange {
+		public:
+			explicit SecureRange(size_t unSize);
+			SecureRange(void* pAddress, size_t unSize);
+			~SecureRange();
+			SecureRange(const SecureRange&) = delete;
+			SecureRange(SecureRange&&) = delete;
+			SecureRange& operator=(const SecureRange&) = delete;
+			SecureRange& operator=(SecureRange&&) = delete;
+
+		public:
+			void* Alloc(size_t unSize, size_t unSizeAlign = 1, size_t unAddressAlign = alignof(void*));
+			void* ZeroAlloc(size_t unSize, size_t unSizeAlign = 1, size_t unAddressAlign = alignof(void*));
+			bool DeAlloc(void* pAddress);
+			bool DeAllocAll();
+			bool Release();
+
+		public:
+			void* GetRangeAddress() const noexcept;
+			size_t GetRangeSize() const noexcept;
+			size_t GetDataSize() const noexcept;
+			bool IsRangeEmpty() const noexcept;
+			bool IsSecured() const noexcept;
+			bool IsCompromised() const;
+
+		private:
+			std::shared_ptr<void> m_pState;
+		};
+
+		// ----------------------------------------------------------------
+		// SecureStorage
+		// ----------------------------------------------------------------
+
+		class SecureStorage {
+		public:
+			explicit SecureStorage(size_t unTotalCapacity = 0);
+			~SecureStorage();
+			SecureStorage(const SecureStorage&) = delete;
+			SecureStorage(SecureStorage&&) = delete;
+			SecureStorage& operator=(const SecureStorage&) = delete;
+			SecureStorage& operator=(SecureStorage&&) = delete;
+
+		public:
+			void* Alloc(size_t unSize);
+			void* ZeroAlloc(size_t unSize);
+			bool DeAlloc(void* pAddress);
+			bool DeAllocAll();
+
+		public:
+			size_t GetStorageCapacity() const noexcept;
+			size_t GetDataSize() const noexcept;
+			bool IsStorageEmpty() const noexcept;
+			bool IsSecured() const noexcept;
+			bool IsCompromised() const;
+
+		private:
+			size_t m_unTotalCapacity;
+			size_t m_unUsedSpace;
+			std::list<std::unique_ptr<SecureRange>> m_vecRanges;
+		};
+
+		// ----------------------------------------------------------------
+		// SecureMemoryManager
+		// ----------------------------------------------------------------
+
+		class SecureMemoryManager {
+		public:
+			SecureMemoryManager() = default;
+			~SecureMemoryManager() = default;
+
+		public:
+			SecurePage* CreatePage();
+			SecureStorage* CreateStorage(size_t unTotalCapacity = 0);
+
+		public:
+			bool DestroyPage(SecurePage* pPage);
+			bool DestroyStorage(SecureStorage* pStorage);
+
+		private:
+			std::deque<std::unique_ptr<SecurePage>> m_vecPages;
+			std::deque<std::unique_ptr<SecureStorage>> m_vecStorages;
 		};
 	} // namespace Memory
 
@@ -3247,7 +3492,7 @@ namespace Detours {
 			int m_nSignalCode;
 			void* m_pSignalAddress;
 			void* m_pExceptionAddress;
-			size_t m_ExceptionInformation[4];
+			size_t m_unExceptionInformation[4];
 		} SIGNAL_EXCEPTION_RECORD, *PSIGNAL_EXCEPTION_RECORD;
 #endif
 
@@ -3282,11 +3527,11 @@ namespace Detours {
 
 		private:
 #if defined(_WIN32)
-			HANDLE m_pVEH;
+			HANDLE m_hVEH;
 #elif defined(__linux__)
 			void* m_pVEH;
 #endif
-			std::deque<fnExceptionCallBack> m_CallBacks;
+			std::deque<fnExceptionCallBack> m_vecCallBacks;
 		};
 
 		extern ExceptionListener g_ExceptionListener;
@@ -7320,21 +7565,17 @@ namespace Detours {
 		// ----------------------------------------------------------------
 		// Raw Context
 		// ----------------------------------------------------------------
-
-#if defined(_WIN32)
-		using RAW_THREAD_HANDLE = HANDLE;
-#elif defined(__linux__)
-		using RAW_THREAD_HANDLE = pid_t;
-#endif
-
-		// Copies the requested thread context into pCTX. A non-current thread must
-		// already be suspended; this function never suspends or resumes it. On
-		// failure pCTX is zeroed.
-		DETOURS_NOINLINE void GetContext(RAW_THREAD_HANDLE hThread, PRAW_CONTEXT pCTX);
-
 		// Captures the context of the calling thread into pCTX. On failure pCTX is
 		// zeroed. Stack is converted to a caller-owned slot suitable for a later
 		// CallAddress call; use a separate writable stack for stack arguments.
+#if defined(_MSC_VER)
+#define DETOURS_NOINLINE __declspec(noinline)
+#elif defined(__GNUC__) || defined(__clang__)
+#define DETOURS_NOINLINE __attribute__((noinline))
+#else
+#define DETOURS_NOINLINE
+#endif
+
 		DETOURS_NOINLINE void GetCurrentContext(PRAW_CONTEXT pCTX);
 
 #undef DETOURS_NOINLINE

@@ -16,7 +16,7 @@ It provides tools for code patching, inline hooks, raw register-level hooks, mem
 | Windows x86 | Supported | Visual Studio 2022 / MSVC | PE, PEB/TEB, LDR, VEH, WinAPI synchronization, MSVC RTTI. |
 | Windows x64 | Supported | Visual Studio 2022 / MSVC | Same as Windows x86, with x64-specific hook wrappers. |
 | Linux x86 | Supported by code paths | GCC or Clang | POSIX/Linux primitives, ELF scanning, signals, `mmap`/`mprotect`. |
-| Linux x64 | Tested | GCC or Clang | Current Linux test harness passes on x86_64. |
+| Linux x64 | Tested | GCC or Clang | The native `main.cpp` memory test suite is exercised in Debug and Release configurations. |
 
 Only x86 and x86-64 are supported. Other architectures currently fail at compile time.
 
@@ -59,6 +59,13 @@ Use `interrupts32.asm` for 32-bit builds.
 
 ```bash
 g++ -std=c++17 -O2 -pthread your_code.cpp Detours.cpp -ldl -o your_app
+```
+
+Build and run the native Linux tests with:
+
+```bash
+g++ -std=c++17 -O2 -pthread -I. main.cpp Detours.cpp -ldl -o detours_tests
+./detours_tests --test-suite=Detours::Memory --no-skip
 ```
 
 ## Feature matrix
@@ -182,11 +189,15 @@ The current Linux port does not expose `Detours::RTTI`; use normal compiler RTTI
 ### `Detours::Memory`
 
 - `Shared`, `SharedServer`, `SharedClient` - shared memory helpers.
-- `Page` - single-page allocator with protection support.
-- `Region` - multi-page/region allocator.
+- `Page` - allocator backed by exactly one operating-system page, with protection support.
+- `Region` - arbitrary-size multi-page/region allocator.
 - `Storage` - collection of regions/pages for hook/trampoline allocation.
 - `Protection` - RAII-style memory protection changes.
 - `MemoryManager` - creates and destroys page/storage objects.
+- `ProtectedPage`, `ProtectedRange`, `ProtectedStorage` - authenticated page-guarded memory that is `NOACCESS` while idle and temporarily becomes readable, writable, and executable for one trapped instruction.
+- `ProtectedMemoryManager` - owns protected pages and storages through `Create*`/`Destroy*` operations.
+- `SecurePage`, `SecureRange`, `SecureStorage` - the same automatic page guarding with AES-256-GCM encryption and a sticky SHA-256-backed `IsCompromised()` integrity result. Every independent secure range has a random key and nonce plus its original plaintext hash in a separate `ProtectedPage`; persistent links to that metadata are stored through `ObfuscatedMemory`. Exact `(address, size)` Protected wrappers share the secure state, so a `ProtectedPage` can be layered over a `SecurePage` without installing an overlapping memory hook. All access and lifecycle operations must be externally synchronized because page protection is process-wide; on Linux, one machine instruction must not span multiple protected ranges. Storage capacity `0` is unlimited.
+- `SecureMemoryManager` - owns secure pages and storages through `Create*`/`Destroy*` operations.
 
 ### `Detours::Exception`
 
@@ -222,7 +233,6 @@ Hooking primitives:
 - `InlineHook` - overwrites function prologues and creates trampolines.
 - `InlineWrapperHook` - inline hook with wrapper/trampoline support.
 - `RawHook` - raw hook with direct access to a saved `RAW_CONTEXT` containing GPR, flags, stack, and optional FPU/SIMD state.
-- `GetContext(...)` - copies an already suspended thread into `RAW_CONTEXT` without suspending or resuming it.
 - `GetCurrentContext(...)` - captures the calling thread into `RAW_CONTEXT`.
 - `CallAddress(...)` - synchronously invokes an arbitrary address from `RAW_CONTEXT` and writes the returned state back.
 
@@ -309,25 +319,9 @@ Context.m_unECX = 100;
 Detours::Hook::CallAddress(reinterpret_cast<void*>(&Target), &Context);
 ```
 
-`GetContext` reads an existing thread context but deliberately does not change the thread's suspend count. The caller is responsible for making the target thread stable before the read and resuming it afterwards:
-
-```cpp
-#if defined(_WIN32)
-Detours::Hook::RAW_CONTEXT Context {};
-
-const DWORD PreviousSuspendCount = SuspendThread(hThread);
-if (PreviousSuspendCount != static_cast<DWORD>(-1)) {
-    Detours::Hook::GetContext(hThread, &Context);
-    ResumeThread(hThread);
-}
-#endif
-```
-
-On Windows, `RAW_THREAD_HANDLE` is `HANDLE`; on Linux it is the native thread ID type `pid_t`. Passing the calling thread is supported and is routed to `GetCurrentContext`, because an operating-system thread-context query is not a valid way to capture the running caller. `CallAddress` always executes synchronously on the thread that calls it; supplying another thread's captured context does not schedule execution in that other thread.
-
 ### Calling a function from an independent `RAW_CONTEXT`
 
-`CallAddress` is not tied to a `RawHook` callback. A complete context can be initialized manually, captured with `GetCurrentContext` / `GetContext`, and used to invoke any ABI-compatible address:
+`CallAddress` is not tied to a `RawHook` callback. A complete context can be initialized manually, captured with `GetCurrentContext`, and used to invoke any ABI-compatible address:
 
 ```cpp
 Detours::Hook::RAW_CONTEXT Context {};
@@ -362,7 +356,6 @@ When `Context.Stack` is null, `CallAddress` supplies a temporary ABI-aligned sta
 - Hardware debug-register hooks may require specific privileges or kernel/debugging settings and can be unavailable in restricted containers.
 - Inline/raw hooks depend on instruction decoding, writable code pages, executable trampoline memory, and safe thread suspension. Compiler optimizations, W^X policy, PIE/ASLR, and concurrent execution can affect hookability.
 - `RawHook` can save native GPR state only or extended FPU/SIMD state depending on the `bNative` argument and detected CPU/OS support. Its wrapper and restore paths, as well as `CallTrampoline`, use monolithic cumulative variants: AVX-512 contains AVX/AVX2/YMM + SSE/XMM + native, AVX/AVX2/YMM contains SSE/XMM + native, and SSE/XMM contains native; every tier has an independent x87 FPU/no-FPU variant.
-- `GetContext` never suspends or resumes a thread. On Windows, the caller must provide a handle with context-query access and suspend a non-current target before reading it. `GetCurrentContext` must be used for the calling thread.
 - `CallTrampoline` and `CallAddress` mirror the selected stack, preserve stack arguments and callee stack cleanup, and support nested and concurrent calls without global or thread-local frame state. Every invocation owns an independent internal frame outside the mirrored stack; each mirror has guard pages and an internal header from which the post-call code recovers that exact frame. The header is validated through its self-pointer, allocation address, stack bounds, and owning frame; no numeric signature is used. Win64 home slots are snapshotted before the target call and restored in the mirror before stack write-back, preventing target shadow-space stores from overwriting the active `CallAddress` frame. The generated machine code is immutable and may be entered concurrently. `CallAddress` accepts a caller-owned `RAW_CONTEXT` outside `RawHook`; it must not receive storage created by a native-only `RawHook`.
 - `RAW_CONTEXT` models AVX-512 ZMM vector state but does not currently expose or preserve the AVX-512 `k0`-`k7` opmask registers.
 - Generated machine-code blocks have no platform unwind metadata. The trampoline must return normally; exceptions, `longjmp`, and other non-local unwinds must not cross generated code.
@@ -373,7 +366,7 @@ When `Context.Stack` is null, `CallAddress` supplies a temporary ABI-aligned sta
 Detours.h          Public API and declarations
 Detours.cpp        Implementation and embedded machine-code byte arrays
 README.md          Project documentation
-main.cpp           Windows-oriented doctest harness
+main.cpp           Windows and Linux doctest harness
 doctest.h          Test framework
 asm.asm / asm64.asm                 Readable RawHook wrapper/restore and GetCurrentContext machine code
 call.asm / call64.asm               Readable sources for embedded CallTrampoline/CallAddress machine code

@@ -1,4 +1,4 @@
-name: MSBuild
+name: Build and test
 
 on:
   push:
@@ -17,6 +17,43 @@ permissions:
   actions: write
 
 jobs:
+  building-and-testing-linux:
+    name: Building and testing Linux (${{ matrix.configuration }})
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        configuration: [ Debug, Release ]
+
+    steps:
+      - uses: actions/checkout@v4.1.7
+
+      - name: Building Linux (${{ matrix.configuration }})
+        env:
+          CONFIGURATION: ${{ matrix.configuration }}
+        shell: bash
+        working-directory: ${{env.GITHUB_WORKSPACE}}
+        run: |
+          set -euo pipefail
+          flags=(-std=c++17 -pthread -I.)
+          if [[ "$CONFIGURATION" == "Debug" ]]; then
+            flags+=(-O0 -g3 -D_DEBUG)
+          else
+            flags+=(-O2 -DNDEBUG)
+          fi
+          output="build/linux/x86_64/$CONFIGURATION"
+          mkdir -p "$output"
+          g++ "${flags[@]}" Detours.cpp main.cpp -ldl -o "$output/Detours"
+
+      - name: Testing Linux (${{ matrix.configuration }})
+        timeout-minutes: 3
+        env:
+          CONFIGURATION: ${{ matrix.configuration }}
+        shell: bash
+        working-directory: ${{env.GITHUB_WORKSPACE}}
+        run: build/linux/x86_64/$CONFIGURATION/Detours --test-suite=Detours::Memory --no-skip
+
   building-debug-x86:
     name: Building Debug (x86)
     runs-on: windows-latest
