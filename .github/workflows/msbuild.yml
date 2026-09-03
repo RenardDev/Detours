@@ -30,10 +30,17 @@ jobs:
           set -euo pipefail
           pattern='\b(thread_local|_Thread_local|__thread)\b|__declspec\s*\(\s*thread\s*\)|\b(TlsAlloc|TlsFree|TlsGetValue|TlsSetValue|FlsAlloc|FlsFree|FlsGetValue|FlsSetValue|pthread_key_create|pthread_key_delete|pthread_getspecific|pthread_setspecific)\b'
           set +e
-          matches="$(rg -n "$pattern" \
-            Detours.h \
-            Detours.cpp \
-            main.cpp)"
+          if command -v rg >/dev/null 2>&1; then
+            matches="$(rg -n "$pattern" \
+              Detours.h \
+              Detours.cpp \
+              main.cpp)"
+          else
+            matches="$(grep -nP "$pattern" \
+              Detours.h \
+              Detours.cpp \
+              main.cpp)"
+          fi
           status=$?
           set -e
           if [[ $status -eq 0 ]]; then
