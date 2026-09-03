@@ -65,11 +65,11 @@ jobs:
           header = pathlib.Path("Detours.h").read_text(encoding="utf-8")
 
           definitions = {
-              "OpenProtectedMemoryShadowMetaData": re.compile(
+              "OpenProtectedMemoryShadowMetadata": re.compile(
                   r"static\s+PPROTECTED_MEMORY_SHADOW_METADATA\s+"
-                  r"OpenProtectedMemoryShadowMetaData\s*\([^;{}]*\)\s*noexcept\s*\{"),
-              "CloseProtectedMemoryShadowMetaData": re.compile(
-                  r"static\s+bool\s+CloseProtectedMemoryShadowMetaData\s*"
+                  r"OpenProtectedMemoryShadowMetadata\s*\([^;{}]*\)\s*noexcept\s*\{"),
+              "CloseProtectedMemoryShadowMetadata": re.compile(
+                  r"static\s+bool\s+CloseProtectedMemoryShadowMetadata\s*"
                   r"\([^;{}]*\)\s*noexcept\s*\{"),
           }
           matches = {}
@@ -81,10 +81,10 @@ jobs:
               if re.search(rf"\b{name}\b", implementation[:found[0].start()]):
                   raise SystemExit(f"{name} has a declaration, alias, or use before its definition")
 
-          if matches["OpenProtectedMemoryShadowMetaData"].start() >= matches[
-              "CloseProtectedMemoryShadowMetaData"
+          if matches["OpenProtectedMemoryShadowMetadata"].start() >= matches[
+              "CloseProtectedMemoryShadowMetadata"
           ].start():
-              raise SystemExit("OpenProtectedMemoryShadowMetaData must precede CloseProtectedMemoryShadowMetaData")
+              raise SystemExit("OpenProtectedMemoryShadowMetadata must precede CloseProtectedMemoryShadowMetadata")
 
           classes = (
               "ProtectedPage",
