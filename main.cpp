@@ -13214,7 +13214,10 @@ TEST_SUITE("Detours::Scan") {
 		int const nCurrentDirectory = ::open(".", O_RDONLY | O_DIRECTORY | O_CLOEXEC);
 		REQUIRE(nCurrentDirectory >= 0);
 		auto CurrentDirectoryCleanup = MakeScopeExit([nCurrentDirectory]() {
-			::fchdir(nCurrentDirectory);
+			if (::fchdir(nCurrentDirectory) != 0) {
+				::close(nCurrentDirectory);
+				return;
+			}
 			::close(nCurrentDirectory);
 		});
 
@@ -13887,7 +13890,10 @@ TEST_SUITE("Detours::Sync") {
 
 				if (!bSignalQueued.load(std::memory_order_acquire)) {
 					unsigned char const unValue = 1;
-					::write(arrPipe[1], &unValue, sizeof(unValue));
+					ssize_t const nWriteResult = ::write(arrPipe[1], &unValue, sizeof(unValue));
+					if (nWriteResult != static_cast<ssize_t>(sizeof(unValue))) {
+						::_exit(kLinuxSignalChainingFailureExitCode);
+					}
 				}
 			});
 
