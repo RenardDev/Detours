@@ -1,75 +1,92 @@
-
 .code
-	CallInterrupt proc
+	CallInterrupt proc frame
 		push rax
+		.allocstack 8
 		push rcx
+		.allocstack 8
 		push rdx
+		.allocstack 8
 		push rbx
+		.pushreg rbx
 		; push rsp
 		push rbp
+		.pushreg rbp
 		push rsi
+		.pushreg rsi
 		push rdi
+		.pushreg rdi
 		push r8
+		.allocstack 8
 		push r9
+		.allocstack 8
 		push r10
+		.allocstack 8
 		push r11
+		.allocstack 8
 		push r12
+		.pushreg r12
 		push r13
+		.pushreg r13
 		push r14
+		.pushreg r14
 		push r15
-
-		add rsp, 78h
-		add rsp, 28h
+		.pushreg r15
+		.endprolog
 
 		mov rax, rcx
 		mov rcx, rdx
 		mov rdx, r8
 		mov rbx, r9
-		mov rbp, qword ptr [rsp+00h]
-		mov rsi, qword ptr [rsp+08h]
-		mov rdi, qword ptr [rsp+10h]
-		mov  r8, qword ptr [rsp+18h]
-		mov  r9, qword ptr [rsp+20h]
-		mov r10, qword ptr [rsp+28h]
-		mov r11, qword ptr [rsp+30h]
-		mov r12, qword ptr [rsp+38h]
-		mov r13, qword ptr [rsp+40h]
-		mov r14, qword ptr [rsp+48h]
-		mov r15, qword ptr [rsp+50h]
-
-		sub rsp, 28h
-		sub rsp, 78h
+		mov rbp, qword ptr [rsp+0A0h]
+		mov rsi, qword ptr [rsp+0A8h]
+		mov rdi, qword ptr [rsp+0B0h]
+		mov r8, qword ptr [rsp+0B8h]
+		mov r9, qword ptr [rsp+0C0h]
+		mov r10, qword ptr [rsp+0C8h]
+		mov r11, qword ptr [rsp+0D0h]
+		mov r12, qword ptr [rsp+0D8h]
+		mov r13, qword ptr [rsp+0E0h]
+		mov r14, qword ptr [rsp+0E8h]
+		mov r15, qword ptr [rsp+0F0h]
 
 		int 7Eh
 
-		pop r15
-		pop r14
-		pop r13
-		pop r12
-		pop r11
-		pop r10
-		pop r9
-		pop r8
-		pop rdi
-		pop rsi
-		pop rbp
-		; pop rsp
-		pop rbx
-		pop rdx
-		pop rcx
-		; pop rax
-		add rsp, 8
+		mov r15, qword ptr [rsp+00h]
+		mov r14, qword ptr [rsp+08h]
+		mov r13, qword ptr [rsp+10h]
+		mov r12, qword ptr [rsp+18h]
+		mov r11, qword ptr [rsp+20h]
+		mov r10, qword ptr [rsp+28h]
+		mov r9, qword ptr [rsp+30h]
+		mov r8, qword ptr [rsp+38h]
+		mov rdi, qword ptr [rsp+40h]
+		mov rsi, qword ptr [rsp+48h]
+		mov rbp, qword ptr [rsp+50h]
+		mov rbx, qword ptr [rsp+58h]
+		mov rdx, qword ptr [rsp+60h]
+		mov rcx, qword ptr [rsp+68h]
+		add rsp, 78h
 		ret
 	CallInterrupt endp
 
-	CallInrerruptReturn proc
+	CallInterruptReturn proc
 		add rsp, 8
 		iretq
-	CallInrerruptReturn endp
+	CallInterruptReturn endp
 
 	TryRead proc
 		mov rax, rcx
 		mov al, byte ptr [rax]
 		ret
 	TryRead endp
+
+	WindowsHardwareContextBreakpoint proc
+		WindowsHardwareContextBreakpointInstruction label byte
+		int 3
+		ret
+	WindowsHardwareContextBreakpoint endp
+
+.const
+	public WindowsHardwareContextBreakpointAddress
+	WindowsHardwareContextBreakpointAddress dq offset WindowsHardwareContextBreakpointInstruction
 end

@@ -194,6 +194,23 @@ raw_hook_wrapper_x86_cdecl_avx512fpu_patch_36:
 .globl raw_hook_wrapper_x86_cdecl_avx512fpu_patch_36_end
 raw_hook_wrapper_x86_cdecl_avx512fpu_patch_36_end:
 	mov eax, esp
+.globl raw_hook_wrapper_x86_cdecl_avx512fpu_cet_patch_0
+raw_hook_wrapper_x86_cdecl_avx512fpu_cet_patch_0:
+	add eax, 0x7fffffff
+.globl raw_hook_wrapper_x86_cdecl_avx512fpu_cet_patch_0_end
+raw_hook_wrapper_x86_cdecl_avx512fpu_cet_patch_0_end:
+.globl raw_hook_wrapper_x86_cdecl_avx512fpu_cet_patch_1
+raw_hook_wrapper_x86_cdecl_avx512fpu_cet_patch_1:
+	mov dword ptr [esp + 0x7fffffff], eax
+.globl raw_hook_wrapper_x86_cdecl_avx512fpu_cet_patch_1_end
+raw_hook_wrapper_x86_cdecl_avx512fpu_cet_patch_1_end:
+	mov eax, dword ptr [eax]
+.globl raw_hook_wrapper_x86_cdecl_avx512fpu_cet_patch_2
+raw_hook_wrapper_x86_cdecl_avx512fpu_cet_patch_2:
+	mov dword ptr [esp + 0x7fffffff], eax
+.globl raw_hook_wrapper_x86_cdecl_avx512fpu_cet_patch_2_end
+raw_hook_wrapper_x86_cdecl_avx512fpu_cet_patch_2_end:
+	mov eax, esp
 	push eax
 .globl raw_hook_wrapper_x86_cdecl_avx512fpu_patch_37
 raw_hook_wrapper_x86_cdecl_avx512fpu_patch_37:
@@ -334,12 +351,6 @@ raw_hook_wrapper_x86_cdecl_avx512fpu_patch_63:
 	ldmxcsr dword ptr [esp + 0x7fffffff]
 .globl raw_hook_wrapper_x86_cdecl_avx512fpu_patch_63_end
 raw_hook_wrapper_x86_cdecl_avx512fpu_patch_63_end:
-.globl raw_hook_wrapper_x86_cdecl_avx512fpu_patch_64
-raw_hook_wrapper_x86_cdecl_avx512fpu_patch_64:
-	push dword ptr [esp + 0x7fffffff]
-.globl raw_hook_wrapper_x86_cdecl_avx512fpu_patch_64_end
-raw_hook_wrapper_x86_cdecl_avx512fpu_patch_64_end:
-	popfd
 .globl raw_hook_wrapper_x86_cdecl_avx512fpu_patch_65
 raw_hook_wrapper_x86_cdecl_avx512fpu_patch_65:
 	mov edi, dword ptr [esp + 0x7fffffff]
@@ -360,6 +371,63 @@ raw_hook_wrapper_x86_cdecl_avx512fpu_patch_68:
 	mov ebx, dword ptr [esp + 0x7fffffff]
 .globl raw_hook_wrapper_x86_cdecl_avx512fpu_patch_68_end
 raw_hook_wrapper_x86_cdecl_avx512fpu_patch_68_end:
+.globl raw_hook_wrapper_x86_cdecl_avx512fpu_cet_patch_3
+raw_hook_wrapper_x86_cdecl_avx512fpu_cet_patch_3:
+	mov eax, dword ptr [esp + 0x7fffffff]
+.globl raw_hook_wrapper_x86_cdecl_avx512fpu_cet_patch_3_end
+raw_hook_wrapper_x86_cdecl_avx512fpu_cet_patch_3_end:
+	test eax, 0x3
+	jne raw_hook_wrapper_x86_cdecl_avx512fpu_unsupported_stack
+.globl raw_hook_wrapper_x86_cdecl_avx512fpu_cet_patch_4
+raw_hook_wrapper_x86_cdecl_avx512fpu_cet_patch_4:
+	mov ecx, dword ptr [esp + 0x7fffffff]
+.globl raw_hook_wrapper_x86_cdecl_avx512fpu_cet_patch_4_end
+raw_hook_wrapper_x86_cdecl_avx512fpu_cet_patch_4_end:
+	cmp eax, ecx
+	ja raw_hook_wrapper_x86_cdecl_avx512fpu_unsupported_stack
+	lea edx, [eax + 0x4]
+	cmp edx, ecx
+	jb raw_hook_wrapper_x86_cdecl_avx512fpu_unsupported_stack
+	nop
+	nop
+	nop
+	nop
+.globl raw_hook_wrapper_x86_cdecl_avx512fpu_cet_patch_6
+raw_hook_wrapper_x86_cdecl_avx512fpu_cet_patch_6:
+	mov edx, dword ptr [esp + 0x7fffffff]
+.globl raw_hook_wrapper_x86_cdecl_avx512fpu_cet_patch_6_end
+raw_hook_wrapper_x86_cdecl_avx512fpu_cet_patch_6_end:
+	cmp dword ptr [ecx], edx
+	jne raw_hook_wrapper_x86_cdecl_avx512fpu_unsupported_stack
+	cmp eax, ecx
+	je raw_hook_wrapper_x86_cdecl_avx512fpu_direct_return
+	lea eax, [eax + 0x4]
+	cmp eax, ecx
+	je raw_hook_wrapper_x86_cdecl_avx512fpu_redirect_return
+raw_hook_wrapper_x86_cdecl_avx512fpu_unsupported_stack:
+.globl raw_hook_wrapper_x86_cdecl_avx512fpu_cet_patch_7
+raw_hook_wrapper_x86_cdecl_avx512fpu_cet_patch_7:
+	mov ecx, dword ptr [esp + 0x7fffffff]
+.globl raw_hook_wrapper_x86_cdecl_avx512fpu_cet_patch_7_end
+raw_hook_wrapper_x86_cdecl_avx512fpu_cet_patch_7_end:
+.globl raw_hook_wrapper_x86_cdecl_avx512fpu_cet_patch_8
+raw_hook_wrapper_x86_cdecl_avx512fpu_cet_patch_8:
+	mov dword ptr [esp + 0x7fffffff], ecx
+.globl raw_hook_wrapper_x86_cdecl_avx512fpu_cet_patch_8_end
+raw_hook_wrapper_x86_cdecl_avx512fpu_cet_patch_8_end:
+.globl raw_hook_wrapper_x86_cdecl_avx512fpu_cet_patch_9
+raw_hook_wrapper_x86_cdecl_avx512fpu_cet_patch_9:
+	mov edx, dword ptr [esp + 0x7fffffff]
+.globl raw_hook_wrapper_x86_cdecl_avx512fpu_cet_patch_9_end
+raw_hook_wrapper_x86_cdecl_avx512fpu_cet_patch_9_end:
+	mov dword ptr [ecx], edx
+raw_hook_wrapper_x86_cdecl_avx512fpu_direct_return:
+.globl raw_hook_wrapper_x86_cdecl_avx512fpu_patch_64
+raw_hook_wrapper_x86_cdecl_avx512fpu_patch_64:
+	push dword ptr [esp + 0x7fffffff]
+.globl raw_hook_wrapper_x86_cdecl_avx512fpu_patch_64_end
+raw_hook_wrapper_x86_cdecl_avx512fpu_patch_64_end:
+	popfd
 .globl raw_hook_wrapper_x86_cdecl_avx512fpu_patch_69
 raw_hook_wrapper_x86_cdecl_avx512fpu_patch_69:
 	mov edx, dword ptr [esp + 0x7fffffff]
@@ -381,6 +449,35 @@ raw_hook_wrapper_x86_cdecl_avx512fpu_patch_72:
 .globl raw_hook_wrapper_x86_cdecl_avx512fpu_patch_72_end
 raw_hook_wrapper_x86_cdecl_avx512fpu_patch_72_end:
 	ret
+raw_hook_wrapper_x86_cdecl_avx512fpu_redirect_return:
+.globl raw_hook_wrapper_x86_cdecl_avx512fpu_cet_patch_10
+raw_hook_wrapper_x86_cdecl_avx512fpu_cet_patch_10:
+	push dword ptr [esp + 0x7fffffff]
+.globl raw_hook_wrapper_x86_cdecl_avx512fpu_cet_patch_10_end
+raw_hook_wrapper_x86_cdecl_avx512fpu_cet_patch_10_end:
+	popfd
+.globl raw_hook_wrapper_x86_cdecl_avx512fpu_cet_patch_11
+raw_hook_wrapper_x86_cdecl_avx512fpu_cet_patch_11:
+	mov edx, dword ptr [esp + 0x7fffffff]
+.globl raw_hook_wrapper_x86_cdecl_avx512fpu_cet_patch_11_end
+raw_hook_wrapper_x86_cdecl_avx512fpu_cet_patch_11_end:
+.globl raw_hook_wrapper_x86_cdecl_avx512fpu_cet_patch_12
+raw_hook_wrapper_x86_cdecl_avx512fpu_cet_patch_12:
+	mov ecx, dword ptr [esp + 0x7fffffff]
+.globl raw_hook_wrapper_x86_cdecl_avx512fpu_cet_patch_12_end
+raw_hook_wrapper_x86_cdecl_avx512fpu_cet_patch_12_end:
+.globl raw_hook_wrapper_x86_cdecl_avx512fpu_cet_patch_13
+raw_hook_wrapper_x86_cdecl_avx512fpu_cet_patch_13:
+	mov eax, dword ptr [esp + 0x7fffffff]
+.globl raw_hook_wrapper_x86_cdecl_avx512fpu_cet_patch_13_end
+raw_hook_wrapper_x86_cdecl_avx512fpu_cet_patch_13_end:
+.globl raw_hook_wrapper_x86_cdecl_avx512fpu_cet_patch_14
+raw_hook_wrapper_x86_cdecl_avx512fpu_cet_patch_14:
+	mov esp, dword ptr [esp + 0x7fffffff]
+.globl raw_hook_wrapper_x86_cdecl_avx512fpu_cet_patch_14_end
+raw_hook_wrapper_x86_cdecl_avx512fpu_cet_patch_14_end:
+	lea esp, [esp + 0x4]
+	jmp dword ptr [esp - 0x4]
 raw_hook_wrapper_x86_cdecl_avx512fpu_nothing_modified:
 .globl raw_hook_wrapper_x86_cdecl_avx512fpu_patch_73
 raw_hook_wrapper_x86_cdecl_avx512fpu_patch_73:
@@ -575,6 +672,23 @@ raw_hook_wrapper_x86_cdecl_avx512_patch_35:
 .globl raw_hook_wrapper_x86_cdecl_avx512_patch_35_end
 raw_hook_wrapper_x86_cdecl_avx512_patch_35_end:
 	mov eax, esp
+.globl raw_hook_wrapper_x86_cdecl_avx512_cet_patch_0
+raw_hook_wrapper_x86_cdecl_avx512_cet_patch_0:
+	add eax, 0x7fffffff
+.globl raw_hook_wrapper_x86_cdecl_avx512_cet_patch_0_end
+raw_hook_wrapper_x86_cdecl_avx512_cet_patch_0_end:
+.globl raw_hook_wrapper_x86_cdecl_avx512_cet_patch_1
+raw_hook_wrapper_x86_cdecl_avx512_cet_patch_1:
+	mov dword ptr [esp + 0x7fffffff], eax
+.globl raw_hook_wrapper_x86_cdecl_avx512_cet_patch_1_end
+raw_hook_wrapper_x86_cdecl_avx512_cet_patch_1_end:
+	mov eax, dword ptr [eax]
+.globl raw_hook_wrapper_x86_cdecl_avx512_cet_patch_2
+raw_hook_wrapper_x86_cdecl_avx512_cet_patch_2:
+	mov dword ptr [esp + 0x7fffffff], eax
+.globl raw_hook_wrapper_x86_cdecl_avx512_cet_patch_2_end
+raw_hook_wrapper_x86_cdecl_avx512_cet_patch_2_end:
+	mov eax, esp
 	push eax
 .globl raw_hook_wrapper_x86_cdecl_avx512_patch_36
 raw_hook_wrapper_x86_cdecl_avx512_patch_36:
@@ -710,12 +824,6 @@ raw_hook_wrapper_x86_cdecl_avx512_patch_61:
 	ldmxcsr dword ptr [esp + 0x7fffffff]
 .globl raw_hook_wrapper_x86_cdecl_avx512_patch_61_end
 raw_hook_wrapper_x86_cdecl_avx512_patch_61_end:
-.globl raw_hook_wrapper_x86_cdecl_avx512_patch_62
-raw_hook_wrapper_x86_cdecl_avx512_patch_62:
-	push dword ptr [esp + 0x7fffffff]
-.globl raw_hook_wrapper_x86_cdecl_avx512_patch_62_end
-raw_hook_wrapper_x86_cdecl_avx512_patch_62_end:
-	popfd
 .globl raw_hook_wrapper_x86_cdecl_avx512_patch_63
 raw_hook_wrapper_x86_cdecl_avx512_patch_63:
 	mov edi, dword ptr [esp + 0x7fffffff]
@@ -736,6 +844,63 @@ raw_hook_wrapper_x86_cdecl_avx512_patch_66:
 	mov ebx, dword ptr [esp + 0x7fffffff]
 .globl raw_hook_wrapper_x86_cdecl_avx512_patch_66_end
 raw_hook_wrapper_x86_cdecl_avx512_patch_66_end:
+.globl raw_hook_wrapper_x86_cdecl_avx512_cet_patch_3
+raw_hook_wrapper_x86_cdecl_avx512_cet_patch_3:
+	mov eax, dword ptr [esp + 0x7fffffff]
+.globl raw_hook_wrapper_x86_cdecl_avx512_cet_patch_3_end
+raw_hook_wrapper_x86_cdecl_avx512_cet_patch_3_end:
+	test eax, 0x3
+	jne raw_hook_wrapper_x86_cdecl_avx512_unsupported_stack
+.globl raw_hook_wrapper_x86_cdecl_avx512_cet_patch_4
+raw_hook_wrapper_x86_cdecl_avx512_cet_patch_4:
+	mov ecx, dword ptr [esp + 0x7fffffff]
+.globl raw_hook_wrapper_x86_cdecl_avx512_cet_patch_4_end
+raw_hook_wrapper_x86_cdecl_avx512_cet_patch_4_end:
+	cmp eax, ecx
+	ja raw_hook_wrapper_x86_cdecl_avx512_unsupported_stack
+	lea edx, [eax + 0x4]
+	cmp edx, ecx
+	jb raw_hook_wrapper_x86_cdecl_avx512_unsupported_stack
+	nop
+	nop
+	nop
+	nop
+.globl raw_hook_wrapper_x86_cdecl_avx512_cet_patch_6
+raw_hook_wrapper_x86_cdecl_avx512_cet_patch_6:
+	mov edx, dword ptr [esp + 0x7fffffff]
+.globl raw_hook_wrapper_x86_cdecl_avx512_cet_patch_6_end
+raw_hook_wrapper_x86_cdecl_avx512_cet_patch_6_end:
+	cmp dword ptr [ecx], edx
+	jne raw_hook_wrapper_x86_cdecl_avx512_unsupported_stack
+	cmp eax, ecx
+	je raw_hook_wrapper_x86_cdecl_avx512_direct_return
+	lea eax, [eax + 0x4]
+	cmp eax, ecx
+	je raw_hook_wrapper_x86_cdecl_avx512_redirect_return
+raw_hook_wrapper_x86_cdecl_avx512_unsupported_stack:
+.globl raw_hook_wrapper_x86_cdecl_avx512_cet_patch_7
+raw_hook_wrapper_x86_cdecl_avx512_cet_patch_7:
+	mov ecx, dword ptr [esp + 0x7fffffff]
+.globl raw_hook_wrapper_x86_cdecl_avx512_cet_patch_7_end
+raw_hook_wrapper_x86_cdecl_avx512_cet_patch_7_end:
+.globl raw_hook_wrapper_x86_cdecl_avx512_cet_patch_8
+raw_hook_wrapper_x86_cdecl_avx512_cet_patch_8:
+	mov dword ptr [esp + 0x7fffffff], ecx
+.globl raw_hook_wrapper_x86_cdecl_avx512_cet_patch_8_end
+raw_hook_wrapper_x86_cdecl_avx512_cet_patch_8_end:
+.globl raw_hook_wrapper_x86_cdecl_avx512_cet_patch_9
+raw_hook_wrapper_x86_cdecl_avx512_cet_patch_9:
+	mov edx, dword ptr [esp + 0x7fffffff]
+.globl raw_hook_wrapper_x86_cdecl_avx512_cet_patch_9_end
+raw_hook_wrapper_x86_cdecl_avx512_cet_patch_9_end:
+	mov dword ptr [ecx], edx
+raw_hook_wrapper_x86_cdecl_avx512_direct_return:
+.globl raw_hook_wrapper_x86_cdecl_avx512_patch_62
+raw_hook_wrapper_x86_cdecl_avx512_patch_62:
+	push dword ptr [esp + 0x7fffffff]
+.globl raw_hook_wrapper_x86_cdecl_avx512_patch_62_end
+raw_hook_wrapper_x86_cdecl_avx512_patch_62_end:
+	popfd
 .globl raw_hook_wrapper_x86_cdecl_avx512_patch_67
 raw_hook_wrapper_x86_cdecl_avx512_patch_67:
 	mov edx, dword ptr [esp + 0x7fffffff]
@@ -757,6 +922,35 @@ raw_hook_wrapper_x86_cdecl_avx512_patch_70:
 .globl raw_hook_wrapper_x86_cdecl_avx512_patch_70_end
 raw_hook_wrapper_x86_cdecl_avx512_patch_70_end:
 	ret
+raw_hook_wrapper_x86_cdecl_avx512_redirect_return:
+.globl raw_hook_wrapper_x86_cdecl_avx512_cet_patch_10
+raw_hook_wrapper_x86_cdecl_avx512_cet_patch_10:
+	push dword ptr [esp + 0x7fffffff]
+.globl raw_hook_wrapper_x86_cdecl_avx512_cet_patch_10_end
+raw_hook_wrapper_x86_cdecl_avx512_cet_patch_10_end:
+	popfd
+.globl raw_hook_wrapper_x86_cdecl_avx512_cet_patch_11
+raw_hook_wrapper_x86_cdecl_avx512_cet_patch_11:
+	mov edx, dword ptr [esp + 0x7fffffff]
+.globl raw_hook_wrapper_x86_cdecl_avx512_cet_patch_11_end
+raw_hook_wrapper_x86_cdecl_avx512_cet_patch_11_end:
+.globl raw_hook_wrapper_x86_cdecl_avx512_cet_patch_12
+raw_hook_wrapper_x86_cdecl_avx512_cet_patch_12:
+	mov ecx, dword ptr [esp + 0x7fffffff]
+.globl raw_hook_wrapper_x86_cdecl_avx512_cet_patch_12_end
+raw_hook_wrapper_x86_cdecl_avx512_cet_patch_12_end:
+.globl raw_hook_wrapper_x86_cdecl_avx512_cet_patch_13
+raw_hook_wrapper_x86_cdecl_avx512_cet_patch_13:
+	mov eax, dword ptr [esp + 0x7fffffff]
+.globl raw_hook_wrapper_x86_cdecl_avx512_cet_patch_13_end
+raw_hook_wrapper_x86_cdecl_avx512_cet_patch_13_end:
+.globl raw_hook_wrapper_x86_cdecl_avx512_cet_patch_14
+raw_hook_wrapper_x86_cdecl_avx512_cet_patch_14:
+	mov esp, dword ptr [esp + 0x7fffffff]
+.globl raw_hook_wrapper_x86_cdecl_avx512_cet_patch_14_end
+raw_hook_wrapper_x86_cdecl_avx512_cet_patch_14_end:
+	lea esp, [esp + 0x4]
+	jmp dword ptr [esp - 0x4]
 raw_hook_wrapper_x86_cdecl_avx512_nothing_modified:
 .globl raw_hook_wrapper_x86_cdecl_avx512_patch_71
 raw_hook_wrapper_x86_cdecl_avx512_patch_71:
@@ -916,6 +1110,23 @@ raw_hook_wrapper_x86_cdecl_avxfpu_patch_28:
 .globl raw_hook_wrapper_x86_cdecl_avxfpu_patch_28_end
 raw_hook_wrapper_x86_cdecl_avxfpu_patch_28_end:
 	mov eax, esp
+.globl raw_hook_wrapper_x86_cdecl_avxfpu_cet_patch_0
+raw_hook_wrapper_x86_cdecl_avxfpu_cet_patch_0:
+	add eax, 0x7fffffff
+.globl raw_hook_wrapper_x86_cdecl_avxfpu_cet_patch_0_end
+raw_hook_wrapper_x86_cdecl_avxfpu_cet_patch_0_end:
+.globl raw_hook_wrapper_x86_cdecl_avxfpu_cet_patch_1
+raw_hook_wrapper_x86_cdecl_avxfpu_cet_patch_1:
+	mov dword ptr [esp + 0x7fffffff], eax
+.globl raw_hook_wrapper_x86_cdecl_avxfpu_cet_patch_1_end
+raw_hook_wrapper_x86_cdecl_avxfpu_cet_patch_1_end:
+	mov eax, dword ptr [eax]
+.globl raw_hook_wrapper_x86_cdecl_avxfpu_cet_patch_2
+raw_hook_wrapper_x86_cdecl_avxfpu_cet_patch_2:
+	mov dword ptr [esp + 0x7fffffff], eax
+.globl raw_hook_wrapper_x86_cdecl_avxfpu_cet_patch_2_end
+raw_hook_wrapper_x86_cdecl_avxfpu_cet_patch_2_end:
+	mov eax, esp
 	push eax
 .globl raw_hook_wrapper_x86_cdecl_avxfpu_patch_29
 raw_hook_wrapper_x86_cdecl_avxfpu_patch_29:
@@ -1016,12 +1227,6 @@ raw_hook_wrapper_x86_cdecl_avxfpu_patch_47:
 	ldmxcsr dword ptr [esp + 0x7fffffff]
 .globl raw_hook_wrapper_x86_cdecl_avxfpu_patch_47_end
 raw_hook_wrapper_x86_cdecl_avxfpu_patch_47_end:
-.globl raw_hook_wrapper_x86_cdecl_avxfpu_patch_48
-raw_hook_wrapper_x86_cdecl_avxfpu_patch_48:
-	push dword ptr [esp + 0x7fffffff]
-.globl raw_hook_wrapper_x86_cdecl_avxfpu_patch_48_end
-raw_hook_wrapper_x86_cdecl_avxfpu_patch_48_end:
-	popfd
 .globl raw_hook_wrapper_x86_cdecl_avxfpu_patch_49
 raw_hook_wrapper_x86_cdecl_avxfpu_patch_49:
 	mov edi, dword ptr [esp + 0x7fffffff]
@@ -1042,6 +1247,63 @@ raw_hook_wrapper_x86_cdecl_avxfpu_patch_52:
 	mov ebx, dword ptr [esp + 0x7fffffff]
 .globl raw_hook_wrapper_x86_cdecl_avxfpu_patch_52_end
 raw_hook_wrapper_x86_cdecl_avxfpu_patch_52_end:
+.globl raw_hook_wrapper_x86_cdecl_avxfpu_cet_patch_3
+raw_hook_wrapper_x86_cdecl_avxfpu_cet_patch_3:
+	mov eax, dword ptr [esp + 0x7fffffff]
+.globl raw_hook_wrapper_x86_cdecl_avxfpu_cet_patch_3_end
+raw_hook_wrapper_x86_cdecl_avxfpu_cet_patch_3_end:
+	test eax, 0x3
+	jne raw_hook_wrapper_x86_cdecl_avxfpu_unsupported_stack
+.globl raw_hook_wrapper_x86_cdecl_avxfpu_cet_patch_4
+raw_hook_wrapper_x86_cdecl_avxfpu_cet_patch_4:
+	mov ecx, dword ptr [esp + 0x7fffffff]
+.globl raw_hook_wrapper_x86_cdecl_avxfpu_cet_patch_4_end
+raw_hook_wrapper_x86_cdecl_avxfpu_cet_patch_4_end:
+	cmp eax, ecx
+	ja raw_hook_wrapper_x86_cdecl_avxfpu_unsupported_stack
+	lea edx, [eax + 0x4]
+	cmp edx, ecx
+	jb raw_hook_wrapper_x86_cdecl_avxfpu_unsupported_stack
+	nop
+	nop
+	nop
+	nop
+.globl raw_hook_wrapper_x86_cdecl_avxfpu_cet_patch_6
+raw_hook_wrapper_x86_cdecl_avxfpu_cet_patch_6:
+	mov edx, dword ptr [esp + 0x7fffffff]
+.globl raw_hook_wrapper_x86_cdecl_avxfpu_cet_patch_6_end
+raw_hook_wrapper_x86_cdecl_avxfpu_cet_patch_6_end:
+	cmp dword ptr [ecx], edx
+	jne raw_hook_wrapper_x86_cdecl_avxfpu_unsupported_stack
+	cmp eax, ecx
+	je raw_hook_wrapper_x86_cdecl_avxfpu_direct_return
+	lea eax, [eax + 0x4]
+	cmp eax, ecx
+	je raw_hook_wrapper_x86_cdecl_avxfpu_redirect_return
+raw_hook_wrapper_x86_cdecl_avxfpu_unsupported_stack:
+.globl raw_hook_wrapper_x86_cdecl_avxfpu_cet_patch_7
+raw_hook_wrapper_x86_cdecl_avxfpu_cet_patch_7:
+	mov ecx, dword ptr [esp + 0x7fffffff]
+.globl raw_hook_wrapper_x86_cdecl_avxfpu_cet_patch_7_end
+raw_hook_wrapper_x86_cdecl_avxfpu_cet_patch_7_end:
+.globl raw_hook_wrapper_x86_cdecl_avxfpu_cet_patch_8
+raw_hook_wrapper_x86_cdecl_avxfpu_cet_patch_8:
+	mov dword ptr [esp + 0x7fffffff], ecx
+.globl raw_hook_wrapper_x86_cdecl_avxfpu_cet_patch_8_end
+raw_hook_wrapper_x86_cdecl_avxfpu_cet_patch_8_end:
+.globl raw_hook_wrapper_x86_cdecl_avxfpu_cet_patch_9
+raw_hook_wrapper_x86_cdecl_avxfpu_cet_patch_9:
+	mov edx, dword ptr [esp + 0x7fffffff]
+.globl raw_hook_wrapper_x86_cdecl_avxfpu_cet_patch_9_end
+raw_hook_wrapper_x86_cdecl_avxfpu_cet_patch_9_end:
+	mov dword ptr [ecx], edx
+raw_hook_wrapper_x86_cdecl_avxfpu_direct_return:
+.globl raw_hook_wrapper_x86_cdecl_avxfpu_patch_48
+raw_hook_wrapper_x86_cdecl_avxfpu_patch_48:
+	push dword ptr [esp + 0x7fffffff]
+.globl raw_hook_wrapper_x86_cdecl_avxfpu_patch_48_end
+raw_hook_wrapper_x86_cdecl_avxfpu_patch_48_end:
+	popfd
 .globl raw_hook_wrapper_x86_cdecl_avxfpu_patch_53
 raw_hook_wrapper_x86_cdecl_avxfpu_patch_53:
 	mov edx, dword ptr [esp + 0x7fffffff]
@@ -1063,6 +1325,35 @@ raw_hook_wrapper_x86_cdecl_avxfpu_patch_56:
 .globl raw_hook_wrapper_x86_cdecl_avxfpu_patch_56_end
 raw_hook_wrapper_x86_cdecl_avxfpu_patch_56_end:
 	ret
+raw_hook_wrapper_x86_cdecl_avxfpu_redirect_return:
+.globl raw_hook_wrapper_x86_cdecl_avxfpu_cet_patch_10
+raw_hook_wrapper_x86_cdecl_avxfpu_cet_patch_10:
+	push dword ptr [esp + 0x7fffffff]
+.globl raw_hook_wrapper_x86_cdecl_avxfpu_cet_patch_10_end
+raw_hook_wrapper_x86_cdecl_avxfpu_cet_patch_10_end:
+	popfd
+.globl raw_hook_wrapper_x86_cdecl_avxfpu_cet_patch_11
+raw_hook_wrapper_x86_cdecl_avxfpu_cet_patch_11:
+	mov edx, dword ptr [esp + 0x7fffffff]
+.globl raw_hook_wrapper_x86_cdecl_avxfpu_cet_patch_11_end
+raw_hook_wrapper_x86_cdecl_avxfpu_cet_patch_11_end:
+.globl raw_hook_wrapper_x86_cdecl_avxfpu_cet_patch_12
+raw_hook_wrapper_x86_cdecl_avxfpu_cet_patch_12:
+	mov ecx, dword ptr [esp + 0x7fffffff]
+.globl raw_hook_wrapper_x86_cdecl_avxfpu_cet_patch_12_end
+raw_hook_wrapper_x86_cdecl_avxfpu_cet_patch_12_end:
+.globl raw_hook_wrapper_x86_cdecl_avxfpu_cet_patch_13
+raw_hook_wrapper_x86_cdecl_avxfpu_cet_patch_13:
+	mov eax, dword ptr [esp + 0x7fffffff]
+.globl raw_hook_wrapper_x86_cdecl_avxfpu_cet_patch_13_end
+raw_hook_wrapper_x86_cdecl_avxfpu_cet_patch_13_end:
+.globl raw_hook_wrapper_x86_cdecl_avxfpu_cet_patch_14
+raw_hook_wrapper_x86_cdecl_avxfpu_cet_patch_14:
+	mov esp, dword ptr [esp + 0x7fffffff]
+.globl raw_hook_wrapper_x86_cdecl_avxfpu_cet_patch_14_end
+raw_hook_wrapper_x86_cdecl_avxfpu_cet_patch_14_end:
+	lea esp, [esp + 0x4]
+	jmp dword ptr [esp - 0x4]
 raw_hook_wrapper_x86_cdecl_avxfpu_nothing_modified:
 .globl raw_hook_wrapper_x86_cdecl_avxfpu_patch_57
 raw_hook_wrapper_x86_cdecl_avxfpu_patch_57:
@@ -1217,6 +1508,23 @@ raw_hook_wrapper_x86_cdecl_avx_patch_27:
 .globl raw_hook_wrapper_x86_cdecl_avx_patch_27_end
 raw_hook_wrapper_x86_cdecl_avx_patch_27_end:
 	mov eax, esp
+.globl raw_hook_wrapper_x86_cdecl_avx_cet_patch_0
+raw_hook_wrapper_x86_cdecl_avx_cet_patch_0:
+	add eax, 0x7fffffff
+.globl raw_hook_wrapper_x86_cdecl_avx_cet_patch_0_end
+raw_hook_wrapper_x86_cdecl_avx_cet_patch_0_end:
+.globl raw_hook_wrapper_x86_cdecl_avx_cet_patch_1
+raw_hook_wrapper_x86_cdecl_avx_cet_patch_1:
+	mov dword ptr [esp + 0x7fffffff], eax
+.globl raw_hook_wrapper_x86_cdecl_avx_cet_patch_1_end
+raw_hook_wrapper_x86_cdecl_avx_cet_patch_1_end:
+	mov eax, dword ptr [eax]
+.globl raw_hook_wrapper_x86_cdecl_avx_cet_patch_2
+raw_hook_wrapper_x86_cdecl_avx_cet_patch_2:
+	mov dword ptr [esp + 0x7fffffff], eax
+.globl raw_hook_wrapper_x86_cdecl_avx_cet_patch_2_end
+raw_hook_wrapper_x86_cdecl_avx_cet_patch_2_end:
+	mov eax, esp
 	push eax
 .globl raw_hook_wrapper_x86_cdecl_avx_patch_28
 raw_hook_wrapper_x86_cdecl_avx_patch_28:
@@ -1312,12 +1620,6 @@ raw_hook_wrapper_x86_cdecl_avx_patch_45:
 	ldmxcsr dword ptr [esp + 0x7fffffff]
 .globl raw_hook_wrapper_x86_cdecl_avx_patch_45_end
 raw_hook_wrapper_x86_cdecl_avx_patch_45_end:
-.globl raw_hook_wrapper_x86_cdecl_avx_patch_46
-raw_hook_wrapper_x86_cdecl_avx_patch_46:
-	push dword ptr [esp + 0x7fffffff]
-.globl raw_hook_wrapper_x86_cdecl_avx_patch_46_end
-raw_hook_wrapper_x86_cdecl_avx_patch_46_end:
-	popfd
 .globl raw_hook_wrapper_x86_cdecl_avx_patch_47
 raw_hook_wrapper_x86_cdecl_avx_patch_47:
 	mov edi, dword ptr [esp + 0x7fffffff]
@@ -1338,6 +1640,63 @@ raw_hook_wrapper_x86_cdecl_avx_patch_50:
 	mov ebx, dword ptr [esp + 0x7fffffff]
 .globl raw_hook_wrapper_x86_cdecl_avx_patch_50_end
 raw_hook_wrapper_x86_cdecl_avx_patch_50_end:
+.globl raw_hook_wrapper_x86_cdecl_avx_cet_patch_3
+raw_hook_wrapper_x86_cdecl_avx_cet_patch_3:
+	mov eax, dword ptr [esp + 0x7fffffff]
+.globl raw_hook_wrapper_x86_cdecl_avx_cet_patch_3_end
+raw_hook_wrapper_x86_cdecl_avx_cet_patch_3_end:
+	test eax, 0x3
+	jne raw_hook_wrapper_x86_cdecl_avx_unsupported_stack
+.globl raw_hook_wrapper_x86_cdecl_avx_cet_patch_4
+raw_hook_wrapper_x86_cdecl_avx_cet_patch_4:
+	mov ecx, dword ptr [esp + 0x7fffffff]
+.globl raw_hook_wrapper_x86_cdecl_avx_cet_patch_4_end
+raw_hook_wrapper_x86_cdecl_avx_cet_patch_4_end:
+	cmp eax, ecx
+	ja raw_hook_wrapper_x86_cdecl_avx_unsupported_stack
+	lea edx, [eax + 0x4]
+	cmp edx, ecx
+	jb raw_hook_wrapper_x86_cdecl_avx_unsupported_stack
+	nop
+	nop
+	nop
+	nop
+.globl raw_hook_wrapper_x86_cdecl_avx_cet_patch_6
+raw_hook_wrapper_x86_cdecl_avx_cet_patch_6:
+	mov edx, dword ptr [esp + 0x7fffffff]
+.globl raw_hook_wrapper_x86_cdecl_avx_cet_patch_6_end
+raw_hook_wrapper_x86_cdecl_avx_cet_patch_6_end:
+	cmp dword ptr [ecx], edx
+	jne raw_hook_wrapper_x86_cdecl_avx_unsupported_stack
+	cmp eax, ecx
+	je raw_hook_wrapper_x86_cdecl_avx_direct_return
+	lea eax, [eax + 0x4]
+	cmp eax, ecx
+	je raw_hook_wrapper_x86_cdecl_avx_redirect_return
+raw_hook_wrapper_x86_cdecl_avx_unsupported_stack:
+.globl raw_hook_wrapper_x86_cdecl_avx_cet_patch_7
+raw_hook_wrapper_x86_cdecl_avx_cet_patch_7:
+	mov ecx, dword ptr [esp + 0x7fffffff]
+.globl raw_hook_wrapper_x86_cdecl_avx_cet_patch_7_end
+raw_hook_wrapper_x86_cdecl_avx_cet_patch_7_end:
+.globl raw_hook_wrapper_x86_cdecl_avx_cet_patch_8
+raw_hook_wrapper_x86_cdecl_avx_cet_patch_8:
+	mov dword ptr [esp + 0x7fffffff], ecx
+.globl raw_hook_wrapper_x86_cdecl_avx_cet_patch_8_end
+raw_hook_wrapper_x86_cdecl_avx_cet_patch_8_end:
+.globl raw_hook_wrapper_x86_cdecl_avx_cet_patch_9
+raw_hook_wrapper_x86_cdecl_avx_cet_patch_9:
+	mov edx, dword ptr [esp + 0x7fffffff]
+.globl raw_hook_wrapper_x86_cdecl_avx_cet_patch_9_end
+raw_hook_wrapper_x86_cdecl_avx_cet_patch_9_end:
+	mov dword ptr [ecx], edx
+raw_hook_wrapper_x86_cdecl_avx_direct_return:
+.globl raw_hook_wrapper_x86_cdecl_avx_patch_46
+raw_hook_wrapper_x86_cdecl_avx_patch_46:
+	push dword ptr [esp + 0x7fffffff]
+.globl raw_hook_wrapper_x86_cdecl_avx_patch_46_end
+raw_hook_wrapper_x86_cdecl_avx_patch_46_end:
+	popfd
 .globl raw_hook_wrapper_x86_cdecl_avx_patch_51
 raw_hook_wrapper_x86_cdecl_avx_patch_51:
 	mov edx, dword ptr [esp + 0x7fffffff]
@@ -1359,6 +1718,35 @@ raw_hook_wrapper_x86_cdecl_avx_patch_54:
 .globl raw_hook_wrapper_x86_cdecl_avx_patch_54_end
 raw_hook_wrapper_x86_cdecl_avx_patch_54_end:
 	ret
+raw_hook_wrapper_x86_cdecl_avx_redirect_return:
+.globl raw_hook_wrapper_x86_cdecl_avx_cet_patch_10
+raw_hook_wrapper_x86_cdecl_avx_cet_patch_10:
+	push dword ptr [esp + 0x7fffffff]
+.globl raw_hook_wrapper_x86_cdecl_avx_cet_patch_10_end
+raw_hook_wrapper_x86_cdecl_avx_cet_patch_10_end:
+	popfd
+.globl raw_hook_wrapper_x86_cdecl_avx_cet_patch_11
+raw_hook_wrapper_x86_cdecl_avx_cet_patch_11:
+	mov edx, dword ptr [esp + 0x7fffffff]
+.globl raw_hook_wrapper_x86_cdecl_avx_cet_patch_11_end
+raw_hook_wrapper_x86_cdecl_avx_cet_patch_11_end:
+.globl raw_hook_wrapper_x86_cdecl_avx_cet_patch_12
+raw_hook_wrapper_x86_cdecl_avx_cet_patch_12:
+	mov ecx, dword ptr [esp + 0x7fffffff]
+.globl raw_hook_wrapper_x86_cdecl_avx_cet_patch_12_end
+raw_hook_wrapper_x86_cdecl_avx_cet_patch_12_end:
+.globl raw_hook_wrapper_x86_cdecl_avx_cet_patch_13
+raw_hook_wrapper_x86_cdecl_avx_cet_patch_13:
+	mov eax, dword ptr [esp + 0x7fffffff]
+.globl raw_hook_wrapper_x86_cdecl_avx_cet_patch_13_end
+raw_hook_wrapper_x86_cdecl_avx_cet_patch_13_end:
+.globl raw_hook_wrapper_x86_cdecl_avx_cet_patch_14
+raw_hook_wrapper_x86_cdecl_avx_cet_patch_14:
+	mov esp, dword ptr [esp + 0x7fffffff]
+.globl raw_hook_wrapper_x86_cdecl_avx_cet_patch_14_end
+raw_hook_wrapper_x86_cdecl_avx_cet_patch_14_end:
+	lea esp, [esp + 0x4]
+	jmp dword ptr [esp - 0x4]
 raw_hook_wrapper_x86_cdecl_avx_nothing_modified:
 .globl raw_hook_wrapper_x86_cdecl_avx_patch_55
 raw_hook_wrapper_x86_cdecl_avx_patch_55:
@@ -1478,6 +1866,23 @@ raw_hook_wrapper_x86_cdecl_ssefpu_patch_20:
 .globl raw_hook_wrapper_x86_cdecl_ssefpu_patch_20_end
 raw_hook_wrapper_x86_cdecl_ssefpu_patch_20_end:
 	mov eax, esp
+.globl raw_hook_wrapper_x86_cdecl_ssefpu_cet_patch_0
+raw_hook_wrapper_x86_cdecl_ssefpu_cet_patch_0:
+	add eax, 0x7fffffff
+.globl raw_hook_wrapper_x86_cdecl_ssefpu_cet_patch_0_end
+raw_hook_wrapper_x86_cdecl_ssefpu_cet_patch_0_end:
+.globl raw_hook_wrapper_x86_cdecl_ssefpu_cet_patch_1
+raw_hook_wrapper_x86_cdecl_ssefpu_cet_patch_1:
+	mov dword ptr [esp + 0x7fffffff], eax
+.globl raw_hook_wrapper_x86_cdecl_ssefpu_cet_patch_1_end
+raw_hook_wrapper_x86_cdecl_ssefpu_cet_patch_1_end:
+	mov eax, dword ptr [eax]
+.globl raw_hook_wrapper_x86_cdecl_ssefpu_cet_patch_2
+raw_hook_wrapper_x86_cdecl_ssefpu_cet_patch_2:
+	mov dword ptr [esp + 0x7fffffff], eax
+.globl raw_hook_wrapper_x86_cdecl_ssefpu_cet_patch_2_end
+raw_hook_wrapper_x86_cdecl_ssefpu_cet_patch_2_end:
+	mov eax, esp
 	push eax
 .globl raw_hook_wrapper_x86_cdecl_ssefpu_patch_21
 raw_hook_wrapper_x86_cdecl_ssefpu_patch_21:
@@ -1538,12 +1943,6 @@ raw_hook_wrapper_x86_cdecl_ssefpu_patch_31:
 	ldmxcsr dword ptr [esp + 0x7fffffff]
 .globl raw_hook_wrapper_x86_cdecl_ssefpu_patch_31_end
 raw_hook_wrapper_x86_cdecl_ssefpu_patch_31_end:
-.globl raw_hook_wrapper_x86_cdecl_ssefpu_patch_32
-raw_hook_wrapper_x86_cdecl_ssefpu_patch_32:
-	push dword ptr [esp + 0x7fffffff]
-.globl raw_hook_wrapper_x86_cdecl_ssefpu_patch_32_end
-raw_hook_wrapper_x86_cdecl_ssefpu_patch_32_end:
-	popfd
 .globl raw_hook_wrapper_x86_cdecl_ssefpu_patch_33
 raw_hook_wrapper_x86_cdecl_ssefpu_patch_33:
 	mov edi, dword ptr [esp + 0x7fffffff]
@@ -1564,6 +1963,63 @@ raw_hook_wrapper_x86_cdecl_ssefpu_patch_36:
 	mov ebx, dword ptr [esp + 0x7fffffff]
 .globl raw_hook_wrapper_x86_cdecl_ssefpu_patch_36_end
 raw_hook_wrapper_x86_cdecl_ssefpu_patch_36_end:
+.globl raw_hook_wrapper_x86_cdecl_ssefpu_cet_patch_3
+raw_hook_wrapper_x86_cdecl_ssefpu_cet_patch_3:
+	mov eax, dword ptr [esp + 0x7fffffff]
+.globl raw_hook_wrapper_x86_cdecl_ssefpu_cet_patch_3_end
+raw_hook_wrapper_x86_cdecl_ssefpu_cet_patch_3_end:
+	test eax, 0x3
+	jne raw_hook_wrapper_x86_cdecl_ssefpu_unsupported_stack
+.globl raw_hook_wrapper_x86_cdecl_ssefpu_cet_patch_4
+raw_hook_wrapper_x86_cdecl_ssefpu_cet_patch_4:
+	mov ecx, dword ptr [esp + 0x7fffffff]
+.globl raw_hook_wrapper_x86_cdecl_ssefpu_cet_patch_4_end
+raw_hook_wrapper_x86_cdecl_ssefpu_cet_patch_4_end:
+	cmp eax, ecx
+	ja raw_hook_wrapper_x86_cdecl_ssefpu_unsupported_stack
+	lea edx, [eax + 0x4]
+	cmp edx, ecx
+	jb raw_hook_wrapper_x86_cdecl_ssefpu_unsupported_stack
+	nop
+	nop
+	nop
+	nop
+.globl raw_hook_wrapper_x86_cdecl_ssefpu_cet_patch_6
+raw_hook_wrapper_x86_cdecl_ssefpu_cet_patch_6:
+	mov edx, dword ptr [esp + 0x7fffffff]
+.globl raw_hook_wrapper_x86_cdecl_ssefpu_cet_patch_6_end
+raw_hook_wrapper_x86_cdecl_ssefpu_cet_patch_6_end:
+	cmp dword ptr [ecx], edx
+	jne raw_hook_wrapper_x86_cdecl_ssefpu_unsupported_stack
+	cmp eax, ecx
+	je raw_hook_wrapper_x86_cdecl_ssefpu_direct_return
+	lea eax, [eax + 0x4]
+	cmp eax, ecx
+	je raw_hook_wrapper_x86_cdecl_ssefpu_redirect_return
+raw_hook_wrapper_x86_cdecl_ssefpu_unsupported_stack:
+.globl raw_hook_wrapper_x86_cdecl_ssefpu_cet_patch_7
+raw_hook_wrapper_x86_cdecl_ssefpu_cet_patch_7:
+	mov ecx, dword ptr [esp + 0x7fffffff]
+.globl raw_hook_wrapper_x86_cdecl_ssefpu_cet_patch_7_end
+raw_hook_wrapper_x86_cdecl_ssefpu_cet_patch_7_end:
+.globl raw_hook_wrapper_x86_cdecl_ssefpu_cet_patch_8
+raw_hook_wrapper_x86_cdecl_ssefpu_cet_patch_8:
+	mov dword ptr [esp + 0x7fffffff], ecx
+.globl raw_hook_wrapper_x86_cdecl_ssefpu_cet_patch_8_end
+raw_hook_wrapper_x86_cdecl_ssefpu_cet_patch_8_end:
+.globl raw_hook_wrapper_x86_cdecl_ssefpu_cet_patch_9
+raw_hook_wrapper_x86_cdecl_ssefpu_cet_patch_9:
+	mov edx, dword ptr [esp + 0x7fffffff]
+.globl raw_hook_wrapper_x86_cdecl_ssefpu_cet_patch_9_end
+raw_hook_wrapper_x86_cdecl_ssefpu_cet_patch_9_end:
+	mov dword ptr [ecx], edx
+raw_hook_wrapper_x86_cdecl_ssefpu_direct_return:
+.globl raw_hook_wrapper_x86_cdecl_ssefpu_patch_32
+raw_hook_wrapper_x86_cdecl_ssefpu_patch_32:
+	push dword ptr [esp + 0x7fffffff]
+.globl raw_hook_wrapper_x86_cdecl_ssefpu_patch_32_end
+raw_hook_wrapper_x86_cdecl_ssefpu_patch_32_end:
+	popfd
 .globl raw_hook_wrapper_x86_cdecl_ssefpu_patch_37
 raw_hook_wrapper_x86_cdecl_ssefpu_patch_37:
 	mov edx, dword ptr [esp + 0x7fffffff]
@@ -1585,6 +2041,35 @@ raw_hook_wrapper_x86_cdecl_ssefpu_patch_40:
 .globl raw_hook_wrapper_x86_cdecl_ssefpu_patch_40_end
 raw_hook_wrapper_x86_cdecl_ssefpu_patch_40_end:
 	ret
+raw_hook_wrapper_x86_cdecl_ssefpu_redirect_return:
+.globl raw_hook_wrapper_x86_cdecl_ssefpu_cet_patch_10
+raw_hook_wrapper_x86_cdecl_ssefpu_cet_patch_10:
+	push dword ptr [esp + 0x7fffffff]
+.globl raw_hook_wrapper_x86_cdecl_ssefpu_cet_patch_10_end
+raw_hook_wrapper_x86_cdecl_ssefpu_cet_patch_10_end:
+	popfd
+.globl raw_hook_wrapper_x86_cdecl_ssefpu_cet_patch_11
+raw_hook_wrapper_x86_cdecl_ssefpu_cet_patch_11:
+	mov edx, dword ptr [esp + 0x7fffffff]
+.globl raw_hook_wrapper_x86_cdecl_ssefpu_cet_patch_11_end
+raw_hook_wrapper_x86_cdecl_ssefpu_cet_patch_11_end:
+.globl raw_hook_wrapper_x86_cdecl_ssefpu_cet_patch_12
+raw_hook_wrapper_x86_cdecl_ssefpu_cet_patch_12:
+	mov ecx, dword ptr [esp + 0x7fffffff]
+.globl raw_hook_wrapper_x86_cdecl_ssefpu_cet_patch_12_end
+raw_hook_wrapper_x86_cdecl_ssefpu_cet_patch_12_end:
+.globl raw_hook_wrapper_x86_cdecl_ssefpu_cet_patch_13
+raw_hook_wrapper_x86_cdecl_ssefpu_cet_patch_13:
+	mov eax, dword ptr [esp + 0x7fffffff]
+.globl raw_hook_wrapper_x86_cdecl_ssefpu_cet_patch_13_end
+raw_hook_wrapper_x86_cdecl_ssefpu_cet_patch_13_end:
+.globl raw_hook_wrapper_x86_cdecl_ssefpu_cet_patch_14
+raw_hook_wrapper_x86_cdecl_ssefpu_cet_patch_14:
+	mov esp, dword ptr [esp + 0x7fffffff]
+.globl raw_hook_wrapper_x86_cdecl_ssefpu_cet_patch_14_end
+raw_hook_wrapper_x86_cdecl_ssefpu_cet_patch_14_end:
+	lea esp, [esp + 0x4]
+	jmp dword ptr [esp - 0x4]
 raw_hook_wrapper_x86_cdecl_ssefpu_nothing_modified:
 .globl raw_hook_wrapper_x86_cdecl_ssefpu_patch_41
 raw_hook_wrapper_x86_cdecl_ssefpu_patch_41:
@@ -1699,6 +2184,23 @@ raw_hook_wrapper_x86_cdecl_sse_patch_19:
 .globl raw_hook_wrapper_x86_cdecl_sse_patch_19_end
 raw_hook_wrapper_x86_cdecl_sse_patch_19_end:
 	mov eax, esp
+.globl raw_hook_wrapper_x86_cdecl_sse_cet_patch_0
+raw_hook_wrapper_x86_cdecl_sse_cet_patch_0:
+	add eax, 0x7fffffff
+.globl raw_hook_wrapper_x86_cdecl_sse_cet_patch_0_end
+raw_hook_wrapper_x86_cdecl_sse_cet_patch_0_end:
+.globl raw_hook_wrapper_x86_cdecl_sse_cet_patch_1
+raw_hook_wrapper_x86_cdecl_sse_cet_patch_1:
+	mov dword ptr [esp + 0x7fffffff], eax
+.globl raw_hook_wrapper_x86_cdecl_sse_cet_patch_1_end
+raw_hook_wrapper_x86_cdecl_sse_cet_patch_1_end:
+	mov eax, dword ptr [eax]
+.globl raw_hook_wrapper_x86_cdecl_sse_cet_patch_2
+raw_hook_wrapper_x86_cdecl_sse_cet_patch_2:
+	mov dword ptr [esp + 0x7fffffff], eax
+.globl raw_hook_wrapper_x86_cdecl_sse_cet_patch_2_end
+raw_hook_wrapper_x86_cdecl_sse_cet_patch_2_end:
+	mov eax, esp
 	push eax
 .globl raw_hook_wrapper_x86_cdecl_sse_patch_20
 raw_hook_wrapper_x86_cdecl_sse_patch_20:
@@ -1754,12 +2256,6 @@ raw_hook_wrapper_x86_cdecl_sse_patch_29:
 	ldmxcsr dword ptr [esp + 0x7fffffff]
 .globl raw_hook_wrapper_x86_cdecl_sse_patch_29_end
 raw_hook_wrapper_x86_cdecl_sse_patch_29_end:
-.globl raw_hook_wrapper_x86_cdecl_sse_patch_30
-raw_hook_wrapper_x86_cdecl_sse_patch_30:
-	push dword ptr [esp + 0x7fffffff]
-.globl raw_hook_wrapper_x86_cdecl_sse_patch_30_end
-raw_hook_wrapper_x86_cdecl_sse_patch_30_end:
-	popfd
 .globl raw_hook_wrapper_x86_cdecl_sse_patch_31
 raw_hook_wrapper_x86_cdecl_sse_patch_31:
 	mov edi, dword ptr [esp + 0x7fffffff]
@@ -1780,6 +2276,63 @@ raw_hook_wrapper_x86_cdecl_sse_patch_34:
 	mov ebx, dword ptr [esp + 0x7fffffff]
 .globl raw_hook_wrapper_x86_cdecl_sse_patch_34_end
 raw_hook_wrapper_x86_cdecl_sse_patch_34_end:
+.globl raw_hook_wrapper_x86_cdecl_sse_cet_patch_3
+raw_hook_wrapper_x86_cdecl_sse_cet_patch_3:
+	mov eax, dword ptr [esp + 0x7fffffff]
+.globl raw_hook_wrapper_x86_cdecl_sse_cet_patch_3_end
+raw_hook_wrapper_x86_cdecl_sse_cet_patch_3_end:
+	test eax, 0x3
+	jne raw_hook_wrapper_x86_cdecl_sse_unsupported_stack
+.globl raw_hook_wrapper_x86_cdecl_sse_cet_patch_4
+raw_hook_wrapper_x86_cdecl_sse_cet_patch_4:
+	mov ecx, dword ptr [esp + 0x7fffffff]
+.globl raw_hook_wrapper_x86_cdecl_sse_cet_patch_4_end
+raw_hook_wrapper_x86_cdecl_sse_cet_patch_4_end:
+	cmp eax, ecx
+	ja raw_hook_wrapper_x86_cdecl_sse_unsupported_stack
+	lea edx, [eax + 0x4]
+	cmp edx, ecx
+	jb raw_hook_wrapper_x86_cdecl_sse_unsupported_stack
+	nop
+	nop
+	nop
+	nop
+.globl raw_hook_wrapper_x86_cdecl_sse_cet_patch_6
+raw_hook_wrapper_x86_cdecl_sse_cet_patch_6:
+	mov edx, dword ptr [esp + 0x7fffffff]
+.globl raw_hook_wrapper_x86_cdecl_sse_cet_patch_6_end
+raw_hook_wrapper_x86_cdecl_sse_cet_patch_6_end:
+	cmp dword ptr [ecx], edx
+	jne raw_hook_wrapper_x86_cdecl_sse_unsupported_stack
+	cmp eax, ecx
+	je raw_hook_wrapper_x86_cdecl_sse_direct_return
+	lea eax, [eax + 0x4]
+	cmp eax, ecx
+	je raw_hook_wrapper_x86_cdecl_sse_redirect_return
+raw_hook_wrapper_x86_cdecl_sse_unsupported_stack:
+.globl raw_hook_wrapper_x86_cdecl_sse_cet_patch_7
+raw_hook_wrapper_x86_cdecl_sse_cet_patch_7:
+	mov ecx, dword ptr [esp + 0x7fffffff]
+.globl raw_hook_wrapper_x86_cdecl_sse_cet_patch_7_end
+raw_hook_wrapper_x86_cdecl_sse_cet_patch_7_end:
+.globl raw_hook_wrapper_x86_cdecl_sse_cet_patch_8
+raw_hook_wrapper_x86_cdecl_sse_cet_patch_8:
+	mov dword ptr [esp + 0x7fffffff], ecx
+.globl raw_hook_wrapper_x86_cdecl_sse_cet_patch_8_end
+raw_hook_wrapper_x86_cdecl_sse_cet_patch_8_end:
+.globl raw_hook_wrapper_x86_cdecl_sse_cet_patch_9
+raw_hook_wrapper_x86_cdecl_sse_cet_patch_9:
+	mov edx, dword ptr [esp + 0x7fffffff]
+.globl raw_hook_wrapper_x86_cdecl_sse_cet_patch_9_end
+raw_hook_wrapper_x86_cdecl_sse_cet_patch_9_end:
+	mov dword ptr [ecx], edx
+raw_hook_wrapper_x86_cdecl_sse_direct_return:
+.globl raw_hook_wrapper_x86_cdecl_sse_patch_30
+raw_hook_wrapper_x86_cdecl_sse_patch_30:
+	push dword ptr [esp + 0x7fffffff]
+.globl raw_hook_wrapper_x86_cdecl_sse_patch_30_end
+raw_hook_wrapper_x86_cdecl_sse_patch_30_end:
+	popfd
 .globl raw_hook_wrapper_x86_cdecl_sse_patch_35
 raw_hook_wrapper_x86_cdecl_sse_patch_35:
 	mov edx, dword ptr [esp + 0x7fffffff]
@@ -1801,6 +2354,35 @@ raw_hook_wrapper_x86_cdecl_sse_patch_38:
 .globl raw_hook_wrapper_x86_cdecl_sse_patch_38_end
 raw_hook_wrapper_x86_cdecl_sse_patch_38_end:
 	ret
+raw_hook_wrapper_x86_cdecl_sse_redirect_return:
+.globl raw_hook_wrapper_x86_cdecl_sse_cet_patch_10
+raw_hook_wrapper_x86_cdecl_sse_cet_patch_10:
+	push dword ptr [esp + 0x7fffffff]
+.globl raw_hook_wrapper_x86_cdecl_sse_cet_patch_10_end
+raw_hook_wrapper_x86_cdecl_sse_cet_patch_10_end:
+	popfd
+.globl raw_hook_wrapper_x86_cdecl_sse_cet_patch_11
+raw_hook_wrapper_x86_cdecl_sse_cet_patch_11:
+	mov edx, dword ptr [esp + 0x7fffffff]
+.globl raw_hook_wrapper_x86_cdecl_sse_cet_patch_11_end
+raw_hook_wrapper_x86_cdecl_sse_cet_patch_11_end:
+.globl raw_hook_wrapper_x86_cdecl_sse_cet_patch_12
+raw_hook_wrapper_x86_cdecl_sse_cet_patch_12:
+	mov ecx, dword ptr [esp + 0x7fffffff]
+.globl raw_hook_wrapper_x86_cdecl_sse_cet_patch_12_end
+raw_hook_wrapper_x86_cdecl_sse_cet_patch_12_end:
+.globl raw_hook_wrapper_x86_cdecl_sse_cet_patch_13
+raw_hook_wrapper_x86_cdecl_sse_cet_patch_13:
+	mov eax, dword ptr [esp + 0x7fffffff]
+.globl raw_hook_wrapper_x86_cdecl_sse_cet_patch_13_end
+raw_hook_wrapper_x86_cdecl_sse_cet_patch_13_end:
+.globl raw_hook_wrapper_x86_cdecl_sse_cet_patch_14
+raw_hook_wrapper_x86_cdecl_sse_cet_patch_14:
+	mov esp, dword ptr [esp + 0x7fffffff]
+.globl raw_hook_wrapper_x86_cdecl_sse_cet_patch_14_end
+raw_hook_wrapper_x86_cdecl_sse_cet_patch_14_end:
+	lea esp, [esp + 0x4]
+	jmp dword ptr [esp - 0x4]
 raw_hook_wrapper_x86_cdecl_sse_nothing_modified:
 .globl raw_hook_wrapper_x86_cdecl_sse_patch_39
 raw_hook_wrapper_x86_cdecl_sse_patch_39:
@@ -1875,6 +2457,23 @@ raw_hook_wrapper_x86_cdecl_fpu_patch_11:
 .globl raw_hook_wrapper_x86_cdecl_fpu_patch_11_end
 raw_hook_wrapper_x86_cdecl_fpu_patch_11_end:
 	mov eax, esp
+.globl raw_hook_wrapper_x86_cdecl_fpu_cet_patch_0
+raw_hook_wrapper_x86_cdecl_fpu_cet_patch_0:
+	add eax, 0x7fffffff
+.globl raw_hook_wrapper_x86_cdecl_fpu_cet_patch_0_end
+raw_hook_wrapper_x86_cdecl_fpu_cet_patch_0_end:
+.globl raw_hook_wrapper_x86_cdecl_fpu_cet_patch_1
+raw_hook_wrapper_x86_cdecl_fpu_cet_patch_1:
+	mov dword ptr [esp + 0x7fffffff], eax
+.globl raw_hook_wrapper_x86_cdecl_fpu_cet_patch_1_end
+raw_hook_wrapper_x86_cdecl_fpu_cet_patch_1_end:
+	mov eax, dword ptr [eax]
+.globl raw_hook_wrapper_x86_cdecl_fpu_cet_patch_2
+raw_hook_wrapper_x86_cdecl_fpu_cet_patch_2:
+	mov dword ptr [esp + 0x7fffffff], eax
+.globl raw_hook_wrapper_x86_cdecl_fpu_cet_patch_2_end
+raw_hook_wrapper_x86_cdecl_fpu_cet_patch_2_end:
+	mov eax, esp
 	push eax
 .globl raw_hook_wrapper_x86_cdecl_fpu_patch_12
 raw_hook_wrapper_x86_cdecl_fpu_patch_12:
@@ -1890,12 +2489,6 @@ raw_hook_wrapper_x86_cdecl_fpu_patch_13:
 	frstor [esp + 0x7fffffff]
 .globl raw_hook_wrapper_x86_cdecl_fpu_patch_13_end
 raw_hook_wrapper_x86_cdecl_fpu_patch_13_end:
-.globl raw_hook_wrapper_x86_cdecl_fpu_patch_14
-raw_hook_wrapper_x86_cdecl_fpu_patch_14:
-	push dword ptr [esp + 0x7fffffff]
-.globl raw_hook_wrapper_x86_cdecl_fpu_patch_14_end
-raw_hook_wrapper_x86_cdecl_fpu_patch_14_end:
-	popfd
 .globl raw_hook_wrapper_x86_cdecl_fpu_patch_15
 raw_hook_wrapper_x86_cdecl_fpu_patch_15:
 	mov edi, dword ptr [esp + 0x7fffffff]
@@ -1916,6 +2509,63 @@ raw_hook_wrapper_x86_cdecl_fpu_patch_18:
 	mov ebx, dword ptr [esp + 0x7fffffff]
 .globl raw_hook_wrapper_x86_cdecl_fpu_patch_18_end
 raw_hook_wrapper_x86_cdecl_fpu_patch_18_end:
+.globl raw_hook_wrapper_x86_cdecl_fpu_cet_patch_3
+raw_hook_wrapper_x86_cdecl_fpu_cet_patch_3:
+	mov eax, dword ptr [esp + 0x7fffffff]
+.globl raw_hook_wrapper_x86_cdecl_fpu_cet_patch_3_end
+raw_hook_wrapper_x86_cdecl_fpu_cet_patch_3_end:
+	test eax, 0x3
+	jne raw_hook_wrapper_x86_cdecl_fpu_unsupported_stack
+.globl raw_hook_wrapper_x86_cdecl_fpu_cet_patch_4
+raw_hook_wrapper_x86_cdecl_fpu_cet_patch_4:
+	mov ecx, dword ptr [esp + 0x7fffffff]
+.globl raw_hook_wrapper_x86_cdecl_fpu_cet_patch_4_end
+raw_hook_wrapper_x86_cdecl_fpu_cet_patch_4_end:
+	cmp eax, ecx
+	ja raw_hook_wrapper_x86_cdecl_fpu_unsupported_stack
+	lea edx, [eax + 0x4]
+	cmp edx, ecx
+	jb raw_hook_wrapper_x86_cdecl_fpu_unsupported_stack
+	nop
+	nop
+	nop
+	nop
+.globl raw_hook_wrapper_x86_cdecl_fpu_cet_patch_6
+raw_hook_wrapper_x86_cdecl_fpu_cet_patch_6:
+	mov edx, dword ptr [esp + 0x7fffffff]
+.globl raw_hook_wrapper_x86_cdecl_fpu_cet_patch_6_end
+raw_hook_wrapper_x86_cdecl_fpu_cet_patch_6_end:
+	cmp dword ptr [ecx], edx
+	jne raw_hook_wrapper_x86_cdecl_fpu_unsupported_stack
+	cmp eax, ecx
+	je raw_hook_wrapper_x86_cdecl_fpu_direct_return
+	lea eax, [eax + 0x4]
+	cmp eax, ecx
+	je raw_hook_wrapper_x86_cdecl_fpu_redirect_return
+raw_hook_wrapper_x86_cdecl_fpu_unsupported_stack:
+.globl raw_hook_wrapper_x86_cdecl_fpu_cet_patch_7
+raw_hook_wrapper_x86_cdecl_fpu_cet_patch_7:
+	mov ecx, dword ptr [esp + 0x7fffffff]
+.globl raw_hook_wrapper_x86_cdecl_fpu_cet_patch_7_end
+raw_hook_wrapper_x86_cdecl_fpu_cet_patch_7_end:
+.globl raw_hook_wrapper_x86_cdecl_fpu_cet_patch_8
+raw_hook_wrapper_x86_cdecl_fpu_cet_patch_8:
+	mov dword ptr [esp + 0x7fffffff], ecx
+.globl raw_hook_wrapper_x86_cdecl_fpu_cet_patch_8_end
+raw_hook_wrapper_x86_cdecl_fpu_cet_patch_8_end:
+.globl raw_hook_wrapper_x86_cdecl_fpu_cet_patch_9
+raw_hook_wrapper_x86_cdecl_fpu_cet_patch_9:
+	mov edx, dword ptr [esp + 0x7fffffff]
+.globl raw_hook_wrapper_x86_cdecl_fpu_cet_patch_9_end
+raw_hook_wrapper_x86_cdecl_fpu_cet_patch_9_end:
+	mov dword ptr [ecx], edx
+raw_hook_wrapper_x86_cdecl_fpu_direct_return:
+.globl raw_hook_wrapper_x86_cdecl_fpu_patch_14
+raw_hook_wrapper_x86_cdecl_fpu_patch_14:
+	push dword ptr [esp + 0x7fffffff]
+.globl raw_hook_wrapper_x86_cdecl_fpu_patch_14_end
+raw_hook_wrapper_x86_cdecl_fpu_patch_14_end:
+	popfd
 .globl raw_hook_wrapper_x86_cdecl_fpu_patch_19
 raw_hook_wrapper_x86_cdecl_fpu_patch_19:
 	mov edx, dword ptr [esp + 0x7fffffff]
@@ -1937,6 +2587,35 @@ raw_hook_wrapper_x86_cdecl_fpu_patch_22:
 .globl raw_hook_wrapper_x86_cdecl_fpu_patch_22_end
 raw_hook_wrapper_x86_cdecl_fpu_patch_22_end:
 	ret
+raw_hook_wrapper_x86_cdecl_fpu_redirect_return:
+.globl raw_hook_wrapper_x86_cdecl_fpu_cet_patch_10
+raw_hook_wrapper_x86_cdecl_fpu_cet_patch_10:
+	push dword ptr [esp + 0x7fffffff]
+.globl raw_hook_wrapper_x86_cdecl_fpu_cet_patch_10_end
+raw_hook_wrapper_x86_cdecl_fpu_cet_patch_10_end:
+	popfd
+.globl raw_hook_wrapper_x86_cdecl_fpu_cet_patch_11
+raw_hook_wrapper_x86_cdecl_fpu_cet_patch_11:
+	mov edx, dword ptr [esp + 0x7fffffff]
+.globl raw_hook_wrapper_x86_cdecl_fpu_cet_patch_11_end
+raw_hook_wrapper_x86_cdecl_fpu_cet_patch_11_end:
+.globl raw_hook_wrapper_x86_cdecl_fpu_cet_patch_12
+raw_hook_wrapper_x86_cdecl_fpu_cet_patch_12:
+	mov ecx, dword ptr [esp + 0x7fffffff]
+.globl raw_hook_wrapper_x86_cdecl_fpu_cet_patch_12_end
+raw_hook_wrapper_x86_cdecl_fpu_cet_patch_12_end:
+.globl raw_hook_wrapper_x86_cdecl_fpu_cet_patch_13
+raw_hook_wrapper_x86_cdecl_fpu_cet_patch_13:
+	mov eax, dword ptr [esp + 0x7fffffff]
+.globl raw_hook_wrapper_x86_cdecl_fpu_cet_patch_13_end
+raw_hook_wrapper_x86_cdecl_fpu_cet_patch_13_end:
+.globl raw_hook_wrapper_x86_cdecl_fpu_cet_patch_14
+raw_hook_wrapper_x86_cdecl_fpu_cet_patch_14:
+	mov esp, dword ptr [esp + 0x7fffffff]
+.globl raw_hook_wrapper_x86_cdecl_fpu_cet_patch_14_end
+raw_hook_wrapper_x86_cdecl_fpu_cet_patch_14_end:
+	lea esp, [esp + 0x4]
+	jmp dword ptr [esp - 0x4]
 raw_hook_wrapper_x86_cdecl_fpu_nothing_modified:
 .globl raw_hook_wrapper_x86_cdecl_fpu_patch_23
 raw_hook_wrapper_x86_cdecl_fpu_patch_23:
@@ -2006,6 +2685,23 @@ raw_hook_wrapper_x86_cdecl_native_patch_10:
 .globl raw_hook_wrapper_x86_cdecl_native_patch_10_end
 raw_hook_wrapper_x86_cdecl_native_patch_10_end:
 	mov eax, esp
+.globl raw_hook_wrapper_x86_cdecl_native_cet_patch_0
+raw_hook_wrapper_x86_cdecl_native_cet_patch_0:
+	add eax, 0x7fffffff
+.globl raw_hook_wrapper_x86_cdecl_native_cet_patch_0_end
+raw_hook_wrapper_x86_cdecl_native_cet_patch_0_end:
+.globl raw_hook_wrapper_x86_cdecl_native_cet_patch_1
+raw_hook_wrapper_x86_cdecl_native_cet_patch_1:
+	mov dword ptr [esp + 0x7fffffff], eax
+.globl raw_hook_wrapper_x86_cdecl_native_cet_patch_1_end
+raw_hook_wrapper_x86_cdecl_native_cet_patch_1_end:
+	mov eax, dword ptr [eax]
+.globl raw_hook_wrapper_x86_cdecl_native_cet_patch_2
+raw_hook_wrapper_x86_cdecl_native_cet_patch_2:
+	mov dword ptr [esp + 0x7fffffff], eax
+.globl raw_hook_wrapper_x86_cdecl_native_cet_patch_2_end
+raw_hook_wrapper_x86_cdecl_native_cet_patch_2_end:
+	mov eax, esp
 	push eax
 .globl raw_hook_wrapper_x86_cdecl_native_patch_11
 raw_hook_wrapper_x86_cdecl_native_patch_11:
@@ -2016,12 +2712,6 @@ raw_hook_wrapper_x86_cdecl_native_patch_11_end:
 	add esp, 0x4
 	test al, al
 	je raw_hook_wrapper_x86_cdecl_native_nothing_modified
-.globl raw_hook_wrapper_x86_cdecl_native_patch_12
-raw_hook_wrapper_x86_cdecl_native_patch_12:
-	push dword ptr [esp + 0x7fffffff]
-.globl raw_hook_wrapper_x86_cdecl_native_patch_12_end
-raw_hook_wrapper_x86_cdecl_native_patch_12_end:
-	popfd
 .globl raw_hook_wrapper_x86_cdecl_native_patch_13
 raw_hook_wrapper_x86_cdecl_native_patch_13:
 	mov edi, dword ptr [esp + 0x7fffffff]
@@ -2042,6 +2732,63 @@ raw_hook_wrapper_x86_cdecl_native_patch_16:
 	mov ebx, dword ptr [esp + 0x7fffffff]
 .globl raw_hook_wrapper_x86_cdecl_native_patch_16_end
 raw_hook_wrapper_x86_cdecl_native_patch_16_end:
+.globl raw_hook_wrapper_x86_cdecl_native_cet_patch_3
+raw_hook_wrapper_x86_cdecl_native_cet_patch_3:
+	mov eax, dword ptr [esp + 0x7fffffff]
+.globl raw_hook_wrapper_x86_cdecl_native_cet_patch_3_end
+raw_hook_wrapper_x86_cdecl_native_cet_patch_3_end:
+	test eax, 0x3
+	jne raw_hook_wrapper_x86_cdecl_native_unsupported_stack
+.globl raw_hook_wrapper_x86_cdecl_native_cet_patch_4
+raw_hook_wrapper_x86_cdecl_native_cet_patch_4:
+	mov ecx, dword ptr [esp + 0x7fffffff]
+.globl raw_hook_wrapper_x86_cdecl_native_cet_patch_4_end
+raw_hook_wrapper_x86_cdecl_native_cet_patch_4_end:
+	cmp eax, ecx
+	ja raw_hook_wrapper_x86_cdecl_native_unsupported_stack
+	lea edx, [eax + 0x4]
+	cmp edx, ecx
+	jb raw_hook_wrapper_x86_cdecl_native_unsupported_stack
+	nop
+	nop
+	nop
+	nop
+.globl raw_hook_wrapper_x86_cdecl_native_cet_patch_6
+raw_hook_wrapper_x86_cdecl_native_cet_patch_6:
+	mov edx, dword ptr [esp + 0x7fffffff]
+.globl raw_hook_wrapper_x86_cdecl_native_cet_patch_6_end
+raw_hook_wrapper_x86_cdecl_native_cet_patch_6_end:
+	cmp dword ptr [ecx], edx
+	jne raw_hook_wrapper_x86_cdecl_native_unsupported_stack
+	cmp eax, ecx
+	je raw_hook_wrapper_x86_cdecl_native_direct_return
+	lea eax, [eax + 0x4]
+	cmp eax, ecx
+	je raw_hook_wrapper_x86_cdecl_native_redirect_return
+raw_hook_wrapper_x86_cdecl_native_unsupported_stack:
+.globl raw_hook_wrapper_x86_cdecl_native_cet_patch_7
+raw_hook_wrapper_x86_cdecl_native_cet_patch_7:
+	mov ecx, dword ptr [esp + 0x7fffffff]
+.globl raw_hook_wrapper_x86_cdecl_native_cet_patch_7_end
+raw_hook_wrapper_x86_cdecl_native_cet_patch_7_end:
+.globl raw_hook_wrapper_x86_cdecl_native_cet_patch_8
+raw_hook_wrapper_x86_cdecl_native_cet_patch_8:
+	mov dword ptr [esp + 0x7fffffff], ecx
+.globl raw_hook_wrapper_x86_cdecl_native_cet_patch_8_end
+raw_hook_wrapper_x86_cdecl_native_cet_patch_8_end:
+.globl raw_hook_wrapper_x86_cdecl_native_cet_patch_9
+raw_hook_wrapper_x86_cdecl_native_cet_patch_9:
+	mov edx, dword ptr [esp + 0x7fffffff]
+.globl raw_hook_wrapper_x86_cdecl_native_cet_patch_9_end
+raw_hook_wrapper_x86_cdecl_native_cet_patch_9_end:
+	mov dword ptr [ecx], edx
+raw_hook_wrapper_x86_cdecl_native_direct_return:
+.globl raw_hook_wrapper_x86_cdecl_native_patch_12
+raw_hook_wrapper_x86_cdecl_native_patch_12:
+	push dword ptr [esp + 0x7fffffff]
+.globl raw_hook_wrapper_x86_cdecl_native_patch_12_end
+raw_hook_wrapper_x86_cdecl_native_patch_12_end:
+	popfd
 .globl raw_hook_wrapper_x86_cdecl_native_patch_17
 raw_hook_wrapper_x86_cdecl_native_patch_17:
 	mov edx, dword ptr [esp + 0x7fffffff]
@@ -2063,6 +2810,35 @@ raw_hook_wrapper_x86_cdecl_native_patch_20:
 .globl raw_hook_wrapper_x86_cdecl_native_patch_20_end
 raw_hook_wrapper_x86_cdecl_native_patch_20_end:
 	ret
+raw_hook_wrapper_x86_cdecl_native_redirect_return:
+.globl raw_hook_wrapper_x86_cdecl_native_cet_patch_10
+raw_hook_wrapper_x86_cdecl_native_cet_patch_10:
+	push dword ptr [esp + 0x7fffffff]
+.globl raw_hook_wrapper_x86_cdecl_native_cet_patch_10_end
+raw_hook_wrapper_x86_cdecl_native_cet_patch_10_end:
+	popfd
+.globl raw_hook_wrapper_x86_cdecl_native_cet_patch_11
+raw_hook_wrapper_x86_cdecl_native_cet_patch_11:
+	mov edx, dword ptr [esp + 0x7fffffff]
+.globl raw_hook_wrapper_x86_cdecl_native_cet_patch_11_end
+raw_hook_wrapper_x86_cdecl_native_cet_patch_11_end:
+.globl raw_hook_wrapper_x86_cdecl_native_cet_patch_12
+raw_hook_wrapper_x86_cdecl_native_cet_patch_12:
+	mov ecx, dword ptr [esp + 0x7fffffff]
+.globl raw_hook_wrapper_x86_cdecl_native_cet_patch_12_end
+raw_hook_wrapper_x86_cdecl_native_cet_patch_12_end:
+.globl raw_hook_wrapper_x86_cdecl_native_cet_patch_13
+raw_hook_wrapper_x86_cdecl_native_cet_patch_13:
+	mov eax, dword ptr [esp + 0x7fffffff]
+.globl raw_hook_wrapper_x86_cdecl_native_cet_patch_13_end
+raw_hook_wrapper_x86_cdecl_native_cet_patch_13_end:
+.globl raw_hook_wrapper_x86_cdecl_native_cet_patch_14
+raw_hook_wrapper_x86_cdecl_native_cet_patch_14:
+	mov esp, dword ptr [esp + 0x7fffffff]
+.globl raw_hook_wrapper_x86_cdecl_native_cet_patch_14_end
+raw_hook_wrapper_x86_cdecl_native_cet_patch_14_end:
+	lea esp, [esp + 0x4]
+	jmp dword ptr [esp - 0x4]
 raw_hook_wrapper_x86_cdecl_native_nothing_modified:
 .globl raw_hook_wrapper_x86_cdecl_native_patch_21
 raw_hook_wrapper_x86_cdecl_native_patch_21:
@@ -2273,7 +3049,8 @@ raw_hook_restore_x86_avx512fpu_patch_38:
 	mov esp, dword ptr [esp + 0x7fffffff]
 .globl raw_hook_restore_x86_avx512fpu_patch_38_end
 raw_hook_restore_x86_avx512fpu_patch_38_end:
-	ret
+	lea esp, [esp + 0x4]
+	jmp dword ptr [esp - 0x4]
 
 # RawHook restore: x86 AVX512
 .intel_syntax noprefix
@@ -2473,7 +3250,8 @@ raw_hook_restore_x86_avx512_patch_37:
 	mov esp, dword ptr [esp + 0x7fffffff]
 .globl raw_hook_restore_x86_avx512_patch_37_end
 raw_hook_restore_x86_avx512_patch_37_end:
-	ret
+	lea esp, [esp + 0x4]
+	jmp dword ptr [esp - 0x4]
 
 # RawHook restore: x86 AVXFPU
 .intel_syntax noprefix
@@ -2638,7 +3416,8 @@ raw_hook_restore_x86_avxfpu_patch_30:
 	mov esp, dword ptr [esp + 0x7fffffff]
 .globl raw_hook_restore_x86_avxfpu_patch_30_end
 raw_hook_restore_x86_avxfpu_patch_30_end:
-	ret
+	lea esp, [esp + 0x4]
+	jmp dword ptr [esp - 0x4]
 
 # RawHook restore: x86 AVX
 .intel_syntax noprefix
@@ -2798,7 +3577,8 @@ raw_hook_restore_x86_avx_patch_29:
 	mov esp, dword ptr [esp + 0x7fffffff]
 .globl raw_hook_restore_x86_avx_patch_29_end
 raw_hook_restore_x86_avx_patch_29_end:
-	ret
+	lea esp, [esp + 0x4]
+	jmp dword ptr [esp - 0x4]
 
 # RawHook restore: x86 SSEFPU
 .intel_syntax noprefix
@@ -2923,7 +3703,8 @@ raw_hook_restore_x86_ssefpu_patch_22:
 	mov esp, dword ptr [esp + 0x7fffffff]
 .globl raw_hook_restore_x86_ssefpu_patch_22_end
 raw_hook_restore_x86_ssefpu_patch_22_end:
-	ret
+	lea esp, [esp + 0x4]
+	jmp dword ptr [esp - 0x4]
 
 # RawHook restore: x86 SSE
 .intel_syntax noprefix
@@ -3043,7 +3824,8 @@ raw_hook_restore_x86_sse_patch_21:
 	mov esp, dword ptr [esp + 0x7fffffff]
 .globl raw_hook_restore_x86_sse_patch_21_end
 raw_hook_restore_x86_sse_patch_21_end:
-	ret
+	lea esp, [esp + 0x4]
+	jmp dword ptr [esp - 0x4]
 
 # RawHook restore: x86 FPU
 .intel_syntax noprefix
@@ -3123,7 +3905,8 @@ raw_hook_restore_x86_fpu_patch_13:
 	mov esp, dword ptr [esp + 0x7fffffff]
 .globl raw_hook_restore_x86_fpu_patch_13_end
 raw_hook_restore_x86_fpu_patch_13_end:
-	ret
+	lea esp, [esp + 0x4]
+	jmp dword ptr [esp - 0x4]
 
 # RawHook restore: x86 Native
 .intel_syntax noprefix
@@ -3198,7 +3981,8 @@ raw_hook_restore_x86_native_patch_12:
 	mov esp, dword ptr [esp + 0x7fffffff]
 .globl raw_hook_restore_x86_native_patch_12_end
 raw_hook_restore_x86_native_patch_12_end:
-	ret
+	lea esp, [esp + 0x4]
+	jmp dword ptr [esp - 0x4]
 
 # GetCurrentContext: x86 AVX512FPU
 .intel_syntax noprefix

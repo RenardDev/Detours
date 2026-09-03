@@ -1,19 +1,19 @@
 ---
 Language: Cpp
 BasedOnStyle: LLVM
-Standard: Latest
+Standard: c++17
 
 # ----------------------------------------------------------------
 # Core layout
 # ----------------------------------------------------------------
 
-UseTab: ForIndentation
+UseTab: ForContinuationAndIndentation
 IndentWidth: 4
 TabWidth: 4
 ContinuationIndentWidth: 4
 ColumnLimit: 0
 LineEnding: CRLF
-InsertNewlineAtEOF: false
+InsertNewlineAtEOF: true
 
 NamespaceIndentation: All
 IndentAccessModifiers: false
@@ -47,40 +47,41 @@ BraceWrapping:
   SplitEmptyNamespace: true
 
 AllowShortBlocksOnASingleLine: Never
-AllowShortFunctionsOnASingleLine: Empty
+AllowShortFunctionsOnASingleLine: None
+AllowShortLambdasOnASingleLine: None
 AllowShortIfStatementsOnASingleLine: Never
 AllowShortLoopsOnASingleLine: false
 AllowShortCaseLabelsOnASingleLine: false
 AllowShortEnumsOnASingleLine: false
 AllowShortNamespacesOnASingleLine: false
-InsertBraces: false
-SeparateDefinitionBlocks: Always
+InsertBraces: true
+SeparateDefinitionBlocks: Leave
 
 # ----------------------------------------------------------------
 # Alignment and wrapping
 # ----------------------------------------------------------------
 
-AlignAfterOpenBracket: Align
+AlignAfterOpenBracket: DontAlign
 AlignEscapedNewlines: Right
-AlignOperands: Align
+AlignOperands: DontAlign
 AlignTrailingComments:
   Kind: Always
   OverEmptyLines: 0
 
 BinPackArguments: true
-BinPackParameters: BinPack
-AllowAllArgumentsOnNextLine: true
-AllowAllParametersOfDeclarationOnNextLine: true
+BinPackParameters: true
+AllowAllArgumentsOnNextLine: false
+AllowAllParametersOfDeclarationOnNextLine: false
 
 BreakAfterReturnType: None
 AlwaysBreakAfterDefinitionReturnType: None
 BreakFunctionDefinitionParameters: false
-BreakConstructorInitializers: BeforeColon
-PackConstructorInitializers: BinPack
+BreakConstructorInitializers: AfterColon
+PackConstructorInitializers: Never
 ConstructorInitializerIndentWidth: 4
 BreakBeforeBinaryOperators: None
 BreakBeforeTernaryOperators: true
-BreakStringLiterals: true
+BreakStringLiterals: false
 
 # ----------------------------------------------------------------
 # Spacing and declarations
@@ -98,7 +99,6 @@ SpaceBeforeParensOptions:
   AfterFunctionDefinitionName: false
   AfterFunctionDeclarationName: false
   AfterIfMacros: true
-  AfterNot: false
   AfterOverloadedOperator: false
   AfterPlacementOperator: true
   AfterRequiresInClause: false
@@ -124,7 +124,7 @@ BitFieldColonSpacing: Both
 # Empty lines and comments
 # ----------------------------------------------------------------
 
-ReflowComments: Never
+ReflowComments: false
 MaxEmptyLinesToKeep: 1
 KeepEmptyLines:
   AtStartOfFile: true
@@ -139,8 +139,7 @@ SpacesBeforeTrailingComments: 1
 # Includes
 # ----------------------------------------------------------------
 
-SortIncludes:
-  Enabled: false
+SortIncludes: Never
 IncludeBlocks: Preserve
 MainIncludeChar: Quote
 
@@ -170,6 +169,8 @@ WhitespaceSensitiveMacros:
 IncludeIsMainRegex: '(Test)?$'
 IncludeIsMainSourceRegex: ''
 SortUsingDeclarations: LexicographicNumeric
+NamespaceMacros:
+  - TEST_SUITE
 InsertTrailingCommas: None
 RemoveBracesLLVM: false
 RemoveParentheses: Leave

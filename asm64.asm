@@ -435,6 +435,23 @@ raw_hook_wrapper_x64_windows_avx512fpu_patch_84:
 	fsave [rsp + 0x7fffffff]
 .globl raw_hook_wrapper_x64_windows_avx512fpu_patch_84_end
 raw_hook_wrapper_x64_windows_avx512fpu_patch_84_end:
+	mov rax, rsp
+.globl raw_hook_wrapper_x64_windows_avx512fpu_cet_patch_0
+raw_hook_wrapper_x64_windows_avx512fpu_cet_patch_0:
+	add rax, 0x7fffffff
+.globl raw_hook_wrapper_x64_windows_avx512fpu_cet_patch_0_end
+raw_hook_wrapper_x64_windows_avx512fpu_cet_patch_0_end:
+.globl raw_hook_wrapper_x64_windows_avx512fpu_cet_patch_1
+raw_hook_wrapper_x64_windows_avx512fpu_cet_patch_1:
+	mov qword ptr [rsp + 0x7fffffff], rax
+.globl raw_hook_wrapper_x64_windows_avx512fpu_cet_patch_1_end
+raw_hook_wrapper_x64_windows_avx512fpu_cet_patch_1_end:
+	mov rax, qword ptr [rax]
+.globl raw_hook_wrapper_x64_windows_avx512fpu_cet_patch_2
+raw_hook_wrapper_x64_windows_avx512fpu_cet_patch_2:
+	mov qword ptr [rsp + 0x7fffffff], rax
+.globl raw_hook_wrapper_x64_windows_avx512fpu_cet_patch_2_end
+raw_hook_wrapper_x64_windows_avx512fpu_cet_patch_2_end:
 	mov rcx, rsp
 	sub rsp, 0x20
 .globl raw_hook_wrapper_x64_windows_avx512fpu_patch_85
@@ -776,12 +793,6 @@ raw_hook_wrapper_x64_windows_avx512fpu_patch_151:
 	ldmxcsr dword ptr [rsp + 0x7fffffff]
 .globl raw_hook_wrapper_x64_windows_avx512fpu_patch_151_end
 raw_hook_wrapper_x64_windows_avx512fpu_patch_151_end:
-.globl raw_hook_wrapper_x64_windows_avx512fpu_patch_152
-raw_hook_wrapper_x64_windows_avx512fpu_patch_152:
-	push qword ptr [rsp + 0x7fffffff]
-.globl raw_hook_wrapper_x64_windows_avx512fpu_patch_152_end
-raw_hook_wrapper_x64_windows_avx512fpu_patch_152_end:
-	popfq
 .globl raw_hook_wrapper_x64_windows_avx512fpu_patch_153
 raw_hook_wrapper_x64_windows_avx512fpu_patch_153:
 	mov r15, qword ptr [rsp + 0x7fffffff]
@@ -842,6 +853,63 @@ raw_hook_wrapper_x64_windows_avx512fpu_patch_164:
 	mov rbx, qword ptr [rsp + 0x7fffffff]
 .globl raw_hook_wrapper_x64_windows_avx512fpu_patch_164_end
 raw_hook_wrapper_x64_windows_avx512fpu_patch_164_end:
+.globl raw_hook_wrapper_x64_windows_avx512fpu_cet_patch_3
+raw_hook_wrapper_x64_windows_avx512fpu_cet_patch_3:
+	mov rax, qword ptr [rsp + 0x7fffffff]
+.globl raw_hook_wrapper_x64_windows_avx512fpu_cet_patch_3_end
+raw_hook_wrapper_x64_windows_avx512fpu_cet_patch_3_end:
+	test rax, 0x7
+	jne raw_hook_wrapper_x64_windows_avx512fpu_unsupported_stack
+.globl raw_hook_wrapper_x64_windows_avx512fpu_cet_patch_4
+raw_hook_wrapper_x64_windows_avx512fpu_cet_patch_4:
+	lea rcx, [rsp + 0x7fffffff]
+.globl raw_hook_wrapper_x64_windows_avx512fpu_cet_patch_4_end
+raw_hook_wrapper_x64_windows_avx512fpu_cet_patch_4_end:
+	cmp rax, rcx
+	jb raw_hook_wrapper_x64_windows_avx512fpu_unsupported_stack
+.globl raw_hook_wrapper_x64_windows_avx512fpu_cet_patch_5
+raw_hook_wrapper_x64_windows_avx512fpu_cet_patch_5:
+	lea rcx, [rsp + 0x7fffffff]
+.globl raw_hook_wrapper_x64_windows_avx512fpu_cet_patch_5_end
+raw_hook_wrapper_x64_windows_avx512fpu_cet_patch_5_end:
+	cmp rax, rcx
+	ja raw_hook_wrapper_x64_windows_avx512fpu_unsupported_stack
+.globl raw_hook_wrapper_x64_windows_avx512fpu_cet_patch_6
+raw_hook_wrapper_x64_windows_avx512fpu_cet_patch_6:
+	mov rdx, qword ptr [rsp + 0x7fffffff]
+.globl raw_hook_wrapper_x64_windows_avx512fpu_cet_patch_6_end
+raw_hook_wrapper_x64_windows_avx512fpu_cet_patch_6_end:
+	cmp qword ptr [rcx], rdx
+	jne raw_hook_wrapper_x64_windows_avx512fpu_unsupported_stack
+	cmp rax, rcx
+	je raw_hook_wrapper_x64_windows_avx512fpu_direct_return
+	lea rax, [rax + 0x8]
+	cmp rax, rcx
+	je raw_hook_wrapper_x64_windows_avx512fpu_redirect_return
+raw_hook_wrapper_x64_windows_avx512fpu_unsupported_stack:
+.globl raw_hook_wrapper_x64_windows_avx512fpu_cet_patch_7
+raw_hook_wrapper_x64_windows_avx512fpu_cet_patch_7:
+	mov rcx, qword ptr [rsp + 0x7fffffff]
+.globl raw_hook_wrapper_x64_windows_avx512fpu_cet_patch_7_end
+raw_hook_wrapper_x64_windows_avx512fpu_cet_patch_7_end:
+.globl raw_hook_wrapper_x64_windows_avx512fpu_cet_patch_8
+raw_hook_wrapper_x64_windows_avx512fpu_cet_patch_8:
+	mov qword ptr [rsp + 0x7fffffff], rcx
+.globl raw_hook_wrapper_x64_windows_avx512fpu_cet_patch_8_end
+raw_hook_wrapper_x64_windows_avx512fpu_cet_patch_8_end:
+.globl raw_hook_wrapper_x64_windows_avx512fpu_cet_patch_9
+raw_hook_wrapper_x64_windows_avx512fpu_cet_patch_9:
+	mov rdx, qword ptr [rsp + 0x7fffffff]
+.globl raw_hook_wrapper_x64_windows_avx512fpu_cet_patch_9_end
+raw_hook_wrapper_x64_windows_avx512fpu_cet_patch_9_end:
+	mov qword ptr [rcx], rdx
+raw_hook_wrapper_x64_windows_avx512fpu_direct_return:
+.globl raw_hook_wrapper_x64_windows_avx512fpu_patch_152
+raw_hook_wrapper_x64_windows_avx512fpu_patch_152:
+	push qword ptr [rsp + 0x7fffffff]
+.globl raw_hook_wrapper_x64_windows_avx512fpu_patch_152_end
+raw_hook_wrapper_x64_windows_avx512fpu_patch_152_end:
+	popfq
 .globl raw_hook_wrapper_x64_windows_avx512fpu_patch_165
 raw_hook_wrapper_x64_windows_avx512fpu_patch_165:
 	mov rdx, qword ptr [rsp + 0x7fffffff]
@@ -863,6 +931,35 @@ raw_hook_wrapper_x64_windows_avx512fpu_patch_168:
 .globl raw_hook_wrapper_x64_windows_avx512fpu_patch_168_end
 raw_hook_wrapper_x64_windows_avx512fpu_patch_168_end:
 	ret
+raw_hook_wrapper_x64_windows_avx512fpu_redirect_return:
+.globl raw_hook_wrapper_x64_windows_avx512fpu_cet_patch_10
+raw_hook_wrapper_x64_windows_avx512fpu_cet_patch_10:
+	push qword ptr [rsp + 0x7fffffff]
+.globl raw_hook_wrapper_x64_windows_avx512fpu_cet_patch_10_end
+raw_hook_wrapper_x64_windows_avx512fpu_cet_patch_10_end:
+	popfq
+.globl raw_hook_wrapper_x64_windows_avx512fpu_cet_patch_11
+raw_hook_wrapper_x64_windows_avx512fpu_cet_patch_11:
+	mov rdx, qword ptr [rsp + 0x7fffffff]
+.globl raw_hook_wrapper_x64_windows_avx512fpu_cet_patch_11_end
+raw_hook_wrapper_x64_windows_avx512fpu_cet_patch_11_end:
+.globl raw_hook_wrapper_x64_windows_avx512fpu_cet_patch_12
+raw_hook_wrapper_x64_windows_avx512fpu_cet_patch_12:
+	mov rcx, qword ptr [rsp + 0x7fffffff]
+.globl raw_hook_wrapper_x64_windows_avx512fpu_cet_patch_12_end
+raw_hook_wrapper_x64_windows_avx512fpu_cet_patch_12_end:
+.globl raw_hook_wrapper_x64_windows_avx512fpu_cet_patch_13
+raw_hook_wrapper_x64_windows_avx512fpu_cet_patch_13:
+	mov rax, qword ptr [rsp + 0x7fffffff]
+.globl raw_hook_wrapper_x64_windows_avx512fpu_cet_patch_13_end
+raw_hook_wrapper_x64_windows_avx512fpu_cet_patch_13_end:
+.globl raw_hook_wrapper_x64_windows_avx512fpu_cet_patch_14
+raw_hook_wrapper_x64_windows_avx512fpu_cet_patch_14:
+	mov rsp, qword ptr [rsp + 0x7fffffff]
+.globl raw_hook_wrapper_x64_windows_avx512fpu_cet_patch_14_end
+raw_hook_wrapper_x64_windows_avx512fpu_cet_patch_14_end:
+	lea rsp, [rsp + 0x8]
+	jmp qword ptr [rsp - 0x8]
 raw_hook_wrapper_x64_windows_avx512fpu_nothing_modified:
 .globl raw_hook_wrapper_x64_windows_avx512fpu_patch_169
 raw_hook_wrapper_x64_windows_avx512fpu_patch_169:
@@ -1298,6 +1395,23 @@ raw_hook_wrapper_x64_windows_avx512_patch_83:
 	vmovups zmmword ptr [rsp + 0x7fffffff], zmm31
 .globl raw_hook_wrapper_x64_windows_avx512_patch_83_end
 raw_hook_wrapper_x64_windows_avx512_patch_83_end:
+	mov rax, rsp
+.globl raw_hook_wrapper_x64_windows_avx512_cet_patch_0
+raw_hook_wrapper_x64_windows_avx512_cet_patch_0:
+	add rax, 0x7fffffff
+.globl raw_hook_wrapper_x64_windows_avx512_cet_patch_0_end
+raw_hook_wrapper_x64_windows_avx512_cet_patch_0_end:
+.globl raw_hook_wrapper_x64_windows_avx512_cet_patch_1
+raw_hook_wrapper_x64_windows_avx512_cet_patch_1:
+	mov qword ptr [rsp + 0x7fffffff], rax
+.globl raw_hook_wrapper_x64_windows_avx512_cet_patch_1_end
+raw_hook_wrapper_x64_windows_avx512_cet_patch_1_end:
+	mov rax, qword ptr [rax]
+.globl raw_hook_wrapper_x64_windows_avx512_cet_patch_2
+raw_hook_wrapper_x64_windows_avx512_cet_patch_2:
+	mov qword ptr [rsp + 0x7fffffff], rax
+.globl raw_hook_wrapper_x64_windows_avx512_cet_patch_2_end
+raw_hook_wrapper_x64_windows_avx512_cet_patch_2_end:
 	mov rcx, rsp
 	sub rsp, 0x20
 .globl raw_hook_wrapper_x64_windows_avx512_patch_84
@@ -1634,12 +1748,6 @@ raw_hook_wrapper_x64_windows_avx512_patch_149:
 	ldmxcsr dword ptr [rsp + 0x7fffffff]
 .globl raw_hook_wrapper_x64_windows_avx512_patch_149_end
 raw_hook_wrapper_x64_windows_avx512_patch_149_end:
-.globl raw_hook_wrapper_x64_windows_avx512_patch_150
-raw_hook_wrapper_x64_windows_avx512_patch_150:
-	push qword ptr [rsp + 0x7fffffff]
-.globl raw_hook_wrapper_x64_windows_avx512_patch_150_end
-raw_hook_wrapper_x64_windows_avx512_patch_150_end:
-	popfq
 .globl raw_hook_wrapper_x64_windows_avx512_patch_151
 raw_hook_wrapper_x64_windows_avx512_patch_151:
 	mov r15, qword ptr [rsp + 0x7fffffff]
@@ -1700,6 +1808,63 @@ raw_hook_wrapper_x64_windows_avx512_patch_162:
 	mov rbx, qword ptr [rsp + 0x7fffffff]
 .globl raw_hook_wrapper_x64_windows_avx512_patch_162_end
 raw_hook_wrapper_x64_windows_avx512_patch_162_end:
+.globl raw_hook_wrapper_x64_windows_avx512_cet_patch_3
+raw_hook_wrapper_x64_windows_avx512_cet_patch_3:
+	mov rax, qword ptr [rsp + 0x7fffffff]
+.globl raw_hook_wrapper_x64_windows_avx512_cet_patch_3_end
+raw_hook_wrapper_x64_windows_avx512_cet_patch_3_end:
+	test rax, 0x7
+	jne raw_hook_wrapper_x64_windows_avx512_unsupported_stack
+.globl raw_hook_wrapper_x64_windows_avx512_cet_patch_4
+raw_hook_wrapper_x64_windows_avx512_cet_patch_4:
+	lea rcx, [rsp + 0x7fffffff]
+.globl raw_hook_wrapper_x64_windows_avx512_cet_patch_4_end
+raw_hook_wrapper_x64_windows_avx512_cet_patch_4_end:
+	cmp rax, rcx
+	jb raw_hook_wrapper_x64_windows_avx512_unsupported_stack
+.globl raw_hook_wrapper_x64_windows_avx512_cet_patch_5
+raw_hook_wrapper_x64_windows_avx512_cet_patch_5:
+	lea rcx, [rsp + 0x7fffffff]
+.globl raw_hook_wrapper_x64_windows_avx512_cet_patch_5_end
+raw_hook_wrapper_x64_windows_avx512_cet_patch_5_end:
+	cmp rax, rcx
+	ja raw_hook_wrapper_x64_windows_avx512_unsupported_stack
+.globl raw_hook_wrapper_x64_windows_avx512_cet_patch_6
+raw_hook_wrapper_x64_windows_avx512_cet_patch_6:
+	mov rdx, qword ptr [rsp + 0x7fffffff]
+.globl raw_hook_wrapper_x64_windows_avx512_cet_patch_6_end
+raw_hook_wrapper_x64_windows_avx512_cet_patch_6_end:
+	cmp qword ptr [rcx], rdx
+	jne raw_hook_wrapper_x64_windows_avx512_unsupported_stack
+	cmp rax, rcx
+	je raw_hook_wrapper_x64_windows_avx512_direct_return
+	lea rax, [rax + 0x8]
+	cmp rax, rcx
+	je raw_hook_wrapper_x64_windows_avx512_redirect_return
+raw_hook_wrapper_x64_windows_avx512_unsupported_stack:
+.globl raw_hook_wrapper_x64_windows_avx512_cet_patch_7
+raw_hook_wrapper_x64_windows_avx512_cet_patch_7:
+	mov rcx, qword ptr [rsp + 0x7fffffff]
+.globl raw_hook_wrapper_x64_windows_avx512_cet_patch_7_end
+raw_hook_wrapper_x64_windows_avx512_cet_patch_7_end:
+.globl raw_hook_wrapper_x64_windows_avx512_cet_patch_8
+raw_hook_wrapper_x64_windows_avx512_cet_patch_8:
+	mov qword ptr [rsp + 0x7fffffff], rcx
+.globl raw_hook_wrapper_x64_windows_avx512_cet_patch_8_end
+raw_hook_wrapper_x64_windows_avx512_cet_patch_8_end:
+.globl raw_hook_wrapper_x64_windows_avx512_cet_patch_9
+raw_hook_wrapper_x64_windows_avx512_cet_patch_9:
+	mov rdx, qword ptr [rsp + 0x7fffffff]
+.globl raw_hook_wrapper_x64_windows_avx512_cet_patch_9_end
+raw_hook_wrapper_x64_windows_avx512_cet_patch_9_end:
+	mov qword ptr [rcx], rdx
+raw_hook_wrapper_x64_windows_avx512_direct_return:
+.globl raw_hook_wrapper_x64_windows_avx512_patch_150
+raw_hook_wrapper_x64_windows_avx512_patch_150:
+	push qword ptr [rsp + 0x7fffffff]
+.globl raw_hook_wrapper_x64_windows_avx512_patch_150_end
+raw_hook_wrapper_x64_windows_avx512_patch_150_end:
+	popfq
 .globl raw_hook_wrapper_x64_windows_avx512_patch_163
 raw_hook_wrapper_x64_windows_avx512_patch_163:
 	mov rdx, qword ptr [rsp + 0x7fffffff]
@@ -1721,6 +1886,35 @@ raw_hook_wrapper_x64_windows_avx512_patch_166:
 .globl raw_hook_wrapper_x64_windows_avx512_patch_166_end
 raw_hook_wrapper_x64_windows_avx512_patch_166_end:
 	ret
+raw_hook_wrapper_x64_windows_avx512_redirect_return:
+.globl raw_hook_wrapper_x64_windows_avx512_cet_patch_10
+raw_hook_wrapper_x64_windows_avx512_cet_patch_10:
+	push qword ptr [rsp + 0x7fffffff]
+.globl raw_hook_wrapper_x64_windows_avx512_cet_patch_10_end
+raw_hook_wrapper_x64_windows_avx512_cet_patch_10_end:
+	popfq
+.globl raw_hook_wrapper_x64_windows_avx512_cet_patch_11
+raw_hook_wrapper_x64_windows_avx512_cet_patch_11:
+	mov rdx, qword ptr [rsp + 0x7fffffff]
+.globl raw_hook_wrapper_x64_windows_avx512_cet_patch_11_end
+raw_hook_wrapper_x64_windows_avx512_cet_patch_11_end:
+.globl raw_hook_wrapper_x64_windows_avx512_cet_patch_12
+raw_hook_wrapper_x64_windows_avx512_cet_patch_12:
+	mov rcx, qword ptr [rsp + 0x7fffffff]
+.globl raw_hook_wrapper_x64_windows_avx512_cet_patch_12_end
+raw_hook_wrapper_x64_windows_avx512_cet_patch_12_end:
+.globl raw_hook_wrapper_x64_windows_avx512_cet_patch_13
+raw_hook_wrapper_x64_windows_avx512_cet_patch_13:
+	mov rax, qword ptr [rsp + 0x7fffffff]
+.globl raw_hook_wrapper_x64_windows_avx512_cet_patch_13_end
+raw_hook_wrapper_x64_windows_avx512_cet_patch_13_end:
+.globl raw_hook_wrapper_x64_windows_avx512_cet_patch_14
+raw_hook_wrapper_x64_windows_avx512_cet_patch_14:
+	mov rsp, qword ptr [rsp + 0x7fffffff]
+.globl raw_hook_wrapper_x64_windows_avx512_cet_patch_14_end
+raw_hook_wrapper_x64_windows_avx512_cet_patch_14_end:
+	lea rsp, [rsp + 0x8]
+	jmp qword ptr [rsp - 0x8]
 raw_hook_wrapper_x64_windows_avx512_nothing_modified:
 .globl raw_hook_wrapper_x64_windows_avx512_patch_167
 raw_hook_wrapper_x64_windows_avx512_patch_167:
@@ -2001,6 +2195,23 @@ raw_hook_wrapper_x64_windows_avxfpu_patch_52:
 	fsave [rsp + 0x7fffffff]
 .globl raw_hook_wrapper_x64_windows_avxfpu_patch_52_end
 raw_hook_wrapper_x64_windows_avxfpu_patch_52_end:
+	mov rax, rsp
+.globl raw_hook_wrapper_x64_windows_avxfpu_cet_patch_0
+raw_hook_wrapper_x64_windows_avxfpu_cet_patch_0:
+	add rax, 0x7fffffff
+.globl raw_hook_wrapper_x64_windows_avxfpu_cet_patch_0_end
+raw_hook_wrapper_x64_windows_avxfpu_cet_patch_0_end:
+.globl raw_hook_wrapper_x64_windows_avxfpu_cet_patch_1
+raw_hook_wrapper_x64_windows_avxfpu_cet_patch_1:
+	mov qword ptr [rsp + 0x7fffffff], rax
+.globl raw_hook_wrapper_x64_windows_avxfpu_cet_patch_1_end
+raw_hook_wrapper_x64_windows_avxfpu_cet_patch_1_end:
+	mov rax, qword ptr [rax]
+.globl raw_hook_wrapper_x64_windows_avxfpu_cet_patch_2
+raw_hook_wrapper_x64_windows_avxfpu_cet_patch_2:
+	mov qword ptr [rsp + 0x7fffffff], rax
+.globl raw_hook_wrapper_x64_windows_avxfpu_cet_patch_2_end
+raw_hook_wrapper_x64_windows_avxfpu_cet_patch_2_end:
 	mov rcx, rsp
 	sub rsp, 0x20
 .globl raw_hook_wrapper_x64_windows_avxfpu_patch_53
@@ -2182,12 +2393,6 @@ raw_hook_wrapper_x64_windows_avxfpu_patch_87:
 	ldmxcsr dword ptr [rsp + 0x7fffffff]
 .globl raw_hook_wrapper_x64_windows_avxfpu_patch_87_end
 raw_hook_wrapper_x64_windows_avxfpu_patch_87_end:
-.globl raw_hook_wrapper_x64_windows_avxfpu_patch_88
-raw_hook_wrapper_x64_windows_avxfpu_patch_88:
-	push qword ptr [rsp + 0x7fffffff]
-.globl raw_hook_wrapper_x64_windows_avxfpu_patch_88_end
-raw_hook_wrapper_x64_windows_avxfpu_patch_88_end:
-	popfq
 .globl raw_hook_wrapper_x64_windows_avxfpu_patch_89
 raw_hook_wrapper_x64_windows_avxfpu_patch_89:
 	mov r15, qword ptr [rsp + 0x7fffffff]
@@ -2248,6 +2453,63 @@ raw_hook_wrapper_x64_windows_avxfpu_patch_100:
 	mov rbx, qword ptr [rsp + 0x7fffffff]
 .globl raw_hook_wrapper_x64_windows_avxfpu_patch_100_end
 raw_hook_wrapper_x64_windows_avxfpu_patch_100_end:
+.globl raw_hook_wrapper_x64_windows_avxfpu_cet_patch_3
+raw_hook_wrapper_x64_windows_avxfpu_cet_patch_3:
+	mov rax, qword ptr [rsp + 0x7fffffff]
+.globl raw_hook_wrapper_x64_windows_avxfpu_cet_patch_3_end
+raw_hook_wrapper_x64_windows_avxfpu_cet_patch_3_end:
+	test rax, 0x7
+	jne raw_hook_wrapper_x64_windows_avxfpu_unsupported_stack
+.globl raw_hook_wrapper_x64_windows_avxfpu_cet_patch_4
+raw_hook_wrapper_x64_windows_avxfpu_cet_patch_4:
+	lea rcx, [rsp + 0x7fffffff]
+.globl raw_hook_wrapper_x64_windows_avxfpu_cet_patch_4_end
+raw_hook_wrapper_x64_windows_avxfpu_cet_patch_4_end:
+	cmp rax, rcx
+	jb raw_hook_wrapper_x64_windows_avxfpu_unsupported_stack
+.globl raw_hook_wrapper_x64_windows_avxfpu_cet_patch_5
+raw_hook_wrapper_x64_windows_avxfpu_cet_patch_5:
+	lea rcx, [rsp + 0x7fffffff]
+.globl raw_hook_wrapper_x64_windows_avxfpu_cet_patch_5_end
+raw_hook_wrapper_x64_windows_avxfpu_cet_patch_5_end:
+	cmp rax, rcx
+	ja raw_hook_wrapper_x64_windows_avxfpu_unsupported_stack
+.globl raw_hook_wrapper_x64_windows_avxfpu_cet_patch_6
+raw_hook_wrapper_x64_windows_avxfpu_cet_patch_6:
+	mov rdx, qword ptr [rsp + 0x7fffffff]
+.globl raw_hook_wrapper_x64_windows_avxfpu_cet_patch_6_end
+raw_hook_wrapper_x64_windows_avxfpu_cet_patch_6_end:
+	cmp qword ptr [rcx], rdx
+	jne raw_hook_wrapper_x64_windows_avxfpu_unsupported_stack
+	cmp rax, rcx
+	je raw_hook_wrapper_x64_windows_avxfpu_direct_return
+	lea rax, [rax + 0x8]
+	cmp rax, rcx
+	je raw_hook_wrapper_x64_windows_avxfpu_redirect_return
+raw_hook_wrapper_x64_windows_avxfpu_unsupported_stack:
+.globl raw_hook_wrapper_x64_windows_avxfpu_cet_patch_7
+raw_hook_wrapper_x64_windows_avxfpu_cet_patch_7:
+	mov rcx, qword ptr [rsp + 0x7fffffff]
+.globl raw_hook_wrapper_x64_windows_avxfpu_cet_patch_7_end
+raw_hook_wrapper_x64_windows_avxfpu_cet_patch_7_end:
+.globl raw_hook_wrapper_x64_windows_avxfpu_cet_patch_8
+raw_hook_wrapper_x64_windows_avxfpu_cet_patch_8:
+	mov qword ptr [rsp + 0x7fffffff], rcx
+.globl raw_hook_wrapper_x64_windows_avxfpu_cet_patch_8_end
+raw_hook_wrapper_x64_windows_avxfpu_cet_patch_8_end:
+.globl raw_hook_wrapper_x64_windows_avxfpu_cet_patch_9
+raw_hook_wrapper_x64_windows_avxfpu_cet_patch_9:
+	mov rdx, qword ptr [rsp + 0x7fffffff]
+.globl raw_hook_wrapper_x64_windows_avxfpu_cet_patch_9_end
+raw_hook_wrapper_x64_windows_avxfpu_cet_patch_9_end:
+	mov qword ptr [rcx], rdx
+raw_hook_wrapper_x64_windows_avxfpu_direct_return:
+.globl raw_hook_wrapper_x64_windows_avxfpu_patch_88
+raw_hook_wrapper_x64_windows_avxfpu_patch_88:
+	push qword ptr [rsp + 0x7fffffff]
+.globl raw_hook_wrapper_x64_windows_avxfpu_patch_88_end
+raw_hook_wrapper_x64_windows_avxfpu_patch_88_end:
+	popfq
 .globl raw_hook_wrapper_x64_windows_avxfpu_patch_101
 raw_hook_wrapper_x64_windows_avxfpu_patch_101:
 	mov rdx, qword ptr [rsp + 0x7fffffff]
@@ -2269,6 +2531,35 @@ raw_hook_wrapper_x64_windows_avxfpu_patch_104:
 .globl raw_hook_wrapper_x64_windows_avxfpu_patch_104_end
 raw_hook_wrapper_x64_windows_avxfpu_patch_104_end:
 	ret
+raw_hook_wrapper_x64_windows_avxfpu_redirect_return:
+.globl raw_hook_wrapper_x64_windows_avxfpu_cet_patch_10
+raw_hook_wrapper_x64_windows_avxfpu_cet_patch_10:
+	push qword ptr [rsp + 0x7fffffff]
+.globl raw_hook_wrapper_x64_windows_avxfpu_cet_patch_10_end
+raw_hook_wrapper_x64_windows_avxfpu_cet_patch_10_end:
+	popfq
+.globl raw_hook_wrapper_x64_windows_avxfpu_cet_patch_11
+raw_hook_wrapper_x64_windows_avxfpu_cet_patch_11:
+	mov rdx, qword ptr [rsp + 0x7fffffff]
+.globl raw_hook_wrapper_x64_windows_avxfpu_cet_patch_11_end
+raw_hook_wrapper_x64_windows_avxfpu_cet_patch_11_end:
+.globl raw_hook_wrapper_x64_windows_avxfpu_cet_patch_12
+raw_hook_wrapper_x64_windows_avxfpu_cet_patch_12:
+	mov rcx, qword ptr [rsp + 0x7fffffff]
+.globl raw_hook_wrapper_x64_windows_avxfpu_cet_patch_12_end
+raw_hook_wrapper_x64_windows_avxfpu_cet_patch_12_end:
+.globl raw_hook_wrapper_x64_windows_avxfpu_cet_patch_13
+raw_hook_wrapper_x64_windows_avxfpu_cet_patch_13:
+	mov rax, qword ptr [rsp + 0x7fffffff]
+.globl raw_hook_wrapper_x64_windows_avxfpu_cet_patch_13_end
+raw_hook_wrapper_x64_windows_avxfpu_cet_patch_13_end:
+.globl raw_hook_wrapper_x64_windows_avxfpu_cet_patch_14
+raw_hook_wrapper_x64_windows_avxfpu_cet_patch_14:
+	mov rsp, qword ptr [rsp + 0x7fffffff]
+.globl raw_hook_wrapper_x64_windows_avxfpu_cet_patch_14_end
+raw_hook_wrapper_x64_windows_avxfpu_cet_patch_14_end:
+	lea rsp, [rsp + 0x8]
+	jmp qword ptr [rsp - 0x8]
 raw_hook_wrapper_x64_windows_avxfpu_nothing_modified:
 .globl raw_hook_wrapper_x64_windows_avxfpu_patch_105
 raw_hook_wrapper_x64_windows_avxfpu_patch_105:
@@ -2544,6 +2835,23 @@ raw_hook_wrapper_x64_windows_avx_patch_51:
 	vmovups ymmword ptr [rsp + 0x7fffffff], ymm15
 .globl raw_hook_wrapper_x64_windows_avx_patch_51_end
 raw_hook_wrapper_x64_windows_avx_patch_51_end:
+	mov rax, rsp
+.globl raw_hook_wrapper_x64_windows_avx_cet_patch_0
+raw_hook_wrapper_x64_windows_avx_cet_patch_0:
+	add rax, 0x7fffffff
+.globl raw_hook_wrapper_x64_windows_avx_cet_patch_0_end
+raw_hook_wrapper_x64_windows_avx_cet_patch_0_end:
+.globl raw_hook_wrapper_x64_windows_avx_cet_patch_1
+raw_hook_wrapper_x64_windows_avx_cet_patch_1:
+	mov qword ptr [rsp + 0x7fffffff], rax
+.globl raw_hook_wrapper_x64_windows_avx_cet_patch_1_end
+raw_hook_wrapper_x64_windows_avx_cet_patch_1_end:
+	mov rax, qword ptr [rax]
+.globl raw_hook_wrapper_x64_windows_avx_cet_patch_2
+raw_hook_wrapper_x64_windows_avx_cet_patch_2:
+	mov qword ptr [rsp + 0x7fffffff], rax
+.globl raw_hook_wrapper_x64_windows_avx_cet_patch_2_end
+raw_hook_wrapper_x64_windows_avx_cet_patch_2_end:
 	mov rcx, rsp
 	sub rsp, 0x20
 .globl raw_hook_wrapper_x64_windows_avx_patch_52
@@ -2720,12 +3028,6 @@ raw_hook_wrapper_x64_windows_avx_patch_85:
 	ldmxcsr dword ptr [rsp + 0x7fffffff]
 .globl raw_hook_wrapper_x64_windows_avx_patch_85_end
 raw_hook_wrapper_x64_windows_avx_patch_85_end:
-.globl raw_hook_wrapper_x64_windows_avx_patch_86
-raw_hook_wrapper_x64_windows_avx_patch_86:
-	push qword ptr [rsp + 0x7fffffff]
-.globl raw_hook_wrapper_x64_windows_avx_patch_86_end
-raw_hook_wrapper_x64_windows_avx_patch_86_end:
-	popfq
 .globl raw_hook_wrapper_x64_windows_avx_patch_87
 raw_hook_wrapper_x64_windows_avx_patch_87:
 	mov r15, qword ptr [rsp + 0x7fffffff]
@@ -2786,6 +3088,63 @@ raw_hook_wrapper_x64_windows_avx_patch_98:
 	mov rbx, qword ptr [rsp + 0x7fffffff]
 .globl raw_hook_wrapper_x64_windows_avx_patch_98_end
 raw_hook_wrapper_x64_windows_avx_patch_98_end:
+.globl raw_hook_wrapper_x64_windows_avx_cet_patch_3
+raw_hook_wrapper_x64_windows_avx_cet_patch_3:
+	mov rax, qword ptr [rsp + 0x7fffffff]
+.globl raw_hook_wrapper_x64_windows_avx_cet_patch_3_end
+raw_hook_wrapper_x64_windows_avx_cet_patch_3_end:
+	test rax, 0x7
+	jne raw_hook_wrapper_x64_windows_avx_unsupported_stack
+.globl raw_hook_wrapper_x64_windows_avx_cet_patch_4
+raw_hook_wrapper_x64_windows_avx_cet_patch_4:
+	lea rcx, [rsp + 0x7fffffff]
+.globl raw_hook_wrapper_x64_windows_avx_cet_patch_4_end
+raw_hook_wrapper_x64_windows_avx_cet_patch_4_end:
+	cmp rax, rcx
+	jb raw_hook_wrapper_x64_windows_avx_unsupported_stack
+.globl raw_hook_wrapper_x64_windows_avx_cet_patch_5
+raw_hook_wrapper_x64_windows_avx_cet_patch_5:
+	lea rcx, [rsp + 0x7fffffff]
+.globl raw_hook_wrapper_x64_windows_avx_cet_patch_5_end
+raw_hook_wrapper_x64_windows_avx_cet_patch_5_end:
+	cmp rax, rcx
+	ja raw_hook_wrapper_x64_windows_avx_unsupported_stack
+.globl raw_hook_wrapper_x64_windows_avx_cet_patch_6
+raw_hook_wrapper_x64_windows_avx_cet_patch_6:
+	mov rdx, qword ptr [rsp + 0x7fffffff]
+.globl raw_hook_wrapper_x64_windows_avx_cet_patch_6_end
+raw_hook_wrapper_x64_windows_avx_cet_patch_6_end:
+	cmp qword ptr [rcx], rdx
+	jne raw_hook_wrapper_x64_windows_avx_unsupported_stack
+	cmp rax, rcx
+	je raw_hook_wrapper_x64_windows_avx_direct_return
+	lea rax, [rax + 0x8]
+	cmp rax, rcx
+	je raw_hook_wrapper_x64_windows_avx_redirect_return
+raw_hook_wrapper_x64_windows_avx_unsupported_stack:
+.globl raw_hook_wrapper_x64_windows_avx_cet_patch_7
+raw_hook_wrapper_x64_windows_avx_cet_patch_7:
+	mov rcx, qword ptr [rsp + 0x7fffffff]
+.globl raw_hook_wrapper_x64_windows_avx_cet_patch_7_end
+raw_hook_wrapper_x64_windows_avx_cet_patch_7_end:
+.globl raw_hook_wrapper_x64_windows_avx_cet_patch_8
+raw_hook_wrapper_x64_windows_avx_cet_patch_8:
+	mov qword ptr [rsp + 0x7fffffff], rcx
+.globl raw_hook_wrapper_x64_windows_avx_cet_patch_8_end
+raw_hook_wrapper_x64_windows_avx_cet_patch_8_end:
+.globl raw_hook_wrapper_x64_windows_avx_cet_patch_9
+raw_hook_wrapper_x64_windows_avx_cet_patch_9:
+	mov rdx, qword ptr [rsp + 0x7fffffff]
+.globl raw_hook_wrapper_x64_windows_avx_cet_patch_9_end
+raw_hook_wrapper_x64_windows_avx_cet_patch_9_end:
+	mov qword ptr [rcx], rdx
+raw_hook_wrapper_x64_windows_avx_direct_return:
+.globl raw_hook_wrapper_x64_windows_avx_patch_86
+raw_hook_wrapper_x64_windows_avx_patch_86:
+	push qword ptr [rsp + 0x7fffffff]
+.globl raw_hook_wrapper_x64_windows_avx_patch_86_end
+raw_hook_wrapper_x64_windows_avx_patch_86_end:
+	popfq
 .globl raw_hook_wrapper_x64_windows_avx_patch_99
 raw_hook_wrapper_x64_windows_avx_patch_99:
 	mov rdx, qword ptr [rsp + 0x7fffffff]
@@ -2807,6 +3166,35 @@ raw_hook_wrapper_x64_windows_avx_patch_102:
 .globl raw_hook_wrapper_x64_windows_avx_patch_102_end
 raw_hook_wrapper_x64_windows_avx_patch_102_end:
 	ret
+raw_hook_wrapper_x64_windows_avx_redirect_return:
+.globl raw_hook_wrapper_x64_windows_avx_cet_patch_10
+raw_hook_wrapper_x64_windows_avx_cet_patch_10:
+	push qword ptr [rsp + 0x7fffffff]
+.globl raw_hook_wrapper_x64_windows_avx_cet_patch_10_end
+raw_hook_wrapper_x64_windows_avx_cet_patch_10_end:
+	popfq
+.globl raw_hook_wrapper_x64_windows_avx_cet_patch_11
+raw_hook_wrapper_x64_windows_avx_cet_patch_11:
+	mov rdx, qword ptr [rsp + 0x7fffffff]
+.globl raw_hook_wrapper_x64_windows_avx_cet_patch_11_end
+raw_hook_wrapper_x64_windows_avx_cet_patch_11_end:
+.globl raw_hook_wrapper_x64_windows_avx_cet_patch_12
+raw_hook_wrapper_x64_windows_avx_cet_patch_12:
+	mov rcx, qword ptr [rsp + 0x7fffffff]
+.globl raw_hook_wrapper_x64_windows_avx_cet_patch_12_end
+raw_hook_wrapper_x64_windows_avx_cet_patch_12_end:
+.globl raw_hook_wrapper_x64_windows_avx_cet_patch_13
+raw_hook_wrapper_x64_windows_avx_cet_patch_13:
+	mov rax, qword ptr [rsp + 0x7fffffff]
+.globl raw_hook_wrapper_x64_windows_avx_cet_patch_13_end
+raw_hook_wrapper_x64_windows_avx_cet_patch_13_end:
+.globl raw_hook_wrapper_x64_windows_avx_cet_patch_14
+raw_hook_wrapper_x64_windows_avx_cet_patch_14:
+	mov rsp, qword ptr [rsp + 0x7fffffff]
+.globl raw_hook_wrapper_x64_windows_avx_cet_patch_14_end
+raw_hook_wrapper_x64_windows_avx_cet_patch_14_end:
+	lea rsp, [rsp + 0x8]
+	jmp qword ptr [rsp - 0x8]
 raw_hook_wrapper_x64_windows_avx_nothing_modified:
 .globl raw_hook_wrapper_x64_windows_avx_patch_103
 raw_hook_wrapper_x64_windows_avx_patch_103:
@@ -3007,6 +3395,23 @@ raw_hook_wrapper_x64_windows_ssefpu_patch_36:
 	fsave [rsp + 0x7fffffff]
 .globl raw_hook_wrapper_x64_windows_ssefpu_patch_36_end
 raw_hook_wrapper_x64_windows_ssefpu_patch_36_end:
+	mov rax, rsp
+.globl raw_hook_wrapper_x64_windows_ssefpu_cet_patch_0
+raw_hook_wrapper_x64_windows_ssefpu_cet_patch_0:
+	add rax, 0x7fffffff
+.globl raw_hook_wrapper_x64_windows_ssefpu_cet_patch_0_end
+raw_hook_wrapper_x64_windows_ssefpu_cet_patch_0_end:
+.globl raw_hook_wrapper_x64_windows_ssefpu_cet_patch_1
+raw_hook_wrapper_x64_windows_ssefpu_cet_patch_1:
+	mov qword ptr [rsp + 0x7fffffff], rax
+.globl raw_hook_wrapper_x64_windows_ssefpu_cet_patch_1_end
+raw_hook_wrapper_x64_windows_ssefpu_cet_patch_1_end:
+	mov rax, qword ptr [rax]
+.globl raw_hook_wrapper_x64_windows_ssefpu_cet_patch_2
+raw_hook_wrapper_x64_windows_ssefpu_cet_patch_2:
+	mov qword ptr [rsp + 0x7fffffff], rax
+.globl raw_hook_wrapper_x64_windows_ssefpu_cet_patch_2_end
+raw_hook_wrapper_x64_windows_ssefpu_cet_patch_2_end:
 	mov rcx, rsp
 	sub rsp, 0x20
 .globl raw_hook_wrapper_x64_windows_ssefpu_patch_37
@@ -3108,12 +3513,6 @@ raw_hook_wrapper_x64_windows_ssefpu_patch_55:
 	ldmxcsr dword ptr [rsp + 0x7fffffff]
 .globl raw_hook_wrapper_x64_windows_ssefpu_patch_55_end
 raw_hook_wrapper_x64_windows_ssefpu_patch_55_end:
-.globl raw_hook_wrapper_x64_windows_ssefpu_patch_56
-raw_hook_wrapper_x64_windows_ssefpu_patch_56:
-	push qword ptr [rsp + 0x7fffffff]
-.globl raw_hook_wrapper_x64_windows_ssefpu_patch_56_end
-raw_hook_wrapper_x64_windows_ssefpu_patch_56_end:
-	popfq
 .globl raw_hook_wrapper_x64_windows_ssefpu_patch_57
 raw_hook_wrapper_x64_windows_ssefpu_patch_57:
 	mov r15, qword ptr [rsp + 0x7fffffff]
@@ -3174,6 +3573,63 @@ raw_hook_wrapper_x64_windows_ssefpu_patch_68:
 	mov rbx, qword ptr [rsp + 0x7fffffff]
 .globl raw_hook_wrapper_x64_windows_ssefpu_patch_68_end
 raw_hook_wrapper_x64_windows_ssefpu_patch_68_end:
+.globl raw_hook_wrapper_x64_windows_ssefpu_cet_patch_3
+raw_hook_wrapper_x64_windows_ssefpu_cet_patch_3:
+	mov rax, qword ptr [rsp + 0x7fffffff]
+.globl raw_hook_wrapper_x64_windows_ssefpu_cet_patch_3_end
+raw_hook_wrapper_x64_windows_ssefpu_cet_patch_3_end:
+	test rax, 0x7
+	jne raw_hook_wrapper_x64_windows_ssefpu_unsupported_stack
+.globl raw_hook_wrapper_x64_windows_ssefpu_cet_patch_4
+raw_hook_wrapper_x64_windows_ssefpu_cet_patch_4:
+	lea rcx, [rsp + 0x7fffffff]
+.globl raw_hook_wrapper_x64_windows_ssefpu_cet_patch_4_end
+raw_hook_wrapper_x64_windows_ssefpu_cet_patch_4_end:
+	cmp rax, rcx
+	jb raw_hook_wrapper_x64_windows_ssefpu_unsupported_stack
+.globl raw_hook_wrapper_x64_windows_ssefpu_cet_patch_5
+raw_hook_wrapper_x64_windows_ssefpu_cet_patch_5:
+	lea rcx, [rsp + 0x7fffffff]
+.globl raw_hook_wrapper_x64_windows_ssefpu_cet_patch_5_end
+raw_hook_wrapper_x64_windows_ssefpu_cet_patch_5_end:
+	cmp rax, rcx
+	ja raw_hook_wrapper_x64_windows_ssefpu_unsupported_stack
+.globl raw_hook_wrapper_x64_windows_ssefpu_cet_patch_6
+raw_hook_wrapper_x64_windows_ssefpu_cet_patch_6:
+	mov rdx, qword ptr [rsp + 0x7fffffff]
+.globl raw_hook_wrapper_x64_windows_ssefpu_cet_patch_6_end
+raw_hook_wrapper_x64_windows_ssefpu_cet_patch_6_end:
+	cmp qword ptr [rcx], rdx
+	jne raw_hook_wrapper_x64_windows_ssefpu_unsupported_stack
+	cmp rax, rcx
+	je raw_hook_wrapper_x64_windows_ssefpu_direct_return
+	lea rax, [rax + 0x8]
+	cmp rax, rcx
+	je raw_hook_wrapper_x64_windows_ssefpu_redirect_return
+raw_hook_wrapper_x64_windows_ssefpu_unsupported_stack:
+.globl raw_hook_wrapper_x64_windows_ssefpu_cet_patch_7
+raw_hook_wrapper_x64_windows_ssefpu_cet_patch_7:
+	mov rcx, qword ptr [rsp + 0x7fffffff]
+.globl raw_hook_wrapper_x64_windows_ssefpu_cet_patch_7_end
+raw_hook_wrapper_x64_windows_ssefpu_cet_patch_7_end:
+.globl raw_hook_wrapper_x64_windows_ssefpu_cet_patch_8
+raw_hook_wrapper_x64_windows_ssefpu_cet_patch_8:
+	mov qword ptr [rsp + 0x7fffffff], rcx
+.globl raw_hook_wrapper_x64_windows_ssefpu_cet_patch_8_end
+raw_hook_wrapper_x64_windows_ssefpu_cet_patch_8_end:
+.globl raw_hook_wrapper_x64_windows_ssefpu_cet_patch_9
+raw_hook_wrapper_x64_windows_ssefpu_cet_patch_9:
+	mov rdx, qword ptr [rsp + 0x7fffffff]
+.globl raw_hook_wrapper_x64_windows_ssefpu_cet_patch_9_end
+raw_hook_wrapper_x64_windows_ssefpu_cet_patch_9_end:
+	mov qword ptr [rcx], rdx
+raw_hook_wrapper_x64_windows_ssefpu_direct_return:
+.globl raw_hook_wrapper_x64_windows_ssefpu_patch_56
+raw_hook_wrapper_x64_windows_ssefpu_patch_56:
+	push qword ptr [rsp + 0x7fffffff]
+.globl raw_hook_wrapper_x64_windows_ssefpu_patch_56_end
+raw_hook_wrapper_x64_windows_ssefpu_patch_56_end:
+	popfq
 .globl raw_hook_wrapper_x64_windows_ssefpu_patch_69
 raw_hook_wrapper_x64_windows_ssefpu_patch_69:
 	mov rdx, qword ptr [rsp + 0x7fffffff]
@@ -3195,6 +3651,35 @@ raw_hook_wrapper_x64_windows_ssefpu_patch_72:
 .globl raw_hook_wrapper_x64_windows_ssefpu_patch_72_end
 raw_hook_wrapper_x64_windows_ssefpu_patch_72_end:
 	ret
+raw_hook_wrapper_x64_windows_ssefpu_redirect_return:
+.globl raw_hook_wrapper_x64_windows_ssefpu_cet_patch_10
+raw_hook_wrapper_x64_windows_ssefpu_cet_patch_10:
+	push qword ptr [rsp + 0x7fffffff]
+.globl raw_hook_wrapper_x64_windows_ssefpu_cet_patch_10_end
+raw_hook_wrapper_x64_windows_ssefpu_cet_patch_10_end:
+	popfq
+.globl raw_hook_wrapper_x64_windows_ssefpu_cet_patch_11
+raw_hook_wrapper_x64_windows_ssefpu_cet_patch_11:
+	mov rdx, qword ptr [rsp + 0x7fffffff]
+.globl raw_hook_wrapper_x64_windows_ssefpu_cet_patch_11_end
+raw_hook_wrapper_x64_windows_ssefpu_cet_patch_11_end:
+.globl raw_hook_wrapper_x64_windows_ssefpu_cet_patch_12
+raw_hook_wrapper_x64_windows_ssefpu_cet_patch_12:
+	mov rcx, qword ptr [rsp + 0x7fffffff]
+.globl raw_hook_wrapper_x64_windows_ssefpu_cet_patch_12_end
+raw_hook_wrapper_x64_windows_ssefpu_cet_patch_12_end:
+.globl raw_hook_wrapper_x64_windows_ssefpu_cet_patch_13
+raw_hook_wrapper_x64_windows_ssefpu_cet_patch_13:
+	mov rax, qword ptr [rsp + 0x7fffffff]
+.globl raw_hook_wrapper_x64_windows_ssefpu_cet_patch_13_end
+raw_hook_wrapper_x64_windows_ssefpu_cet_patch_13_end:
+.globl raw_hook_wrapper_x64_windows_ssefpu_cet_patch_14
+raw_hook_wrapper_x64_windows_ssefpu_cet_patch_14:
+	mov rsp, qword ptr [rsp + 0x7fffffff]
+.globl raw_hook_wrapper_x64_windows_ssefpu_cet_patch_14_end
+raw_hook_wrapper_x64_windows_ssefpu_cet_patch_14_end:
+	lea rsp, [rsp + 0x8]
+	jmp qword ptr [rsp - 0x8]
 raw_hook_wrapper_x64_windows_ssefpu_nothing_modified:
 .globl raw_hook_wrapper_x64_windows_ssefpu_patch_73
 raw_hook_wrapper_x64_windows_ssefpu_patch_73:
@@ -3390,6 +3875,23 @@ raw_hook_wrapper_x64_windows_sse_patch_35:
 	movups xmmword ptr [rsp + 0x7fffffff], xmm15
 .globl raw_hook_wrapper_x64_windows_sse_patch_35_end
 raw_hook_wrapper_x64_windows_sse_patch_35_end:
+	mov rax, rsp
+.globl raw_hook_wrapper_x64_windows_sse_cet_patch_0
+raw_hook_wrapper_x64_windows_sse_cet_patch_0:
+	add rax, 0x7fffffff
+.globl raw_hook_wrapper_x64_windows_sse_cet_patch_0_end
+raw_hook_wrapper_x64_windows_sse_cet_patch_0_end:
+.globl raw_hook_wrapper_x64_windows_sse_cet_patch_1
+raw_hook_wrapper_x64_windows_sse_cet_patch_1:
+	mov qword ptr [rsp + 0x7fffffff], rax
+.globl raw_hook_wrapper_x64_windows_sse_cet_patch_1_end
+raw_hook_wrapper_x64_windows_sse_cet_patch_1_end:
+	mov rax, qword ptr [rax]
+.globl raw_hook_wrapper_x64_windows_sse_cet_patch_2
+raw_hook_wrapper_x64_windows_sse_cet_patch_2:
+	mov qword ptr [rsp + 0x7fffffff], rax
+.globl raw_hook_wrapper_x64_windows_sse_cet_patch_2_end
+raw_hook_wrapper_x64_windows_sse_cet_patch_2_end:
 	mov rcx, rsp
 	sub rsp, 0x20
 .globl raw_hook_wrapper_x64_windows_sse_patch_36
@@ -3486,12 +3988,6 @@ raw_hook_wrapper_x64_windows_sse_patch_53:
 	ldmxcsr dword ptr [rsp + 0x7fffffff]
 .globl raw_hook_wrapper_x64_windows_sse_patch_53_end
 raw_hook_wrapper_x64_windows_sse_patch_53_end:
-.globl raw_hook_wrapper_x64_windows_sse_patch_54
-raw_hook_wrapper_x64_windows_sse_patch_54:
-	push qword ptr [rsp + 0x7fffffff]
-.globl raw_hook_wrapper_x64_windows_sse_patch_54_end
-raw_hook_wrapper_x64_windows_sse_patch_54_end:
-	popfq
 .globl raw_hook_wrapper_x64_windows_sse_patch_55
 raw_hook_wrapper_x64_windows_sse_patch_55:
 	mov r15, qword ptr [rsp + 0x7fffffff]
@@ -3552,6 +4048,63 @@ raw_hook_wrapper_x64_windows_sse_patch_66:
 	mov rbx, qword ptr [rsp + 0x7fffffff]
 .globl raw_hook_wrapper_x64_windows_sse_patch_66_end
 raw_hook_wrapper_x64_windows_sse_patch_66_end:
+.globl raw_hook_wrapper_x64_windows_sse_cet_patch_3
+raw_hook_wrapper_x64_windows_sse_cet_patch_3:
+	mov rax, qword ptr [rsp + 0x7fffffff]
+.globl raw_hook_wrapper_x64_windows_sse_cet_patch_3_end
+raw_hook_wrapper_x64_windows_sse_cet_patch_3_end:
+	test rax, 0x7
+	jne raw_hook_wrapper_x64_windows_sse_unsupported_stack
+.globl raw_hook_wrapper_x64_windows_sse_cet_patch_4
+raw_hook_wrapper_x64_windows_sse_cet_patch_4:
+	lea rcx, [rsp + 0x7fffffff]
+.globl raw_hook_wrapper_x64_windows_sse_cet_patch_4_end
+raw_hook_wrapper_x64_windows_sse_cet_patch_4_end:
+	cmp rax, rcx
+	jb raw_hook_wrapper_x64_windows_sse_unsupported_stack
+.globl raw_hook_wrapper_x64_windows_sse_cet_patch_5
+raw_hook_wrapper_x64_windows_sse_cet_patch_5:
+	lea rcx, [rsp + 0x7fffffff]
+.globl raw_hook_wrapper_x64_windows_sse_cet_patch_5_end
+raw_hook_wrapper_x64_windows_sse_cet_patch_5_end:
+	cmp rax, rcx
+	ja raw_hook_wrapper_x64_windows_sse_unsupported_stack
+.globl raw_hook_wrapper_x64_windows_sse_cet_patch_6
+raw_hook_wrapper_x64_windows_sse_cet_patch_6:
+	mov rdx, qword ptr [rsp + 0x7fffffff]
+.globl raw_hook_wrapper_x64_windows_sse_cet_patch_6_end
+raw_hook_wrapper_x64_windows_sse_cet_patch_6_end:
+	cmp qword ptr [rcx], rdx
+	jne raw_hook_wrapper_x64_windows_sse_unsupported_stack
+	cmp rax, rcx
+	je raw_hook_wrapper_x64_windows_sse_direct_return
+	lea rax, [rax + 0x8]
+	cmp rax, rcx
+	je raw_hook_wrapper_x64_windows_sse_redirect_return
+raw_hook_wrapper_x64_windows_sse_unsupported_stack:
+.globl raw_hook_wrapper_x64_windows_sse_cet_patch_7
+raw_hook_wrapper_x64_windows_sse_cet_patch_7:
+	mov rcx, qword ptr [rsp + 0x7fffffff]
+.globl raw_hook_wrapper_x64_windows_sse_cet_patch_7_end
+raw_hook_wrapper_x64_windows_sse_cet_patch_7_end:
+.globl raw_hook_wrapper_x64_windows_sse_cet_patch_8
+raw_hook_wrapper_x64_windows_sse_cet_patch_8:
+	mov qword ptr [rsp + 0x7fffffff], rcx
+.globl raw_hook_wrapper_x64_windows_sse_cet_patch_8_end
+raw_hook_wrapper_x64_windows_sse_cet_patch_8_end:
+.globl raw_hook_wrapper_x64_windows_sse_cet_patch_9
+raw_hook_wrapper_x64_windows_sse_cet_patch_9:
+	mov rdx, qword ptr [rsp + 0x7fffffff]
+.globl raw_hook_wrapper_x64_windows_sse_cet_patch_9_end
+raw_hook_wrapper_x64_windows_sse_cet_patch_9_end:
+	mov qword ptr [rcx], rdx
+raw_hook_wrapper_x64_windows_sse_direct_return:
+.globl raw_hook_wrapper_x64_windows_sse_patch_54
+raw_hook_wrapper_x64_windows_sse_patch_54:
+	push qword ptr [rsp + 0x7fffffff]
+.globl raw_hook_wrapper_x64_windows_sse_patch_54_end
+raw_hook_wrapper_x64_windows_sse_patch_54_end:
+	popfq
 .globl raw_hook_wrapper_x64_windows_sse_patch_67
 raw_hook_wrapper_x64_windows_sse_patch_67:
 	mov rdx, qword ptr [rsp + 0x7fffffff]
@@ -3573,6 +4126,35 @@ raw_hook_wrapper_x64_windows_sse_patch_70:
 .globl raw_hook_wrapper_x64_windows_sse_patch_70_end
 raw_hook_wrapper_x64_windows_sse_patch_70_end:
 	ret
+raw_hook_wrapper_x64_windows_sse_redirect_return:
+.globl raw_hook_wrapper_x64_windows_sse_cet_patch_10
+raw_hook_wrapper_x64_windows_sse_cet_patch_10:
+	push qword ptr [rsp + 0x7fffffff]
+.globl raw_hook_wrapper_x64_windows_sse_cet_patch_10_end
+raw_hook_wrapper_x64_windows_sse_cet_patch_10_end:
+	popfq
+.globl raw_hook_wrapper_x64_windows_sse_cet_patch_11
+raw_hook_wrapper_x64_windows_sse_cet_patch_11:
+	mov rdx, qword ptr [rsp + 0x7fffffff]
+.globl raw_hook_wrapper_x64_windows_sse_cet_patch_11_end
+raw_hook_wrapper_x64_windows_sse_cet_patch_11_end:
+.globl raw_hook_wrapper_x64_windows_sse_cet_patch_12
+raw_hook_wrapper_x64_windows_sse_cet_patch_12:
+	mov rcx, qword ptr [rsp + 0x7fffffff]
+.globl raw_hook_wrapper_x64_windows_sse_cet_patch_12_end
+raw_hook_wrapper_x64_windows_sse_cet_patch_12_end:
+.globl raw_hook_wrapper_x64_windows_sse_cet_patch_13
+raw_hook_wrapper_x64_windows_sse_cet_patch_13:
+	mov rax, qword ptr [rsp + 0x7fffffff]
+.globl raw_hook_wrapper_x64_windows_sse_cet_patch_13_end
+raw_hook_wrapper_x64_windows_sse_cet_patch_13_end:
+.globl raw_hook_wrapper_x64_windows_sse_cet_patch_14
+raw_hook_wrapper_x64_windows_sse_cet_patch_14:
+	mov rsp, qword ptr [rsp + 0x7fffffff]
+.globl raw_hook_wrapper_x64_windows_sse_cet_patch_14_end
+raw_hook_wrapper_x64_windows_sse_cet_patch_14_end:
+	lea rsp, [rsp + 0x8]
+	jmp qword ptr [rsp - 0x8]
 raw_hook_wrapper_x64_windows_sse_nothing_modified:
 .globl raw_hook_wrapper_x64_windows_sse_patch_71
 raw_hook_wrapper_x64_windows_sse_patch_71:
@@ -3688,6 +4270,23 @@ raw_hook_wrapper_x64_windows_fpu_patch_19:
 	fsave [rsp + 0x7fffffff]
 .globl raw_hook_wrapper_x64_windows_fpu_patch_19_end
 raw_hook_wrapper_x64_windows_fpu_patch_19_end:
+	mov rax, rsp
+.globl raw_hook_wrapper_x64_windows_fpu_cet_patch_0
+raw_hook_wrapper_x64_windows_fpu_cet_patch_0:
+	add rax, 0x7fffffff
+.globl raw_hook_wrapper_x64_windows_fpu_cet_patch_0_end
+raw_hook_wrapper_x64_windows_fpu_cet_patch_0_end:
+.globl raw_hook_wrapper_x64_windows_fpu_cet_patch_1
+raw_hook_wrapper_x64_windows_fpu_cet_patch_1:
+	mov qword ptr [rsp + 0x7fffffff], rax
+.globl raw_hook_wrapper_x64_windows_fpu_cet_patch_1_end
+raw_hook_wrapper_x64_windows_fpu_cet_patch_1_end:
+	mov rax, qword ptr [rax]
+.globl raw_hook_wrapper_x64_windows_fpu_cet_patch_2
+raw_hook_wrapper_x64_windows_fpu_cet_patch_2:
+	mov qword ptr [rsp + 0x7fffffff], rax
+.globl raw_hook_wrapper_x64_windows_fpu_cet_patch_2_end
+raw_hook_wrapper_x64_windows_fpu_cet_patch_2_end:
 	mov rcx, rsp
 	sub rsp, 0x20
 .globl raw_hook_wrapper_x64_windows_fpu_patch_20
@@ -3704,12 +4303,6 @@ raw_hook_wrapper_x64_windows_fpu_patch_21:
 	frstor [rsp + 0x7fffffff]
 .globl raw_hook_wrapper_x64_windows_fpu_patch_21_end
 raw_hook_wrapper_x64_windows_fpu_patch_21_end:
-.globl raw_hook_wrapper_x64_windows_fpu_patch_22
-raw_hook_wrapper_x64_windows_fpu_patch_22:
-	push qword ptr [rsp + 0x7fffffff]
-.globl raw_hook_wrapper_x64_windows_fpu_patch_22_end
-raw_hook_wrapper_x64_windows_fpu_patch_22_end:
-	popfq
 .globl raw_hook_wrapper_x64_windows_fpu_patch_23
 raw_hook_wrapper_x64_windows_fpu_patch_23:
 	mov r15, qword ptr [rsp + 0x7fffffff]
@@ -3770,6 +4363,63 @@ raw_hook_wrapper_x64_windows_fpu_patch_34:
 	mov rbx, qword ptr [rsp + 0x7fffffff]
 .globl raw_hook_wrapper_x64_windows_fpu_patch_34_end
 raw_hook_wrapper_x64_windows_fpu_patch_34_end:
+.globl raw_hook_wrapper_x64_windows_fpu_cet_patch_3
+raw_hook_wrapper_x64_windows_fpu_cet_patch_3:
+	mov rax, qword ptr [rsp + 0x7fffffff]
+.globl raw_hook_wrapper_x64_windows_fpu_cet_patch_3_end
+raw_hook_wrapper_x64_windows_fpu_cet_patch_3_end:
+	test rax, 0x7
+	jne raw_hook_wrapper_x64_windows_fpu_unsupported_stack
+.globl raw_hook_wrapper_x64_windows_fpu_cet_patch_4
+raw_hook_wrapper_x64_windows_fpu_cet_patch_4:
+	lea rcx, [rsp + 0x7fffffff]
+.globl raw_hook_wrapper_x64_windows_fpu_cet_patch_4_end
+raw_hook_wrapper_x64_windows_fpu_cet_patch_4_end:
+	cmp rax, rcx
+	jb raw_hook_wrapper_x64_windows_fpu_unsupported_stack
+.globl raw_hook_wrapper_x64_windows_fpu_cet_patch_5
+raw_hook_wrapper_x64_windows_fpu_cet_patch_5:
+	lea rcx, [rsp + 0x7fffffff]
+.globl raw_hook_wrapper_x64_windows_fpu_cet_patch_5_end
+raw_hook_wrapper_x64_windows_fpu_cet_patch_5_end:
+	cmp rax, rcx
+	ja raw_hook_wrapper_x64_windows_fpu_unsupported_stack
+.globl raw_hook_wrapper_x64_windows_fpu_cet_patch_6
+raw_hook_wrapper_x64_windows_fpu_cet_patch_6:
+	mov rdx, qword ptr [rsp + 0x7fffffff]
+.globl raw_hook_wrapper_x64_windows_fpu_cet_patch_6_end
+raw_hook_wrapper_x64_windows_fpu_cet_patch_6_end:
+	cmp qword ptr [rcx], rdx
+	jne raw_hook_wrapper_x64_windows_fpu_unsupported_stack
+	cmp rax, rcx
+	je raw_hook_wrapper_x64_windows_fpu_direct_return
+	lea rax, [rax + 0x8]
+	cmp rax, rcx
+	je raw_hook_wrapper_x64_windows_fpu_redirect_return
+raw_hook_wrapper_x64_windows_fpu_unsupported_stack:
+.globl raw_hook_wrapper_x64_windows_fpu_cet_patch_7
+raw_hook_wrapper_x64_windows_fpu_cet_patch_7:
+	mov rcx, qword ptr [rsp + 0x7fffffff]
+.globl raw_hook_wrapper_x64_windows_fpu_cet_patch_7_end
+raw_hook_wrapper_x64_windows_fpu_cet_patch_7_end:
+.globl raw_hook_wrapper_x64_windows_fpu_cet_patch_8
+raw_hook_wrapper_x64_windows_fpu_cet_patch_8:
+	mov qword ptr [rsp + 0x7fffffff], rcx
+.globl raw_hook_wrapper_x64_windows_fpu_cet_patch_8_end
+raw_hook_wrapper_x64_windows_fpu_cet_patch_8_end:
+.globl raw_hook_wrapper_x64_windows_fpu_cet_patch_9
+raw_hook_wrapper_x64_windows_fpu_cet_patch_9:
+	mov rdx, qword ptr [rsp + 0x7fffffff]
+.globl raw_hook_wrapper_x64_windows_fpu_cet_patch_9_end
+raw_hook_wrapper_x64_windows_fpu_cet_patch_9_end:
+	mov qword ptr [rcx], rdx
+raw_hook_wrapper_x64_windows_fpu_direct_return:
+.globl raw_hook_wrapper_x64_windows_fpu_patch_22
+raw_hook_wrapper_x64_windows_fpu_patch_22:
+	push qword ptr [rsp + 0x7fffffff]
+.globl raw_hook_wrapper_x64_windows_fpu_patch_22_end
+raw_hook_wrapper_x64_windows_fpu_patch_22_end:
+	popfq
 .globl raw_hook_wrapper_x64_windows_fpu_patch_35
 raw_hook_wrapper_x64_windows_fpu_patch_35:
 	mov rdx, qword ptr [rsp + 0x7fffffff]
@@ -3791,6 +4441,35 @@ raw_hook_wrapper_x64_windows_fpu_patch_38:
 .globl raw_hook_wrapper_x64_windows_fpu_patch_38_end
 raw_hook_wrapper_x64_windows_fpu_patch_38_end:
 	ret
+raw_hook_wrapper_x64_windows_fpu_redirect_return:
+.globl raw_hook_wrapper_x64_windows_fpu_cet_patch_10
+raw_hook_wrapper_x64_windows_fpu_cet_patch_10:
+	push qword ptr [rsp + 0x7fffffff]
+.globl raw_hook_wrapper_x64_windows_fpu_cet_patch_10_end
+raw_hook_wrapper_x64_windows_fpu_cet_patch_10_end:
+	popfq
+.globl raw_hook_wrapper_x64_windows_fpu_cet_patch_11
+raw_hook_wrapper_x64_windows_fpu_cet_patch_11:
+	mov rdx, qword ptr [rsp + 0x7fffffff]
+.globl raw_hook_wrapper_x64_windows_fpu_cet_patch_11_end
+raw_hook_wrapper_x64_windows_fpu_cet_patch_11_end:
+.globl raw_hook_wrapper_x64_windows_fpu_cet_patch_12
+raw_hook_wrapper_x64_windows_fpu_cet_patch_12:
+	mov rcx, qword ptr [rsp + 0x7fffffff]
+.globl raw_hook_wrapper_x64_windows_fpu_cet_patch_12_end
+raw_hook_wrapper_x64_windows_fpu_cet_patch_12_end:
+.globl raw_hook_wrapper_x64_windows_fpu_cet_patch_13
+raw_hook_wrapper_x64_windows_fpu_cet_patch_13:
+	mov rax, qword ptr [rsp + 0x7fffffff]
+.globl raw_hook_wrapper_x64_windows_fpu_cet_patch_13_end
+raw_hook_wrapper_x64_windows_fpu_cet_patch_13_end:
+.globl raw_hook_wrapper_x64_windows_fpu_cet_patch_14
+raw_hook_wrapper_x64_windows_fpu_cet_patch_14:
+	mov rsp, qword ptr [rsp + 0x7fffffff]
+.globl raw_hook_wrapper_x64_windows_fpu_cet_patch_14_end
+raw_hook_wrapper_x64_windows_fpu_cet_patch_14_end:
+	lea rsp, [rsp + 0x8]
+	jmp qword ptr [rsp - 0x8]
 raw_hook_wrapper_x64_windows_fpu_nothing_modified:
 .globl raw_hook_wrapper_x64_windows_fpu_patch_39
 raw_hook_wrapper_x64_windows_fpu_patch_39:
@@ -3901,6 +4580,23 @@ raw_hook_wrapper_x64_windows_native_patch_18:
 	mov qword ptr [rsp + 0x7fffffff], r15
 .globl raw_hook_wrapper_x64_windows_native_patch_18_end
 raw_hook_wrapper_x64_windows_native_patch_18_end:
+	mov rax, rsp
+.globl raw_hook_wrapper_x64_windows_native_cet_patch_0
+raw_hook_wrapper_x64_windows_native_cet_patch_0:
+	add rax, 0x7fffffff
+.globl raw_hook_wrapper_x64_windows_native_cet_patch_0_end
+raw_hook_wrapper_x64_windows_native_cet_patch_0_end:
+.globl raw_hook_wrapper_x64_windows_native_cet_patch_1
+raw_hook_wrapper_x64_windows_native_cet_patch_1:
+	mov qword ptr [rsp + 0x7fffffff], rax
+.globl raw_hook_wrapper_x64_windows_native_cet_patch_1_end
+raw_hook_wrapper_x64_windows_native_cet_patch_1_end:
+	mov rax, qword ptr [rax]
+.globl raw_hook_wrapper_x64_windows_native_cet_patch_2
+raw_hook_wrapper_x64_windows_native_cet_patch_2:
+	mov qword ptr [rsp + 0x7fffffff], rax
+.globl raw_hook_wrapper_x64_windows_native_cet_patch_2_end
+raw_hook_wrapper_x64_windows_native_cet_patch_2_end:
 	mov rcx, rsp
 	sub rsp, 0x20
 .globl raw_hook_wrapper_x64_windows_native_patch_19
@@ -3912,12 +4608,6 @@ raw_hook_wrapper_x64_windows_native_patch_19_end:
 	add rsp, 0x20
 	test al, al
 	je raw_hook_wrapper_x64_windows_native_nothing_modified
-.globl raw_hook_wrapper_x64_windows_native_patch_20
-raw_hook_wrapper_x64_windows_native_patch_20:
-	push qword ptr [rsp + 0x7fffffff]
-.globl raw_hook_wrapper_x64_windows_native_patch_20_end
-raw_hook_wrapper_x64_windows_native_patch_20_end:
-	popfq
 .globl raw_hook_wrapper_x64_windows_native_patch_21
 raw_hook_wrapper_x64_windows_native_patch_21:
 	mov r15, qword ptr [rsp + 0x7fffffff]
@@ -3978,6 +4668,63 @@ raw_hook_wrapper_x64_windows_native_patch_32:
 	mov rbx, qword ptr [rsp + 0x7fffffff]
 .globl raw_hook_wrapper_x64_windows_native_patch_32_end
 raw_hook_wrapper_x64_windows_native_patch_32_end:
+.globl raw_hook_wrapper_x64_windows_native_cet_patch_3
+raw_hook_wrapper_x64_windows_native_cet_patch_3:
+	mov rax, qword ptr [rsp + 0x7fffffff]
+.globl raw_hook_wrapper_x64_windows_native_cet_patch_3_end
+raw_hook_wrapper_x64_windows_native_cet_patch_3_end:
+	test rax, 0x7
+	jne raw_hook_wrapper_x64_windows_native_unsupported_stack
+.globl raw_hook_wrapper_x64_windows_native_cet_patch_4
+raw_hook_wrapper_x64_windows_native_cet_patch_4:
+	lea rcx, [rsp + 0x7fffffff]
+.globl raw_hook_wrapper_x64_windows_native_cet_patch_4_end
+raw_hook_wrapper_x64_windows_native_cet_patch_4_end:
+	cmp rax, rcx
+	jb raw_hook_wrapper_x64_windows_native_unsupported_stack
+.globl raw_hook_wrapper_x64_windows_native_cet_patch_5
+raw_hook_wrapper_x64_windows_native_cet_patch_5:
+	lea rcx, [rsp + 0x7fffffff]
+.globl raw_hook_wrapper_x64_windows_native_cet_patch_5_end
+raw_hook_wrapper_x64_windows_native_cet_patch_5_end:
+	cmp rax, rcx
+	ja raw_hook_wrapper_x64_windows_native_unsupported_stack
+.globl raw_hook_wrapper_x64_windows_native_cet_patch_6
+raw_hook_wrapper_x64_windows_native_cet_patch_6:
+	mov rdx, qword ptr [rsp + 0x7fffffff]
+.globl raw_hook_wrapper_x64_windows_native_cet_patch_6_end
+raw_hook_wrapper_x64_windows_native_cet_patch_6_end:
+	cmp qword ptr [rcx], rdx
+	jne raw_hook_wrapper_x64_windows_native_unsupported_stack
+	cmp rax, rcx
+	je raw_hook_wrapper_x64_windows_native_direct_return
+	lea rax, [rax + 0x8]
+	cmp rax, rcx
+	je raw_hook_wrapper_x64_windows_native_redirect_return
+raw_hook_wrapper_x64_windows_native_unsupported_stack:
+.globl raw_hook_wrapper_x64_windows_native_cet_patch_7
+raw_hook_wrapper_x64_windows_native_cet_patch_7:
+	mov rcx, qword ptr [rsp + 0x7fffffff]
+.globl raw_hook_wrapper_x64_windows_native_cet_patch_7_end
+raw_hook_wrapper_x64_windows_native_cet_patch_7_end:
+.globl raw_hook_wrapper_x64_windows_native_cet_patch_8
+raw_hook_wrapper_x64_windows_native_cet_patch_8:
+	mov qword ptr [rsp + 0x7fffffff], rcx
+.globl raw_hook_wrapper_x64_windows_native_cet_patch_8_end
+raw_hook_wrapper_x64_windows_native_cet_patch_8_end:
+.globl raw_hook_wrapper_x64_windows_native_cet_patch_9
+raw_hook_wrapper_x64_windows_native_cet_patch_9:
+	mov rdx, qword ptr [rsp + 0x7fffffff]
+.globl raw_hook_wrapper_x64_windows_native_cet_patch_9_end
+raw_hook_wrapper_x64_windows_native_cet_patch_9_end:
+	mov qword ptr [rcx], rdx
+raw_hook_wrapper_x64_windows_native_direct_return:
+.globl raw_hook_wrapper_x64_windows_native_patch_20
+raw_hook_wrapper_x64_windows_native_patch_20:
+	push qword ptr [rsp + 0x7fffffff]
+.globl raw_hook_wrapper_x64_windows_native_patch_20_end
+raw_hook_wrapper_x64_windows_native_patch_20_end:
+	popfq
 .globl raw_hook_wrapper_x64_windows_native_patch_33
 raw_hook_wrapper_x64_windows_native_patch_33:
 	mov rdx, qword ptr [rsp + 0x7fffffff]
@@ -3999,6 +4746,35 @@ raw_hook_wrapper_x64_windows_native_patch_36:
 .globl raw_hook_wrapper_x64_windows_native_patch_36_end
 raw_hook_wrapper_x64_windows_native_patch_36_end:
 	ret
+raw_hook_wrapper_x64_windows_native_redirect_return:
+.globl raw_hook_wrapper_x64_windows_native_cet_patch_10
+raw_hook_wrapper_x64_windows_native_cet_patch_10:
+	push qword ptr [rsp + 0x7fffffff]
+.globl raw_hook_wrapper_x64_windows_native_cet_patch_10_end
+raw_hook_wrapper_x64_windows_native_cet_patch_10_end:
+	popfq
+.globl raw_hook_wrapper_x64_windows_native_cet_patch_11
+raw_hook_wrapper_x64_windows_native_cet_patch_11:
+	mov rdx, qword ptr [rsp + 0x7fffffff]
+.globl raw_hook_wrapper_x64_windows_native_cet_patch_11_end
+raw_hook_wrapper_x64_windows_native_cet_patch_11_end:
+.globl raw_hook_wrapper_x64_windows_native_cet_patch_12
+raw_hook_wrapper_x64_windows_native_cet_patch_12:
+	mov rcx, qword ptr [rsp + 0x7fffffff]
+.globl raw_hook_wrapper_x64_windows_native_cet_patch_12_end
+raw_hook_wrapper_x64_windows_native_cet_patch_12_end:
+.globl raw_hook_wrapper_x64_windows_native_cet_patch_13
+raw_hook_wrapper_x64_windows_native_cet_patch_13:
+	mov rax, qword ptr [rsp + 0x7fffffff]
+.globl raw_hook_wrapper_x64_windows_native_cet_patch_13_end
+raw_hook_wrapper_x64_windows_native_cet_patch_13_end:
+.globl raw_hook_wrapper_x64_windows_native_cet_patch_14
+raw_hook_wrapper_x64_windows_native_cet_patch_14:
+	mov rsp, qword ptr [rsp + 0x7fffffff]
+.globl raw_hook_wrapper_x64_windows_native_cet_patch_14_end
+raw_hook_wrapper_x64_windows_native_cet_patch_14_end:
+	lea rsp, [rsp + 0x8]
+	jmp qword ptr [rsp - 0x8]
 raw_hook_wrapper_x64_windows_native_nothing_modified:
 .globl raw_hook_wrapper_x64_windows_native_patch_37
 raw_hook_wrapper_x64_windows_native_patch_37:
@@ -4439,6 +5215,23 @@ raw_hook_wrapper_x64_systemv_avx512fpu_patch_84:
 	fsave [rsp + 0x7fffffff]
 .globl raw_hook_wrapper_x64_systemv_avx512fpu_patch_84_end
 raw_hook_wrapper_x64_systemv_avx512fpu_patch_84_end:
+	mov rax, rsp
+.globl raw_hook_wrapper_x64_systemv_avx512fpu_cet_patch_0
+raw_hook_wrapper_x64_systemv_avx512fpu_cet_patch_0:
+	add rax, 0x7fffffff
+.globl raw_hook_wrapper_x64_systemv_avx512fpu_cet_patch_0_end
+raw_hook_wrapper_x64_systemv_avx512fpu_cet_patch_0_end:
+.globl raw_hook_wrapper_x64_systemv_avx512fpu_cet_patch_1
+raw_hook_wrapper_x64_systemv_avx512fpu_cet_patch_1:
+	mov qword ptr [rsp + 0x7fffffff], rax
+.globl raw_hook_wrapper_x64_systemv_avx512fpu_cet_patch_1_end
+raw_hook_wrapper_x64_systemv_avx512fpu_cet_patch_1_end:
+	mov rax, qword ptr [rax]
+.globl raw_hook_wrapper_x64_systemv_avx512fpu_cet_patch_2
+raw_hook_wrapper_x64_systemv_avx512fpu_cet_patch_2:
+	mov qword ptr [rsp + 0x7fffffff], rax
+.globl raw_hook_wrapper_x64_systemv_avx512fpu_cet_patch_2_end
+raw_hook_wrapper_x64_systemv_avx512fpu_cet_patch_2_end:
 	mov rdi, rsp
 .globl raw_hook_wrapper_x64_systemv_avx512fpu_patch_85
 raw_hook_wrapper_x64_systemv_avx512fpu_patch_85:
@@ -4778,12 +5571,6 @@ raw_hook_wrapper_x64_systemv_avx512fpu_patch_151:
 	ldmxcsr dword ptr [rsp + 0x7fffffff]
 .globl raw_hook_wrapper_x64_systemv_avx512fpu_patch_151_end
 raw_hook_wrapper_x64_systemv_avx512fpu_patch_151_end:
-.globl raw_hook_wrapper_x64_systemv_avx512fpu_patch_152
-raw_hook_wrapper_x64_systemv_avx512fpu_patch_152:
-	push qword ptr [rsp + 0x7fffffff]
-.globl raw_hook_wrapper_x64_systemv_avx512fpu_patch_152_end
-raw_hook_wrapper_x64_systemv_avx512fpu_patch_152_end:
-	popfq
 .globl raw_hook_wrapper_x64_systemv_avx512fpu_patch_153
 raw_hook_wrapper_x64_systemv_avx512fpu_patch_153:
 	mov r15, qword ptr [rsp + 0x7fffffff]
@@ -4844,6 +5631,63 @@ raw_hook_wrapper_x64_systemv_avx512fpu_patch_164:
 	mov rbx, qword ptr [rsp + 0x7fffffff]
 .globl raw_hook_wrapper_x64_systemv_avx512fpu_patch_164_end
 raw_hook_wrapper_x64_systemv_avx512fpu_patch_164_end:
+.globl raw_hook_wrapper_x64_systemv_avx512fpu_cet_patch_3
+raw_hook_wrapper_x64_systemv_avx512fpu_cet_patch_3:
+	mov rax, qword ptr [rsp + 0x7fffffff]
+.globl raw_hook_wrapper_x64_systemv_avx512fpu_cet_patch_3_end
+raw_hook_wrapper_x64_systemv_avx512fpu_cet_patch_3_end:
+	test rax, 0x7
+	jne raw_hook_wrapper_x64_systemv_avx512fpu_unsupported_stack
+.globl raw_hook_wrapper_x64_systemv_avx512fpu_cet_patch_4
+raw_hook_wrapper_x64_systemv_avx512fpu_cet_patch_4:
+	lea rcx, [rsp + 0x7fffffff]
+.globl raw_hook_wrapper_x64_systemv_avx512fpu_cet_patch_4_end
+raw_hook_wrapper_x64_systemv_avx512fpu_cet_patch_4_end:
+	cmp rax, rcx
+	jb raw_hook_wrapper_x64_systemv_avx512fpu_unsupported_stack
+.globl raw_hook_wrapper_x64_systemv_avx512fpu_cet_patch_5
+raw_hook_wrapper_x64_systemv_avx512fpu_cet_patch_5:
+	lea rcx, [rsp + 0x7fffffff]
+.globl raw_hook_wrapper_x64_systemv_avx512fpu_cet_patch_5_end
+raw_hook_wrapper_x64_systemv_avx512fpu_cet_patch_5_end:
+	cmp rax, rcx
+	ja raw_hook_wrapper_x64_systemv_avx512fpu_unsupported_stack
+.globl raw_hook_wrapper_x64_systemv_avx512fpu_cet_patch_6
+raw_hook_wrapper_x64_systemv_avx512fpu_cet_patch_6:
+	mov rdx, qword ptr [rsp + 0x7fffffff]
+.globl raw_hook_wrapper_x64_systemv_avx512fpu_cet_patch_6_end
+raw_hook_wrapper_x64_systemv_avx512fpu_cet_patch_6_end:
+	cmp qword ptr [rcx], rdx
+	jne raw_hook_wrapper_x64_systemv_avx512fpu_unsupported_stack
+	cmp rax, rcx
+	je raw_hook_wrapper_x64_systemv_avx512fpu_direct_return
+	lea rax, [rax + 0x8]
+	cmp rax, rcx
+	je raw_hook_wrapper_x64_systemv_avx512fpu_redirect_return
+raw_hook_wrapper_x64_systemv_avx512fpu_unsupported_stack:
+.globl raw_hook_wrapper_x64_systemv_avx512fpu_cet_patch_7
+raw_hook_wrapper_x64_systemv_avx512fpu_cet_patch_7:
+	mov rcx, qword ptr [rsp + 0x7fffffff]
+.globl raw_hook_wrapper_x64_systemv_avx512fpu_cet_patch_7_end
+raw_hook_wrapper_x64_systemv_avx512fpu_cet_patch_7_end:
+.globl raw_hook_wrapper_x64_systemv_avx512fpu_cet_patch_8
+raw_hook_wrapper_x64_systemv_avx512fpu_cet_patch_8:
+	mov qword ptr [rsp + 0x7fffffff], rcx
+.globl raw_hook_wrapper_x64_systemv_avx512fpu_cet_patch_8_end
+raw_hook_wrapper_x64_systemv_avx512fpu_cet_patch_8_end:
+.globl raw_hook_wrapper_x64_systemv_avx512fpu_cet_patch_9
+raw_hook_wrapper_x64_systemv_avx512fpu_cet_patch_9:
+	mov rdx, qword ptr [rsp + 0x7fffffff]
+.globl raw_hook_wrapper_x64_systemv_avx512fpu_cet_patch_9_end
+raw_hook_wrapper_x64_systemv_avx512fpu_cet_patch_9_end:
+	mov qword ptr [rcx], rdx
+raw_hook_wrapper_x64_systemv_avx512fpu_direct_return:
+.globl raw_hook_wrapper_x64_systemv_avx512fpu_patch_152
+raw_hook_wrapper_x64_systemv_avx512fpu_patch_152:
+	push qword ptr [rsp + 0x7fffffff]
+.globl raw_hook_wrapper_x64_systemv_avx512fpu_patch_152_end
+raw_hook_wrapper_x64_systemv_avx512fpu_patch_152_end:
+	popfq
 .globl raw_hook_wrapper_x64_systemv_avx512fpu_patch_165
 raw_hook_wrapper_x64_systemv_avx512fpu_patch_165:
 	mov rdx, qword ptr [rsp + 0x7fffffff]
@@ -4865,6 +5709,35 @@ raw_hook_wrapper_x64_systemv_avx512fpu_patch_168:
 .globl raw_hook_wrapper_x64_systemv_avx512fpu_patch_168_end
 raw_hook_wrapper_x64_systemv_avx512fpu_patch_168_end:
 	ret
+raw_hook_wrapper_x64_systemv_avx512fpu_redirect_return:
+.globl raw_hook_wrapper_x64_systemv_avx512fpu_cet_patch_10
+raw_hook_wrapper_x64_systemv_avx512fpu_cet_patch_10:
+	push qword ptr [rsp + 0x7fffffff]
+.globl raw_hook_wrapper_x64_systemv_avx512fpu_cet_patch_10_end
+raw_hook_wrapper_x64_systemv_avx512fpu_cet_patch_10_end:
+	popfq
+.globl raw_hook_wrapper_x64_systemv_avx512fpu_cet_patch_11
+raw_hook_wrapper_x64_systemv_avx512fpu_cet_patch_11:
+	mov rdx, qword ptr [rsp + 0x7fffffff]
+.globl raw_hook_wrapper_x64_systemv_avx512fpu_cet_patch_11_end
+raw_hook_wrapper_x64_systemv_avx512fpu_cet_patch_11_end:
+.globl raw_hook_wrapper_x64_systemv_avx512fpu_cet_patch_12
+raw_hook_wrapper_x64_systemv_avx512fpu_cet_patch_12:
+	mov rcx, qword ptr [rsp + 0x7fffffff]
+.globl raw_hook_wrapper_x64_systemv_avx512fpu_cet_patch_12_end
+raw_hook_wrapper_x64_systemv_avx512fpu_cet_patch_12_end:
+.globl raw_hook_wrapper_x64_systemv_avx512fpu_cet_patch_13
+raw_hook_wrapper_x64_systemv_avx512fpu_cet_patch_13:
+	mov rax, qword ptr [rsp + 0x7fffffff]
+.globl raw_hook_wrapper_x64_systemv_avx512fpu_cet_patch_13_end
+raw_hook_wrapper_x64_systemv_avx512fpu_cet_patch_13_end:
+.globl raw_hook_wrapper_x64_systemv_avx512fpu_cet_patch_14
+raw_hook_wrapper_x64_systemv_avx512fpu_cet_patch_14:
+	mov rsp, qword ptr [rsp + 0x7fffffff]
+.globl raw_hook_wrapper_x64_systemv_avx512fpu_cet_patch_14_end
+raw_hook_wrapper_x64_systemv_avx512fpu_cet_patch_14_end:
+	lea rsp, [rsp + 0x8]
+	jmp qword ptr [rsp - 0x8]
 raw_hook_wrapper_x64_systemv_avx512fpu_nothing_modified:
 .globl raw_hook_wrapper_x64_systemv_avx512fpu_patch_169
 raw_hook_wrapper_x64_systemv_avx512fpu_patch_169:
@@ -5300,6 +6173,23 @@ raw_hook_wrapper_x64_systemv_avx512_patch_83:
 	vmovups zmmword ptr [rsp + 0x7fffffff], zmm31
 .globl raw_hook_wrapper_x64_systemv_avx512_patch_83_end
 raw_hook_wrapper_x64_systemv_avx512_patch_83_end:
+	mov rax, rsp
+.globl raw_hook_wrapper_x64_systemv_avx512_cet_patch_0
+raw_hook_wrapper_x64_systemv_avx512_cet_patch_0:
+	add rax, 0x7fffffff
+.globl raw_hook_wrapper_x64_systemv_avx512_cet_patch_0_end
+raw_hook_wrapper_x64_systemv_avx512_cet_patch_0_end:
+.globl raw_hook_wrapper_x64_systemv_avx512_cet_patch_1
+raw_hook_wrapper_x64_systemv_avx512_cet_patch_1:
+	mov qword ptr [rsp + 0x7fffffff], rax
+.globl raw_hook_wrapper_x64_systemv_avx512_cet_patch_1_end
+raw_hook_wrapper_x64_systemv_avx512_cet_patch_1_end:
+	mov rax, qword ptr [rax]
+.globl raw_hook_wrapper_x64_systemv_avx512_cet_patch_2
+raw_hook_wrapper_x64_systemv_avx512_cet_patch_2:
+	mov qword ptr [rsp + 0x7fffffff], rax
+.globl raw_hook_wrapper_x64_systemv_avx512_cet_patch_2_end
+raw_hook_wrapper_x64_systemv_avx512_cet_patch_2_end:
 	mov rdi, rsp
 .globl raw_hook_wrapper_x64_systemv_avx512_patch_84
 raw_hook_wrapper_x64_systemv_avx512_patch_84:
@@ -5634,12 +6524,6 @@ raw_hook_wrapper_x64_systemv_avx512_patch_149:
 	ldmxcsr dword ptr [rsp + 0x7fffffff]
 .globl raw_hook_wrapper_x64_systemv_avx512_patch_149_end
 raw_hook_wrapper_x64_systemv_avx512_patch_149_end:
-.globl raw_hook_wrapper_x64_systemv_avx512_patch_150
-raw_hook_wrapper_x64_systemv_avx512_patch_150:
-	push qword ptr [rsp + 0x7fffffff]
-.globl raw_hook_wrapper_x64_systemv_avx512_patch_150_end
-raw_hook_wrapper_x64_systemv_avx512_patch_150_end:
-	popfq
 .globl raw_hook_wrapper_x64_systemv_avx512_patch_151
 raw_hook_wrapper_x64_systemv_avx512_patch_151:
 	mov r15, qword ptr [rsp + 0x7fffffff]
@@ -5700,6 +6584,63 @@ raw_hook_wrapper_x64_systemv_avx512_patch_162:
 	mov rbx, qword ptr [rsp + 0x7fffffff]
 .globl raw_hook_wrapper_x64_systemv_avx512_patch_162_end
 raw_hook_wrapper_x64_systemv_avx512_patch_162_end:
+.globl raw_hook_wrapper_x64_systemv_avx512_cet_patch_3
+raw_hook_wrapper_x64_systemv_avx512_cet_patch_3:
+	mov rax, qword ptr [rsp + 0x7fffffff]
+.globl raw_hook_wrapper_x64_systemv_avx512_cet_patch_3_end
+raw_hook_wrapper_x64_systemv_avx512_cet_patch_3_end:
+	test rax, 0x7
+	jne raw_hook_wrapper_x64_systemv_avx512_unsupported_stack
+.globl raw_hook_wrapper_x64_systemv_avx512_cet_patch_4
+raw_hook_wrapper_x64_systemv_avx512_cet_patch_4:
+	lea rcx, [rsp + 0x7fffffff]
+.globl raw_hook_wrapper_x64_systemv_avx512_cet_patch_4_end
+raw_hook_wrapper_x64_systemv_avx512_cet_patch_4_end:
+	cmp rax, rcx
+	jb raw_hook_wrapper_x64_systemv_avx512_unsupported_stack
+.globl raw_hook_wrapper_x64_systemv_avx512_cet_patch_5
+raw_hook_wrapper_x64_systemv_avx512_cet_patch_5:
+	lea rcx, [rsp + 0x7fffffff]
+.globl raw_hook_wrapper_x64_systemv_avx512_cet_patch_5_end
+raw_hook_wrapper_x64_systemv_avx512_cet_patch_5_end:
+	cmp rax, rcx
+	ja raw_hook_wrapper_x64_systemv_avx512_unsupported_stack
+.globl raw_hook_wrapper_x64_systemv_avx512_cet_patch_6
+raw_hook_wrapper_x64_systemv_avx512_cet_patch_6:
+	mov rdx, qword ptr [rsp + 0x7fffffff]
+.globl raw_hook_wrapper_x64_systemv_avx512_cet_patch_6_end
+raw_hook_wrapper_x64_systemv_avx512_cet_patch_6_end:
+	cmp qword ptr [rcx], rdx
+	jne raw_hook_wrapper_x64_systemv_avx512_unsupported_stack
+	cmp rax, rcx
+	je raw_hook_wrapper_x64_systemv_avx512_direct_return
+	lea rax, [rax + 0x8]
+	cmp rax, rcx
+	je raw_hook_wrapper_x64_systemv_avx512_redirect_return
+raw_hook_wrapper_x64_systemv_avx512_unsupported_stack:
+.globl raw_hook_wrapper_x64_systemv_avx512_cet_patch_7
+raw_hook_wrapper_x64_systemv_avx512_cet_patch_7:
+	mov rcx, qword ptr [rsp + 0x7fffffff]
+.globl raw_hook_wrapper_x64_systemv_avx512_cet_patch_7_end
+raw_hook_wrapper_x64_systemv_avx512_cet_patch_7_end:
+.globl raw_hook_wrapper_x64_systemv_avx512_cet_patch_8
+raw_hook_wrapper_x64_systemv_avx512_cet_patch_8:
+	mov qword ptr [rsp + 0x7fffffff], rcx
+.globl raw_hook_wrapper_x64_systemv_avx512_cet_patch_8_end
+raw_hook_wrapper_x64_systemv_avx512_cet_patch_8_end:
+.globl raw_hook_wrapper_x64_systemv_avx512_cet_patch_9
+raw_hook_wrapper_x64_systemv_avx512_cet_patch_9:
+	mov rdx, qword ptr [rsp + 0x7fffffff]
+.globl raw_hook_wrapper_x64_systemv_avx512_cet_patch_9_end
+raw_hook_wrapper_x64_systemv_avx512_cet_patch_9_end:
+	mov qword ptr [rcx], rdx
+raw_hook_wrapper_x64_systemv_avx512_direct_return:
+.globl raw_hook_wrapper_x64_systemv_avx512_patch_150
+raw_hook_wrapper_x64_systemv_avx512_patch_150:
+	push qword ptr [rsp + 0x7fffffff]
+.globl raw_hook_wrapper_x64_systemv_avx512_patch_150_end
+raw_hook_wrapper_x64_systemv_avx512_patch_150_end:
+	popfq
 .globl raw_hook_wrapper_x64_systemv_avx512_patch_163
 raw_hook_wrapper_x64_systemv_avx512_patch_163:
 	mov rdx, qword ptr [rsp + 0x7fffffff]
@@ -5721,6 +6662,35 @@ raw_hook_wrapper_x64_systemv_avx512_patch_166:
 .globl raw_hook_wrapper_x64_systemv_avx512_patch_166_end
 raw_hook_wrapper_x64_systemv_avx512_patch_166_end:
 	ret
+raw_hook_wrapper_x64_systemv_avx512_redirect_return:
+.globl raw_hook_wrapper_x64_systemv_avx512_cet_patch_10
+raw_hook_wrapper_x64_systemv_avx512_cet_patch_10:
+	push qword ptr [rsp + 0x7fffffff]
+.globl raw_hook_wrapper_x64_systemv_avx512_cet_patch_10_end
+raw_hook_wrapper_x64_systemv_avx512_cet_patch_10_end:
+	popfq
+.globl raw_hook_wrapper_x64_systemv_avx512_cet_patch_11
+raw_hook_wrapper_x64_systemv_avx512_cet_patch_11:
+	mov rdx, qword ptr [rsp + 0x7fffffff]
+.globl raw_hook_wrapper_x64_systemv_avx512_cet_patch_11_end
+raw_hook_wrapper_x64_systemv_avx512_cet_patch_11_end:
+.globl raw_hook_wrapper_x64_systemv_avx512_cet_patch_12
+raw_hook_wrapper_x64_systemv_avx512_cet_patch_12:
+	mov rcx, qword ptr [rsp + 0x7fffffff]
+.globl raw_hook_wrapper_x64_systemv_avx512_cet_patch_12_end
+raw_hook_wrapper_x64_systemv_avx512_cet_patch_12_end:
+.globl raw_hook_wrapper_x64_systemv_avx512_cet_patch_13
+raw_hook_wrapper_x64_systemv_avx512_cet_patch_13:
+	mov rax, qword ptr [rsp + 0x7fffffff]
+.globl raw_hook_wrapper_x64_systemv_avx512_cet_patch_13_end
+raw_hook_wrapper_x64_systemv_avx512_cet_patch_13_end:
+.globl raw_hook_wrapper_x64_systemv_avx512_cet_patch_14
+raw_hook_wrapper_x64_systemv_avx512_cet_patch_14:
+	mov rsp, qword ptr [rsp + 0x7fffffff]
+.globl raw_hook_wrapper_x64_systemv_avx512_cet_patch_14_end
+raw_hook_wrapper_x64_systemv_avx512_cet_patch_14_end:
+	lea rsp, [rsp + 0x8]
+	jmp qword ptr [rsp - 0x8]
 raw_hook_wrapper_x64_systemv_avx512_nothing_modified:
 .globl raw_hook_wrapper_x64_systemv_avx512_patch_167
 raw_hook_wrapper_x64_systemv_avx512_patch_167:
@@ -6001,6 +6971,23 @@ raw_hook_wrapper_x64_systemv_avxfpu_patch_52:
 	fsave [rsp + 0x7fffffff]
 .globl raw_hook_wrapper_x64_systemv_avxfpu_patch_52_end
 raw_hook_wrapper_x64_systemv_avxfpu_patch_52_end:
+	mov rax, rsp
+.globl raw_hook_wrapper_x64_systemv_avxfpu_cet_patch_0
+raw_hook_wrapper_x64_systemv_avxfpu_cet_patch_0:
+	add rax, 0x7fffffff
+.globl raw_hook_wrapper_x64_systemv_avxfpu_cet_patch_0_end
+raw_hook_wrapper_x64_systemv_avxfpu_cet_patch_0_end:
+.globl raw_hook_wrapper_x64_systemv_avxfpu_cet_patch_1
+raw_hook_wrapper_x64_systemv_avxfpu_cet_patch_1:
+	mov qword ptr [rsp + 0x7fffffff], rax
+.globl raw_hook_wrapper_x64_systemv_avxfpu_cet_patch_1_end
+raw_hook_wrapper_x64_systemv_avxfpu_cet_patch_1_end:
+	mov rax, qword ptr [rax]
+.globl raw_hook_wrapper_x64_systemv_avxfpu_cet_patch_2
+raw_hook_wrapper_x64_systemv_avxfpu_cet_patch_2:
+	mov qword ptr [rsp + 0x7fffffff], rax
+.globl raw_hook_wrapper_x64_systemv_avxfpu_cet_patch_2_end
+raw_hook_wrapper_x64_systemv_avxfpu_cet_patch_2_end:
 	mov rdi, rsp
 .globl raw_hook_wrapper_x64_systemv_avxfpu_patch_53
 raw_hook_wrapper_x64_systemv_avxfpu_patch_53:
@@ -6180,12 +7167,6 @@ raw_hook_wrapper_x64_systemv_avxfpu_patch_87:
 	ldmxcsr dword ptr [rsp + 0x7fffffff]
 .globl raw_hook_wrapper_x64_systemv_avxfpu_patch_87_end
 raw_hook_wrapper_x64_systemv_avxfpu_patch_87_end:
-.globl raw_hook_wrapper_x64_systemv_avxfpu_patch_88
-raw_hook_wrapper_x64_systemv_avxfpu_patch_88:
-	push qword ptr [rsp + 0x7fffffff]
-.globl raw_hook_wrapper_x64_systemv_avxfpu_patch_88_end
-raw_hook_wrapper_x64_systemv_avxfpu_patch_88_end:
-	popfq
 .globl raw_hook_wrapper_x64_systemv_avxfpu_patch_89
 raw_hook_wrapper_x64_systemv_avxfpu_patch_89:
 	mov r15, qword ptr [rsp + 0x7fffffff]
@@ -6246,6 +7227,63 @@ raw_hook_wrapper_x64_systemv_avxfpu_patch_100:
 	mov rbx, qword ptr [rsp + 0x7fffffff]
 .globl raw_hook_wrapper_x64_systemv_avxfpu_patch_100_end
 raw_hook_wrapper_x64_systemv_avxfpu_patch_100_end:
+.globl raw_hook_wrapper_x64_systemv_avxfpu_cet_patch_3
+raw_hook_wrapper_x64_systemv_avxfpu_cet_patch_3:
+	mov rax, qword ptr [rsp + 0x7fffffff]
+.globl raw_hook_wrapper_x64_systemv_avxfpu_cet_patch_3_end
+raw_hook_wrapper_x64_systemv_avxfpu_cet_patch_3_end:
+	test rax, 0x7
+	jne raw_hook_wrapper_x64_systemv_avxfpu_unsupported_stack
+.globl raw_hook_wrapper_x64_systemv_avxfpu_cet_patch_4
+raw_hook_wrapper_x64_systemv_avxfpu_cet_patch_4:
+	lea rcx, [rsp + 0x7fffffff]
+.globl raw_hook_wrapper_x64_systemv_avxfpu_cet_patch_4_end
+raw_hook_wrapper_x64_systemv_avxfpu_cet_patch_4_end:
+	cmp rax, rcx
+	jb raw_hook_wrapper_x64_systemv_avxfpu_unsupported_stack
+.globl raw_hook_wrapper_x64_systemv_avxfpu_cet_patch_5
+raw_hook_wrapper_x64_systemv_avxfpu_cet_patch_5:
+	lea rcx, [rsp + 0x7fffffff]
+.globl raw_hook_wrapper_x64_systemv_avxfpu_cet_patch_5_end
+raw_hook_wrapper_x64_systemv_avxfpu_cet_patch_5_end:
+	cmp rax, rcx
+	ja raw_hook_wrapper_x64_systemv_avxfpu_unsupported_stack
+.globl raw_hook_wrapper_x64_systemv_avxfpu_cet_patch_6
+raw_hook_wrapper_x64_systemv_avxfpu_cet_patch_6:
+	mov rdx, qword ptr [rsp + 0x7fffffff]
+.globl raw_hook_wrapper_x64_systemv_avxfpu_cet_patch_6_end
+raw_hook_wrapper_x64_systemv_avxfpu_cet_patch_6_end:
+	cmp qword ptr [rcx], rdx
+	jne raw_hook_wrapper_x64_systemv_avxfpu_unsupported_stack
+	cmp rax, rcx
+	je raw_hook_wrapper_x64_systemv_avxfpu_direct_return
+	lea rax, [rax + 0x8]
+	cmp rax, rcx
+	je raw_hook_wrapper_x64_systemv_avxfpu_redirect_return
+raw_hook_wrapper_x64_systemv_avxfpu_unsupported_stack:
+.globl raw_hook_wrapper_x64_systemv_avxfpu_cet_patch_7
+raw_hook_wrapper_x64_systemv_avxfpu_cet_patch_7:
+	mov rcx, qword ptr [rsp + 0x7fffffff]
+.globl raw_hook_wrapper_x64_systemv_avxfpu_cet_patch_7_end
+raw_hook_wrapper_x64_systemv_avxfpu_cet_patch_7_end:
+.globl raw_hook_wrapper_x64_systemv_avxfpu_cet_patch_8
+raw_hook_wrapper_x64_systemv_avxfpu_cet_patch_8:
+	mov qword ptr [rsp + 0x7fffffff], rcx
+.globl raw_hook_wrapper_x64_systemv_avxfpu_cet_patch_8_end
+raw_hook_wrapper_x64_systemv_avxfpu_cet_patch_8_end:
+.globl raw_hook_wrapper_x64_systemv_avxfpu_cet_patch_9
+raw_hook_wrapper_x64_systemv_avxfpu_cet_patch_9:
+	mov rdx, qword ptr [rsp + 0x7fffffff]
+.globl raw_hook_wrapper_x64_systemv_avxfpu_cet_patch_9_end
+raw_hook_wrapper_x64_systemv_avxfpu_cet_patch_9_end:
+	mov qword ptr [rcx], rdx
+raw_hook_wrapper_x64_systemv_avxfpu_direct_return:
+.globl raw_hook_wrapper_x64_systemv_avxfpu_patch_88
+raw_hook_wrapper_x64_systemv_avxfpu_patch_88:
+	push qword ptr [rsp + 0x7fffffff]
+.globl raw_hook_wrapper_x64_systemv_avxfpu_patch_88_end
+raw_hook_wrapper_x64_systemv_avxfpu_patch_88_end:
+	popfq
 .globl raw_hook_wrapper_x64_systemv_avxfpu_patch_101
 raw_hook_wrapper_x64_systemv_avxfpu_patch_101:
 	mov rdx, qword ptr [rsp + 0x7fffffff]
@@ -6267,6 +7305,35 @@ raw_hook_wrapper_x64_systemv_avxfpu_patch_104:
 .globl raw_hook_wrapper_x64_systemv_avxfpu_patch_104_end
 raw_hook_wrapper_x64_systemv_avxfpu_patch_104_end:
 	ret
+raw_hook_wrapper_x64_systemv_avxfpu_redirect_return:
+.globl raw_hook_wrapper_x64_systemv_avxfpu_cet_patch_10
+raw_hook_wrapper_x64_systemv_avxfpu_cet_patch_10:
+	push qword ptr [rsp + 0x7fffffff]
+.globl raw_hook_wrapper_x64_systemv_avxfpu_cet_patch_10_end
+raw_hook_wrapper_x64_systemv_avxfpu_cet_patch_10_end:
+	popfq
+.globl raw_hook_wrapper_x64_systemv_avxfpu_cet_patch_11
+raw_hook_wrapper_x64_systemv_avxfpu_cet_patch_11:
+	mov rdx, qword ptr [rsp + 0x7fffffff]
+.globl raw_hook_wrapper_x64_systemv_avxfpu_cet_patch_11_end
+raw_hook_wrapper_x64_systemv_avxfpu_cet_patch_11_end:
+.globl raw_hook_wrapper_x64_systemv_avxfpu_cet_patch_12
+raw_hook_wrapper_x64_systemv_avxfpu_cet_patch_12:
+	mov rcx, qword ptr [rsp + 0x7fffffff]
+.globl raw_hook_wrapper_x64_systemv_avxfpu_cet_patch_12_end
+raw_hook_wrapper_x64_systemv_avxfpu_cet_patch_12_end:
+.globl raw_hook_wrapper_x64_systemv_avxfpu_cet_patch_13
+raw_hook_wrapper_x64_systemv_avxfpu_cet_patch_13:
+	mov rax, qword ptr [rsp + 0x7fffffff]
+.globl raw_hook_wrapper_x64_systemv_avxfpu_cet_patch_13_end
+raw_hook_wrapper_x64_systemv_avxfpu_cet_patch_13_end:
+.globl raw_hook_wrapper_x64_systemv_avxfpu_cet_patch_14
+raw_hook_wrapper_x64_systemv_avxfpu_cet_patch_14:
+	mov rsp, qword ptr [rsp + 0x7fffffff]
+.globl raw_hook_wrapper_x64_systemv_avxfpu_cet_patch_14_end
+raw_hook_wrapper_x64_systemv_avxfpu_cet_patch_14_end:
+	lea rsp, [rsp + 0x8]
+	jmp qword ptr [rsp - 0x8]
 raw_hook_wrapper_x64_systemv_avxfpu_nothing_modified:
 .globl raw_hook_wrapper_x64_systemv_avxfpu_patch_105
 raw_hook_wrapper_x64_systemv_avxfpu_patch_105:
@@ -6542,6 +7609,23 @@ raw_hook_wrapper_x64_systemv_avx_patch_51:
 	vmovups ymmword ptr [rsp + 0x7fffffff], ymm15
 .globl raw_hook_wrapper_x64_systemv_avx_patch_51_end
 raw_hook_wrapper_x64_systemv_avx_patch_51_end:
+	mov rax, rsp
+.globl raw_hook_wrapper_x64_systemv_avx_cet_patch_0
+raw_hook_wrapper_x64_systemv_avx_cet_patch_0:
+	add rax, 0x7fffffff
+.globl raw_hook_wrapper_x64_systemv_avx_cet_patch_0_end
+raw_hook_wrapper_x64_systemv_avx_cet_patch_0_end:
+.globl raw_hook_wrapper_x64_systemv_avx_cet_patch_1
+raw_hook_wrapper_x64_systemv_avx_cet_patch_1:
+	mov qword ptr [rsp + 0x7fffffff], rax
+.globl raw_hook_wrapper_x64_systemv_avx_cet_patch_1_end
+raw_hook_wrapper_x64_systemv_avx_cet_patch_1_end:
+	mov rax, qword ptr [rax]
+.globl raw_hook_wrapper_x64_systemv_avx_cet_patch_2
+raw_hook_wrapper_x64_systemv_avx_cet_patch_2:
+	mov qword ptr [rsp + 0x7fffffff], rax
+.globl raw_hook_wrapper_x64_systemv_avx_cet_patch_2_end
+raw_hook_wrapper_x64_systemv_avx_cet_patch_2_end:
 	mov rdi, rsp
 .globl raw_hook_wrapper_x64_systemv_avx_patch_52
 raw_hook_wrapper_x64_systemv_avx_patch_52:
@@ -6716,12 +7800,6 @@ raw_hook_wrapper_x64_systemv_avx_patch_85:
 	ldmxcsr dword ptr [rsp + 0x7fffffff]
 .globl raw_hook_wrapper_x64_systemv_avx_patch_85_end
 raw_hook_wrapper_x64_systemv_avx_patch_85_end:
-.globl raw_hook_wrapper_x64_systemv_avx_patch_86
-raw_hook_wrapper_x64_systemv_avx_patch_86:
-	push qword ptr [rsp + 0x7fffffff]
-.globl raw_hook_wrapper_x64_systemv_avx_patch_86_end
-raw_hook_wrapper_x64_systemv_avx_patch_86_end:
-	popfq
 .globl raw_hook_wrapper_x64_systemv_avx_patch_87
 raw_hook_wrapper_x64_systemv_avx_patch_87:
 	mov r15, qword ptr [rsp + 0x7fffffff]
@@ -6782,6 +7860,63 @@ raw_hook_wrapper_x64_systemv_avx_patch_98:
 	mov rbx, qword ptr [rsp + 0x7fffffff]
 .globl raw_hook_wrapper_x64_systemv_avx_patch_98_end
 raw_hook_wrapper_x64_systemv_avx_patch_98_end:
+.globl raw_hook_wrapper_x64_systemv_avx_cet_patch_3
+raw_hook_wrapper_x64_systemv_avx_cet_patch_3:
+	mov rax, qword ptr [rsp + 0x7fffffff]
+.globl raw_hook_wrapper_x64_systemv_avx_cet_patch_3_end
+raw_hook_wrapper_x64_systemv_avx_cet_patch_3_end:
+	test rax, 0x7
+	jne raw_hook_wrapper_x64_systemv_avx_unsupported_stack
+.globl raw_hook_wrapper_x64_systemv_avx_cet_patch_4
+raw_hook_wrapper_x64_systemv_avx_cet_patch_4:
+	lea rcx, [rsp + 0x7fffffff]
+.globl raw_hook_wrapper_x64_systemv_avx_cet_patch_4_end
+raw_hook_wrapper_x64_systemv_avx_cet_patch_4_end:
+	cmp rax, rcx
+	jb raw_hook_wrapper_x64_systemv_avx_unsupported_stack
+.globl raw_hook_wrapper_x64_systemv_avx_cet_patch_5
+raw_hook_wrapper_x64_systemv_avx_cet_patch_5:
+	lea rcx, [rsp + 0x7fffffff]
+.globl raw_hook_wrapper_x64_systemv_avx_cet_patch_5_end
+raw_hook_wrapper_x64_systemv_avx_cet_patch_5_end:
+	cmp rax, rcx
+	ja raw_hook_wrapper_x64_systemv_avx_unsupported_stack
+.globl raw_hook_wrapper_x64_systemv_avx_cet_patch_6
+raw_hook_wrapper_x64_systemv_avx_cet_patch_6:
+	mov rdx, qword ptr [rsp + 0x7fffffff]
+.globl raw_hook_wrapper_x64_systemv_avx_cet_patch_6_end
+raw_hook_wrapper_x64_systemv_avx_cet_patch_6_end:
+	cmp qword ptr [rcx], rdx
+	jne raw_hook_wrapper_x64_systemv_avx_unsupported_stack
+	cmp rax, rcx
+	je raw_hook_wrapper_x64_systemv_avx_direct_return
+	lea rax, [rax + 0x8]
+	cmp rax, rcx
+	je raw_hook_wrapper_x64_systemv_avx_redirect_return
+raw_hook_wrapper_x64_systemv_avx_unsupported_stack:
+.globl raw_hook_wrapper_x64_systemv_avx_cet_patch_7
+raw_hook_wrapper_x64_systemv_avx_cet_patch_7:
+	mov rcx, qword ptr [rsp + 0x7fffffff]
+.globl raw_hook_wrapper_x64_systemv_avx_cet_patch_7_end
+raw_hook_wrapper_x64_systemv_avx_cet_patch_7_end:
+.globl raw_hook_wrapper_x64_systemv_avx_cet_patch_8
+raw_hook_wrapper_x64_systemv_avx_cet_patch_8:
+	mov qword ptr [rsp + 0x7fffffff], rcx
+.globl raw_hook_wrapper_x64_systemv_avx_cet_patch_8_end
+raw_hook_wrapper_x64_systemv_avx_cet_patch_8_end:
+.globl raw_hook_wrapper_x64_systemv_avx_cet_patch_9
+raw_hook_wrapper_x64_systemv_avx_cet_patch_9:
+	mov rdx, qword ptr [rsp + 0x7fffffff]
+.globl raw_hook_wrapper_x64_systemv_avx_cet_patch_9_end
+raw_hook_wrapper_x64_systemv_avx_cet_patch_9_end:
+	mov qword ptr [rcx], rdx
+raw_hook_wrapper_x64_systemv_avx_direct_return:
+.globl raw_hook_wrapper_x64_systemv_avx_patch_86
+raw_hook_wrapper_x64_systemv_avx_patch_86:
+	push qword ptr [rsp + 0x7fffffff]
+.globl raw_hook_wrapper_x64_systemv_avx_patch_86_end
+raw_hook_wrapper_x64_systemv_avx_patch_86_end:
+	popfq
 .globl raw_hook_wrapper_x64_systemv_avx_patch_99
 raw_hook_wrapper_x64_systemv_avx_patch_99:
 	mov rdx, qword ptr [rsp + 0x7fffffff]
@@ -6803,6 +7938,35 @@ raw_hook_wrapper_x64_systemv_avx_patch_102:
 .globl raw_hook_wrapper_x64_systemv_avx_patch_102_end
 raw_hook_wrapper_x64_systemv_avx_patch_102_end:
 	ret
+raw_hook_wrapper_x64_systemv_avx_redirect_return:
+.globl raw_hook_wrapper_x64_systemv_avx_cet_patch_10
+raw_hook_wrapper_x64_systemv_avx_cet_patch_10:
+	push qword ptr [rsp + 0x7fffffff]
+.globl raw_hook_wrapper_x64_systemv_avx_cet_patch_10_end
+raw_hook_wrapper_x64_systemv_avx_cet_patch_10_end:
+	popfq
+.globl raw_hook_wrapper_x64_systemv_avx_cet_patch_11
+raw_hook_wrapper_x64_systemv_avx_cet_patch_11:
+	mov rdx, qword ptr [rsp + 0x7fffffff]
+.globl raw_hook_wrapper_x64_systemv_avx_cet_patch_11_end
+raw_hook_wrapper_x64_systemv_avx_cet_patch_11_end:
+.globl raw_hook_wrapper_x64_systemv_avx_cet_patch_12
+raw_hook_wrapper_x64_systemv_avx_cet_patch_12:
+	mov rcx, qword ptr [rsp + 0x7fffffff]
+.globl raw_hook_wrapper_x64_systemv_avx_cet_patch_12_end
+raw_hook_wrapper_x64_systemv_avx_cet_patch_12_end:
+.globl raw_hook_wrapper_x64_systemv_avx_cet_patch_13
+raw_hook_wrapper_x64_systemv_avx_cet_patch_13:
+	mov rax, qword ptr [rsp + 0x7fffffff]
+.globl raw_hook_wrapper_x64_systemv_avx_cet_patch_13_end
+raw_hook_wrapper_x64_systemv_avx_cet_patch_13_end:
+.globl raw_hook_wrapper_x64_systemv_avx_cet_patch_14
+raw_hook_wrapper_x64_systemv_avx_cet_patch_14:
+	mov rsp, qword ptr [rsp + 0x7fffffff]
+.globl raw_hook_wrapper_x64_systemv_avx_cet_patch_14_end
+raw_hook_wrapper_x64_systemv_avx_cet_patch_14_end:
+	lea rsp, [rsp + 0x8]
+	jmp qword ptr [rsp - 0x8]
 raw_hook_wrapper_x64_systemv_avx_nothing_modified:
 .globl raw_hook_wrapper_x64_systemv_avx_patch_103
 raw_hook_wrapper_x64_systemv_avx_patch_103:
@@ -7003,6 +8167,23 @@ raw_hook_wrapper_x64_systemv_ssefpu_patch_36:
 	fsave [rsp + 0x7fffffff]
 .globl raw_hook_wrapper_x64_systemv_ssefpu_patch_36_end
 raw_hook_wrapper_x64_systemv_ssefpu_patch_36_end:
+	mov rax, rsp
+.globl raw_hook_wrapper_x64_systemv_ssefpu_cet_patch_0
+raw_hook_wrapper_x64_systemv_ssefpu_cet_patch_0:
+	add rax, 0x7fffffff
+.globl raw_hook_wrapper_x64_systemv_ssefpu_cet_patch_0_end
+raw_hook_wrapper_x64_systemv_ssefpu_cet_patch_0_end:
+.globl raw_hook_wrapper_x64_systemv_ssefpu_cet_patch_1
+raw_hook_wrapper_x64_systemv_ssefpu_cet_patch_1:
+	mov qword ptr [rsp + 0x7fffffff], rax
+.globl raw_hook_wrapper_x64_systemv_ssefpu_cet_patch_1_end
+raw_hook_wrapper_x64_systemv_ssefpu_cet_patch_1_end:
+	mov rax, qword ptr [rax]
+.globl raw_hook_wrapper_x64_systemv_ssefpu_cet_patch_2
+raw_hook_wrapper_x64_systemv_ssefpu_cet_patch_2:
+	mov qword ptr [rsp + 0x7fffffff], rax
+.globl raw_hook_wrapper_x64_systemv_ssefpu_cet_patch_2_end
+raw_hook_wrapper_x64_systemv_ssefpu_cet_patch_2_end:
 	mov rdi, rsp
 .globl raw_hook_wrapper_x64_systemv_ssefpu_patch_37
 raw_hook_wrapper_x64_systemv_ssefpu_patch_37:
@@ -7102,12 +8283,6 @@ raw_hook_wrapper_x64_systemv_ssefpu_patch_55:
 	ldmxcsr dword ptr [rsp + 0x7fffffff]
 .globl raw_hook_wrapper_x64_systemv_ssefpu_patch_55_end
 raw_hook_wrapper_x64_systemv_ssefpu_patch_55_end:
-.globl raw_hook_wrapper_x64_systemv_ssefpu_patch_56
-raw_hook_wrapper_x64_systemv_ssefpu_patch_56:
-	push qword ptr [rsp + 0x7fffffff]
-.globl raw_hook_wrapper_x64_systemv_ssefpu_patch_56_end
-raw_hook_wrapper_x64_systemv_ssefpu_patch_56_end:
-	popfq
 .globl raw_hook_wrapper_x64_systemv_ssefpu_patch_57
 raw_hook_wrapper_x64_systemv_ssefpu_patch_57:
 	mov r15, qword ptr [rsp + 0x7fffffff]
@@ -7168,6 +8343,63 @@ raw_hook_wrapper_x64_systemv_ssefpu_patch_68:
 	mov rbx, qword ptr [rsp + 0x7fffffff]
 .globl raw_hook_wrapper_x64_systemv_ssefpu_patch_68_end
 raw_hook_wrapper_x64_systemv_ssefpu_patch_68_end:
+.globl raw_hook_wrapper_x64_systemv_ssefpu_cet_patch_3
+raw_hook_wrapper_x64_systemv_ssefpu_cet_patch_3:
+	mov rax, qword ptr [rsp + 0x7fffffff]
+.globl raw_hook_wrapper_x64_systemv_ssefpu_cet_patch_3_end
+raw_hook_wrapper_x64_systemv_ssefpu_cet_patch_3_end:
+	test rax, 0x7
+	jne raw_hook_wrapper_x64_systemv_ssefpu_unsupported_stack
+.globl raw_hook_wrapper_x64_systemv_ssefpu_cet_patch_4
+raw_hook_wrapper_x64_systemv_ssefpu_cet_patch_4:
+	lea rcx, [rsp + 0x7fffffff]
+.globl raw_hook_wrapper_x64_systemv_ssefpu_cet_patch_4_end
+raw_hook_wrapper_x64_systemv_ssefpu_cet_patch_4_end:
+	cmp rax, rcx
+	jb raw_hook_wrapper_x64_systemv_ssefpu_unsupported_stack
+.globl raw_hook_wrapper_x64_systemv_ssefpu_cet_patch_5
+raw_hook_wrapper_x64_systemv_ssefpu_cet_patch_5:
+	lea rcx, [rsp + 0x7fffffff]
+.globl raw_hook_wrapper_x64_systemv_ssefpu_cet_patch_5_end
+raw_hook_wrapper_x64_systemv_ssefpu_cet_patch_5_end:
+	cmp rax, rcx
+	ja raw_hook_wrapper_x64_systemv_ssefpu_unsupported_stack
+.globl raw_hook_wrapper_x64_systemv_ssefpu_cet_patch_6
+raw_hook_wrapper_x64_systemv_ssefpu_cet_patch_6:
+	mov rdx, qword ptr [rsp + 0x7fffffff]
+.globl raw_hook_wrapper_x64_systemv_ssefpu_cet_patch_6_end
+raw_hook_wrapper_x64_systemv_ssefpu_cet_patch_6_end:
+	cmp qword ptr [rcx], rdx
+	jne raw_hook_wrapper_x64_systemv_ssefpu_unsupported_stack
+	cmp rax, rcx
+	je raw_hook_wrapper_x64_systemv_ssefpu_direct_return
+	lea rax, [rax + 0x8]
+	cmp rax, rcx
+	je raw_hook_wrapper_x64_systemv_ssefpu_redirect_return
+raw_hook_wrapper_x64_systemv_ssefpu_unsupported_stack:
+.globl raw_hook_wrapper_x64_systemv_ssefpu_cet_patch_7
+raw_hook_wrapper_x64_systemv_ssefpu_cet_patch_7:
+	mov rcx, qword ptr [rsp + 0x7fffffff]
+.globl raw_hook_wrapper_x64_systemv_ssefpu_cet_patch_7_end
+raw_hook_wrapper_x64_systemv_ssefpu_cet_patch_7_end:
+.globl raw_hook_wrapper_x64_systemv_ssefpu_cet_patch_8
+raw_hook_wrapper_x64_systemv_ssefpu_cet_patch_8:
+	mov qword ptr [rsp + 0x7fffffff], rcx
+.globl raw_hook_wrapper_x64_systemv_ssefpu_cet_patch_8_end
+raw_hook_wrapper_x64_systemv_ssefpu_cet_patch_8_end:
+.globl raw_hook_wrapper_x64_systemv_ssefpu_cet_patch_9
+raw_hook_wrapper_x64_systemv_ssefpu_cet_patch_9:
+	mov rdx, qword ptr [rsp + 0x7fffffff]
+.globl raw_hook_wrapper_x64_systemv_ssefpu_cet_patch_9_end
+raw_hook_wrapper_x64_systemv_ssefpu_cet_patch_9_end:
+	mov qword ptr [rcx], rdx
+raw_hook_wrapper_x64_systemv_ssefpu_direct_return:
+.globl raw_hook_wrapper_x64_systemv_ssefpu_patch_56
+raw_hook_wrapper_x64_systemv_ssefpu_patch_56:
+	push qword ptr [rsp + 0x7fffffff]
+.globl raw_hook_wrapper_x64_systemv_ssefpu_patch_56_end
+raw_hook_wrapper_x64_systemv_ssefpu_patch_56_end:
+	popfq
 .globl raw_hook_wrapper_x64_systemv_ssefpu_patch_69
 raw_hook_wrapper_x64_systemv_ssefpu_patch_69:
 	mov rdx, qword ptr [rsp + 0x7fffffff]
@@ -7189,6 +8421,35 @@ raw_hook_wrapper_x64_systemv_ssefpu_patch_72:
 .globl raw_hook_wrapper_x64_systemv_ssefpu_patch_72_end
 raw_hook_wrapper_x64_systemv_ssefpu_patch_72_end:
 	ret
+raw_hook_wrapper_x64_systemv_ssefpu_redirect_return:
+.globl raw_hook_wrapper_x64_systemv_ssefpu_cet_patch_10
+raw_hook_wrapper_x64_systemv_ssefpu_cet_patch_10:
+	push qword ptr [rsp + 0x7fffffff]
+.globl raw_hook_wrapper_x64_systemv_ssefpu_cet_patch_10_end
+raw_hook_wrapper_x64_systemv_ssefpu_cet_patch_10_end:
+	popfq
+.globl raw_hook_wrapper_x64_systemv_ssefpu_cet_patch_11
+raw_hook_wrapper_x64_systemv_ssefpu_cet_patch_11:
+	mov rdx, qword ptr [rsp + 0x7fffffff]
+.globl raw_hook_wrapper_x64_systemv_ssefpu_cet_patch_11_end
+raw_hook_wrapper_x64_systemv_ssefpu_cet_patch_11_end:
+.globl raw_hook_wrapper_x64_systemv_ssefpu_cet_patch_12
+raw_hook_wrapper_x64_systemv_ssefpu_cet_patch_12:
+	mov rcx, qword ptr [rsp + 0x7fffffff]
+.globl raw_hook_wrapper_x64_systemv_ssefpu_cet_patch_12_end
+raw_hook_wrapper_x64_systemv_ssefpu_cet_patch_12_end:
+.globl raw_hook_wrapper_x64_systemv_ssefpu_cet_patch_13
+raw_hook_wrapper_x64_systemv_ssefpu_cet_patch_13:
+	mov rax, qword ptr [rsp + 0x7fffffff]
+.globl raw_hook_wrapper_x64_systemv_ssefpu_cet_patch_13_end
+raw_hook_wrapper_x64_systemv_ssefpu_cet_patch_13_end:
+.globl raw_hook_wrapper_x64_systemv_ssefpu_cet_patch_14
+raw_hook_wrapper_x64_systemv_ssefpu_cet_patch_14:
+	mov rsp, qword ptr [rsp + 0x7fffffff]
+.globl raw_hook_wrapper_x64_systemv_ssefpu_cet_patch_14_end
+raw_hook_wrapper_x64_systemv_ssefpu_cet_patch_14_end:
+	lea rsp, [rsp + 0x8]
+	jmp qword ptr [rsp - 0x8]
 raw_hook_wrapper_x64_systemv_ssefpu_nothing_modified:
 .globl raw_hook_wrapper_x64_systemv_ssefpu_patch_73
 raw_hook_wrapper_x64_systemv_ssefpu_patch_73:
@@ -7384,6 +8645,23 @@ raw_hook_wrapper_x64_systemv_sse_patch_35:
 	movups xmmword ptr [rsp + 0x7fffffff], xmm15
 .globl raw_hook_wrapper_x64_systemv_sse_patch_35_end
 raw_hook_wrapper_x64_systemv_sse_patch_35_end:
+	mov rax, rsp
+.globl raw_hook_wrapper_x64_systemv_sse_cet_patch_0
+raw_hook_wrapper_x64_systemv_sse_cet_patch_0:
+	add rax, 0x7fffffff
+.globl raw_hook_wrapper_x64_systemv_sse_cet_patch_0_end
+raw_hook_wrapper_x64_systemv_sse_cet_patch_0_end:
+.globl raw_hook_wrapper_x64_systemv_sse_cet_patch_1
+raw_hook_wrapper_x64_systemv_sse_cet_patch_1:
+	mov qword ptr [rsp + 0x7fffffff], rax
+.globl raw_hook_wrapper_x64_systemv_sse_cet_patch_1_end
+raw_hook_wrapper_x64_systemv_sse_cet_patch_1_end:
+	mov rax, qword ptr [rax]
+.globl raw_hook_wrapper_x64_systemv_sse_cet_patch_2
+raw_hook_wrapper_x64_systemv_sse_cet_patch_2:
+	mov qword ptr [rsp + 0x7fffffff], rax
+.globl raw_hook_wrapper_x64_systemv_sse_cet_patch_2_end
+raw_hook_wrapper_x64_systemv_sse_cet_patch_2_end:
 	mov rdi, rsp
 .globl raw_hook_wrapper_x64_systemv_sse_patch_36
 raw_hook_wrapper_x64_systemv_sse_patch_36:
@@ -7478,12 +8756,6 @@ raw_hook_wrapper_x64_systemv_sse_patch_53:
 	ldmxcsr dword ptr [rsp + 0x7fffffff]
 .globl raw_hook_wrapper_x64_systemv_sse_patch_53_end
 raw_hook_wrapper_x64_systemv_sse_patch_53_end:
-.globl raw_hook_wrapper_x64_systemv_sse_patch_54
-raw_hook_wrapper_x64_systemv_sse_patch_54:
-	push qword ptr [rsp + 0x7fffffff]
-.globl raw_hook_wrapper_x64_systemv_sse_patch_54_end
-raw_hook_wrapper_x64_systemv_sse_patch_54_end:
-	popfq
 .globl raw_hook_wrapper_x64_systemv_sse_patch_55
 raw_hook_wrapper_x64_systemv_sse_patch_55:
 	mov r15, qword ptr [rsp + 0x7fffffff]
@@ -7544,6 +8816,63 @@ raw_hook_wrapper_x64_systemv_sse_patch_66:
 	mov rbx, qword ptr [rsp + 0x7fffffff]
 .globl raw_hook_wrapper_x64_systemv_sse_patch_66_end
 raw_hook_wrapper_x64_systemv_sse_patch_66_end:
+.globl raw_hook_wrapper_x64_systemv_sse_cet_patch_3
+raw_hook_wrapper_x64_systemv_sse_cet_patch_3:
+	mov rax, qword ptr [rsp + 0x7fffffff]
+.globl raw_hook_wrapper_x64_systemv_sse_cet_patch_3_end
+raw_hook_wrapper_x64_systemv_sse_cet_patch_3_end:
+	test rax, 0x7
+	jne raw_hook_wrapper_x64_systemv_sse_unsupported_stack
+.globl raw_hook_wrapper_x64_systemv_sse_cet_patch_4
+raw_hook_wrapper_x64_systemv_sse_cet_patch_4:
+	lea rcx, [rsp + 0x7fffffff]
+.globl raw_hook_wrapper_x64_systemv_sse_cet_patch_4_end
+raw_hook_wrapper_x64_systemv_sse_cet_patch_4_end:
+	cmp rax, rcx
+	jb raw_hook_wrapper_x64_systemv_sse_unsupported_stack
+.globl raw_hook_wrapper_x64_systemv_sse_cet_patch_5
+raw_hook_wrapper_x64_systemv_sse_cet_patch_5:
+	lea rcx, [rsp + 0x7fffffff]
+.globl raw_hook_wrapper_x64_systemv_sse_cet_patch_5_end
+raw_hook_wrapper_x64_systemv_sse_cet_patch_5_end:
+	cmp rax, rcx
+	ja raw_hook_wrapper_x64_systemv_sse_unsupported_stack
+.globl raw_hook_wrapper_x64_systemv_sse_cet_patch_6
+raw_hook_wrapper_x64_systemv_sse_cet_patch_6:
+	mov rdx, qword ptr [rsp + 0x7fffffff]
+.globl raw_hook_wrapper_x64_systemv_sse_cet_patch_6_end
+raw_hook_wrapper_x64_systemv_sse_cet_patch_6_end:
+	cmp qword ptr [rcx], rdx
+	jne raw_hook_wrapper_x64_systemv_sse_unsupported_stack
+	cmp rax, rcx
+	je raw_hook_wrapper_x64_systemv_sse_direct_return
+	lea rax, [rax + 0x8]
+	cmp rax, rcx
+	je raw_hook_wrapper_x64_systemv_sse_redirect_return
+raw_hook_wrapper_x64_systemv_sse_unsupported_stack:
+.globl raw_hook_wrapper_x64_systemv_sse_cet_patch_7
+raw_hook_wrapper_x64_systemv_sse_cet_patch_7:
+	mov rcx, qword ptr [rsp + 0x7fffffff]
+.globl raw_hook_wrapper_x64_systemv_sse_cet_patch_7_end
+raw_hook_wrapper_x64_systemv_sse_cet_patch_7_end:
+.globl raw_hook_wrapper_x64_systemv_sse_cet_patch_8
+raw_hook_wrapper_x64_systemv_sse_cet_patch_8:
+	mov qword ptr [rsp + 0x7fffffff], rcx
+.globl raw_hook_wrapper_x64_systemv_sse_cet_patch_8_end
+raw_hook_wrapper_x64_systemv_sse_cet_patch_8_end:
+.globl raw_hook_wrapper_x64_systemv_sse_cet_patch_9
+raw_hook_wrapper_x64_systemv_sse_cet_patch_9:
+	mov rdx, qword ptr [rsp + 0x7fffffff]
+.globl raw_hook_wrapper_x64_systemv_sse_cet_patch_9_end
+raw_hook_wrapper_x64_systemv_sse_cet_patch_9_end:
+	mov qword ptr [rcx], rdx
+raw_hook_wrapper_x64_systemv_sse_direct_return:
+.globl raw_hook_wrapper_x64_systemv_sse_patch_54
+raw_hook_wrapper_x64_systemv_sse_patch_54:
+	push qword ptr [rsp + 0x7fffffff]
+.globl raw_hook_wrapper_x64_systemv_sse_patch_54_end
+raw_hook_wrapper_x64_systemv_sse_patch_54_end:
+	popfq
 .globl raw_hook_wrapper_x64_systemv_sse_patch_67
 raw_hook_wrapper_x64_systemv_sse_patch_67:
 	mov rdx, qword ptr [rsp + 0x7fffffff]
@@ -7565,6 +8894,35 @@ raw_hook_wrapper_x64_systemv_sse_patch_70:
 .globl raw_hook_wrapper_x64_systemv_sse_patch_70_end
 raw_hook_wrapper_x64_systemv_sse_patch_70_end:
 	ret
+raw_hook_wrapper_x64_systemv_sse_redirect_return:
+.globl raw_hook_wrapper_x64_systemv_sse_cet_patch_10
+raw_hook_wrapper_x64_systemv_sse_cet_patch_10:
+	push qword ptr [rsp + 0x7fffffff]
+.globl raw_hook_wrapper_x64_systemv_sse_cet_patch_10_end
+raw_hook_wrapper_x64_systemv_sse_cet_patch_10_end:
+	popfq
+.globl raw_hook_wrapper_x64_systemv_sse_cet_patch_11
+raw_hook_wrapper_x64_systemv_sse_cet_patch_11:
+	mov rdx, qword ptr [rsp + 0x7fffffff]
+.globl raw_hook_wrapper_x64_systemv_sse_cet_patch_11_end
+raw_hook_wrapper_x64_systemv_sse_cet_patch_11_end:
+.globl raw_hook_wrapper_x64_systemv_sse_cet_patch_12
+raw_hook_wrapper_x64_systemv_sse_cet_patch_12:
+	mov rcx, qword ptr [rsp + 0x7fffffff]
+.globl raw_hook_wrapper_x64_systemv_sse_cet_patch_12_end
+raw_hook_wrapper_x64_systemv_sse_cet_patch_12_end:
+.globl raw_hook_wrapper_x64_systemv_sse_cet_patch_13
+raw_hook_wrapper_x64_systemv_sse_cet_patch_13:
+	mov rax, qword ptr [rsp + 0x7fffffff]
+.globl raw_hook_wrapper_x64_systemv_sse_cet_patch_13_end
+raw_hook_wrapper_x64_systemv_sse_cet_patch_13_end:
+.globl raw_hook_wrapper_x64_systemv_sse_cet_patch_14
+raw_hook_wrapper_x64_systemv_sse_cet_patch_14:
+	mov rsp, qword ptr [rsp + 0x7fffffff]
+.globl raw_hook_wrapper_x64_systemv_sse_cet_patch_14_end
+raw_hook_wrapper_x64_systemv_sse_cet_patch_14_end:
+	lea rsp, [rsp + 0x8]
+	jmp qword ptr [rsp - 0x8]
 raw_hook_wrapper_x64_systemv_sse_nothing_modified:
 .globl raw_hook_wrapper_x64_systemv_sse_patch_71
 raw_hook_wrapper_x64_systemv_sse_patch_71:
@@ -7680,6 +9038,23 @@ raw_hook_wrapper_x64_systemv_fpu_patch_19:
 	fsave [rsp + 0x7fffffff]
 .globl raw_hook_wrapper_x64_systemv_fpu_patch_19_end
 raw_hook_wrapper_x64_systemv_fpu_patch_19_end:
+	mov rax, rsp
+.globl raw_hook_wrapper_x64_systemv_fpu_cet_patch_0
+raw_hook_wrapper_x64_systemv_fpu_cet_patch_0:
+	add rax, 0x7fffffff
+.globl raw_hook_wrapper_x64_systemv_fpu_cet_patch_0_end
+raw_hook_wrapper_x64_systemv_fpu_cet_patch_0_end:
+.globl raw_hook_wrapper_x64_systemv_fpu_cet_patch_1
+raw_hook_wrapper_x64_systemv_fpu_cet_patch_1:
+	mov qword ptr [rsp + 0x7fffffff], rax
+.globl raw_hook_wrapper_x64_systemv_fpu_cet_patch_1_end
+raw_hook_wrapper_x64_systemv_fpu_cet_patch_1_end:
+	mov rax, qword ptr [rax]
+.globl raw_hook_wrapper_x64_systemv_fpu_cet_patch_2
+raw_hook_wrapper_x64_systemv_fpu_cet_patch_2:
+	mov qword ptr [rsp + 0x7fffffff], rax
+.globl raw_hook_wrapper_x64_systemv_fpu_cet_patch_2_end
+raw_hook_wrapper_x64_systemv_fpu_cet_patch_2_end:
 	mov rdi, rsp
 .globl raw_hook_wrapper_x64_systemv_fpu_patch_20
 raw_hook_wrapper_x64_systemv_fpu_patch_20:
@@ -7694,12 +9069,6 @@ raw_hook_wrapper_x64_systemv_fpu_patch_21:
 	frstor [rsp + 0x7fffffff]
 .globl raw_hook_wrapper_x64_systemv_fpu_patch_21_end
 raw_hook_wrapper_x64_systemv_fpu_patch_21_end:
-.globl raw_hook_wrapper_x64_systemv_fpu_patch_22
-raw_hook_wrapper_x64_systemv_fpu_patch_22:
-	push qword ptr [rsp + 0x7fffffff]
-.globl raw_hook_wrapper_x64_systemv_fpu_patch_22_end
-raw_hook_wrapper_x64_systemv_fpu_patch_22_end:
-	popfq
 .globl raw_hook_wrapper_x64_systemv_fpu_patch_23
 raw_hook_wrapper_x64_systemv_fpu_patch_23:
 	mov r15, qword ptr [rsp + 0x7fffffff]
@@ -7760,6 +9129,63 @@ raw_hook_wrapper_x64_systemv_fpu_patch_34:
 	mov rbx, qword ptr [rsp + 0x7fffffff]
 .globl raw_hook_wrapper_x64_systemv_fpu_patch_34_end
 raw_hook_wrapper_x64_systemv_fpu_patch_34_end:
+.globl raw_hook_wrapper_x64_systemv_fpu_cet_patch_3
+raw_hook_wrapper_x64_systemv_fpu_cet_patch_3:
+	mov rax, qword ptr [rsp + 0x7fffffff]
+.globl raw_hook_wrapper_x64_systemv_fpu_cet_patch_3_end
+raw_hook_wrapper_x64_systemv_fpu_cet_patch_3_end:
+	test rax, 0x7
+	jne raw_hook_wrapper_x64_systemv_fpu_unsupported_stack
+.globl raw_hook_wrapper_x64_systemv_fpu_cet_patch_4
+raw_hook_wrapper_x64_systemv_fpu_cet_patch_4:
+	lea rcx, [rsp + 0x7fffffff]
+.globl raw_hook_wrapper_x64_systemv_fpu_cet_patch_4_end
+raw_hook_wrapper_x64_systemv_fpu_cet_patch_4_end:
+	cmp rax, rcx
+	jb raw_hook_wrapper_x64_systemv_fpu_unsupported_stack
+.globl raw_hook_wrapper_x64_systemv_fpu_cet_patch_5
+raw_hook_wrapper_x64_systemv_fpu_cet_patch_5:
+	lea rcx, [rsp + 0x7fffffff]
+.globl raw_hook_wrapper_x64_systemv_fpu_cet_patch_5_end
+raw_hook_wrapper_x64_systemv_fpu_cet_patch_5_end:
+	cmp rax, rcx
+	ja raw_hook_wrapper_x64_systemv_fpu_unsupported_stack
+.globl raw_hook_wrapper_x64_systemv_fpu_cet_patch_6
+raw_hook_wrapper_x64_systemv_fpu_cet_patch_6:
+	mov rdx, qword ptr [rsp + 0x7fffffff]
+.globl raw_hook_wrapper_x64_systemv_fpu_cet_patch_6_end
+raw_hook_wrapper_x64_systemv_fpu_cet_patch_6_end:
+	cmp qword ptr [rcx], rdx
+	jne raw_hook_wrapper_x64_systemv_fpu_unsupported_stack
+	cmp rax, rcx
+	je raw_hook_wrapper_x64_systemv_fpu_direct_return
+	lea rax, [rax + 0x8]
+	cmp rax, rcx
+	je raw_hook_wrapper_x64_systemv_fpu_redirect_return
+raw_hook_wrapper_x64_systemv_fpu_unsupported_stack:
+.globl raw_hook_wrapper_x64_systemv_fpu_cet_patch_7
+raw_hook_wrapper_x64_systemv_fpu_cet_patch_7:
+	mov rcx, qword ptr [rsp + 0x7fffffff]
+.globl raw_hook_wrapper_x64_systemv_fpu_cet_patch_7_end
+raw_hook_wrapper_x64_systemv_fpu_cet_patch_7_end:
+.globl raw_hook_wrapper_x64_systemv_fpu_cet_patch_8
+raw_hook_wrapper_x64_systemv_fpu_cet_patch_8:
+	mov qword ptr [rsp + 0x7fffffff], rcx
+.globl raw_hook_wrapper_x64_systemv_fpu_cet_patch_8_end
+raw_hook_wrapper_x64_systemv_fpu_cet_patch_8_end:
+.globl raw_hook_wrapper_x64_systemv_fpu_cet_patch_9
+raw_hook_wrapper_x64_systemv_fpu_cet_patch_9:
+	mov rdx, qword ptr [rsp + 0x7fffffff]
+.globl raw_hook_wrapper_x64_systemv_fpu_cet_patch_9_end
+raw_hook_wrapper_x64_systemv_fpu_cet_patch_9_end:
+	mov qword ptr [rcx], rdx
+raw_hook_wrapper_x64_systemv_fpu_direct_return:
+.globl raw_hook_wrapper_x64_systemv_fpu_patch_22
+raw_hook_wrapper_x64_systemv_fpu_patch_22:
+	push qword ptr [rsp + 0x7fffffff]
+.globl raw_hook_wrapper_x64_systemv_fpu_patch_22_end
+raw_hook_wrapper_x64_systemv_fpu_patch_22_end:
+	popfq
 .globl raw_hook_wrapper_x64_systemv_fpu_patch_35
 raw_hook_wrapper_x64_systemv_fpu_patch_35:
 	mov rdx, qword ptr [rsp + 0x7fffffff]
@@ -7781,6 +9207,35 @@ raw_hook_wrapper_x64_systemv_fpu_patch_38:
 .globl raw_hook_wrapper_x64_systemv_fpu_patch_38_end
 raw_hook_wrapper_x64_systemv_fpu_patch_38_end:
 	ret
+raw_hook_wrapper_x64_systemv_fpu_redirect_return:
+.globl raw_hook_wrapper_x64_systemv_fpu_cet_patch_10
+raw_hook_wrapper_x64_systemv_fpu_cet_patch_10:
+	push qword ptr [rsp + 0x7fffffff]
+.globl raw_hook_wrapper_x64_systemv_fpu_cet_patch_10_end
+raw_hook_wrapper_x64_systemv_fpu_cet_patch_10_end:
+	popfq
+.globl raw_hook_wrapper_x64_systemv_fpu_cet_patch_11
+raw_hook_wrapper_x64_systemv_fpu_cet_patch_11:
+	mov rdx, qword ptr [rsp + 0x7fffffff]
+.globl raw_hook_wrapper_x64_systemv_fpu_cet_patch_11_end
+raw_hook_wrapper_x64_systemv_fpu_cet_patch_11_end:
+.globl raw_hook_wrapper_x64_systemv_fpu_cet_patch_12
+raw_hook_wrapper_x64_systemv_fpu_cet_patch_12:
+	mov rcx, qword ptr [rsp + 0x7fffffff]
+.globl raw_hook_wrapper_x64_systemv_fpu_cet_patch_12_end
+raw_hook_wrapper_x64_systemv_fpu_cet_patch_12_end:
+.globl raw_hook_wrapper_x64_systemv_fpu_cet_patch_13
+raw_hook_wrapper_x64_systemv_fpu_cet_patch_13:
+	mov rax, qword ptr [rsp + 0x7fffffff]
+.globl raw_hook_wrapper_x64_systemv_fpu_cet_patch_13_end
+raw_hook_wrapper_x64_systemv_fpu_cet_patch_13_end:
+.globl raw_hook_wrapper_x64_systemv_fpu_cet_patch_14
+raw_hook_wrapper_x64_systemv_fpu_cet_patch_14:
+	mov rsp, qword ptr [rsp + 0x7fffffff]
+.globl raw_hook_wrapper_x64_systemv_fpu_cet_patch_14_end
+raw_hook_wrapper_x64_systemv_fpu_cet_patch_14_end:
+	lea rsp, [rsp + 0x8]
+	jmp qword ptr [rsp - 0x8]
 raw_hook_wrapper_x64_systemv_fpu_nothing_modified:
 .globl raw_hook_wrapper_x64_systemv_fpu_patch_39
 raw_hook_wrapper_x64_systemv_fpu_patch_39:
@@ -7891,6 +9346,23 @@ raw_hook_wrapper_x64_systemv_native_patch_18:
 	mov qword ptr [rsp + 0x7fffffff], r15
 .globl raw_hook_wrapper_x64_systemv_native_patch_18_end
 raw_hook_wrapper_x64_systemv_native_patch_18_end:
+	mov rax, rsp
+.globl raw_hook_wrapper_x64_systemv_native_cet_patch_0
+raw_hook_wrapper_x64_systemv_native_cet_patch_0:
+	add rax, 0x7fffffff
+.globl raw_hook_wrapper_x64_systemv_native_cet_patch_0_end
+raw_hook_wrapper_x64_systemv_native_cet_patch_0_end:
+.globl raw_hook_wrapper_x64_systemv_native_cet_patch_1
+raw_hook_wrapper_x64_systemv_native_cet_patch_1:
+	mov qword ptr [rsp + 0x7fffffff], rax
+.globl raw_hook_wrapper_x64_systemv_native_cet_patch_1_end
+raw_hook_wrapper_x64_systemv_native_cet_patch_1_end:
+	mov rax, qword ptr [rax]
+.globl raw_hook_wrapper_x64_systemv_native_cet_patch_2
+raw_hook_wrapper_x64_systemv_native_cet_patch_2:
+	mov qword ptr [rsp + 0x7fffffff], rax
+.globl raw_hook_wrapper_x64_systemv_native_cet_patch_2_end
+raw_hook_wrapper_x64_systemv_native_cet_patch_2_end:
 	mov rdi, rsp
 .globl raw_hook_wrapper_x64_systemv_native_patch_19
 raw_hook_wrapper_x64_systemv_native_patch_19:
@@ -7900,12 +9372,6 @@ raw_hook_wrapper_x64_systemv_native_patch_19_end:
 	call rax
 	test al, al
 	je raw_hook_wrapper_x64_systemv_native_nothing_modified
-.globl raw_hook_wrapper_x64_systemv_native_patch_20
-raw_hook_wrapper_x64_systemv_native_patch_20:
-	push qword ptr [rsp + 0x7fffffff]
-.globl raw_hook_wrapper_x64_systemv_native_patch_20_end
-raw_hook_wrapper_x64_systemv_native_patch_20_end:
-	popfq
 .globl raw_hook_wrapper_x64_systemv_native_patch_21
 raw_hook_wrapper_x64_systemv_native_patch_21:
 	mov r15, qword ptr [rsp + 0x7fffffff]
@@ -7966,6 +9432,63 @@ raw_hook_wrapper_x64_systemv_native_patch_32:
 	mov rbx, qword ptr [rsp + 0x7fffffff]
 .globl raw_hook_wrapper_x64_systemv_native_patch_32_end
 raw_hook_wrapper_x64_systemv_native_patch_32_end:
+.globl raw_hook_wrapper_x64_systemv_native_cet_patch_3
+raw_hook_wrapper_x64_systemv_native_cet_patch_3:
+	mov rax, qword ptr [rsp + 0x7fffffff]
+.globl raw_hook_wrapper_x64_systemv_native_cet_patch_3_end
+raw_hook_wrapper_x64_systemv_native_cet_patch_3_end:
+	test rax, 0x7
+	jne raw_hook_wrapper_x64_systemv_native_unsupported_stack
+.globl raw_hook_wrapper_x64_systemv_native_cet_patch_4
+raw_hook_wrapper_x64_systemv_native_cet_patch_4:
+	lea rcx, [rsp + 0x7fffffff]
+.globl raw_hook_wrapper_x64_systemv_native_cet_patch_4_end
+raw_hook_wrapper_x64_systemv_native_cet_patch_4_end:
+	cmp rax, rcx
+	jb raw_hook_wrapper_x64_systemv_native_unsupported_stack
+.globl raw_hook_wrapper_x64_systemv_native_cet_patch_5
+raw_hook_wrapper_x64_systemv_native_cet_patch_5:
+	lea rcx, [rsp + 0x7fffffff]
+.globl raw_hook_wrapper_x64_systemv_native_cet_patch_5_end
+raw_hook_wrapper_x64_systemv_native_cet_patch_5_end:
+	cmp rax, rcx
+	ja raw_hook_wrapper_x64_systemv_native_unsupported_stack
+.globl raw_hook_wrapper_x64_systemv_native_cet_patch_6
+raw_hook_wrapper_x64_systemv_native_cet_patch_6:
+	mov rdx, qword ptr [rsp + 0x7fffffff]
+.globl raw_hook_wrapper_x64_systemv_native_cet_patch_6_end
+raw_hook_wrapper_x64_systemv_native_cet_patch_6_end:
+	cmp qword ptr [rcx], rdx
+	jne raw_hook_wrapper_x64_systemv_native_unsupported_stack
+	cmp rax, rcx
+	je raw_hook_wrapper_x64_systemv_native_direct_return
+	lea rax, [rax + 0x8]
+	cmp rax, rcx
+	je raw_hook_wrapper_x64_systemv_native_redirect_return
+raw_hook_wrapper_x64_systemv_native_unsupported_stack:
+.globl raw_hook_wrapper_x64_systemv_native_cet_patch_7
+raw_hook_wrapper_x64_systemv_native_cet_patch_7:
+	mov rcx, qword ptr [rsp + 0x7fffffff]
+.globl raw_hook_wrapper_x64_systemv_native_cet_patch_7_end
+raw_hook_wrapper_x64_systemv_native_cet_patch_7_end:
+.globl raw_hook_wrapper_x64_systemv_native_cet_patch_8
+raw_hook_wrapper_x64_systemv_native_cet_patch_8:
+	mov qword ptr [rsp + 0x7fffffff], rcx
+.globl raw_hook_wrapper_x64_systemv_native_cet_patch_8_end
+raw_hook_wrapper_x64_systemv_native_cet_patch_8_end:
+.globl raw_hook_wrapper_x64_systemv_native_cet_patch_9
+raw_hook_wrapper_x64_systemv_native_cet_patch_9:
+	mov rdx, qword ptr [rsp + 0x7fffffff]
+.globl raw_hook_wrapper_x64_systemv_native_cet_patch_9_end
+raw_hook_wrapper_x64_systemv_native_cet_patch_9_end:
+	mov qword ptr [rcx], rdx
+raw_hook_wrapper_x64_systemv_native_direct_return:
+.globl raw_hook_wrapper_x64_systemv_native_patch_20
+raw_hook_wrapper_x64_systemv_native_patch_20:
+	push qword ptr [rsp + 0x7fffffff]
+.globl raw_hook_wrapper_x64_systemv_native_patch_20_end
+raw_hook_wrapper_x64_systemv_native_patch_20_end:
+	popfq
 .globl raw_hook_wrapper_x64_systemv_native_patch_33
 raw_hook_wrapper_x64_systemv_native_patch_33:
 	mov rdx, qword ptr [rsp + 0x7fffffff]
@@ -7987,6 +9510,35 @@ raw_hook_wrapper_x64_systemv_native_patch_36:
 .globl raw_hook_wrapper_x64_systemv_native_patch_36_end
 raw_hook_wrapper_x64_systemv_native_patch_36_end:
 	ret
+raw_hook_wrapper_x64_systemv_native_redirect_return:
+.globl raw_hook_wrapper_x64_systemv_native_cet_patch_10
+raw_hook_wrapper_x64_systemv_native_cet_patch_10:
+	push qword ptr [rsp + 0x7fffffff]
+.globl raw_hook_wrapper_x64_systemv_native_cet_patch_10_end
+raw_hook_wrapper_x64_systemv_native_cet_patch_10_end:
+	popfq
+.globl raw_hook_wrapper_x64_systemv_native_cet_patch_11
+raw_hook_wrapper_x64_systemv_native_cet_patch_11:
+	mov rdx, qword ptr [rsp + 0x7fffffff]
+.globl raw_hook_wrapper_x64_systemv_native_cet_patch_11_end
+raw_hook_wrapper_x64_systemv_native_cet_patch_11_end:
+.globl raw_hook_wrapper_x64_systemv_native_cet_patch_12
+raw_hook_wrapper_x64_systemv_native_cet_patch_12:
+	mov rcx, qword ptr [rsp + 0x7fffffff]
+.globl raw_hook_wrapper_x64_systemv_native_cet_patch_12_end
+raw_hook_wrapper_x64_systemv_native_cet_patch_12_end:
+.globl raw_hook_wrapper_x64_systemv_native_cet_patch_13
+raw_hook_wrapper_x64_systemv_native_cet_patch_13:
+	mov rax, qword ptr [rsp + 0x7fffffff]
+.globl raw_hook_wrapper_x64_systemv_native_cet_patch_13_end
+raw_hook_wrapper_x64_systemv_native_cet_patch_13_end:
+.globl raw_hook_wrapper_x64_systemv_native_cet_patch_14
+raw_hook_wrapper_x64_systemv_native_cet_patch_14:
+	mov rsp, qword ptr [rsp + 0x7fffffff]
+.globl raw_hook_wrapper_x64_systemv_native_cet_patch_14_end
+raw_hook_wrapper_x64_systemv_native_cet_patch_14_end:
+	lea rsp, [rsp + 0x8]
+	jmp qword ptr [rsp - 0x8]
 raw_hook_wrapper_x64_systemv_native_nothing_modified:
 .globl raw_hook_wrapper_x64_systemv_native_patch_37
 raw_hook_wrapper_x64_systemv_native_patch_37:
@@ -8437,7 +9989,8 @@ raw_hook_restore_x64_avx512fpu_patch_86:
 	mov rsp, qword ptr [rsp + 0x7fffffff]
 .globl raw_hook_restore_x64_avx512fpu_patch_86_end
 raw_hook_restore_x64_avx512fpu_patch_86_end:
-	ret
+	lea rsp, [rsp + 0x8]
+	jmp qword ptr [rsp - 0x8]
 
 # RawHook restore: x64 AVX512
 .intel_syntax noprefix
@@ -8877,7 +10430,8 @@ raw_hook_restore_x64_avx512_patch_85:
 	mov rsp, qword ptr [rsp + 0x7fffffff]
 .globl raw_hook_restore_x64_avx512_patch_85_end
 raw_hook_restore_x64_avx512_patch_85_end:
-	ret
+	lea rsp, [rsp + 0x8]
+	jmp qword ptr [rsp - 0x8]
 
 # RawHook restore: x64 AVXFPU
 .intel_syntax noprefix
@@ -9162,7 +10716,8 @@ raw_hook_restore_x64_avxfpu_patch_54:
 	mov rsp, qword ptr [rsp + 0x7fffffff]
 .globl raw_hook_restore_x64_avxfpu_patch_54_end
 raw_hook_restore_x64_avxfpu_patch_54_end:
-	ret
+	lea rsp, [rsp + 0x8]
+	jmp qword ptr [rsp - 0x8]
 
 # RawHook restore: x64 AVX
 .intel_syntax noprefix
@@ -9442,7 +10997,8 @@ raw_hook_restore_x64_avx_patch_53:
 	mov rsp, qword ptr [rsp + 0x7fffffff]
 .globl raw_hook_restore_x64_avx_patch_53_end
 raw_hook_restore_x64_avx_patch_53_end:
-	ret
+	lea rsp, [rsp + 0x8]
+	jmp qword ptr [rsp - 0x8]
 
 # RawHook restore: x64 SSEFPU
 .intel_syntax noprefix
@@ -9647,7 +11203,8 @@ raw_hook_restore_x64_ssefpu_patch_38:
 	mov rsp, qword ptr [rsp + 0x7fffffff]
 .globl raw_hook_restore_x64_ssefpu_patch_38_end
 raw_hook_restore_x64_ssefpu_patch_38_end:
-	ret
+	lea rsp, [rsp + 0x8]
+	jmp qword ptr [rsp - 0x8]
 
 # RawHook restore: x64 SSE
 .intel_syntax noprefix
@@ -9847,7 +11404,8 @@ raw_hook_restore_x64_sse_patch_37:
 	mov rsp, qword ptr [rsp + 0x7fffffff]
 .globl raw_hook_restore_x64_sse_patch_37_end
 raw_hook_restore_x64_sse_patch_37_end:
-	ret
+	lea rsp, [rsp + 0x8]
+	jmp qword ptr [rsp - 0x8]
 
 # RawHook restore: x64 FPU
 .intel_syntax noprefix
@@ -9967,7 +11525,8 @@ raw_hook_restore_x64_fpu_patch_21:
 	mov rsp, qword ptr [rsp + 0x7fffffff]
 .globl raw_hook_restore_x64_fpu_patch_21_end
 raw_hook_restore_x64_fpu_patch_21_end:
-	ret
+	lea rsp, [rsp + 0x8]
+	jmp qword ptr [rsp - 0x8]
 
 # RawHook restore: x64 Native
 .intel_syntax noprefix
@@ -10082,7 +11641,8 @@ raw_hook_restore_x64_native_patch_20:
 	mov rsp, qword ptr [rsp + 0x7fffffff]
 .globl raw_hook_restore_x64_native_patch_20_end
 raw_hook_restore_x64_native_patch_20_end:
-	ret
+	lea rsp, [rsp + 0x8]
+	jmp qword ptr [rsp - 0x8]
 
 # GetCurrentContext: x64 windows AVX512FPU
 .intel_syntax noprefix

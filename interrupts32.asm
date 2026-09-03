@@ -44,14 +44,25 @@
 		ret
 	CallInterrupt endp
 
-	CallInrerruptReturn proc
+	CallInterruptReturn proc
 		add esp, 4
 		iretd
-	CallInrerruptReturn endp
+	CallInterruptReturn endp
 
 	TryRead proc
 		mov eax, dword ptr [esp+04h]
 		mov al, byte ptr [eax]
 		ret
 	TryRead endp
+
+	WindowsHardwareContextBreakpoint proc
+		mov eax, dword ptr [esp+04h]
+		WindowsHardwareContextBreakpointInstruction label byte
+		int 3
+		ret
+	WindowsHardwareContextBreakpoint endp
+
+.const
+	public WindowsHardwareContextBreakpointAddress
+	WindowsHardwareContextBreakpointAddress dd offset WindowsHardwareContextBreakpointInstruction
 end

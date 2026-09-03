@@ -1,18 +1,31 @@
 #pragma once
 
-#ifndef _DETOURS_H_
-#define _DETOURS_H_
+#ifndef _DETOURSDETOURS_H_
+#define _DETOURSDETOURS_H_
 
 #if defined(_WIN32)
-#pragma warning(push)
-#pragma warning(disable : 4201)
+#if (defined(UNICODE) && !defined(_UNICODE)) || (!defined(UNICODE) && defined(_UNICODE))
+#error UNICODE and _UNICODE must either both be defined or both be undefined.
+#endif
 
-// Default
+#pragma warning(push)
+#pragma warning(disable: 4201)
+
+// General
+// Windows SDK
+#ifndef NOMINMAX
 #define NOMINMAX
+#define DETOURS_DEFINED_NOMINMAX
+#endif // !NOMINMAX
 #include <Windows.h>
 #include <TlHelp32.h>
 
-// Advanced
+#if defined(DETOURS_DEFINED_NOMINMAX)
+#undef NOMINMAX
+#undef DETOURS_DEFINED_NOMINMAX
+#endif
+
+// Intrinsics
 #include <intrin.h>
 #include <mmintrin.h>  // MMX
 #include <xmmintrin.h> // SSE
@@ -25,20 +38,31 @@
 #elif defined(__linux__)
 #ifndef _GNU_SOURCE
 #define _GNU_SOURCE
+#define DETOURS_DEFINED_GNU_SOURCE
 #endif
 
-#include <pthread.h>
-#include <semaphore.h>
-#include <signal.h>
+// General
 #include <sys/mman.h>
 #include <sys/types.h>
 #include <ucontext.h>
+
+// C
+#include <pthread.h>
+#include <semaphore.h>
+#include <signal.h>
+
+#if defined(DETOURS_DEFINED_GNU_SOURCE)
+#undef _GNU_SOURCE
+#undef DETOURS_DEFINED_GNU_SOURCE
+#endif
 #else
 #error Unsupported platform. Detours supports Windows and Linux only.
 #endif
 
 // C++
+#include <climits>
 #include <cstddef>
+#include <cstring>
 #include <cwchar>
 
 // STL
@@ -46,12 +70,14 @@
 #include <atomic>
 #include <condition_variable>
 #include <deque>
+#include <functional>
 #include <list>
 #include <memory>
 #include <mutex>
 #include <set>
 #include <string>
 #include <thread>
+#include <type_traits>
 #include <unordered_set>
 #include <vector>
 
@@ -108,27 +134,6 @@
 
 // Definitions
 
-#ifndef PROCESSOR_FEATURE_MAX
-#define PROCESSOR_FEATURE_MAX 64
-#endif // !PROCESSOR_FEATURE_MAX
-
-#ifndef RTL_MAX_DRIVE_LETTERS
-#define RTL_MAX_DRIVE_LETTERS 32
-#endif // !RTL_MAX_DRIVE_LETTERS
-
-#ifndef GDI_HANDLE_BUFFER_SIZE32
-#define GDI_HANDLE_BUFFER_SIZE32 34
-#endif // !GDI_HANDLE_BUFFER_SIZE32
-
-#ifndef GDI_HANDLE_BUFFER_SIZE64
-#define GDI_HANDLE_BUFFER_SIZE64 60
-#endif // !GDI_HANDLE_BUFFER_SIZE64
-
-#ifndef GDI_BATCH_BUFFER_SIZE
-#define GDI_BATCH_BUFFER_SIZE 310
-#endif // !GDI_BATCH_BUFFER_SIZE
-#endif // defined(_WIN32)
-
 #if defined(_M_X64) || defined(__x86_64__)
 #define DETOURS_ARCH_X64 1
 #elif defined(_M_IX86) || defined(__i386__)
@@ -137,12 +142,49 @@
 #error Only x86 and x86_64 platforms are supported.
 #endif
 
+#if defined(_MSC_VER)
+#define DETOURS_NOINLINE __declspec(noinline)
+#elif defined(__GNUC__) || defined(__clang__)
+#define DETOURS_NOINLINE __attribute__((noinline))
+#else
+#define DETOURS_NOINLINE
+#endif
+
+#ifndef PROCESSOR_FEATURE_MAX
+#define PROCESSOR_FEATURE_MAX 64
+#define DETOURS_DEFINED_PROCESSOR_FEATURE_MAX
+#endif // !PROCESSOR_FEATURE_MAX
+
+#ifndef RTL_MAX_DRIVE_LETTERS
+#define RTL_MAX_DRIVE_LETTERS 32
+#define DETOURS_DEFINED_RTL_MAX_DRIVE_LETTERS
+#endif // !RTL_MAX_DRIVE_LETTERS
+
+#ifndef GDI_HANDLE_BUFFER_SIZE32
+#define GDI_HANDLE_BUFFER_SIZE32 34
+#define DETOURS_DEFINED_GDI_HANDLE_BUFFER_SIZE32
+#endif // !GDI_HANDLE_BUFFER_SIZE32
+
+#ifndef GDI_HANDLE_BUFFER_SIZE64
+#define GDI_HANDLE_BUFFER_SIZE64 60
+#define DETOURS_DEFINED_GDI_HANDLE_BUFFER_SIZE64
+#endif // !GDI_HANDLE_BUFFER_SIZE64
+
+#ifndef GDI_BATCH_BUFFER_SIZE
+#define GDI_BATCH_BUFFER_SIZE 310
+#define DETOURS_DEFINED_GDI_BATCH_BUFFER_SIZE
+#endif // !GDI_BATCH_BUFFER_SIZE
+#endif // defined(_WIN32)
+
 #if defined(_WIN32)
+#ifndef GDI_HANDLE_BUFFER_SIZE
 #if defined(DETOURS_ARCH_X64)
 #define GDI_HANDLE_BUFFER_SIZE GDI_HANDLE_BUFFER_SIZE64
 #elif defined(DETOURS_ARCH_X86)
 #define GDI_HANDLE_BUFFER_SIZE GDI_HANDLE_BUFFER_SIZE32
 #endif
+#define DETOURS_DEFINED_GDI_HANDLE_BUFFER_SIZE
+#endif // !GDI_HANDLE_BUFFER_SIZE
 #endif // defined(_WIN32)
 
 // rddisasm
@@ -698,7 +740,7 @@
 #define HOOK_RAW_WRAPPER_SIZE 0x800
 #elif defined(DETOURS_ARCH_X86)
 // Max wrapper size.
-#define HOOK_RAW_WRAPPER_SIZE 0x300
+#define HOOK_RAW_WRAPPER_SIZE 0x400
 #endif
 #endif // !HOOK_RAW_WRAPPER_SIZE
 
@@ -780,6 +822,8 @@
 // ----------------------------------------------------------------
 
 namespace Detours {
+	constexpr std::size_t kNamedObjectNameCapacity = 64;
+
 #if defined(_WIN32)
 	// ----------------------------------------------------------------
 	// KUSER_SHARED_DATA
@@ -935,7 +979,13 @@ namespace Detours {
 		ULONG64 UserPointerAuthMask;
 	} KUSER_SHARED_DATA, *PKUSER_SHARED_DATA;
 
-	extern const volatile KUSER_SHARED_DATA& KUserSharedData;
+#if defined(DETOURS_DEFINED_PROCESSOR_FEATURE_MAX)
+#undef PROCESSOR_FEATURE_MAX
+#undef DETOURS_DEFINED_PROCESSOR_FEATURE_MAX
+#endif
+
+	extern const KUSER_SHARED_DATA volatile& KUserSharedData;
+	extern const KUSER_SHARED_DATA volatile& g_KUserSharedData;
 
 	// ----------------------------------------------------------------
 	// LDR
@@ -1192,6 +1242,11 @@ namespace Detours {
 		ULONG DefaultThreadpoolThreadMaximum;
 	} RTL_USER_PROCESS_PARAMETERS, *PRTL_USER_PROCESS_PARAMETERS;
 
+#if defined(DETOURS_DEFINED_RTL_MAX_DRIVE_LETTERS)
+#undef RTL_MAX_DRIVE_LETTERS
+#undef DETOURS_DEFINED_RTL_MAX_DRIVE_LETTERS
+#endif
+
 	typedef struct _API_SET_NAMESPACE {
 		ULONG Version;
 		ULONG Size;
@@ -1202,17 +1257,30 @@ namespace Detours {
 		ULONG HashFactor;
 	} API_SET_NAMESPACE, *PAPI_SET_NAMESPACE;
 
-using GDI_HANDLE_BUFFER = ULONG[GDI_HANDLE_BUFFER_SIZE];
-using GDI_HANDLE_BUFFER32 = ULONG[GDI_HANDLE_BUFFER_SIZE32];
-using GDI_HANDLE_BUFFER64 = ULONG[GDI_HANDLE_BUFFER_SIZE64];
+	using GDI_HANDLE_BUFFER = ULONG[GDI_HANDLE_BUFFER_SIZE];
+	using GDI_HANDLE_BUFFER32 = ULONG[GDI_HANDLE_BUFFER_SIZE32];
+	using GDI_HANDLE_BUFFER64 = ULONG[GDI_HANDLE_BUFFER_SIZE64];
 
 #if defined(DETOURS_ARCH_X64)
-static_assert(sizeof(GDI_HANDLE_BUFFER) == sizeof(GDI_HANDLE_BUFFER64), "x64 GDI handle buffer layout mismatch");
+	static_assert(sizeof(GDI_HANDLE_BUFFER) == sizeof(GDI_HANDLE_BUFFER64), "x64 GDI handle buffer layout mismatch");
 #elif defined(DETOURS_ARCH_X86)
-static_assert(sizeof(GDI_HANDLE_BUFFER) == sizeof(GDI_HANDLE_BUFFER32), "x86 GDI handle buffer layout mismatch");
+	static_assert(sizeof(GDI_HANDLE_BUFFER) == sizeof(GDI_HANDLE_BUFFER32), "x86 GDI handle buffer layout mismatch");
 #endif
 
-typedef struct _PEB {
+#if defined(DETOURS_DEFINED_GDI_HANDLE_BUFFER_SIZE)
+#undef GDI_HANDLE_BUFFER_SIZE
+#undef DETOURS_DEFINED_GDI_HANDLE_BUFFER_SIZE
+#endif
+#if defined(DETOURS_DEFINED_GDI_HANDLE_BUFFER_SIZE32)
+#undef GDI_HANDLE_BUFFER_SIZE32
+#undef DETOURS_DEFINED_GDI_HANDLE_BUFFER_SIZE32
+#endif
+#if defined(DETOURS_DEFINED_GDI_HANDLE_BUFFER_SIZE64)
+#undef GDI_HANDLE_BUFFER_SIZE64
+#undef DETOURS_DEFINED_GDI_HANDLE_BUFFER_SIZE64
+#endif
+
+	typedef struct _PEB {
 		BOOLEAN InheritedAddressSpace;
 		BOOLEAN ReadImageFileExecOptions;
 		BOOLEAN BeingDebugged;
@@ -1368,7 +1436,7 @@ typedef struct _PEB {
 		ULONGLONG ExtendedFeatureDisableMask;
 	} PEB, *PPEB;
 
-	PPEB GetPEB();
+	PPEB GetPEB() noexcept;
 
 	// ----------------------------------------------------------------
 	// TEB
@@ -1384,10 +1452,10 @@ typedef struct _PEB {
 		ULONGLONG UniqueThread;
 	} CLIENT_ID64, *PCLIENT_ID64;
 
-#ifdef _M_X64
+#if defined(_M_X64)
 	typedef CLIENT_ID64 CLIENT_ID;
 	typedef PCLIENT_ID64 PCLIENT_ID;
-#elif _M_IX86
+#elif defined(_M_IX86)
 	typedef CLIENT_ID32 CLIENT_ID;
 	typedef PCLIENT_ID32 PCLIENT_ID;
 #endif
@@ -1405,6 +1473,11 @@ typedef struct _PEB {
 		ULONG_PTR HDC;
 		ULONG Buffer[GDI_BATCH_BUFFER_SIZE];
 	} GDI_TEB_BATCH, *PGDI_TEB_BATCH;
+
+#if defined(DETOURS_DEFINED_GDI_BATCH_BUFFER_SIZE)
+#undef GDI_BATCH_BUFFER_SIZE
+#undef DETOURS_DEFINED_GDI_BATCH_BUFFER_SIZE
+#endif
 
 	typedef struct _TEB_ACTIVE_FRAME_CONTEXT {
 		ULONG Flags;
@@ -1434,9 +1507,9 @@ typedef struct _PEB {
 		LCID CurrentLocale;
 		ULONG FpSoftwareStatusRegister;
 		PVOID ReservedForDebuggerInstrumentation[16];
-#ifdef _M_X64
+#if defined(_M_X64)
 		PVOID SystemReserved1[30];
-#elif _M_IX86
+#elif defined(_M_IX86)
 		PVOID SystemReserved1[26];
 #endif
 		CHAR PlaceholderCompatibilityMode;
@@ -1450,12 +1523,12 @@ typedef struct _PEB {
 		ULONG_PTR InstrumentationCallbackSp;
 		ULONG_PTR InstrumentationCallbackPreviousPc;
 		ULONG_PTR InstrumentationCallbackPreviousSp;
-#ifdef _M_X64
+#if defined(_M_X64)
 		ULONG TxFsContext;
 #endif
 		BOOLEAN InstrumentationCallbackDisabled;
-#ifdef _M_X64
-		BOOLEAN UnalignedLoadStoreExceptions;
+#if defined(_M_X64)
+		BOOLEAN UnAlignedLoadStoreExceptions;
 #endif
 #ifdef _M_IX86
 		UCHAR SpareBytes[23];
@@ -1486,9 +1559,9 @@ typedef struct _PEB {
 		PVOID ReservedForNtRpc;
 		PVOID DbgSsReserved[2];
 		ULONG HardErrorMode;
-#ifdef _M_X64
+#if defined(_M_X64)
 		PVOID Instrumentation[11];
-#elif _M_IX86
+#elif defined(_M_IX86)
 		PVOID Instrumentation[9];
 #endif
 		GUID ActivityId;
@@ -1518,7 +1591,7 @@ typedef struct _PEB {
 		ULONG_PTR ReservedForCodeCoverage;
 		PVOID ThreadPoolData;
 		PVOID* TlsExpansionSlots;
-#ifdef _M_X64
+#if defined(_M_X64)
 		PVOID DeallocationBStore;
 		PVOID BStoreLimit;
 #endif
@@ -1577,8 +1650,8 @@ typedef struct _PEB {
 		ULONGLONG ExtendedFeatureDisableMask;
 	} TEB, *PTEB;
 
-	PTEB GetTEB();
-	PTEB GetTEB(HANDLE hThread);
+	PTEB GetTEB() noexcept;
+	PTEB GetTEB(HANDLE hThread) noexcept;
 #endif // defined(_WIN32)
 
 	// ----------------------------------------------------------------
@@ -1586,27 +1659,28 @@ typedef struct _PEB {
 	// ----------------------------------------------------------------
 
 	namespace CallStack {
+		// Windows thread handles must refer to the current process.
 
 		// ----------------------------------------------------------------
 		// GetCallStack
 		// ----------------------------------------------------------------
 
 #if defined(_WIN32)
-		std::vector<void*> GetCallStack(HANDLE hThread, size_t unMaxEntries = CALLSTACK_MAX_ENTRIES);
+		std::vector<void*> GetCallStack(HANDLE hThread, std::size_t unMaxEntries = CALLSTACK_MAX_ENTRIES);
 
 		// ----------------------------------------------------------------
 		// GetShadowStack
 		// ----------------------------------------------------------------
 
-		bool GetShadowStack(HANDLE hThread, void*** pShadowStack, size_t* pSize);
+		bool GetShadowStack(HANDLE hThread, void*** pShadowStack, std::size_t* pSize);
 
 		// ----------------------------------------------------------------
 		// GetShadowCallStack
 		// ----------------------------------------------------------------
 
-		std::vector<void*> GetShadowCallStack(HANDLE hThread, size_t unMaxEntries = CALLSTACK_MAX_ENTRIES);
+		std::vector<void*> GetShadowCallStack(HANDLE hThread, std::size_t unMaxEntries = CALLSTACK_MAX_ENTRIES);
 #elif defined(__linux__)
-		std::vector<void*> GetCallStack(size_t unMaxEntries = CALLSTACK_MAX_ENTRIES);
+		std::vector<void*> GetCallStack(std::size_t unMaxEntries = CALLSTACK_MAX_ENTRIES);
 #endif
 	} // namespace CallStack
 
@@ -1616,6 +1690,8 @@ typedef struct _PEB {
 	// ----------------------------------------------------------------
 
 	namespace LDR {
+		// Returned loader entries are borrowed. The caller must keep the
+		// corresponding module loaded for the entire period of use.
 
 		// ----------------------------------------------------------------
 		// FindModuleListEntry
@@ -1623,12 +1699,12 @@ typedef struct _PEB {
 
 		PLIST_ENTRY FindModuleListEntry(void* pBaseAddress);
 		PLIST_ENTRY FindModuleListEntry(HMODULE hModule);
-		PLIST_ENTRY FindModuleListEntryA(const char* szModuleName);
-		PLIST_ENTRY FindModuleListEntryW(const wchar_t* szModuleName);
+		PLIST_ENTRY FindModuleListEntryA(char const* szModuleName);
+		PLIST_ENTRY FindModuleListEntryW(wchar_t const* szModuleName);
 #ifdef _UNICODE
-		PLIST_ENTRY FindModuleListEntry(const wchar_t* szModuleName);
+		PLIST_ENTRY FindModuleListEntry(wchar_t const* szModuleName);
 #else
-		PLIST_ENTRY FindModuleListEntry(const char* szModuleName);
+		PLIST_ENTRY FindModuleListEntry(char const* szModuleName);
 #endif
 
 		// ----------------------------------------------------------------
@@ -1637,18 +1713,21 @@ typedef struct _PEB {
 
 		PLDR_DATA_TABLE_ENTRY FindModuleDataTableEntry(void* pBaseAddress);
 		PLDR_DATA_TABLE_ENTRY FindModuleDataTableEntry(HMODULE hModule);
-		PLDR_DATA_TABLE_ENTRY FindModuleDataTableEntryA(const char* szModuleName);
-		PLDR_DATA_TABLE_ENTRY FindModuleDataTableEntryW(const wchar_t* szModuleName);
+		PLDR_DATA_TABLE_ENTRY FindModuleDataTableEntryA(char const* szModuleName);
+		PLDR_DATA_TABLE_ENTRY FindModuleDataTableEntryW(wchar_t const* szModuleName);
 #ifdef _UNICODE
-		PLDR_DATA_TABLE_ENTRY FindModuleDataTableEntry(const wchar_t* szModuleName);
+		PLDR_DATA_TABLE_ENTRY FindModuleDataTableEntry(wchar_t const* szModuleName);
 #else
-		PLDR_DATA_TABLE_ENTRY FindModuleDataTableEntry(const char* szModuleName);
+		PLDR_DATA_TABLE_ENTRY FindModuleDataTableEntry(char const* szModuleName);
 #endif
 
 		// ----------------------------------------------------------------
 		// LINK_DATA
 		// ----------------------------------------------------------------
 
+		// LINK_DATA is an opaque, process-local token. A successful ReLinkModule
+		// consumes the token and every bitwise copy of it. UnLinkModule retains an
+		// internal module reference until a successful relink consumes the token.
 		typedef struct _LINK_DATA {
 			PLDR_DATA_TABLE_ENTRY m_pDTE;
 			PLIST_ENTRY m_pSavedInLoadOrderLinks;
@@ -1665,18 +1744,19 @@ typedef struct _PEB {
 		bool UnLinkModule(PLDR_DATA_TABLE_ENTRY pDTE, PLINK_DATA pLinkData);
 		bool UnLinkModule(void* pBaseAddress, PLINK_DATA pLinkData);
 		bool UnLinkModule(HMODULE hModule, PLINK_DATA pLinkData);
-		bool UnLinkModuleA(const char* szModuleName, PLINK_DATA pLinkData);
-		bool UnLinkModuleW(const wchar_t* szModuleName, PLINK_DATA pLinkData);
+		bool UnLinkModuleA(char const* szModuleName, PLINK_DATA pLinkData);
+		bool UnLinkModuleW(wchar_t const* szModuleName, PLINK_DATA pLinkData);
 #ifdef _UNICODE
-		bool UnLinkModule(const wchar_t* szModuleName, PLINK_DATA pLinkData);
+		bool UnLinkModule(wchar_t const* szModuleName, PLINK_DATA pLinkData);
 #else
-		bool UnLinkModule(const char* szModuleName, PLINK_DATA pLinkData);
+		bool UnLinkModule(char const* szModuleName, PLINK_DATA pLinkData);
 #endif
 
 		// ----------------------------------------------------------------
 		// ReLinkModule
 		// ----------------------------------------------------------------
 
+		bool TryReLinkModule(LINK_DATA LinkData);
 		void ReLinkModule(LINK_DATA LinkData);
 	} // namespace LDR
 #endif // defined(_WIN32)
@@ -1691,25 +1771,57 @@ typedef struct _PEB {
 		// UpperCase
 		// ----------------------------------------------------------------
 
-		bool UpperCase(char szBuffer[], const size_t unSize);
+		bool UpperCase(char szBuffer[], const std::size_t unSize);
 
 		// ----------------------------------------------------------------
 		// LowerCase
 		// ----------------------------------------------------------------
 
-		bool LowerCase(char szBuffer[], const size_t unSize);
+		bool LowerCase(char szBuffer[], const std::size_t unSize);
 
 		// ----------------------------------------------------------------
 		// Encode
 		// ----------------------------------------------------------------
 
-		int Encode(unsigned short unCodePage, char const* const szText, wchar_t* szBuffer = nullptr, const int nBufferSize = 0);
+		int Encode(unsigned short unCodePage, char const* const szText, std::size_t unTextCapacity, wchar_t* szBuffer = nullptr, int nBufferSize = 0);
+	
+		template <std::size_t unTextCapacity>
+		int Encode(const unsigned short unCodePage, char const (&szText)[unTextCapacity]) {
+			return Encode(unCodePage, szText, unTextCapacity, nullptr, 0);
+		}
+
+		template <std::size_t unTextCapacity>
+		int Encode(const unsigned short unCodePage, char const (&szText)[unTextCapacity], wchar_t* szBuffer, const int nBufferSize) {
+			return Encode(unCodePage, szText, unTextCapacity, szBuffer, nBufferSize);
+		}
+
+		template <std::size_t unTextCapacity, std::size_t unBufferCapacity>
+		int Encode(const unsigned short unCodePage, char const (&szText)[unTextCapacity], wchar_t (&szBuffer)[unBufferCapacity]) {
+			static_assert(unBufferCapacity <= static_cast<std::size_t>(INT_MAX), "Codec output array exceeds the supported size");
+			return Encode(unCodePage, szText, unTextCapacity, szBuffer, static_cast<int>(unBufferCapacity));
+		}
 
 		// ----------------------------------------------------------------
 		// Decode
 		// ----------------------------------------------------------------
 
-		int Decode(unsigned short unCodePage, wchar_t const* const szText, char* szBuffer = nullptr, const int nBufferSize = 0);
+		int Decode(unsigned short unCodePage, wchar_t const* const szText, std::size_t unTextCapacity, char* szBuffer = nullptr, int nBufferSize = 0);
+
+		template <std::size_t unTextCapacity>
+		int Decode(const unsigned short unCodePage, wchar_t const (&szText)[unTextCapacity]) {
+			return Decode(unCodePage, szText, unTextCapacity, nullptr, 0);
+		}
+
+		template <std::size_t unTextCapacity>
+		int Decode(const unsigned short unCodePage, wchar_t const (&szText)[unTextCapacity], char* szBuffer, const int nBufferSize) {
+			return Decode(unCodePage, szText, unTextCapacity, szBuffer, nBufferSize);
+		}
+
+		template <std::size_t unTextCapacity, std::size_t unBufferCapacity>
+		int Decode(const unsigned short unCodePage, wchar_t const (&szText)[unTextCapacity], char (&szBuffer)[unBufferCapacity]) {
+			static_assert(unBufferCapacity <= static_cast<std::size_t>(INT_MAX), "Codec output array exceeds the supported size");
+			return Decode(unCodePage, szText, unTextCapacity, szBuffer, static_cast<int>(unBufferCapacity));
+		}
 	} // namespace Codec
 
 	// ----------------------------------------------------------------
@@ -1722,24 +1834,66 @@ typedef struct _PEB {
 		// Encode
 		// ----------------------------------------------------------------
 
-		bool EncodeA(void const* const pData, const size_t unSize, char* szHex, const unsigned char unIgnoredByte = 0x2A);
-		bool EncodeW(void const* const pData, const size_t unSize, wchar_t* szHex, const unsigned char unIgnoredByte = 0x2A);
+		bool EncodeA(void const* const pData, const std::size_t unSize, char* szHex, const std::size_t unHexCapacity, const unsigned char unIgnoredByte);
+		template <std::size_t unHexCapacity>
+		bool EncodeA(void const* const pData, const std::size_t unSize, char (&szHex)[unHexCapacity], const unsigned char unIgnoredByte = 0x2A) {
+			return EncodeA(pData, unSize, szHex, unHexCapacity, unIgnoredByte);
+		}
+
+		bool EncodeW(void const* const pData, const std::size_t unSize, wchar_t* szHex, const std::size_t unHexCapacity, const unsigned char unIgnoredByte);
+		template <std::size_t unHexCapacity>
+		bool EncodeW(void const* const pData, const std::size_t unSize, wchar_t (&szHex)[unHexCapacity], const unsigned char unIgnoredByte = 0x2A) {
+			return EncodeW(pData, unSize, szHex, unHexCapacity, unIgnoredByte);
+		}
 #ifdef _UNICODE
-		bool Encode(void const* const pData, const size_t unSize, wchar_t* szHex, const unsigned char unIgnoredByte = 0x2A);
+		bool Encode(void const* const pData, const std::size_t unSize, wchar_t* szHex, const std::size_t unHexCapacity, const unsigned char unIgnoredByte);
+		template <std::size_t unHexCapacity>
+		bool Encode(void const* const pData, const std::size_t unSize, wchar_t (&szHex)[unHexCapacity], const unsigned char unIgnoredByte = 0x2A) {
+			return EncodeW(pData, unSize, szHex, unHexCapacity, unIgnoredByte);
+		}
 #else
-		bool Encode(void const* const pData, const size_t unSize, char* szHex, const unsigned char unIgnoredByte = 0x2A);
+		bool Encode(void const* const pData, const std::size_t unSize, char* szHex, const std::size_t unHexCapacity, const unsigned char unIgnoredByte);
+		template <std::size_t unHexCapacity>
+		bool Encode(void const* const pData, const std::size_t unSize, char (&szHex)[unHexCapacity], const unsigned char unIgnoredByte = 0x2A) {
+			return EncodeA(pData, unSize, szHex, unHexCapacity, unIgnoredByte);
+		}
 #endif
 
 		// ----------------------------------------------------------------
 		// Decode
 		// ----------------------------------------------------------------
 
-		bool DecodeA(char const* const szHex, void* pData, const unsigned char unIgnoredByte = 0x2A);
-		bool DecodeW(wchar_t const* const szHex, void* pData, const unsigned char unIgnoredByte = 0x2A);
+		bool DecodeA(char const* const szHex, const std::size_t unHexCapacity, void* pData, const std::size_t unDataCapacity, const unsigned char unIgnoredByte);
+		template <std::size_t unHexCapacity, typename DataType, std::size_t unDataCount>
+		bool DecodeA(char const (&szHex)[unHexCapacity], DataType (&arrData)[unDataCount], const unsigned char unIgnoredByte = 0x2A) {
+			static_assert(std::is_trivially_copyable<DataType>::value, "Hexadecimal output elements must be trivially copyable");
+			static_assert(!std::is_const<DataType>::value && !std::is_volatile<DataType>::value, "Hexadecimal output elements must be writable");
+			return DecodeA(szHex, unHexCapacity, static_cast<void*>(arrData), sizeof(arrData), unIgnoredByte);
+		}
+
+		bool DecodeW(wchar_t const* const szHex, const std::size_t unHexCapacity, void* pData, const std::size_t unDataCapacity, const unsigned char unIgnoredByte);
+		template <std::size_t unHexCapacity, typename DataType, std::size_t unDataCount>
+		bool DecodeW(wchar_t const (&szHex)[unHexCapacity], DataType (&arrData)[unDataCount], const unsigned char unIgnoredByte = 0x2A) {
+			static_assert(std::is_trivially_copyable<DataType>::value, "Hexadecimal output elements must be trivially copyable");
+			static_assert(!std::is_const<DataType>::value && !std::is_volatile<DataType>::value, "Hexadecimal output elements must be writable");
+			return DecodeW(szHex, unHexCapacity, static_cast<void*>(arrData), sizeof(arrData), unIgnoredByte);
+		}
 #ifdef _UNICODE
-		bool Decode(wchar_t const* const szHex, void* pData, const unsigned char unIgnoredByte = 0x2A);
+		bool Decode(wchar_t const* const szHex, const std::size_t unHexCapacity, void* pData, const std::size_t unDataCapacity, const unsigned char unIgnoredByte);
+		template <std::size_t unHexCapacity, typename DataType, std::size_t unDataCount>
+		bool Decode(wchar_t const (&szHex)[unHexCapacity], DataType (&arrData)[unDataCount], const unsigned char unIgnoredByte = 0x2A) {
+			static_assert(std::is_trivially_copyable<DataType>::value, "Hexadecimal output elements must be trivially copyable");
+			static_assert(!std::is_const<DataType>::value && !std::is_volatile<DataType>::value, "Hexadecimal output elements must be writable");
+			return DecodeW(szHex, unHexCapacity, static_cast<void*>(arrData), sizeof(arrData), unIgnoredByte);
+		}
 #else
-		bool Decode(char const* const szHex, void* pData, const unsigned char unIgnoredByte = 0x2A);
+		bool Decode(char const* const szHex, const std::size_t unHexCapacity, void* pData, const std::size_t unDataCapacity, const unsigned char unIgnoredByte);
+		template <std::size_t unHexCapacity, typename DataType, std::size_t unDataCount>
+		bool Decode(char const (&szHex)[unHexCapacity], DataType (&arrData)[unDataCount], const unsigned char unIgnoredByte = 0x2A) {
+			static_assert(std::is_trivially_copyable<DataType>::value, "Hexadecimal output elements must be trivially copyable");
+			static_assert(!std::is_const<DataType>::value && !std::is_volatile<DataType>::value, "Hexadecimal output elements must be writable");
+			return DecodeA(szHex, unHexCapacity, static_cast<void*>(arrData), sizeof(arrData), unIgnoredByte);
+		}
 #endif
 	} // namespace Hexadecimal
 
@@ -1748,22 +1902,25 @@ typedef struct _PEB {
 	// ----------------------------------------------------------------
 
 	namespace Scan {
+		constexpr std::size_t kSectionNameSize = 8;
+		// Returned module addresses are borrowed. Keep the source module loaded
+		// for as long as any returned address is used.
 
 		// ----------------------------------------------------------------
 		// FindSection
 		// ----------------------------------------------------------------
 
 #if defined(_WIN32)
-		bool FindSection(const HMODULE hModule, const std::array<const unsigned char, 8>& arrSectionName, void** pAddress, size_t* pSize) noexcept;
+		bool FindSection(const HMODULE hModule, std::array<const unsigned char, kSectionNameSize> const& arrSectionName, void** pAddress, std::size_t* pSize) noexcept;
 #elif defined(__linux__)
-		bool FindSection(void* const hModule, const std::array<const unsigned char, 8>& arrSectionName, void** pAddress, size_t* pSize) noexcept;
+		bool FindSection(void* const hModule, std::array<const unsigned char, kSectionNameSize> const& arrSectionName, void** pAddress, std::size_t* pSize) noexcept;
 #endif
-		bool FindSectionA(char const* const szModuleName, const std::array<const unsigned char, 8>& arrSectionName, void** pAddress, size_t* pSize) noexcept;
-		bool FindSectionW(wchar_t const* const szModuleName, const std::array<const unsigned char, 8>& arrSectionName, void** pAddress, size_t* pSize) noexcept;
+		bool FindSectionA(char const* const szModuleName, std::array<const unsigned char, kSectionNameSize> const& arrSectionName, void** pAddress, std::size_t* pSize) noexcept;
+		bool FindSectionW(wchar_t const* const szModuleName, std::array<const unsigned char, kSectionNameSize> const& arrSectionName, void** pAddress, std::size_t* pSize) noexcept;
 #ifdef _UNICODE
-		bool FindSection(wchar_t const* const szModuleName, const std::array<const unsigned char, 8>& arrSectionName, void** pAddress, size_t* pSize) noexcept;
+		bool FindSection(wchar_t const* const szModuleName, std::array<const unsigned char, kSectionNameSize> const& arrSectionName, void** pAddress, std::size_t* pSize) noexcept;
 #else
-		bool FindSection(char const* const szModuleName, const std::array<const unsigned char, 8>& arrSectionName, void** pAddress, size_t* pSize) noexcept;
+		bool FindSection(char const* const szModuleName, std::array<const unsigned char, kSectionNameSize> const& arrSectionName, void** pAddress, std::size_t* pSize) noexcept;
 #endif
 
 		// ----------------------------------------------------------------
@@ -1771,376 +1928,376 @@ typedef struct _PEB {
 		// ----------------------------------------------------------------
 
 #if defined(_WIN32)
-		bool FindSectionPOGO(const HMODULE hModule, char const* const szSectionName, void** pAddress, size_t* pSize) noexcept;
+		bool FindSectionPOGO(const HMODULE hModule, char const* const szSectionName, void** pAddress, std::size_t* pSize) noexcept;
 #elif defined(__linux__)
-		bool FindSectionPOGO(void* const hModule, char const* const szSectionName, void** pAddress, size_t* pSize) noexcept;
+		bool FindSectionPOGO(void* const hModule, char const* const szSectionName, void** pAddress, std::size_t* pSize) noexcept;
 #endif
-		bool FindSectionPOGOA(char const* const szModuleName, char const* const szSectionName, void** pAddress, size_t* pSize) noexcept;
-		bool FindSectionPOGOW(wchar_t const* const szModuleName, char const* const szSectionName, void** pAddress, size_t* pSize) noexcept;
+		bool FindSectionPOGOA(char const* const szModuleName, char const* const szSectionName, void** pAddress, std::size_t* pSize) noexcept;
+		bool FindSectionPOGOW(wchar_t const* const szModuleName, char const* const szSectionName, void** pAddress, std::size_t* pSize) noexcept;
 #ifdef _UNICODE
-		bool FindSectionPOGO(wchar_t const* const szModuleName, char const* const szSectionName, void** pAddress, size_t* pSize) noexcept;
+		bool FindSectionPOGO(wchar_t const* const szModuleName, char const* const szSectionName, void** pAddress, std::size_t* pSize) noexcept;
 #else
-		bool FindSectionPOGO(char const* const szModuleName, char const* const szSectionName, void** pAddress, size_t* pSize) noexcept;
+		bool FindSectionPOGO(char const* const szModuleName, char const* const szSectionName, void** pAddress, std::size_t* pSize) noexcept;
 #endif
 
 		// ----------------------------------------------------------------
 		// FindSignature (Native)
 		// ----------------------------------------------------------------
 
-		void const* FindSignatureNative(void const* const pAddress, const size_t unSize, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const size_t unOffset = 0) noexcept;
+		void const* FindSignatureNative(void const* const pAddress, const std::size_t unSize, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const std::size_t unOffset = 0) noexcept;
 #if defined(_WIN32)
-		void const* FindSignatureNative(const HMODULE hModule, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const size_t unOffset = 0) noexcept;
+		void const* FindSignatureNative(const HMODULE hModule, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const std::size_t unOffset = 0) noexcept;
 #elif defined(__linux__)
-		void const* FindSignatureNative(void* const hModule, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const size_t unOffset = 0) noexcept;
+		void const* FindSignatureNative(void* const hModule, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const std::size_t unOffset = 0) noexcept;
 #endif
 #if defined(_WIN32)
-		void const* FindSignatureNative(const HMODULE hModule, const std::array<const unsigned char, 8>& arrSectionName, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const size_t unOffset = 0) noexcept;
+		void const* FindSignatureNative(const HMODULE hModule, std::array<const unsigned char, kSectionNameSize> const& arrSectionName, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const std::size_t unOffset = 0) noexcept;
 #elif defined(__linux__)
-		void const* FindSignatureNative(void* const hModule, const std::array<const unsigned char, 8>& arrSectionName, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const size_t unOffset = 0) noexcept;
+		void const* FindSignatureNative(void* const hModule, std::array<const unsigned char, kSectionNameSize> const& arrSectionName, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const std::size_t unOffset = 0) noexcept;
 #endif
 #if defined(_WIN32)
-		void const* FindSignatureNative(const HMODULE hModule, char const* const szSectionName, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const size_t unOffset = 0) noexcept;
+		void const* FindSignatureNative(const HMODULE hModule, char const* const szSectionName, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const std::size_t unOffset = 0) noexcept;
 #elif defined(__linux__)
-		void const* FindSignatureNative(void* const hModule, char const* const szSectionName, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const size_t unOffset = 0) noexcept;
+		void const* FindSignatureNative(void* const hModule, char const* const szSectionName, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const std::size_t unOffset = 0) noexcept;
 #endif
-		void const* FindSignatureNativeA(char const* const szModuleName, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const size_t unOffset = 0) noexcept;
-		void const* FindSignatureNativeA(char const* const szModuleName, const std::array<const unsigned char, 8>& arrSectionName, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const size_t unOffset = 0) noexcept;
-		void const* FindSignatureNativeA(char const* const szModuleName, char const* const szSectionName, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const size_t unOffset = 0) noexcept;
-		void const* FindSignatureNativeW(wchar_t const* const szModuleName, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const size_t unOffset = 0) noexcept;
-		void const* FindSignatureNativeW(wchar_t const* const szModuleName, const std::array<const unsigned char, 8>& arrSectionName, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const size_t unOffset = 0) noexcept;
-		void const* FindSignatureNativeW(wchar_t const* const szModuleName, char const* const szSectionName, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const size_t unOffset = 0) noexcept;
+		void const* FindSignatureNativeA(char const* const szModuleName, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const std::size_t unOffset = 0) noexcept;
+		void const* FindSignatureNativeA(char const* const szModuleName, std::array<const unsigned char, kSectionNameSize> const& arrSectionName, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const std::size_t unOffset = 0) noexcept;
+		void const* FindSignatureNativeA(char const* const szModuleName, char const* const szSectionName, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const std::size_t unOffset = 0) noexcept;
+		void const* FindSignatureNativeW(wchar_t const* const szModuleName, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const std::size_t unOffset = 0) noexcept;
+		void const* FindSignatureNativeW(wchar_t const* const szModuleName, std::array<const unsigned char, kSectionNameSize> const& arrSectionName, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const std::size_t unOffset = 0) noexcept;
+		void const* FindSignatureNativeW(wchar_t const* const szModuleName, char const* const szSectionName, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const std::size_t unOffset = 0) noexcept;
 #ifdef _UNICODE
-		void const* FindSignatureNative(wchar_t const* const szModuleName, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const size_t unOffset = 0) noexcept;
-		void const* FindSignatureNative(wchar_t const* const szModuleName, const std::array<const unsigned char, 8>& arrSectionName, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const size_t unOffset = 0) noexcept;
-		void const* FindSignatureNative(wchar_t const* const szModuleName, char const* const szSectionName, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const size_t unOffset = 0) noexcept;
+		void const* FindSignatureNative(wchar_t const* const szModuleName, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const std::size_t unOffset = 0) noexcept;
+		void const* FindSignatureNative(wchar_t const* const szModuleName, std::array<const unsigned char, kSectionNameSize> const& arrSectionName, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const std::size_t unOffset = 0) noexcept;
+		void const* FindSignatureNative(wchar_t const* const szModuleName, char const* const szSectionName, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const std::size_t unOffset = 0) noexcept;
 #else
-		void const* FindSignatureNative(char const* const szModuleName, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const size_t unOffset = 0) noexcept;
-		void const* FindSignatureNative(char const* const szModuleName, const std::array<const unsigned char, 8>& arrSectionName, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const size_t unOffset = 0) noexcept;
-		void const* FindSignatureNative(char const* const szModuleName, char const* const szSectionName, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const size_t unOffset = 0) noexcept;
+		void const* FindSignatureNative(char const* const szModuleName, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const std::size_t unOffset = 0) noexcept;
+		void const* FindSignatureNative(char const* const szModuleName, std::array<const unsigned char, kSectionNameSize> const& arrSectionName, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const std::size_t unOffset = 0) noexcept;
+		void const* FindSignatureNative(char const* const szModuleName, char const* const szSectionName, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const std::size_t unOffset = 0) noexcept;
 #endif
 
 		// ----------------------------------------------------------------
 		// FindSignature (SSE2)
 		// ----------------------------------------------------------------
 
-		void const* FindSignatureSSE2(void const* const pAddress, const size_t unSize, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const size_t unOffset = 0) noexcept;
+		void const* FindSignatureSSE2(void const* const pAddress, const std::size_t unSize, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const std::size_t unOffset = 0) noexcept;
 #if defined(_WIN32)
-		void const* FindSignatureSSE2(const HMODULE hModule, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const size_t unOffset = 0) noexcept;
+		void const* FindSignatureSSE2(const HMODULE hModule, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const std::size_t unOffset = 0) noexcept;
 #elif defined(__linux__)
-		void const* FindSignatureSSE2(void* const hModule, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const size_t unOffset = 0) noexcept;
+		void const* FindSignatureSSE2(void* const hModule, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const std::size_t unOffset = 0) noexcept;
 #endif
 #if defined(_WIN32)
-		void const* FindSignatureSSE2(const HMODULE hModule, const std::array<const unsigned char, 8>& arrSectionName, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const size_t unOffset = 0) noexcept;
+		void const* FindSignatureSSE2(const HMODULE hModule, std::array<const unsigned char, kSectionNameSize> const& arrSectionName, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const std::size_t unOffset = 0) noexcept;
 #elif defined(__linux__)
-		void const* FindSignatureSSE2(void* const hModule, const std::array<const unsigned char, 8>& arrSectionName, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const size_t unOffset = 0) noexcept;
+		void const* FindSignatureSSE2(void* const hModule, std::array<const unsigned char, kSectionNameSize> const& arrSectionName, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const std::size_t unOffset = 0) noexcept;
 #endif
 #if defined(_WIN32)
-		void const* FindSignatureSSE2(const HMODULE hModule, char const* const szSectionName, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const size_t unOffset = 0) noexcept;
+		void const* FindSignatureSSE2(const HMODULE hModule, char const* const szSectionName, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const std::size_t unOffset = 0) noexcept;
 #elif defined(__linux__)
-		void const* FindSignatureSSE2(void* const hModule, char const* const szSectionName, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const size_t unOffset = 0) noexcept;
+		void const* FindSignatureSSE2(void* const hModule, char const* const szSectionName, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const std::size_t unOffset = 0) noexcept;
 #endif
-		void const* FindSignatureSSE2A(char const* const szModuleName, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const size_t unOffset = 0) noexcept;
-		void const* FindSignatureSSE2A(char const* const szModuleName, const std::array<const unsigned char, 8>& arrSectionName, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const size_t unOffset = 0) noexcept;
-		void const* FindSignatureSSE2A(char const* const szModuleName, char const* const szSectionName, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const size_t unOffset = 0) noexcept;
-		void const* FindSignatureSSE2W(wchar_t const* const szModuleName, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const size_t unOffset = 0) noexcept;
-		void const* FindSignatureSSE2W(wchar_t const* const szModuleName, const std::array<const unsigned char, 8>& arrSectionName, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const size_t unOffset = 0) noexcept;
-		void const* FindSignatureSSE2W(wchar_t const* const szModuleName, char const* const szSectionName, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const size_t unOffset = 0) noexcept;
+		void const* FindSignatureSSE2A(char const* const szModuleName, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const std::size_t unOffset = 0) noexcept;
+		void const* FindSignatureSSE2A(char const* const szModuleName, std::array<const unsigned char, kSectionNameSize> const& arrSectionName, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const std::size_t unOffset = 0) noexcept;
+		void const* FindSignatureSSE2A(char const* const szModuleName, char const* const szSectionName, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const std::size_t unOffset = 0) noexcept;
+		void const* FindSignatureSSE2W(wchar_t const* const szModuleName, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const std::size_t unOffset = 0) noexcept;
+		void const* FindSignatureSSE2W(wchar_t const* const szModuleName, std::array<const unsigned char, kSectionNameSize> const& arrSectionName, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const std::size_t unOffset = 0) noexcept;
+		void const* FindSignatureSSE2W(wchar_t const* const szModuleName, char const* const szSectionName, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const std::size_t unOffset = 0) noexcept;
 #ifdef _UNICODE
-		void const* FindSignatureSSE2(wchar_t const* const szModuleName, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const size_t unOffset = 0) noexcept;
-		void const* FindSignatureSSE2(wchar_t const* const szModuleName, const std::array<const unsigned char, 8>& arrSectionName, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const size_t unOffset = 0) noexcept;
-		void const* FindSignatureSSE2(wchar_t const* const szModuleName, char const* const szSectionName, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const size_t unOffset = 0) noexcept;
+		void const* FindSignatureSSE2(wchar_t const* const szModuleName, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const std::size_t unOffset = 0) noexcept;
+		void const* FindSignatureSSE2(wchar_t const* const szModuleName, std::array<const unsigned char, kSectionNameSize> const& arrSectionName, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const std::size_t unOffset = 0) noexcept;
+		void const* FindSignatureSSE2(wchar_t const* const szModuleName, char const* const szSectionName, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const std::size_t unOffset = 0) noexcept;
 #else
-		void const* FindSignatureSSE2(char const* const szModuleName, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const size_t unOffset = 0) noexcept;
-		void const* FindSignatureSSE2(char const* const szModuleName, const std::array<const unsigned char, 8>& arrSectionName, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const size_t unOffset = 0) noexcept;
-		void const* FindSignatureSSE2(char const* const szModuleName, char const* const szSectionName, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const size_t unOffset = 0) noexcept;
+		void const* FindSignatureSSE2(char const* const szModuleName, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const std::size_t unOffset = 0) noexcept;
+		void const* FindSignatureSSE2(char const* const szModuleName, std::array<const unsigned char, kSectionNameSize> const& arrSectionName, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const std::size_t unOffset = 0) noexcept;
+		void const* FindSignatureSSE2(char const* const szModuleName, char const* const szSectionName, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const std::size_t unOffset = 0) noexcept;
 #endif
 
 		// ----------------------------------------------------------------
 		// FindSignature (AVX2)
 		// ----------------------------------------------------------------
 
-		void const* FindSignatureAVX2(void const* const pAddress, const size_t unSize, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const size_t unOffset = 0) noexcept;
+		void const* FindSignatureAVX2(void const* const pAddress, const std::size_t unSize, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const std::size_t unOffset = 0) noexcept;
 #if defined(_WIN32)
-		void const* FindSignatureAVX2(const HMODULE hModule, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const size_t unOffset = 0) noexcept;
+		void const* FindSignatureAVX2(const HMODULE hModule, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const std::size_t unOffset = 0) noexcept;
 #elif defined(__linux__)
-		void const* FindSignatureAVX2(void* const hModule, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const size_t unOffset = 0) noexcept;
+		void const* FindSignatureAVX2(void* const hModule, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const std::size_t unOffset = 0) noexcept;
 #endif
 #if defined(_WIN32)
-		void const* FindSignatureAVX2(const HMODULE hModule, const std::array<const unsigned char, 8>& arrSectionName, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const size_t unOffset = 0) noexcept;
+		void const* FindSignatureAVX2(const HMODULE hModule, std::array<const unsigned char, kSectionNameSize> const& arrSectionName, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const std::size_t unOffset = 0) noexcept;
 #elif defined(__linux__)
-		void const* FindSignatureAVX2(void* const hModule, const std::array<const unsigned char, 8>& arrSectionName, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const size_t unOffset = 0) noexcept;
+		void const* FindSignatureAVX2(void* const hModule, std::array<const unsigned char, kSectionNameSize> const& arrSectionName, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const std::size_t unOffset = 0) noexcept;
 #endif
 #if defined(_WIN32)
-		void const* FindSignatureAVX2(const HMODULE hModule, char const* const szSectionName, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const size_t unOffset = 0) noexcept;
+		void const* FindSignatureAVX2(const HMODULE hModule, char const* const szSectionName, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const std::size_t unOffset = 0) noexcept;
 #elif defined(__linux__)
-		void const* FindSignatureAVX2(void* const hModule, char const* const szSectionName, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const size_t unOffset = 0) noexcept;
+		void const* FindSignatureAVX2(void* const hModule, char const* const szSectionName, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const std::size_t unOffset = 0) noexcept;
 #endif
-		void const* FindSignatureAVX2A(char const* const szModuleName, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const size_t unOffset = 0) noexcept;
-		void const* FindSignatureAVX2A(char const* const szModuleName, const std::array<const unsigned char, 8>& arrSectionName, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const size_t unOffset = 0) noexcept;
-		void const* FindSignatureAVX2A(char const* const szModuleName, char const* const szSectionName, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const size_t unOffset = 0) noexcept;
-		void const* FindSignatureAVX2W(wchar_t const* const szModuleName, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const size_t unOffset = 0) noexcept;
-		void const* FindSignatureAVX2W(wchar_t const* const szModuleName, const std::array<const unsigned char, 8>& arrSectionName, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const size_t unOffset = 0) noexcept;
-		void const* FindSignatureAVX2W(wchar_t const* const szModuleName, char const* const szSectionName, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const size_t unOffset = 0) noexcept;
+		void const* FindSignatureAVX2A(char const* const szModuleName, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const std::size_t unOffset = 0) noexcept;
+		void const* FindSignatureAVX2A(char const* const szModuleName, std::array<const unsigned char, kSectionNameSize> const& arrSectionName, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const std::size_t unOffset = 0) noexcept;
+		void const* FindSignatureAVX2A(char const* const szModuleName, char const* const szSectionName, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const std::size_t unOffset = 0) noexcept;
+		void const* FindSignatureAVX2W(wchar_t const* const szModuleName, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const std::size_t unOffset = 0) noexcept;
+		void const* FindSignatureAVX2W(wchar_t const* const szModuleName, std::array<const unsigned char, kSectionNameSize> const& arrSectionName, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const std::size_t unOffset = 0) noexcept;
+		void const* FindSignatureAVX2W(wchar_t const* const szModuleName, char const* const szSectionName, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const std::size_t unOffset = 0) noexcept;
 #ifdef _UNICODE
-		void const* FindSignatureAVX2(wchar_t const* const szModuleName, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const size_t unOffset = 0) noexcept;
-		void const* FindSignatureAVX2(wchar_t const* const szModuleName, const std::array<const unsigned char, 8>& arrSectionName, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const size_t unOffset = 0) noexcept;
-		void const* FindSignatureAVX2(wchar_t const* const szModuleName, char const* const szSectionName, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const size_t unOffset = 0) noexcept;
+		void const* FindSignatureAVX2(wchar_t const* const szModuleName, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const std::size_t unOffset = 0) noexcept;
+		void const* FindSignatureAVX2(wchar_t const* const szModuleName, std::array<const unsigned char, kSectionNameSize> const& arrSectionName, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const std::size_t unOffset = 0) noexcept;
+		void const* FindSignatureAVX2(wchar_t const* const szModuleName, char const* const szSectionName, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const std::size_t unOffset = 0) noexcept;
 #else
-		void const* FindSignatureAVX2(char const* const szModuleName, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const size_t unOffset = 0) noexcept;
-		void const* FindSignatureAVX2(char const* const szModuleName, const std::array<const unsigned char, 8>& arrSectionName, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const size_t unOffset = 0) noexcept;
-		void const* FindSignatureAVX2(char const* const szModuleName, char const* const szSectionName, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const size_t unOffset = 0) noexcept;
+		void const* FindSignatureAVX2(char const* const szModuleName, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const std::size_t unOffset = 0) noexcept;
+		void const* FindSignatureAVX2(char const* const szModuleName, std::array<const unsigned char, kSectionNameSize> const& arrSectionName, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const std::size_t unOffset = 0) noexcept;
+		void const* FindSignatureAVX2(char const* const szModuleName, char const* const szSectionName, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const std::size_t unOffset = 0) noexcept;
 #endif
 
 		// ----------------------------------------------------------------
 		// FindSignature (AVX512) [AVX512BW]
 		// ----------------------------------------------------------------
 
-		void const* FindSignatureAVX512(void const* const pAddress, const size_t unSize, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const size_t unOffset = 0) noexcept;
+		void const* FindSignatureAVX512(void const* const pAddress, const std::size_t unSize, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const std::size_t unOffset = 0) noexcept;
 #if defined(_WIN32)
-		void const* FindSignatureAVX512(const HMODULE hModule, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const size_t unOffset = 0) noexcept;
+		void const* FindSignatureAVX512(const HMODULE hModule, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const std::size_t unOffset = 0) noexcept;
 #elif defined(__linux__)
-		void const* FindSignatureAVX512(void* const hModule, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const size_t unOffset = 0) noexcept;
+		void const* FindSignatureAVX512(void* const hModule, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const std::size_t unOffset = 0) noexcept;
 #endif
 #if defined(_WIN32)
-		void const* FindSignatureAVX512(const HMODULE hModule, const std::array<const unsigned char, 8>& arrSectionName, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const size_t unOffset = 0) noexcept;
+		void const* FindSignatureAVX512(const HMODULE hModule, std::array<const unsigned char, kSectionNameSize> const& arrSectionName, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const std::size_t unOffset = 0) noexcept;
 #elif defined(__linux__)
-		void const* FindSignatureAVX512(void* const hModule, const std::array<const unsigned char, 8>& arrSectionName, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const size_t unOffset = 0) noexcept;
+		void const* FindSignatureAVX512(void* const hModule, std::array<const unsigned char, kSectionNameSize> const& arrSectionName, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const std::size_t unOffset = 0) noexcept;
 #endif
 #if defined(_WIN32)
-		void const* FindSignatureAVX512(const HMODULE hModule, char const* const szSectionName, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const size_t unOffset = 0) noexcept;
+		void const* FindSignatureAVX512(const HMODULE hModule, char const* const szSectionName, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const std::size_t unOffset = 0) noexcept;
 #elif defined(__linux__)
-		void const* FindSignatureAVX512(void* const hModule, char const* const szSectionName, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const size_t unOffset = 0) noexcept;
+		void const* FindSignatureAVX512(void* const hModule, char const* const szSectionName, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const std::size_t unOffset = 0) noexcept;
 #endif
-		void const* FindSignatureAVX512A(char const* const szModuleName, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const size_t unOffset = 0) noexcept;
-		void const* FindSignatureAVX512A(char const* const szModuleName, const std::array<const unsigned char, 8>& arrSectionName, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const size_t unOffset = 0) noexcept;
-		void const* FindSignatureAVX512A(char const* const szModuleName, char const* const szSectionName, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const size_t unOffset = 0) noexcept;
-		void const* FindSignatureAVX512W(wchar_t const* const szModuleName, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const size_t unOffset = 0) noexcept;
-		void const* FindSignatureAVX512W(wchar_t const* const szModuleName, const std::array<const unsigned char, 8>& arrSectionName, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const size_t unOffset = 0) noexcept;
-		void const* FindSignatureAVX512W(wchar_t const* const szModuleName, char const* const szSectionName, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const size_t unOffset = 0) noexcept;
+		void const* FindSignatureAVX512A(char const* const szModuleName, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const std::size_t unOffset = 0) noexcept;
+		void const* FindSignatureAVX512A(char const* const szModuleName, std::array<const unsigned char, kSectionNameSize> const& arrSectionName, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const std::size_t unOffset = 0) noexcept;
+		void const* FindSignatureAVX512A(char const* const szModuleName, char const* const szSectionName, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const std::size_t unOffset = 0) noexcept;
+		void const* FindSignatureAVX512W(wchar_t const* const szModuleName, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const std::size_t unOffset = 0) noexcept;
+		void const* FindSignatureAVX512W(wchar_t const* const szModuleName, std::array<const unsigned char, kSectionNameSize> const& arrSectionName, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const std::size_t unOffset = 0) noexcept;
+		void const* FindSignatureAVX512W(wchar_t const* const szModuleName, char const* const szSectionName, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const std::size_t unOffset = 0) noexcept;
 #ifdef _UNICODE
-		void const* FindSignatureAVX512(wchar_t const* const szModuleName, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const size_t unOffset = 0) noexcept;
-		void const* FindSignatureAVX512(wchar_t const* const szModuleName, const std::array<const unsigned char, 8>& arrSectionName, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const size_t unOffset = 0) noexcept;
-		void const* FindSignatureAVX512(wchar_t const* const szModuleName, char const* const szSectionName, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const size_t unOffset = 0) noexcept;
+		void const* FindSignatureAVX512(wchar_t const* const szModuleName, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const std::size_t unOffset = 0) noexcept;
+		void const* FindSignatureAVX512(wchar_t const* const szModuleName, std::array<const unsigned char, kSectionNameSize> const& arrSectionName, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const std::size_t unOffset = 0) noexcept;
+		void const* FindSignatureAVX512(wchar_t const* const szModuleName, char const* const szSectionName, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const std::size_t unOffset = 0) noexcept;
 #else
-		void const* FindSignatureAVX512(char const* const szModuleName, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const size_t unOffset = 0) noexcept;
-		void const* FindSignatureAVX512(char const* const szModuleName, const std::array<const unsigned char, 8>& arrSectionName, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const size_t unOffset = 0) noexcept;
-		void const* FindSignatureAVX512(char const* const szModuleName, char const* const szSectionName, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const size_t unOffset = 0) noexcept;
+		void const* FindSignatureAVX512(char const* const szModuleName, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const std::size_t unOffset = 0) noexcept;
+		void const* FindSignatureAVX512(char const* const szModuleName, std::array<const unsigned char, kSectionNameSize> const& arrSectionName, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const std::size_t unOffset = 0) noexcept;
+		void const* FindSignatureAVX512(char const* const szModuleName, char const* const szSectionName, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const std::size_t unOffset = 0) noexcept;
 #endif
 
 		// ----------------------------------------------------------------
 		// FindSignature (Auto)
 		// ----------------------------------------------------------------
 
-		void const* FindSignature(void const* const pAddress, const size_t unSize, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const size_t unOffset = 0) noexcept;
+		void const* FindSignature(void const* const pAddress, const std::size_t unSize, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const std::size_t unOffset = 0) noexcept;
 #if defined(_WIN32)
-		void const* FindSignature(const HMODULE hModule, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const size_t unOffset = 0) noexcept;
+		void const* FindSignature(const HMODULE hModule, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const std::size_t unOffset = 0) noexcept;
 #elif defined(__linux__)
-		void const* FindSignature(void* const hModule, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const size_t unOffset = 0) noexcept;
+		void const* FindSignature(void* const hModule, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const std::size_t unOffset = 0) noexcept;
 #endif
 #if defined(_WIN32)
-		void const* FindSignature(const HMODULE hModule, const std::array<const unsigned char, 8>& arrSectionName, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const size_t unOffset = 0) noexcept;
+		void const* FindSignature(const HMODULE hModule, std::array<const unsigned char, kSectionNameSize> const& arrSectionName, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const std::size_t unOffset = 0) noexcept;
 #elif defined(__linux__)
-		void const* FindSignature(void* const hModule, const std::array<const unsigned char, 8>& arrSectionName, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const size_t unOffset = 0) noexcept;
+		void const* FindSignature(void* const hModule, std::array<const unsigned char, kSectionNameSize> const& arrSectionName, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const std::size_t unOffset = 0) noexcept;
 #endif
 #if defined(_WIN32)
-		void const* FindSignature(const HMODULE hModule, char const* const szSectionName, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const size_t unOffset = 0) noexcept;
+		void const* FindSignature(const HMODULE hModule, char const* const szSectionName, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const std::size_t unOffset = 0) noexcept;
 #elif defined(__linux__)
-		void const* FindSignature(void* const hModule, char const* const szSectionName, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const size_t unOffset = 0) noexcept;
+		void const* FindSignature(void* const hModule, char const* const szSectionName, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const std::size_t unOffset = 0) noexcept;
 #endif
-		void const* FindSignatureA(char const* const szModuleName, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const size_t unOffset = 0) noexcept;
-		void const* FindSignatureA(char const* const szModuleName, const std::array<const unsigned char, 8>& arrSectionName, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const size_t unOffset = 0) noexcept;
-		void const* FindSignatureA(char const* const szModuleName, char const* const szSectionName, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const size_t unOffset = 0) noexcept;
-		void const* FindSignatureW(wchar_t const* const szModuleName, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const size_t unOffset = 0) noexcept;
-		void const* FindSignatureW(wchar_t const* const szModuleName, const std::array<const unsigned char, 8>& arrSectionName, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const size_t unOffset = 0) noexcept;
-		void const* FindSignatureW(wchar_t const* const szModuleName, char const* const szSectionName, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const size_t unOffset = 0) noexcept;
+		void const* FindSignatureA(char const* const szModuleName, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const std::size_t unOffset = 0) noexcept;
+		void const* FindSignatureA(char const* const szModuleName, std::array<const unsigned char, kSectionNameSize> const& arrSectionName, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const std::size_t unOffset = 0) noexcept;
+		void const* FindSignatureA(char const* const szModuleName, char const* const szSectionName, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const std::size_t unOffset = 0) noexcept;
+		void const* FindSignatureW(wchar_t const* const szModuleName, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const std::size_t unOffset = 0) noexcept;
+		void const* FindSignatureW(wchar_t const* const szModuleName, std::array<const unsigned char, kSectionNameSize> const& arrSectionName, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const std::size_t unOffset = 0) noexcept;
+		void const* FindSignatureW(wchar_t const* const szModuleName, char const* const szSectionName, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const std::size_t unOffset = 0) noexcept;
 #ifdef _UNICODE
-		void const* FindSignature(wchar_t const* const szModuleName, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const size_t unOffset = 0) noexcept;
-		void const* FindSignature(wchar_t const* const szModuleName, const std::array<const unsigned char, 8>& arrSectionName, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const size_t unOffset = 0) noexcept;
-		void const* FindSignature(wchar_t const* const szModuleName, char const* const szSectionName, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const size_t unOffset = 0) noexcept;
+		void const* FindSignature(wchar_t const* const szModuleName, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const std::size_t unOffset = 0) noexcept;
+		void const* FindSignature(wchar_t const* const szModuleName, std::array<const unsigned char, kSectionNameSize> const& arrSectionName, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const std::size_t unOffset = 0) noexcept;
+		void const* FindSignature(wchar_t const* const szModuleName, char const* const szSectionName, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const std::size_t unOffset = 0) noexcept;
 #else
-		void const* FindSignature(char const* const szModuleName, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const size_t unOffset = 0) noexcept;
-		void const* FindSignature(char const* const szModuleName, const std::array<const unsigned char, 8>& arrSectionName, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const size_t unOffset = 0) noexcept;
-		void const* FindSignature(char const* const szModuleName, char const* const szSectionName, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const size_t unOffset = 0) noexcept;
+		void const* FindSignature(char const* const szModuleName, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const std::size_t unOffset = 0) noexcept;
+		void const* FindSignature(char const* const szModuleName, std::array<const unsigned char, kSectionNameSize> const& arrSectionName, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const std::size_t unOffset = 0) noexcept;
+		void const* FindSignature(char const* const szModuleName, char const* const szSectionName, char const* const szSignature, const unsigned char unIgnoredByte = '\x2A', const std::size_t unOffset = 0) noexcept;
 #endif
 
 		// ----------------------------------------------------------------
 		// FindData (Native)
 		// ----------------------------------------------------------------
 
-		void const* FindDataNative(void const* const pAddress, const size_t unSize, unsigned char const* const pData, const size_t unDataSize) noexcept;
+		void const* FindDataNative(void const* const pAddress, const std::size_t unSize, unsigned char const* const pData, const std::size_t unDataSize) noexcept;
 #if defined(_WIN32)
-		void const* FindDataNative(const HMODULE hModule, unsigned char const* const pData, const size_t unDataSize) noexcept;
+		void const* FindDataNative(const HMODULE hModule, unsigned char const* const pData, const std::size_t unDataSize) noexcept;
 #elif defined(__linux__)
-		void const* FindDataNative(void* const hModule, unsigned char const* const pData, const size_t unDataSize) noexcept;
+		void const* FindDataNative(void* const hModule, unsigned char const* const pData, const std::size_t unDataSize) noexcept;
 #endif
 #if defined(_WIN32)
-		void const* FindDataNative(const HMODULE hModule, const std::array<const unsigned char, 8>& arrSectionName, unsigned char const* const pData, const size_t unDataSize) noexcept;
+		void const* FindDataNative(const HMODULE hModule, std::array<const unsigned char, kSectionNameSize> const& arrSectionName, unsigned char const* const pData, const std::size_t unDataSize) noexcept;
 #elif defined(__linux__)
-		void const* FindDataNative(void* const hModule, const std::array<const unsigned char, 8>& arrSectionName, unsigned char const* const pData, const size_t unDataSize) noexcept;
+		void const* FindDataNative(void* const hModule, std::array<const unsigned char, kSectionNameSize> const& arrSectionName, unsigned char const* const pData, const std::size_t unDataSize) noexcept;
 #endif
 #if defined(_WIN32)
-		void const* FindDataNative(const HMODULE hModule, char const* const szSectionName, unsigned char const* const pData, const size_t unDataSize) noexcept;
+		void const* FindDataNative(const HMODULE hModule, char const* const szSectionName, unsigned char const* const pData, const std::size_t unDataSize) noexcept;
 #elif defined(__linux__)
-		void const* FindDataNative(void* const hModule, char const* const szSectionName, unsigned char const* const pData, const size_t unDataSize) noexcept;
+		void const* FindDataNative(void* const hModule, char const* const szSectionName, unsigned char const* const pData, const std::size_t unDataSize) noexcept;
 #endif
-		void const* FindDataNativeA(char const* const szModuleName, unsigned char const* const pData, const size_t unDataSize) noexcept;
-		void const* FindDataNativeA(char const* const szModuleName, const std::array<const unsigned char, 8>& arrSectionName, unsigned char const* const pData, const size_t unDataSize) noexcept;
-		void const* FindDataNativeA(char const* const szModuleName, char const* const szSectionName, unsigned char const* const pData, const size_t unDataSize) noexcept;
-		void const* FindDataNativeW(wchar_t const* const szModuleName, unsigned char const* const pData, const size_t unDataSize) noexcept;
-		void const* FindDataNativeW(wchar_t const* const szModuleName, const std::array<const unsigned char, 8>& arrSectionName, unsigned char const* const pData, const size_t unDataSize) noexcept;
-		void const* FindDataNativeW(wchar_t const* const szModuleName, char const* const szSectionName, unsigned char const* const pData, const size_t unDataSize) noexcept;
+		void const* FindDataNativeA(char const* const szModuleName, unsigned char const* const pData, const std::size_t unDataSize) noexcept;
+		void const* FindDataNativeA(char const* const szModuleName, std::array<const unsigned char, kSectionNameSize> const& arrSectionName, unsigned char const* const pData, const std::size_t unDataSize) noexcept;
+		void const* FindDataNativeA(char const* const szModuleName, char const* const szSectionName, unsigned char const* const pData, const std::size_t unDataSize) noexcept;
+		void const* FindDataNativeW(wchar_t const* const szModuleName, unsigned char const* const pData, const std::size_t unDataSize) noexcept;
+		void const* FindDataNativeW(wchar_t const* const szModuleName, std::array<const unsigned char, kSectionNameSize> const& arrSectionName, unsigned char const* const pData, const std::size_t unDataSize) noexcept;
+		void const* FindDataNativeW(wchar_t const* const szModuleName, char const* const szSectionName, unsigned char const* const pData, const std::size_t unDataSize) noexcept;
 #ifdef _UNICODE
-		void const* FindDataNative(wchar_t const* const szModuleName, unsigned char const* const pData, const size_t unDataSize) noexcept;
-		void const* FindDataNative(wchar_t const* const szModuleName, const std::array<const unsigned char, 8>& arrSectionName, unsigned char const* const pData, const size_t unDataSize) noexcept;
-		void const* FindDataNative(wchar_t const* const szModuleName, char const* const szSectionName, unsigned char const* const pData, const size_t unDataSize) noexcept;
+		void const* FindDataNative(wchar_t const* const szModuleName, unsigned char const* const pData, const std::size_t unDataSize) noexcept;
+		void const* FindDataNative(wchar_t const* const szModuleName, std::array<const unsigned char, kSectionNameSize> const& arrSectionName, unsigned char const* const pData, const std::size_t unDataSize) noexcept;
+		void const* FindDataNative(wchar_t const* const szModuleName, char const* const szSectionName, unsigned char const* const pData, const std::size_t unDataSize) noexcept;
 #else
-		void const* FindDataNative(char const* const szModuleName, unsigned char const* const pData, const size_t unDataSize) noexcept;
-		void const* FindDataNative(char const* const szModuleName, const std::array<const unsigned char, 8>& arrSectionName, unsigned char const* const pData, const size_t unDataSize) noexcept;
-		void const* FindDataNative(char const* const szModuleName, char const* const szSectionName, unsigned char const* const pData, const size_t unDataSize) noexcept;
+		void const* FindDataNative(char const* const szModuleName, unsigned char const* const pData, const std::size_t unDataSize) noexcept;
+		void const* FindDataNative(char const* const szModuleName, std::array<const unsigned char, kSectionNameSize> const& arrSectionName, unsigned char const* const pData, const std::size_t unDataSize) noexcept;
+		void const* FindDataNative(char const* const szModuleName, char const* const szSectionName, unsigned char const* const pData, const std::size_t unDataSize) noexcept;
 #endif
 
 		// ----------------------------------------------------------------
 		// FindData (SSE2)
 		// ----------------------------------------------------------------
 
-		void const* FindDataSSE2(void const* const pAddress, const size_t unSize, unsigned char const* const pData, const size_t unDataSize) noexcept;
+		void const* FindDataSSE2(void const* const pAddress, const std::size_t unSize, unsigned char const* const pData, const std::size_t unDataSize) noexcept;
 #if defined(_WIN32)
-		void const* FindDataSSE2(const HMODULE hModule, unsigned char const* const pData, const size_t unDataSize) noexcept;
+		void const* FindDataSSE2(const HMODULE hModule, unsigned char const* const pData, const std::size_t unDataSize) noexcept;
 #elif defined(__linux__)
-		void const* FindDataSSE2(void* const hModule, unsigned char const* const pData, const size_t unDataSize) noexcept;
+		void const* FindDataSSE2(void* const hModule, unsigned char const* const pData, const std::size_t unDataSize) noexcept;
 #endif
 #if defined(_WIN32)
-		void const* FindDataSSE2(const HMODULE hModule, const std::array<const unsigned char, 8>& arrSectionName, unsigned char const* const pData, const size_t unDataSize) noexcept;
+		void const* FindDataSSE2(const HMODULE hModule, std::array<const unsigned char, kSectionNameSize> const& arrSectionName, unsigned char const* const pData, const std::size_t unDataSize) noexcept;
 #elif defined(__linux__)
-		void const* FindDataSSE2(void* const hModule, const std::array<const unsigned char, 8>& arrSectionName, unsigned char const* const pData, const size_t unDataSize) noexcept;
+		void const* FindDataSSE2(void* const hModule, std::array<const unsigned char, kSectionNameSize> const& arrSectionName, unsigned char const* const pData, const std::size_t unDataSize) noexcept;
 #endif
 #if defined(_WIN32)
-		void const* FindDataSSE2(const HMODULE hModule, char const* const szSectionName, unsigned char const* const pData, const size_t unDataSize) noexcept;
+		void const* FindDataSSE2(const HMODULE hModule, char const* const szSectionName, unsigned char const* const pData, const std::size_t unDataSize) noexcept;
 #elif defined(__linux__)
-		void const* FindDataSSE2(void* const hModule, char const* const szSectionName, unsigned char const* const pData, const size_t unDataSize) noexcept;
+		void const* FindDataSSE2(void* const hModule, char const* const szSectionName, unsigned char const* const pData, const std::size_t unDataSize) noexcept;
 #endif
-		void const* FindDataSSE2A(char const* const szModuleName, unsigned char const* const pData, const size_t unDataSize) noexcept;
-		void const* FindDataSSE2A(char const* const szModuleName, const std::array<const unsigned char, 8>& arrSectionName, unsigned char const* const pData, const size_t unDataSize) noexcept;
-		void const* FindDataSSE2A(char const* const szModuleName, char const* const szSectionName, unsigned char const* const pData, const size_t unDataSize) noexcept;
-		void const* FindDataSSE2W(wchar_t const* const szModuleName, unsigned char const* const pData, const size_t unDataSize) noexcept;
-		void const* FindDataSSE2W(wchar_t const* const szModuleName, const std::array<const unsigned char, 8>& arrSectionName, unsigned char const* const pData, const size_t unDataSize) noexcept;
-		void const* FindDataSSE2W(wchar_t const* const szModuleName, char const* const szSectionName, unsigned char const* const pData, const size_t unDataSize) noexcept;
+		void const* FindDataSSE2A(char const* const szModuleName, unsigned char const* const pData, const std::size_t unDataSize) noexcept;
+		void const* FindDataSSE2A(char const* const szModuleName, std::array<const unsigned char, kSectionNameSize> const& arrSectionName, unsigned char const* const pData, const std::size_t unDataSize) noexcept;
+		void const* FindDataSSE2A(char const* const szModuleName, char const* const szSectionName, unsigned char const* const pData, const std::size_t unDataSize) noexcept;
+		void const* FindDataSSE2W(wchar_t const* const szModuleName, unsigned char const* const pData, const std::size_t unDataSize) noexcept;
+		void const* FindDataSSE2W(wchar_t const* const szModuleName, std::array<const unsigned char, kSectionNameSize> const& arrSectionName, unsigned char const* const pData, const std::size_t unDataSize) noexcept;
+		void const* FindDataSSE2W(wchar_t const* const szModuleName, char const* const szSectionName, unsigned char const* const pData, const std::size_t unDataSize) noexcept;
 #ifdef _UNICODE
-		void const* FindDataSSE2(wchar_t const* const szModuleName, unsigned char const* const pData, const size_t unDataSize) noexcept;
-		void const* FindDataSSE2(wchar_t const* const szModuleName, const std::array<const unsigned char, 8>& arrSectionName, unsigned char const* const pData, const size_t unDataSize) noexcept;
-		void const* FindDataSSE2(wchar_t const* const szModuleName, char const* const szSectionName, unsigned char const* const pData, const size_t unDataSize) noexcept;
+		void const* FindDataSSE2(wchar_t const* const szModuleName, unsigned char const* const pData, const std::size_t unDataSize) noexcept;
+		void const* FindDataSSE2(wchar_t const* const szModuleName, std::array<const unsigned char, kSectionNameSize> const& arrSectionName, unsigned char const* const pData, const std::size_t unDataSize) noexcept;
+		void const* FindDataSSE2(wchar_t const* const szModuleName, char const* const szSectionName, unsigned char const* const pData, const std::size_t unDataSize) noexcept;
 #else
-		void const* FindDataSSE2(char const* const szModuleName, unsigned char const* const pData, const size_t unDataSize) noexcept;
-		void const* FindDataSSE2(char const* const szModuleName, const std::array<const unsigned char, 8>& arrSectionName, unsigned char const* const pData, const size_t unDataSize) noexcept;
-		void const* FindDataSSE2(char const* const szModuleName, char const* const szSectionName, unsigned char const* const pData, const size_t unDataSize) noexcept;
+		void const* FindDataSSE2(char const* const szModuleName, unsigned char const* const pData, const std::size_t unDataSize) noexcept;
+		void const* FindDataSSE2(char const* const szModuleName, std::array<const unsigned char, kSectionNameSize> const& arrSectionName, unsigned char const* const pData, const std::size_t unDataSize) noexcept;
+		void const* FindDataSSE2(char const* const szModuleName, char const* const szSectionName, unsigned char const* const pData, const std::size_t unDataSize) noexcept;
 #endif
 
 		// ----------------------------------------------------------------
 		// FindData (AVX2)
 		// ----------------------------------------------------------------
 
-		void const* FindDataAVX2(void const* const pAddress, const size_t unSize, unsigned char const* const pData, const size_t unDataSize) noexcept;
+		void const* FindDataAVX2(void const* const pAddress, const std::size_t unSize, unsigned char const* const pData, const std::size_t unDataSize) noexcept;
 #if defined(_WIN32)
-		void const* FindDataAVX2(const HMODULE hModule, unsigned char const* const pData, const size_t unDataSize) noexcept;
+		void const* FindDataAVX2(const HMODULE hModule, unsigned char const* const pData, const std::size_t unDataSize) noexcept;
 #elif defined(__linux__)
-		void const* FindDataAVX2(void* const hModule, unsigned char const* const pData, const size_t unDataSize) noexcept;
+		void const* FindDataAVX2(void* const hModule, unsigned char const* const pData, const std::size_t unDataSize) noexcept;
 #endif
 #if defined(_WIN32)
-		void const* FindDataAVX2(const HMODULE hModule, const std::array<const unsigned char, 8>& arrSectionName, unsigned char const* const pData, const size_t unDataSize) noexcept;
+		void const* FindDataAVX2(const HMODULE hModule, std::array<const unsigned char, kSectionNameSize> const& arrSectionName, unsigned char const* const pData, const std::size_t unDataSize) noexcept;
 #elif defined(__linux__)
-		void const* FindDataAVX2(void* const hModule, const std::array<const unsigned char, 8>& arrSectionName, unsigned char const* const pData, const size_t unDataSize) noexcept;
+		void const* FindDataAVX2(void* const hModule, std::array<const unsigned char, kSectionNameSize> const& arrSectionName, unsigned char const* const pData, const std::size_t unDataSize) noexcept;
 #endif
 #if defined(_WIN32)
-		void const* FindDataAVX2(const HMODULE hModule, char const* const szSectionName, unsigned char const* const pData, const size_t unDataSize) noexcept;
+		void const* FindDataAVX2(const HMODULE hModule, char const* const szSectionName, unsigned char const* const pData, const std::size_t unDataSize) noexcept;
 #elif defined(__linux__)
-		void const* FindDataAVX2(void* const hModule, char const* const szSectionName, unsigned char const* const pData, const size_t unDataSize) noexcept;
+		void const* FindDataAVX2(void* const hModule, char const* const szSectionName, unsigned char const* const pData, const std::size_t unDataSize) noexcept;
 #endif
-		void const* FindDataAVX2A(char const* const szModuleName, unsigned char const* const pData, const size_t unDataSize) noexcept;
-		void const* FindDataAVX2A(char const* const szModuleName, const std::array<const unsigned char, 8>& arrSectionName, unsigned char const* const pData, const size_t unDataSize) noexcept;
-		void const* FindDataAVX2A(char const* const szModuleName, char const* const szSectionName, unsigned char const* const pData, const size_t unDataSize) noexcept;
-		void const* FindDataAVX2W(wchar_t const* const szModuleName, unsigned char const* const pData, const size_t unDataSize) noexcept;
-		void const* FindDataAVX2W(wchar_t const* const szModuleName, const std::array<const unsigned char, 8>& arrSectionName, unsigned char const* const pData, const size_t unDataSize) noexcept;
-		void const* FindDataAVX2W(wchar_t const* const szModuleName, char const* const szSectionName, unsigned char const* const pData, const size_t unDataSize) noexcept;
+		void const* FindDataAVX2A(char const* const szModuleName, unsigned char const* const pData, const std::size_t unDataSize) noexcept;
+		void const* FindDataAVX2A(char const* const szModuleName, std::array<const unsigned char, kSectionNameSize> const& arrSectionName, unsigned char const* const pData, const std::size_t unDataSize) noexcept;
+		void const* FindDataAVX2A(char const* const szModuleName, char const* const szSectionName, unsigned char const* const pData, const std::size_t unDataSize) noexcept;
+		void const* FindDataAVX2W(wchar_t const* const szModuleName, unsigned char const* const pData, const std::size_t unDataSize) noexcept;
+		void const* FindDataAVX2W(wchar_t const* const szModuleName, std::array<const unsigned char, kSectionNameSize> const& arrSectionName, unsigned char const* const pData, const std::size_t unDataSize) noexcept;
+		void const* FindDataAVX2W(wchar_t const* const szModuleName, char const* const szSectionName, unsigned char const* const pData, const std::size_t unDataSize) noexcept;
 #ifdef _UNICODE
-		void const* FindDataAVX2(wchar_t const* const szModuleName, unsigned char const* const pData, const size_t unDataSize) noexcept;
-		void const* FindDataAVX2(wchar_t const* const szModuleName, const std::array<const unsigned char, 8>& arrSectionName, unsigned char const* const pData, const size_t unDataSize) noexcept;
-		void const* FindDataAVX2(wchar_t const* const szModuleName, char const* const szSectionName, unsigned char const* const pData, const size_t unDataSize) noexcept;
+		void const* FindDataAVX2(wchar_t const* const szModuleName, unsigned char const* const pData, const std::size_t unDataSize) noexcept;
+		void const* FindDataAVX2(wchar_t const* const szModuleName, std::array<const unsigned char, kSectionNameSize> const& arrSectionName, unsigned char const* const pData, const std::size_t unDataSize) noexcept;
+		void const* FindDataAVX2(wchar_t const* const szModuleName, char const* const szSectionName, unsigned char const* const pData, const std::size_t unDataSize) noexcept;
 #else
-		void const* FindDataAVX2(char const* const szModuleName, unsigned char const* const pData, const size_t unDataSize) noexcept;
-		void const* FindDataAVX2(char const* const szModuleName, const std::array<const unsigned char, 8>& arrSectionName, unsigned char const* const pData, const size_t unDataSize) noexcept;
-		void const* FindDataAVX2(char const* const szModuleName, char const* const szSectionName, unsigned char const* const pData, const size_t unDataSize) noexcept;
+		void const* FindDataAVX2(char const* const szModuleName, unsigned char const* const pData, const std::size_t unDataSize) noexcept;
+		void const* FindDataAVX2(char const* const szModuleName, std::array<const unsigned char, kSectionNameSize> const& arrSectionName, unsigned char const* const pData, const std::size_t unDataSize) noexcept;
+		void const* FindDataAVX2(char const* const szModuleName, char const* const szSectionName, unsigned char const* const pData, const std::size_t unDataSize) noexcept;
 #endif
 
 		// ----------------------------------------------------------------
 		// FindData (AVX512) [AVX512BW]
 		// ----------------------------------------------------------------
 
-		void const* FindDataAVX512(void const* const pAddress, const size_t unSize, unsigned char const* const pData, const size_t unDataSize) noexcept;
+		void const* FindDataAVX512(void const* const pAddress, const std::size_t unSize, unsigned char const* const pData, const std::size_t unDataSize) noexcept;
 #if defined(_WIN32)
-		void const* FindDataAVX512(const HMODULE hModule, unsigned char const* const pData, const size_t unDataSize) noexcept;
+		void const* FindDataAVX512(const HMODULE hModule, unsigned char const* const pData, const std::size_t unDataSize) noexcept;
 #elif defined(__linux__)
-		void const* FindDataAVX512(void* const hModule, unsigned char const* const pData, const size_t unDataSize) noexcept;
+		void const* FindDataAVX512(void* const hModule, unsigned char const* const pData, const std::size_t unDataSize) noexcept;
 #endif
 #if defined(_WIN32)
-		void const* FindDataAVX512(const HMODULE hModule, const std::array<const unsigned char, 8>& arrSectionName, unsigned char const* const pData, const size_t unDataSize) noexcept;
+		void const* FindDataAVX512(const HMODULE hModule, std::array<const unsigned char, kSectionNameSize> const& arrSectionName, unsigned char const* const pData, const std::size_t unDataSize) noexcept;
 #elif defined(__linux__)
-		void const* FindDataAVX512(void* const hModule, const std::array<const unsigned char, 8>& arrSectionName, unsigned char const* const pData, const size_t unDataSize) noexcept;
+		void const* FindDataAVX512(void* const hModule, std::array<const unsigned char, kSectionNameSize> const& arrSectionName, unsigned char const* const pData, const std::size_t unDataSize) noexcept;
 #endif
 #if defined(_WIN32)
-		void const* FindDataAVX512(const HMODULE hModule, char const* const szSectionName, unsigned char const* const pData, const size_t unDataSize) noexcept;
+		void const* FindDataAVX512(const HMODULE hModule, char const* const szSectionName, unsigned char const* const pData, const std::size_t unDataSize) noexcept;
 #elif defined(__linux__)
-		void const* FindDataAVX512(void* const hModule, char const* const szSectionName, unsigned char const* const pData, const size_t unDataSize) noexcept;
+		void const* FindDataAVX512(void* const hModule, char const* const szSectionName, unsigned char const* const pData, const std::size_t unDataSize) noexcept;
 #endif
-		void const* FindDataAVX512A(char const* const szModuleName, unsigned char const* const pData, const size_t unDataSize) noexcept;
-		void const* FindDataAVX512A(char const* const szModuleName, const std::array<const unsigned char, 8>& arrSectionName, unsigned char const* const pData, const size_t unDataSize) noexcept;
-		void const* FindDataAVX512A(char const* const szModuleName, char const* const szSectionName, unsigned char const* const pData, const size_t unDataSize) noexcept;
-		void const* FindDataAVX512W(wchar_t const* const szModuleName, unsigned char const* const pData, const size_t unDataSize) noexcept;
-		void const* FindDataAVX512W(wchar_t const* const szModuleName, const std::array<const unsigned char, 8>& arrSectionName, unsigned char const* const pData, const size_t unDataSize) noexcept;
-		void const* FindDataAVX512W(wchar_t const* const szModuleName, char const* const szSectionName, unsigned char const* const pData, const size_t unDataSize) noexcept;
+		void const* FindDataAVX512A(char const* const szModuleName, unsigned char const* const pData, const std::size_t unDataSize) noexcept;
+		void const* FindDataAVX512A(char const* const szModuleName, std::array<const unsigned char, kSectionNameSize> const& arrSectionName, unsigned char const* const pData, const std::size_t unDataSize) noexcept;
+		void const* FindDataAVX512A(char const* const szModuleName, char const* const szSectionName, unsigned char const* const pData, const std::size_t unDataSize) noexcept;
+		void const* FindDataAVX512W(wchar_t const* const szModuleName, unsigned char const* const pData, const std::size_t unDataSize) noexcept;
+		void const* FindDataAVX512W(wchar_t const* const szModuleName, std::array<const unsigned char, kSectionNameSize> const& arrSectionName, unsigned char const* const pData, const std::size_t unDataSize) noexcept;
+		void const* FindDataAVX512W(wchar_t const* const szModuleName, char const* const szSectionName, unsigned char const* const pData, const std::size_t unDataSize) noexcept;
 #ifdef _UNICODE
-		void const* FindDataAVX512(wchar_t const* const szModuleName, unsigned char const* const pData, const size_t unDataSize) noexcept;
-		void const* FindDataAVX512(wchar_t const* const szModuleName, const std::array<const unsigned char, 8>& arrSectionName, unsigned char const* const pData, const size_t unDataSize) noexcept;
-		void const* FindDataAVX512(wchar_t const* const szModuleName, char const* const szSectionName, unsigned char const* const pData, const size_t unDataSize) noexcept;
+		void const* FindDataAVX512(wchar_t const* const szModuleName, unsigned char const* const pData, const std::size_t unDataSize) noexcept;
+		void const* FindDataAVX512(wchar_t const* const szModuleName, std::array<const unsigned char, kSectionNameSize> const& arrSectionName, unsigned char const* const pData, const std::size_t unDataSize) noexcept;
+		void const* FindDataAVX512(wchar_t const* const szModuleName, char const* const szSectionName, unsigned char const* const pData, const std::size_t unDataSize) noexcept;
 #else
-		void const* FindDataAVX512(char const* const szModuleName, unsigned char const* const pData, const size_t unDataSize) noexcept;
-		void const* FindDataAVX512(char const* const szModuleName, const std::array<const unsigned char, 8>& arrSectionName, unsigned char const* const pData, const size_t unDataSize) noexcept;
-		void const* FindDataAVX512(char const* const szModuleName, char const* const szSectionName, unsigned char const* const pData, const size_t unDataSize) noexcept;
+		void const* FindDataAVX512(char const* const szModuleName, unsigned char const* const pData, const std::size_t unDataSize) noexcept;
+		void const* FindDataAVX512(char const* const szModuleName, std::array<const unsigned char, kSectionNameSize> const& arrSectionName, unsigned char const* const pData, const std::size_t unDataSize) noexcept;
+		void const* FindDataAVX512(char const* const szModuleName, char const* const szSectionName, unsigned char const* const pData, const std::size_t unDataSize) noexcept;
 #endif
 
 		// ----------------------------------------------------------------
 		// FindData (Auto)
 		// ----------------------------------------------------------------
 
-		void const* FindData(void const* const pAddress, const size_t unSize, unsigned char const* const pData, const size_t unDataSize) noexcept;
+		void const* FindData(void const* const pAddress, const std::size_t unSize, unsigned char const* const pData, const std::size_t unDataSize) noexcept;
 #if defined(_WIN32)
-		void const* FindData(const HMODULE hModule, unsigned char const* const pData, const size_t unDataSize) noexcept;
+		void const* FindData(const HMODULE hModule, unsigned char const* const pData, const std::size_t unDataSize) noexcept;
 #elif defined(__linux__)
-		void const* FindData(void* const hModule, unsigned char const* const pData, const size_t unDataSize) noexcept;
+		void const* FindData(void* const hModule, unsigned char const* const pData, const std::size_t unDataSize) noexcept;
 #endif
 #if defined(_WIN32)
-		void const* FindData(const HMODULE hModule, const std::array<const unsigned char, 8>& arrSectionName, unsigned char const* const pData, const size_t unDataSize) noexcept;
+		void const* FindData(const HMODULE hModule, std::array<const unsigned char, kSectionNameSize> const& arrSectionName, unsigned char const* const pData, const std::size_t unDataSize) noexcept;
 #elif defined(__linux__)
-		void const* FindData(void* const hModule, const std::array<const unsigned char, 8>& arrSectionName, unsigned char const* const pData, const size_t unDataSize) noexcept;
+		void const* FindData(void* const hModule, std::array<const unsigned char, kSectionNameSize> const& arrSectionName, unsigned char const* const pData, const std::size_t unDataSize) noexcept;
 #endif
 #if defined(_WIN32)
-		void const* FindData(const HMODULE hModule, char const* const szSectionName, unsigned char const* const pData, const size_t unDataSize) noexcept;
+		void const* FindData(const HMODULE hModule, char const* const szSectionName, unsigned char const* const pData, const std::size_t unDataSize) noexcept;
 #elif defined(__linux__)
-		void const* FindData(void* const hModule, char const* const szSectionName, unsigned char const* const pData, const size_t unDataSize) noexcept;
+		void const* FindData(void* const hModule, char const* const szSectionName, unsigned char const* const pData, const std::size_t unDataSize) noexcept;
 #endif
-		void const* FindDataA(char const* const szModuleName, unsigned char const* const pData, const size_t unDataSize) noexcept;
-		void const* FindDataA(char const* const szModuleName, const std::array<const unsigned char, 8>& arrSectionName, unsigned char const* const pData, const size_t unDataSize) noexcept;
-		void const* FindDataA(char const* const szModuleName, char const* const szSectionName, unsigned char const* const pData, const size_t unDataSize) noexcept;
-		void const* FindDataW(wchar_t const* const szModuleName, unsigned char const* const pData, const size_t unDataSize) noexcept;
-		void const* FindDataW(wchar_t const* const szModuleName, const std::array<const unsigned char, 8>& arrSectionName, unsigned char const* const pData, const size_t unDataSize) noexcept;
-		void const* FindDataW(wchar_t const* const szModuleName, char const* const szSectionName, unsigned char const* const pData, const size_t unDataSize) noexcept;
+		void const* FindDataA(char const* const szModuleName, unsigned char const* const pData, const std::size_t unDataSize) noexcept;
+		void const* FindDataA(char const* const szModuleName, std::array<const unsigned char, kSectionNameSize> const& arrSectionName, unsigned char const* const pData, const std::size_t unDataSize) noexcept;
+		void const* FindDataA(char const* const szModuleName, char const* const szSectionName, unsigned char const* const pData, const std::size_t unDataSize) noexcept;
+		void const* FindDataW(wchar_t const* const szModuleName, unsigned char const* const pData, const std::size_t unDataSize) noexcept;
+		void const* FindDataW(wchar_t const* const szModuleName, std::array<const unsigned char, kSectionNameSize> const& arrSectionName, unsigned char const* const pData, const std::size_t unDataSize) noexcept;
+		void const* FindDataW(wchar_t const* const szModuleName, char const* const szSectionName, unsigned char const* const pData, const std::size_t unDataSize) noexcept;
 #ifdef _UNICODE
-		void const* FindData(wchar_t const* const szModuleName, unsigned char const* const pData, const size_t unDataSize) noexcept;
-		void const* FindData(wchar_t const* const szModuleName, const std::array<const unsigned char, 8>& arrSectionName, unsigned char const* const pData, const size_t unDataSize) noexcept;
-		void const* FindData(wchar_t const* const szModuleName, char const* const szSectionName, unsigned char const* const pData, const size_t unDataSize) noexcept;
+		void const* FindData(wchar_t const* const szModuleName, unsigned char const* const pData, const std::size_t unDataSize) noexcept;
+		void const* FindData(wchar_t const* const szModuleName, std::array<const unsigned char, kSectionNameSize> const& arrSectionName, unsigned char const* const pData, const std::size_t unDataSize) noexcept;
+		void const* FindData(wchar_t const* const szModuleName, char const* const szSectionName, unsigned char const* const pData, const std::size_t unDataSize) noexcept;
 #else
-		void const* FindData(char const* const szModuleName, unsigned char const* const pData, const size_t unDataSize) noexcept;
-		void const* FindData(char const* const szModuleName, const std::array<const unsigned char, 8>& arrSectionName, unsigned char const* const pData, const size_t unDataSize) noexcept;
-		void const* FindData(char const* const szModuleName, char const* const szSectionName, unsigned char const* const pData, const size_t unDataSize) noexcept;
+		void const* FindData(char const* const szModuleName, unsigned char const* const pData, const std::size_t unDataSize) noexcept;
+		void const* FindData(char const* const szModuleName, std::array<const unsigned char, kSectionNameSize> const& arrSectionName, unsigned char const* const pData, const std::size_t unDataSize) noexcept;
+		void const* FindData(char const* const szModuleName, char const* const szSectionName, unsigned char const* const pData, const std::size_t unDataSize) noexcept;
 #endif
 	} // namespace Scan
 
@@ -2170,25 +2327,25 @@ typedef struct _PEB {
 		} RTTI_TYPE_DESCRIPTOR, *PRTTI_TYPE_DESCRIPTOR;
 
 		typedef struct _RTTI_BASE_CLASS_DESCRIPTOR {
-#ifdef _M_X64
+#if defined(_M_X64)
 			unsigned int m_unTypeDescriptor;
-#elif _M_IX86
+#elif defined(_M_IX86)
 			_RTTI_TYPE_DESCRIPTOR* m_pTypeDescriptor;
 #endif
 			unsigned int m_unNumberOfContainedBases;
 			_RTTI_PMD m_Where;
 			unsigned int m_unAttributes;
-#if _M_X64
+#if defined(_M_X64)
 			unsigned int m_unClassHierarchyDescriptor;
-#elif _M_IX86
+#elif defined(_M_IX86)
 			struct _RTTI_CLASS_HIERARCHY_DESCRIPTOR* m_pClassHierarchyDescriptor;
 #endif
 		} RTTI_BASE_CLASS_DESCRIPTOR, *PRTTI_BASE_CLASS_DESCRIPTOR;
 
 		typedef struct _RTTI_BASE_CLASS_ARRAY {
-#ifdef _M_X64
+#if defined(_M_X64)
 			unsigned int m_unBaseClassDescriptors[1];
-#elif _M_IX86
+#elif defined(_M_IX86)
 			_RTTI_BASE_CLASS_DESCRIPTOR* m_pBaseClassDescriptors[1];
 #endif
 		} RTTI_BASE_CLASS_ARRAY, *PRTTI_BASE_CLASS_ARRAY;
@@ -2197,9 +2354,9 @@ typedef struct _PEB {
 			unsigned int m_unSignature;
 			unsigned int m_unAttributes;
 			unsigned int m_unNumberOfBaseClasses;
-#ifdef _M_X64
+#if defined(_M_X64)
 			unsigned int m_unBaseClassArray;
-#elif _M_IX86
+#elif defined(_M_IX86)
 			_RTTI_BASE_CLASS_ARRAY* m_pBaseClassArray;
 #endif
 		} RTTI_CLASS_HIERARCHY_DESCRIPTOR, *PRTTI_CLASS_HIERARCHY_DESCRIPTOR;
@@ -2208,11 +2365,11 @@ typedef struct _PEB {
 			unsigned int m_unSignature;
 			unsigned int m_unOffset;
 			unsigned int m_unConstructorOffset;
-#ifdef _M_X64
+#if defined(_M_X64)
 			unsigned int m_unTypeDescriptor;
 			unsigned int m_unClassHierarchyDescriptor;
 			unsigned int m_unSelf;
-#elif _M_IX86
+#elif defined(_M_IX86)
 			_RTTI_TYPE_DESCRIPTOR* m_pTypeDescriptor;
 			_RTTI_CLASS_HIERARCHY_DESCRIPTOR* m_pClassHierarchyDescriptor;
 #endif
@@ -2224,43 +2381,45 @@ typedef struct _PEB {
 		// RT functions
 		// ----------------------------------------------------------------
 
-#ifdef _M_X64
-		void* const RTDynamicCast(void const* const pBaseAddress, void* const pAddress, const LONG nVfDelta, const PRTTI_TYPE_DESCRIPTOR pSourceTypeDescriptor, const PRTTI_TYPE_DESCRIPTOR pTargetTypeDescriptor, const BOOL bIsReference);
-#elif _M_IX86
-		void* const RTDynamicCast(void* const pAddress, const LONG nVfDelta, const PRTTI_TYPE_DESCRIPTOR pSourceTypeDescriptor, const PRTTI_TYPE_DESCRIPTOR pTargetTypeDescriptor, const BOOL bIsReference);
+#if defined(_M_X64)
+		void* RTDynamicCast(void const* const pBaseAddress, void* const pAddress, const LONG nVfDelta, const PRTTI_TYPE_DESCRIPTOR pSourceTypeDescriptor, const PRTTI_TYPE_DESCRIPTOR pTargetTypeDescriptor, const BOOL bIsReference);
+#elif defined(_M_IX86)
+		void* RTDynamicCast(void* const pAddress, const LONG nVfDelta, const PRTTI_TYPE_DESCRIPTOR pSourceTypeDescriptor, const PRTTI_TYPE_DESCRIPTOR pTargetTypeDescriptor, const BOOL bIsReference);
 #endif
 
-		void* const RTCastToVoid(void* const pAddress);
+		void* RTCastToVoid(void* const pAddress);
 
-#ifdef _M_X64
-		const PRTTI_TYPE_DESCRIPTOR RTtypeid(void const* const pBaseAddress, void* const pAddress);
-#elif _M_IX86
-		const PRTTI_TYPE_DESCRIPTOR RTtypeid(void* const pAddress);
+#if defined(_M_X64)
+		PRTTI_TYPE_DESCRIPTOR RTtypeid(void const* const pBaseAddress, void* const pAddress);
+#elif defined(_M_IX86)
+		PRTTI_TYPE_DESCRIPTOR RTtypeid(void* const pAddress);
 #endif
 
 		// ----------------------------------------------------------------
 		// Object
 		// ----------------------------------------------------------------
 
+		// Object keeps borrowed pointers into the source module. Keep that module
+		// loaded while the Object or any pointer returned by it is used.
 		class Object {
 		public:
-			Object(void const* const pBaseAddress, void const* const pAddress, const size_t unSize, const PRTTI_TYPE_DESCRIPTOR pTypeDescriptor, const PRTTI_CLASS_HIERARCHY_DESCRIPTOR pClassHierarchyDescriptor, const PRTTI_BASE_CLASS_ARRAY pBaseClassArray, const PRTTI_COMPLETE_OBJECT_LOCATOR pCompleteObject, void** pVTable);
+			Object(void const* const pBaseAddress, void const* const pAddress, const std::size_t unSize, const PRTTI_TYPE_DESCRIPTOR pTypeDescriptor, const PRTTI_CLASS_HIERARCHY_DESCRIPTOR pClassHierarchyDescriptor, const PRTTI_BASE_CLASS_ARRAY pBaseClassArray, const PRTTI_COMPLETE_OBJECT_LOCATOR pCompleteObject, void** pVTable);
 			~Object() = default;
 
 		public:
-			void const* const DynamicCast(void const* const pAddress, const Object* pObject);
+			void const* DynamicCast(void const* const pAddress, Object const* const pObject);
 
 		public:
-			const PRTTI_TYPE_DESCRIPTOR GetTypeDescriptor() const;
-			const PRTTI_CLASS_HIERARCHY_DESCRIPTOR GetClassHierarchyDescriptor() const;
-			const PRTTI_COMPLETE_OBJECT_LOCATOR GetCompleteObject() const;
-			void** GetVTable() const;
-			std::vector<std::unique_ptr<Object>>& GetBaseObjects();
+			PRTTI_TYPE_DESCRIPTOR GetTypeDescriptor() const noexcept;
+			PRTTI_CLASS_HIERARCHY_DESCRIPTOR GetClassHierarchyDescriptor() const noexcept;
+			PRTTI_COMPLETE_OBJECT_LOCATOR GetCompleteObject() const noexcept;
+			void** GetVTable() const noexcept;
+			std::vector<std::unique_ptr<Object>> const& GetBaseObjects() const noexcept;
 
 		private:
 			void const* const m_pBaseAddress;
 			void const* const m_pAddress;
-			const size_t m_unSize;
+			const std::size_t m_unSize;
 			const PRTTI_TYPE_DESCRIPTOR m_pTypeDescriptor;
 			const PRTTI_CLASS_HIERARCHY_DESCRIPTOR m_pClassHierarchyDescriptor;
 			const PRTTI_BASE_CLASS_ARRAY m_pBaseClassArray;
@@ -2273,22 +2432,22 @@ typedef struct _PEB {
 		// FindObject
 		// ----------------------------------------------------------------
 
-		std::unique_ptr<Object> FindObject(void const* const pBaseAddress, void const* const pAddress, const size_t unSize, char const* const szName, const char* szParentName = nullptr, bool bCompleteObject = true, unsigned int unOffset = 0);
-		std::unique_ptr<Object> FindObject(void const* const pAddress, const size_t unSize, char const* const szName, const char* szParentName = nullptr, bool bCompleteObject = true, unsigned int unOffset = 0);
-		std::unique_ptr<Object> FindObject(const HMODULE hModule, char const* const szName, const char* szParentName = nullptr, bool bCompleteObject = true, unsigned int unOffset = 0);
-		std::unique_ptr<Object> FindObjectA(char const* const szModuleName, char const* const szName, const char* szParentName = nullptr, bool bCompleteObject = true, unsigned int unOffset = 0);
-		std::unique_ptr<Object> FindObjectW(wchar_t const* const szModuleName, char const* const szName, const char* szParentName = nullptr, bool bCompleteObject = true, unsigned int unOffset = 0);
+		std::unique_ptr<Object> FindObject(void const* const pBaseAddress, void const* const pAddress, const std::size_t unSize, char const* const szName, char const* szParentName = nullptr, bool bCompleteObject = true, unsigned int unOffset = 0);
+		std::unique_ptr<Object> FindObject(void const* const pAddress, const std::size_t unSize, char const* const szName, char const* szParentName = nullptr, bool bCompleteObject = true, unsigned int unOffset = 0);
+		std::unique_ptr<Object> FindObject(const HMODULE hModule, char const* const szName, char const* szParentName = nullptr, bool bCompleteObject = true, unsigned int unOffset = 0);
+		std::unique_ptr<Object> FindObjectA(char const* const szModuleName, char const* const szName, char const* szParentName = nullptr, bool bCompleteObject = true, unsigned int unOffset = 0);
+		std::unique_ptr<Object> FindObjectW(wchar_t const* const szModuleName, char const* const szName, char const* szParentName = nullptr, bool bCompleteObject = true, unsigned int unOffset = 0);
 #ifdef _UNICODE
-		std::unique_ptr<Object> FindObject(wchar_t const* const szModuleName, char const* const szName, const char* szParentName = nullptr, bool bCompleteObject = true, unsigned int unOffset = 0);
+		std::unique_ptr<Object> FindObject(wchar_t const* const szModuleName, char const* const szName, char const* szParentName = nullptr, bool bCompleteObject = true, unsigned int unOffset = 0);
 #else
-		std::unique_ptr<Object> FindObject(char const* const szModuleName, char const* const szName, const char* szParentName = nullptr, bool bCompleteObject = true, unsigned int unOffset = 0);
+		std::unique_ptr<Object> FindObject(char const* const szModuleName, char const* const szName, char const* szParentName = nullptr, bool bCompleteObject = true, unsigned int unOffset = 0);
 #endif
 
 		// ----------------------------------------------------------------
 		// DumpRTTI
 		// ----------------------------------------------------------------
 
-		std::vector<std::unique_ptr<Object>> DumpRTTI(void const* const pBaseAddress, void const* const pAddress, const size_t unSize);
+		std::vector<std::unique_ptr<Object>> DumpRTTI(void const* const pBaseAddress, void const* const pAddress, const std::size_t unSize);
 		std::vector<std::unique_ptr<Object>> DumpRTTI(HMODULE hModule);
 		std::vector<std::unique_ptr<Object>> DumpRTTIA(char const* const szModulePath);
 		std::vector<std::unique_ptr<Object>> DumpRTTIW(wchar_t const* const szModulePath);
@@ -2313,13 +2472,19 @@ typedef struct _PEB {
 		class Event {
 		public:
 			Event(bool bManualReset = true, bool bInitialState = false);
-			~Event();
+			~Event() noexcept;
+
+		public:
+			Event(Event const&) = delete;
+			Event(Event&&) noexcept;
+			Event& operator=(Event const&) = delete;
+			Event& operator=(Event&&) noexcept;
 
 		public:
 #if defined(_WIN32)
-			HANDLE GetEvent() const;
+			HANDLE GetEvent() const noexcept;
 #elif defined(__linux__)
-			void* GetEvent() const;
+			void* GetEvent() const noexcept;
 #endif
 
 		public:
@@ -2351,18 +2516,32 @@ typedef struct _PEB {
 		class EventServer {
 		public:
 			EventServer(bool bIsGlobal = false, bool bManualReset = true, bool bInitialState = false);
-			~EventServer();
+			~EventServer() noexcept;
+
+		public:
+			EventServer(EventServer const&) = delete;
+			EventServer(EventServer&&) noexcept;
+			EventServer& operator=(EventServer const&) = delete;
+			EventServer& operator=(EventServer&&) noexcept;
 
 		public:
 #if defined(_WIN32)
-			bool GetEventName(TCHAR szEventName[64]);
+			bool GetEventName(TCHAR* szEventName, std::size_t unCapacity);
+			template <std::size_t unCapacity>
+			bool GetEventName(TCHAR (&szEventName)[unCapacity]) {
+				return GetEventName(szEventName, unCapacity);
+			}
 #elif defined(__linux__)
-			bool GetEventName(char szEventName[64]);
+			bool GetEventName(char* szEventName, std::size_t unCapacity);
+			template <std::size_t unCapacity>
+			bool GetEventName(char (&szEventName)[unCapacity]) {
+				return GetEventName(szEventName, unCapacity);
+			}
 #endif
 #if defined(_WIN32)
-			HANDLE GetEvent() const;
+			HANDLE GetEvent() const noexcept;
 #elif defined(__linux__)
-			void* GetEvent() const;
+			void* GetEvent() const noexcept;
 #endif
 
 		public:
@@ -2381,9 +2560,9 @@ typedef struct _PEB {
 
 		private:
 #if defined(_WIN32)
-			TCHAR m_szEventName[64];
+			TCHAR m_szEventName[kNamedObjectNameCapacity];
 #elif defined(__linux__)
-			char m_szEventName[64];
+			char m_szEventName[kNamedObjectNameCapacity];
 #endif
 #if defined(_WIN32)
 			HANDLE m_hEvent;
@@ -2399,17 +2578,33 @@ typedef struct _PEB {
 		class EventClient {
 		public:
 #if defined(_WIN32)
-			EventClient(TCHAR szEventName[64], bool bIsGlobal = false);
+			EventClient(TCHAR const* szEventName, std::size_t unCapacity, bool bIsGlobal = false);
+			template <std::size_t unCapacity>
+			EventClient(TCHAR const (&szEventName)[unCapacity], bool bIsGlobal = false) :
+				EventClient(szEventName, unCapacity, bIsGlobal)
+			{
+			}
 #elif defined(__linux__)
-			EventClient(char szEventName[64], bool bIsGlobal = false);
+			EventClient(char const* szEventName, std::size_t unCapacity, bool bIsGlobal = false);
+			template <std::size_t unCapacity>
+			EventClient(char const (&szEventName)[unCapacity], bool bIsGlobal = false) :
+				EventClient(szEventName, unCapacity, bIsGlobal)
+			{
+			}
 #endif
-			~EventClient();
+
+		public:
+			~EventClient() noexcept;
+			EventClient(EventClient const&) = delete;
+			EventClient(EventClient&&) noexcept;
+			EventClient& operator=(EventClient const&) = delete;
+			EventClient& operator=(EventClient&&) noexcept;
 
 		public:
 #if defined(_WIN32)
-			HANDLE GetEvent() const;
+			HANDLE GetEvent() const noexcept;
 #elif defined(__linux__)
-			void* GetEvent() const;
+			void* GetEvent() const noexcept;
 #endif
 
 		public:
@@ -2441,13 +2636,19 @@ typedef struct _PEB {
 		class Mutex {
 		public:
 			Mutex(bool bInitialState = false);
-			~Mutex();
+			~Mutex() noexcept;
+
+		public:
+			Mutex(Mutex const&) = delete;
+			Mutex(Mutex&&) noexcept;
+			Mutex& operator=(Mutex const&) = delete;
+			Mutex& operator=(Mutex&&) noexcept;
 
 		public:
 #if defined(_WIN32)
-			HANDLE GetMutex() const;
+			HANDLE GetMutex() const noexcept;
 #elif defined(__linux__)
-			void* GetMutex() const;
+			void* GetMutex() const noexcept;
 #endif
 
 		public:
@@ -2473,18 +2674,32 @@ typedef struct _PEB {
 		class MutexServer {
 		public:
 			MutexServer(bool bIsGlobal = false, bool bInitialState = false);
-			~MutexServer();
+			~MutexServer() noexcept;
+
+		public:
+			MutexServer(MutexServer const&) = delete;
+			MutexServer(MutexServer&&) noexcept;
+			MutexServer& operator=(MutexServer const&) = delete;
+			MutexServer& operator=(MutexServer&&) noexcept;
 
 		public:
 #if defined(_WIN32)
-			bool GetMutexName(TCHAR szMutexName[64]);
+			bool GetMutexName(TCHAR* szMutexName, std::size_t unCapacity);
+			template <std::size_t unCapacity>
+			bool GetMutexName(TCHAR (&szMutexName)[unCapacity]) {
+				return GetMutexName(szMutexName, unCapacity);
+			}
 #elif defined(__linux__)
-			bool GetMutexName(char szMutexName[64]);
+			bool GetMutexName(char* szMutexName, std::size_t unCapacity);
+			template <std::size_t unCapacity>
+			bool GetMutexName(char (&szMutexName)[unCapacity]) {
+				return GetMutexName(szMutexName, unCapacity);
+			}
 #endif
 #if defined(_WIN32)
-			HANDLE GetMutex() const;
+			HANDLE GetMutex() const noexcept;
 #elif defined(__linux__)
-			void* GetMutex() const;
+			void* GetMutex() const noexcept;
 #endif
 
 		public:
@@ -2497,9 +2712,9 @@ typedef struct _PEB {
 
 		private:
 #if defined(_WIN32)
-			TCHAR m_szMutexName[64];
+			TCHAR m_szMutexName[kNamedObjectNameCapacity];
 #elif defined(__linux__)
-			char m_szMutexName[64];
+			char m_szMutexName[kNamedObjectNameCapacity];
 #endif
 #if defined(_WIN32)
 			HANDLE m_hMutex;
@@ -2515,17 +2730,33 @@ typedef struct _PEB {
 		class MutexClient {
 		public:
 #if defined(_WIN32)
-			MutexClient(TCHAR szMutexName[64], bool bIsGlobal = false);
+			MutexClient(TCHAR const* szMutexName, std::size_t unCapacity, bool bIsGlobal = false);
+			template <std::size_t unCapacity>
+			MutexClient(TCHAR const (&szMutexName)[unCapacity], bool bIsGlobal = false) :
+				MutexClient(szMutexName, unCapacity, bIsGlobal)
+			{
+			}
 #elif defined(__linux__)
-			MutexClient(char szMutexName[64], bool bIsGlobal = false);
+			MutexClient(char const* szMutexName, std::size_t unCapacity, bool bIsGlobal = false);
+			template <std::size_t unCapacity>
+			MutexClient(char const (&szMutexName)[unCapacity], bool bIsGlobal = false) :
+				MutexClient(szMutexName, unCapacity, bIsGlobal)
+			{
+			}
 #endif
-			~MutexClient();
+			~MutexClient() noexcept;
+
+		public:
+			MutexClient(MutexClient const&) = delete;
+			MutexClient(MutexClient&&) noexcept;
+			MutexClient& operator=(MutexClient const&) = delete;
+			MutexClient& operator=(MutexClient&&) noexcept;
 
 		public:
 #if defined(_WIN32)
-			HANDLE GetMutex() const;
+			HANDLE GetMutex() const noexcept;
 #elif defined(__linux__)
-			void* GetMutex() const;
+			void* GetMutex() const noexcept;
 #endif
 
 		public:
@@ -2551,13 +2782,19 @@ typedef struct _PEB {
 		class Semaphore {
 		public:
 			Semaphore(int nInitialCount = 1, int nMaximumCount = 1);
-			~Semaphore();
+			~Semaphore() noexcept;
+
+		public:
+			Semaphore(Semaphore const&) = delete;
+			Semaphore(Semaphore&&) noexcept;
+			Semaphore& operator=(Semaphore const&) = delete;
+			Semaphore& operator=(Semaphore&&) noexcept;
 
 		public:
 #if defined(_WIN32)
-			HANDLE GetSemaphore() const;
+			HANDLE GetSemaphore() const noexcept;
 #elif defined(__linux__)
-			void* GetSemaphore() const;
+			void* GetSemaphore() const noexcept;
 #endif
 
 		public:
@@ -2583,18 +2820,32 @@ typedef struct _PEB {
 		class SemaphoreServer {
 		public:
 			SemaphoreServer(bool bIsGlobal = false, int nInitialCount = 1, int nMaximumCount = 1);
-			~SemaphoreServer();
+			~SemaphoreServer() noexcept;
+
+		public:
+			SemaphoreServer(SemaphoreServer const&) = delete;
+			SemaphoreServer(SemaphoreServer&&) noexcept;
+			SemaphoreServer& operator=(SemaphoreServer const&) = delete;
+			SemaphoreServer& operator=(SemaphoreServer&&) noexcept;
 
 		public:
 #if defined(_WIN32)
-			bool GetSemaphoreName(TCHAR szSemaphoreName[64]);
+			bool GetSemaphoreName(TCHAR* szSemaphoreName, std::size_t unCapacity);
+			template <std::size_t unCapacity>
+			bool GetSemaphoreName(TCHAR (&szSemaphoreName)[unCapacity]) {
+				return GetSemaphoreName(szSemaphoreName, unCapacity);
+			}
 #elif defined(__linux__)
-			bool GetSemaphoreName(char szSemaphoreName[64]);
+			bool GetSemaphoreName(char* szSemaphoreName, std::size_t unCapacity);
+			template <std::size_t unCapacity>
+			bool GetSemaphoreName(char (&szSemaphoreName)[unCapacity]) {
+				return GetSemaphoreName(szSemaphoreName, unCapacity);
+			}
 #endif
 #if defined(_WIN32)
-			HANDLE GetSemaphore() const;
+			HANDLE GetSemaphore() const noexcept;
 #elif defined(__linux__)
-			void* GetSemaphore() const;
+			void* GetSemaphore() const noexcept;
 #endif
 
 		public:
@@ -2607,9 +2858,9 @@ typedef struct _PEB {
 
 		private:
 #if defined(_WIN32)
-			TCHAR m_szSemaphoreName[64];
+			TCHAR m_szSemaphoreName[kNamedObjectNameCapacity];
 #elif defined(__linux__)
-			char m_szSemaphoreName[64];
+			char m_szSemaphoreName[kNamedObjectNameCapacity];
 #endif
 #if defined(_WIN32)
 			HANDLE m_hSemaphore;
@@ -2625,17 +2876,33 @@ typedef struct _PEB {
 		class SemaphoreClient {
 		public:
 #if defined(_WIN32)
-			SemaphoreClient(TCHAR szSemaphoreName[64], bool bIsGlobal = false);
+			SemaphoreClient(TCHAR const* szSemaphoreName, std::size_t unCapacity, bool bIsGlobal = false);
+			template <std::size_t unCapacity>
+			SemaphoreClient(TCHAR const (&szSemaphoreName)[unCapacity], bool bIsGlobal = false) :
+				SemaphoreClient(szSemaphoreName, unCapacity, bIsGlobal)
+			{
+			}
 #elif defined(__linux__)
-			SemaphoreClient(char szSemaphoreName[64], bool bIsGlobal = false);
+			SemaphoreClient(char const* szSemaphoreName, std::size_t unCapacity, bool bIsGlobal = false);
+			template <std::size_t unCapacity>
+			SemaphoreClient(char const (&szSemaphoreName)[unCapacity], bool bIsGlobal = false) :
+				SemaphoreClient(szSemaphoreName, unCapacity, bIsGlobal)
+			{
+			}
 #endif
-			~SemaphoreClient();
+			~SemaphoreClient() noexcept;
+
+		public:
+			SemaphoreClient(SemaphoreClient const&) = delete;
+			SemaphoreClient(SemaphoreClient&&) noexcept;
+			SemaphoreClient& operator=(SemaphoreClient const&) = delete;
+			SemaphoreClient& operator=(SemaphoreClient&&) noexcept;
 
 		public:
 #if defined(_WIN32)
-			HANDLE GetSemaphore() const;
+			HANDLE GetSemaphore() const noexcept;
 #elif defined(__linux__)
-			void* GetSemaphore() const;
+			void* GetSemaphore() const noexcept;
 #endif
 
 		public:
@@ -2665,7 +2932,13 @@ typedef struct _PEB {
 #elif defined(__linux__)
 			CriticalSection();
 #endif
-			~CriticalSection();
+			~CriticalSection() noexcept;
+
+		public:
+			CriticalSection(CriticalSection const&) = delete;
+			CriticalSection(CriticalSection&&) = delete;
+			CriticalSection& operator=(CriticalSection const&) = delete;
+			CriticalSection& operator=(CriticalSection&&) = delete;
 
 		public:
 #if defined(_WIN32)
@@ -2682,7 +2955,7 @@ typedef struct _PEB {
 #if defined(_WIN32)
 			CRITICAL_SECTION m_CriticalSection;
 #elif defined(__linux__)
-			pthread_mutex_t m_CriticalSection;
+			void* m_pCriticalSection;
 #endif
 		};
 
@@ -2693,66 +2966,97 @@ typedef struct _PEB {
 		class Suspender {
 		public:
 			Suspender();
-			~Suspender();
+			~Suspender() noexcept;
+
+		public:
+			Suspender(Suspender const&) = delete;
+			Suspender(Suspender&&) = delete;
+			Suspender& operator=(Suspender const&) = delete;
+			Suspender& operator=(Suspender&&) = delete;
 
 		public:
 			bool Suspend(bool bSweepThreads = true);
-			void Resume();
+			bool Resume();
 			bool IsSuspended();
-			size_t GetSuspendDepth();
-			bool IsRegionExecuting(void* pAddress, size_t unSize);
-			bool IsRegionInCallStacks(void* pAddress, size_t unSize);
-			void FixExecutionAddress(void* pAddress, void* pNewAddress);
+			std::size_t GetSuspendDepth();
+			bool IsRegionExecuting(void const* const pAddress, const std::size_t unSize);
+			bool IsRegionInCallStacks(void const* const pAddress, const std::size_t unSize) noexcept;
+			bool FixExecutionAddress(void const* const pAddress, void const* const pNewAddress);
 
 		private:
 #if defined(_WIN32)
-			typedef struct _SUSPENDER_DATA {
-				_SUSPENDER_DATA(DWORD unThreadID, HANDLE hHandle, CONTEXT CTX) {
-					m_unThreadID = unThreadID;
-					m_hHandle = hHandle;
-					m_CTX = CTX;
-				}
+			static constexpr std::size_t kWindowsSuspenderThreadCapacity = 256;
 
+			typedef struct _SUSPENDER_DATA {
 				DWORD m_unThreadID;
 				HANDLE m_hHandle;
-				CONTEXT m_CTX;
+				unsigned long long m_unOwnerToken;
+				std::size_t m_unFrameIndex;
+				bool m_bContextCaptured;
+				CONTEXT m_Context;
 			} SUSPENDER_DATA, *PSUSPENDER_DATA;
 
-			size_t SuspendNewThreadsSnapshot();
+			bool ReconcileWindowsState();
+			bool CompleteWindowsCleanup();
+			bool IsWindowsThreadPrepared(DWORD unThreadID, bool* pIdentityKnown) const noexcept;
+			void CompactWindowsThreads() noexcept;
+			bool PrepareWindowsThread(DWORD unThreadID, HANDLE hThread, bool* pAdded);
+			bool SuspendPreparedWindowsThreads(std::size_t unBeginIndex);
+			bool ResumeSuspendedThreads();
+			std::size_t SuspendNewThreadsSnapshot();
 
-			std::deque<SUSPENDER_DATA> m_vecThreads;
+			std::unique_ptr<SUSPENDER_DATA[]> m_pThreads;
+			std::size_t m_unThreadCount;
 			Mutex m_Mutex;
-			size_t m_unSuspendDepth;
-			std::unordered_set<DWORD> m_setSuspendedTIDs;
+			std::size_t m_unSuspendDepth;
+			unsigned long long m_unThreadStateReaperPauseOwnerToken;
+			bool m_bCleanupPending;
 #elif defined(__linux__)
-			size_t SuspendNewThreadsSnapshot();
+			static constexpr std::size_t kLinuxSuspenderThreadCapacity = 256;
+
+			bool LockAndRefreshForkState();
 
 			Mutex m_Mutex;
-			size_t m_unSuspendDepth;
-			std::unordered_set<unsigned int> m_setSuspendedTIDs;
+			std::size_t m_unSuspendDepth;
+			std::array<unsigned int, kLinuxSuspenderThreadCapacity> m_arrSuspendedThreadIDs;
+			std::size_t m_unSuspendedThreadCount;
 #endif
 		};
+
+		// ----------------------------------------------------------------
+		// SuspendTransaction
+		// ----------------------------------------------------------------
 
 		class SuspendTransaction {
 		public:
 			explicit SuspendTransaction(Suspender& SuspenderReference, bool bSweepThreads = true);
-			~SuspendTransaction();
-			SuspendTransaction(const SuspendTransaction&) = delete;
-			SuspendTransaction& operator=(const SuspendTransaction&) = delete;
+			~SuspendTransaction() noexcept;
+
+		public:
+			SuspendTransaction(SuspendTransaction const&) = delete;
+			SuspendTransaction& operator=(SuspendTransaction const&) = delete;
 			SuspendTransaction(SuspendTransaction&&) = delete;
 			SuspendTransaction& operator=(SuspendTransaction&&) = delete;
 
 		public:
 			bool Begin(bool bSweepThreads = true);
-			void End();
-			bool IsActive() const;
+			bool End();
+			void EndNoFail() noexcept;
+			bool IsActive() const noexcept;
 
 		public:
-			operator bool() const;
+			operator bool() const noexcept;
 
 		private:
+#if defined(__linux__)
+			void RefreshForkState() noexcept;
+#endif
+
 			Suspender* m_pSuspender;
-			size_t m_unBeginDepth;
+			std::size_t m_unBeginDepth;
+#if defined(__linux__)
+			pid_t m_nProcessID;
+#endif
 			bool m_bActive;
 		};
 
@@ -2771,19 +3075,33 @@ typedef struct _PEB {
 
 		class PipeServer {
 		public:
-			PipeServer(const size_t unBufferSize);
-			~PipeServer();
+			PipeServer(const std::size_t unBufferSize);
+			~PipeServer() noexcept;
+
+		public:
+			PipeServer(PipeServer const&) = delete;
+			PipeServer(PipeServer&&) noexcept;
+			PipeServer& operator=(PipeServer const&) = delete;
+			PipeServer& operator=(PipeServer&&) noexcept;
 
 		public:
 #if defined(_WIN32)
-			bool GetPipeName(TCHAR szPipeName[64]);
+			bool GetPipeName(TCHAR* szPipeName, std::size_t unCapacity);
+			template <std::size_t unCapacity>
+			bool GetPipeName(TCHAR (&szPipeName)[unCapacity]) {
+				return GetPipeName(szPipeName, unCapacity);
+			}
 #elif defined(__linux__)
-			bool GetPipeName(char szPipeName[64]);
+			bool GetPipeName(char* szPipeName, std::size_t unCapacity);
+			template <std::size_t unCapacity>
+			bool GetPipeName(char (&szPipeName)[unCapacity]) {
+				return GetPipeName(szPipeName, unCapacity);
+			}
 #endif
 #if defined(_WIN32)
-			HANDLE GetPipe() const;
+			HANDLE GetPipe() const noexcept;
 #elif defined(__linux__)
-			void* GetPipe() const;
+			void* GetPipe() const noexcept;
 #endif
 
 		public:
@@ -2791,15 +3109,26 @@ typedef struct _PEB {
 			bool Close();
 
 		public:
-			bool Send(unsigned char pData[]);
-			bool Receive(unsigned char pData[]);
+			bool Send(unsigned char const* pData, const std::size_t unDataCapacity);
+
+			template <std::size_t unDataCapacity>
+			bool Send(unsigned char const (&arrData)[unDataCapacity]) {
+				return Send(arrData, unDataCapacity);
+			}
+
+			bool Receive(unsigned char* pData, const std::size_t unDataCapacity);
+
+			template <std::size_t unDataCapacity>
+			bool Receive(unsigned char (&arrData)[unDataCapacity]) {
+				return Receive(arrData, unDataCapacity);
+			}
 
 		private:
-			size_t m_unBufferSize;
+			std::size_t m_unBufferSize;
 #if defined(_WIN32)
-			TCHAR m_szPipeName[64];
+			TCHAR m_szPipeName[kNamedObjectNameCapacity];
 #elif defined(__linux__)
-			char m_szPipeName[64];
+			char m_szPipeName[kNamedObjectNameCapacity];
 #endif
 #if defined(_WIN32)
 			HANDLE m_hPipe;
@@ -2814,30 +3143,57 @@ typedef struct _PEB {
 
 		class PipeClient {
 		public:
-			PipeClient(const size_t unBufferSize);
-			~PipeClient();
+			PipeClient(const std::size_t unBufferSize);
+			~PipeClient() noexcept;
+
+		public:
+			PipeClient(PipeClient const&) = delete;
+			PipeClient(PipeClient&&) noexcept;
+			PipeClient& operator=(PipeClient const&) = delete;
+			PipeClient& operator=(PipeClient&&) noexcept;
 
 		public:
 #if defined(_WIN32)
-			HANDLE GetPipe() const;
+			HANDLE GetPipe() const noexcept;
 #elif defined(__linux__)
-			void* GetPipe() const;
+			void* GetPipe() const noexcept;
 #endif
 
 		public:
 #if defined(_WIN32)
-			bool Open(TCHAR szPipeName[64]);
+			bool Open(TCHAR const* szPipeName, std::size_t unCapacity);
+
+			template <std::size_t unCapacity>
+			bool Open(TCHAR const (&szPipeName)[unCapacity]) {
+				return Open(szPipeName, unCapacity);
+			}
 #elif defined(__linux__)
-			bool Open(char szPipeName[64]);
+			bool Open(char const* szPipeName, std::size_t unCapacity);
+
+			template <std::size_t unCapacity>
+			bool Open(char const (&szPipeName)[unCapacity]) {
+				return Open(szPipeName, unCapacity);
+			}
 #endif
 			bool Close();
 
 		public:
-			bool Send(unsigned char pData[]);
-			bool Receive(unsigned char pData[]);
+			bool Send(unsigned char const* pData, const std::size_t unDataCapacity);
+
+			template <std::size_t unDataCapacity>
+			bool Send(unsigned char const (&arrData)[unDataCapacity]) {
+				return Send(arrData, unDataCapacity);
+			}
+
+			bool Receive(unsigned char* pData, const std::size_t unDataCapacity);
+
+			template <std::size_t unDataCapacity>
+			bool Receive(unsigned char (&arrData)[unDataCapacity]) {
+				return Receive(arrData, unDataCapacity);
+			}
 
 		private:
-			size_t m_unBufferSize;
+			std::size_t m_unBufferSize;
 #if defined(_WIN32)
 			HANDLE m_hPipe;
 #elif defined(__linux__)
@@ -2856,7 +3212,7 @@ typedef struct _PEB {
 		// Thread CallBack
 		// ----------------------------------------------------------------
 
-		using fnThreadCallBack = void (*)(void* pData);
+		using fnThreadCallBack = void(*)(void* pData);
 
 		// ----------------------------------------------------------------
 		// Thread
@@ -2865,12 +3221,18 @@ typedef struct _PEB {
 		class Thread {
 		public:
 			Thread();
-			Thread(const fnThreadCallBack pCallBack);
-			Thread(const fnThreadCallBack pCallBack, void* pData);
-			~Thread();
+			Thread(fnThreadCallBack const pCallBack);
+			Thread(fnThreadCallBack const pCallBack, void* pData);
+			~Thread() noexcept;
 
 		public:
-			bool SetCallBack(const fnThreadCallBack pCallBack);
+			Thread(Thread const&) = delete;
+			Thread(Thread&&) = delete;
+			Thread& operator=(Thread const&) = delete;
+			Thread& operator=(Thread&&) = delete;
+
+		public:
+			bool SetCallBack(fnThreadCallBack const pCallBack);
 			bool SetData(void* pData);
 
 		public:
@@ -2880,8 +3242,13 @@ typedef struct _PEB {
 			bool Resume();
 
 		public:
-			fnThreadCallBack GetCallBack() const;
-			void* GetData() const;
+			fnThreadCallBack GetCallBack() const noexcept;
+			void* GetData() const noexcept;
+
+		private:
+#if defined(__linux__)
+			bool RefreshForkState() noexcept;
+#endif
 
 		private:
 			fnThreadCallBack m_pCallBack;
@@ -2890,6 +3257,7 @@ typedef struct _PEB {
 			HANDLE m_hThread;
 #elif defined(__linux__)
 			void* m_hThread;
+			pid_t m_nProcessID;
 #endif
 		};
 
@@ -2897,7 +3265,7 @@ typedef struct _PEB {
 		// Fiber CallBack
 		// ----------------------------------------------------------------
 
-		using fnFiberCallBack = void (*)(void* pData);
+		using fnFiberCallBack = void(*)(void* pData);
 
 		// ----------------------------------------------------------------
 		// Fiber
@@ -2906,19 +3274,19 @@ typedef struct _PEB {
 		class Fiber {
 		public:
 			Fiber();
-			Fiber(const fnFiberCallBack pCallBack);
-			Fiber(const fnFiberCallBack pCallBack, void* pData);
+			Fiber(fnFiberCallBack const pCallBack);
+			Fiber(fnFiberCallBack const pCallBack, void* pData);
 
 		public:
-			bool SetCallBack(const fnFiberCallBack pCallBack);
+			bool SetCallBack(fnFiberCallBack const pCallBack);
 			bool SetData(void* pData);
 
 		public:
 			bool Switch();
 
 		public:
-			fnFiberCallBack GetCallBack() const;
-			void* GetData() const;
+			fnFiberCallBack GetCallBack() const noexcept;
+			void* GetData() const noexcept;
 
 		private:
 			fnFiberCallBack m_pCallBack;
@@ -2938,16 +3306,22 @@ typedef struct _PEB {
 
 		class Shared {
 		public:
-			Shared(const size_t unSize);
-			~Shared();
+			Shared(const std::size_t unSize);
+			~Shared() noexcept;
+
+		public:
+			Shared(Shared const&) = delete;
+			Shared(Shared&&) noexcept;
+			Shared& operator=(Shared const&) = delete;
+			Shared& operator=(Shared&&) noexcept;
 
 		public:
 #if defined(_WIN32)
-			HANDLE GetShared() const;
+			HANDLE GetShared() const noexcept;
 #elif defined(__linux__)
-			void* GetShared() const;
+			void* GetShared() const noexcept;
 #endif
-			void* GetAddress() const;
+			void* GetAddress() const noexcept;
 
 		private:
 #if defined(_WIN32)
@@ -2964,27 +3338,41 @@ typedef struct _PEB {
 
 		class SharedServer {
 		public:
-			SharedServer(const size_t unSize, bool bIsGlobal = false);
-			~SharedServer();
+			SharedServer(const std::size_t unSize, const bool bIsGlobal = false);
+			~SharedServer() noexcept;
+
+		public:
+			SharedServer(SharedServer const&) = delete;
+			SharedServer(SharedServer&&) noexcept;
+			SharedServer& operator=(SharedServer const&) = delete;
+			SharedServer& operator=(SharedServer&&) noexcept;
 
 		public:
 #if defined(_WIN32)
-			bool GetSharedName(TCHAR szSharedName[64]);
+			bool GetSharedName(TCHAR* const pszSharedNameOut, const std::size_t unCapacity);
+			template <std::size_t unCapacity>
+			bool GetSharedName(TCHAR (&szSharedNameOut)[unCapacity]) {
+				return GetSharedName(szSharedNameOut, unCapacity);
+			}
 #elif defined(__linux__)
-			bool GetSharedName(char szSharedName[64]);
+			bool GetSharedName(char* const pszSharedNameOut, const std::size_t unCapacity);
+			template <std::size_t unCapacity>
+			bool GetSharedName(char (&szSharedNameOut)[unCapacity]) {
+				return GetSharedName(szSharedNameOut, unCapacity);
+			}
 #endif
 #if defined(_WIN32)
-			HANDLE GetShared() const;
+			HANDLE GetShared() const noexcept;
 #elif defined(__linux__)
-			void* GetShared() const;
+			void* GetShared() const noexcept;
 #endif
-			void* GetAddress() const;
+			void* GetAddress() const noexcept;
 
 		private:
 #if defined(_WIN32)
-			TCHAR m_szSharedName[64];
+			TCHAR m_szSharedName[kNamedObjectNameCapacity];
 #elif defined(__linux__)
-			char m_szSharedName[64];
+			char m_szSharedName[kNamedObjectNameCapacity];
 #endif
 #if defined(_WIN32)
 			HANDLE m_hMap;
@@ -3001,19 +3389,35 @@ typedef struct _PEB {
 		class SharedClient {
 		public:
 #if defined(_WIN32)
-			SharedClient(TCHAR szSharedName[64], bool bIsGlobal = false);
+			SharedClient(TCHAR const* const pszSharedName, const std::size_t unCapacity, const bool bIsGlobal = false);
+			template <std::size_t unCapacity>
+			SharedClient(TCHAR const (&szSharedName)[unCapacity], const bool bIsGlobal = false) :
+				SharedClient(szSharedName, unCapacity, bIsGlobal)
+			{
+			}
 #elif defined(__linux__)
-			SharedClient(char szSharedName[64], bool bIsGlobal = false);
+			SharedClient(char const* const pszSharedName, const std::size_t unCapacity, const bool bIsGlobal = false);
+			template <std::size_t unCapacity>
+			SharedClient(char const (&szSharedName)[unCapacity], const bool bIsGlobal = false) :
+				SharedClient(szSharedName, unCapacity, bIsGlobal)
+			{
+			}
 #endif
-			~SharedClient();
+
+		public:
+			~SharedClient() noexcept;
+			SharedClient(SharedClient const&) = delete;
+			SharedClient(SharedClient&&) noexcept;
+			SharedClient& operator=(SharedClient const&) = delete;
+			SharedClient& operator=(SharedClient&&) noexcept;
 
 		public:
 #if defined(_WIN32)
-			HANDLE GetShared() const;
+			HANDLE GetShared() const noexcept;
 #elif defined(__linux__)
-			void* GetShared() const;
+			void* GetShared() const noexcept;
 #endif
-			void* GetAddress() const;
+			void* GetAddress() const noexcept;
 
 		private:
 #if defined(_WIN32)
@@ -3030,61 +3434,64 @@ typedef struct _PEB {
 
 		class Page {
 		public:
-			Page(void* pBaseAddress, bool bAutoRestore, bool bCommitPage = false);
-			Page(void* pDesiredAddress = nullptr);
-			~Page();
+			Page(void* const pBaseAddress, const bool bAutoRestore, const bool bCommitPage = false);
+			Page(void* const pDesiredAddress = nullptr);
+			~Page() noexcept;
+
+		public:
+			Page(Page const&) = delete;
+			Page(Page&&) noexcept;
+			Page& operator=(Page const&) = delete;
+			Page& operator=(Page&&) noexcept;
 
 		public:
 #if defined(_WIN32)
-			bool GetProtection(DWORD* const pProtection);
+			bool GetProtection(DWORD* const pProtectionOut);
 #elif defined(__linux__)
-			bool GetProtection(int* const pProtection);
+			bool GetProtection(int* const pProtectionOut) noexcept;
 #endif
 #if defined(_WIN32)
-			bool GetOriginalProtection(DWORD* const pProtection);
+			bool GetOriginalProtection(DWORD* const pProtectionOut);
 #elif defined(__linux__)
-			bool GetOriginalProtection(int* const pProtection);
+			bool GetOriginalProtection(int* const pProtectionOut) noexcept;
 #endif
 #if defined(_WIN32)
 			bool ChangeProtection(const DWORD unNewProtection);
 #elif defined(__linux__)
-			bool ChangeProtection(const int nNewProtection);
+			bool ChangeProtection(const int nNewProtection) noexcept;
 #endif
 			bool RestoreProtection();
 
 		public:
-			void* Alloc(size_t unSize, size_t unSizeAlign = 1, size_t unAddressAlign = alignof(void*));
-			void* ZeroAlloc(size_t unSize, size_t unSizeAlign = 1, size_t unAddressAlign = alignof(void*));
-			bool DeAlloc(void* pAddress);
+			void* Alloc(const std::size_t unSize, const std::size_t unSizeAlign = 1, const std::size_t unAddressAlign = alignof(void*));
+			void* ZeroAlloc(const std::size_t unSize, const std::size_t unSizeAlign = 1, const std::size_t unAddressAlign = alignof(void*));
+			bool DeAlloc(void* const pAddress);
 			void DeAllocAll();
 
 		public:
-			void* GetPageAddress() const;
-			size_t GetPageCapacity() const;
-			size_t GetDataSize() const;
-			bool IsPageEmpty() const;
+			void* GetPageAddress() const noexcept;
+			std::size_t GetPageCapacity() const noexcept;
+			std::size_t GetDataSize() const noexcept;
+			bool IsPageEmpty() const noexcept;
 
 		private:
-			void MergeFreeBlocks();
+			friend class Region;
+			bool SetActiveBlockSize(void* const pAddress, const std::size_t unSize) noexcept;
+			void MergeFreeBlocks() noexcept;
 
 		private:
 			struct Block {
-				Block(void* pAddress, size_t unSize) {
-					m_pAddress = pAddress;
-					m_unSize = unSize;
-				}
-
-				bool operator<(const Block& block) const {
-					return m_pAddress < block.m_pAddress;
+				bool operator<(Block const& Other) const noexcept {
+					return std::less<void*> {}(m_pAddress, Other.m_pAddress);
 				}
 
 				void* m_pAddress;
-				size_t m_unSize;
+				std::size_t m_unSize;
 			};
 
 		private:
 			bool m_bIsManualPage;
-			size_t m_unPageCapacity;
+			std::size_t m_unPageCapacity;
 			void* m_pPageAddress;
 			bool m_bAutoRestore;
 			bool m_bCommitted;
@@ -3103,43 +3510,49 @@ typedef struct _PEB {
 
 		class Region {
 		public:
-			Region(void* pBaseAddress, bool bAutoRestore);
-			Region(void* pDesiredAddress = nullptr, size_t unCapacity = 0);
-			~Region();
+			Region(void* const pBaseAddress, const bool bAutoRestore);
+			Region(void* const pDesiredAddress = nullptr, const std::size_t unCapacity = 0);
+			~Region() noexcept;
+
+		public:
+			Region(Region const&) = delete;
+			Region(Region&&) noexcept;
+			Region& operator=(Region const&) = delete;
+			Region& operator=(Region&&) noexcept;
 
 		public:
 #if defined(_WIN32)
-			bool GetProtection(DWORD* const pProtection);
+			bool GetProtection(DWORD* const pProtectionOut);
 #elif defined(__linux__)
-			bool GetProtection(int* const pProtection);
+			bool GetProtection(int* const pProtectionOut) noexcept;
 #endif
 #if defined(_WIN32)
-			bool GetOriginalProtection(DWORD* const pProtection);
+			bool GetOriginalProtection(DWORD* const pProtectionOut);
 #elif defined(__linux__)
-			bool GetOriginalProtection(int* const pProtection);
+			bool GetOriginalProtection(int* const pProtectionOut) noexcept;
 #endif
 #if defined(_WIN32)
 			bool ChangeProtection(const DWORD unNewProtection);
 #elif defined(__linux__)
-			bool ChangeProtection(const int nNewProtection);
+			bool ChangeProtection(const int nNewProtection) noexcept;
 #endif
 			bool RestoreProtection();
 
 		public:
-			void* Alloc(size_t unSize, size_t unSizeAlign = 1, size_t unAddressAlign = alignof(void*), Page** pUsedPage = nullptr);
-			void* ZeroAlloc(size_t unSize, size_t unSizeAlign = 1, size_t unAddressAlign = alignof(void*), Page** pUsedPage = nullptr);
-			bool DeAlloc(void* pAddress);
+			void* Alloc(const std::size_t unSize, const std::size_t unSizeAlign = 1, const std::size_t unAddressAlign = alignof(void*), Page** const ppUsedPageOut = nullptr);
+			void* ZeroAlloc(const std::size_t unSize, const std::size_t unSizeAlign = 1, const std::size_t unAddressAlign = alignof(void*), Page** const ppUsedPageOut = nullptr);
+			bool DeAlloc(void* const pAddress);
 			void DeAllocAll();
 
 		public:
-			void* GetRegionAddress() const;
-			size_t GetRegionCapacity() const;
-			size_t GetDataSize() const;
-			bool IsRegionEmpty() const;
+			void* GetRegionAddress() const noexcept;
+			std::size_t GetRegionCapacity() const noexcept;
+			std::size_t GetDataSize() const noexcept;
+			bool IsRegionEmpty() const noexcept;
 
 		private:
 			bool m_bIsManualRegion;
-			size_t m_unRegionCapacity;
+			std::size_t m_unRegionCapacity;
 			void* m_pRegionAddress;
 			bool m_bAutoRestore;
 #if defined(_WIN32)
@@ -3147,8 +3560,8 @@ typedef struct _PEB {
 #elif defined(__linux__)
 			int m_nOriginalProtection;
 #endif
-			size_t m_unUsedSpace;
-			std::list<Page> m_vecPages;
+			std::size_t m_unUsedSpace;
+			std::list<Page> m_lstPages;
 		};
 
 		// ----------------------------------------------------------------
@@ -3157,25 +3570,31 @@ typedef struct _PEB {
 
 		class Storage {
 		public:
-			Storage(size_t unTotalCapacity = 0, size_t unRegionCapacity = 0);
+			Storage(const std::size_t unRequestedTotalCapacity = 0, const std::size_t unRequestedRegionCapacity = 0);
 			~Storage() = default;
 
 		public:
-			void* Alloc(size_t unSize, size_t unSizeAlign = 1, size_t unAddressAlign = alignof(void*), void* pDesiredAddress = nullptr, Page** pUsedPage = nullptr, Region** pUsedRegion = nullptr);
-			void* ZeroAlloc(size_t unSize, size_t unSizeAlign = 1, size_t unAddressAlign = alignof(void*), void* pDesiredAddress = nullptr, Page** pUsedPage = nullptr, Region** pUsedRegion = nullptr);
-			bool DeAlloc(void* pAddress);
+			Storage(Storage const&) = delete;
+			Storage(Storage&&) noexcept;
+			Storage& operator=(Storage const&) = delete;
+			Storage& operator=(Storage&&) noexcept;
+
+		public:
+			void* Alloc(const std::size_t unSize, const std::size_t unSizeAlign = 1, const std::size_t unAddressAlign = alignof(void*), void* const pDesiredAddress = nullptr, Page** const ppUsedPageOut = nullptr, Region** const ppUsedRegionOut = nullptr);
+			void* ZeroAlloc(const std::size_t unSize, const std::size_t unSizeAlign = 1, const std::size_t unAddressAlign = alignof(void*), void* const pDesiredAddress = nullptr, Page** const ppUsedPageOut = nullptr, Region** const ppUsedRegionOut = nullptr);
+			bool DeAlloc(void* const pAddress);
 			bool DeAllocAll();
 
 		public:
-			size_t GetStorageCapacity() const;
-			size_t GetDataSize() const;
-			bool IsStorageEmpty() const;
+			std::size_t GetStorageCapacity() const noexcept;
+			std::size_t GetDataSize() const noexcept;
+			bool IsStorageEmpty() const noexcept;
 
 		private:
-			size_t m_unTotalCapacity;
-			size_t m_unRegionCapacity;
-			size_t m_unUsedSpace;
-			std::list<Region> m_vecRegions;
+			std::size_t m_unTotalCapacity;
+			std::size_t m_unRegionCapacity;
+			std::size_t m_unUsedSpace;
+			std::list<Region> m_lstRegions;
 		};
 
 		// ----------------------------------------------------------------
@@ -3184,8 +3603,14 @@ typedef struct _PEB {
 
 		class Protection {
 		public:
-			Protection(void* pAddress, size_t unSize, bool bAutoRestore = true);
-			~Protection();
+			Protection(void* const pAddress, const std::size_t unSize, const bool bAutoRestore = true);
+			~Protection() noexcept;
+
+		public:
+			Protection(Protection const&) = delete;
+			Protection(Protection&&) noexcept;
+			Protection& operator=(Protection const&) = delete;
+			Protection& operator=(Protection&&) noexcept;
 
 		public:
 #if defined(_WIN32)
@@ -3198,8 +3623,8 @@ typedef struct _PEB {
 		private:
 			bool m_bAutoRestore;
 			bool m_bUseRegions;
-			std::deque<Page> m_vecPages;
-			std::deque<Region> m_vecRegions;
+			std::deque<Page> m_deqPages;
+			std::deque<Region> m_deqRegions;
 		};
 
 		// ----------------------------------------------------------------
@@ -3212,62 +3637,77 @@ typedef struct _PEB {
 			~MemoryManager() = default;
 
 		public:
+			MemoryManager(MemoryManager const&) = delete;
+			MemoryManager(MemoryManager&&) noexcept = default;
+			MemoryManager& operator=(MemoryManager const&) = delete;
+			MemoryManager& operator=(MemoryManager&&) noexcept = default;
+
+		public:
 			Page* CreatePage();
-			Storage* CreateStorage(size_t unTotalCapacity = 0, size_t unRegionCapacity = 0);
+			Storage* CreateStorage(const std::size_t unRequestedTotalCapacity = 0, const std::size_t unRequestedRegionCapacity = 0);
 
 		public:
-			bool DestroyPage(Page* pPage);
-			bool DestroyStorage(Storage* pStorage);
+			bool DestroyPage(Page* const pPage);
+			bool DestroyStorage(Storage* const pStorage);
 
 		public:
-			std::unique_ptr<Page> GetPage(void* pAddress);
-			std::unique_ptr<Region> GetRegion(void* pAddress);
+			std::unique_ptr<Page> GetPage(void* const pAddress);
+			std::unique_ptr<Region> GetRegion(void* const pAddress);
 
 		public:
-			std::vector<Page> CollectPages(void* pAddress, size_t unSize);
-			std::vector<Region> CollectRegions(void* pAddress, size_t unSize);
+			std::vector<Page> CollectPages(void* const pAddress, const std::size_t unSize);
+			std::vector<Region> CollectRegions(void* const pAddress, const std::size_t unSize);
 
 		private:
-			std::deque<std::unique_ptr<Page>> m_vecPages;
-			std::deque<std::unique_ptr<Storage>> m_vecStorages;
+			std::deque<std::unique_ptr<Page>> m_deqPages;
+			std::deque<std::unique_ptr<Storage>> m_deqStorages;
 		};
 
 		// ----------------------------------------------------------------
 		// ProtectedPage
 		// ----------------------------------------------------------------
 
-		// All protected payload access and owner lifetime require external synchronization.
+		// Access to a protected payload and changes to wrapper lifetimes must be externally synchronized.
+		// Page protection is process-wide, so independent threads cannot safely overlap access to one range.
 		// An externally owned range must outlive every wrapper attached to it.
-		// On Linux, one machine instruction cannot access multiple protected ranges.
-		struct _PROTECTED_MEMORY_STATE;
-
+		// GetProtection/SetProtection configure transient client access; sealed payload and shadow pages remain inaccessible.
 		class ProtectedPage {
 		public:
 			ProtectedPage();
-			ProtectedPage(void* pAddress, size_t unSize);
-			~ProtectedPage();
-			ProtectedPage(const ProtectedPage&) = delete;
+			ProtectedPage(void* pAddress, std::size_t unSize);
+			~ProtectedPage() noexcept;
+
+		public:
+			ProtectedPage(ProtectedPage const&) = delete;
 			ProtectedPage(ProtectedPage&&) = delete;
-			ProtectedPage& operator=(const ProtectedPage&) = delete;
+			ProtectedPage& operator=(ProtectedPage const&) = delete;
 			ProtectedPage& operator=(ProtectedPage&&) = delete;
 
 		public:
-			void* Alloc(size_t unSize, size_t unSizeAlign = 1, size_t unAddressAlign = alignof(void*));
-			void* ZeroAlloc(size_t unSize, size_t unSizeAlign = 1, size_t unAddressAlign = alignof(void*));
+			void* Alloc(std::size_t unSize, std::size_t unSizeAlign = 1, std::size_t unAddressAlign = alignof(void*));
+			void* ZeroAlloc(std::size_t unSize, std::size_t unSizeAlign = 1, std::size_t unAddressAlign = alignof(void*));
 			bool DeAlloc(void* pAddress);
 			bool DeAllocAll();
 			bool Release();
 
 		public:
+#if defined(_WIN32)
+			bool GetProtection(DWORD* const pProtection) const noexcept;
+			bool SetProtection(const DWORD unProtection) noexcept;
+#elif defined(__linux__)
+			bool GetProtection(int* const pProtection) const noexcept;
+			bool SetProtection(const int nProtection) noexcept;
+#endif
+
+		public:
 			void* GetPageAddress() const noexcept;
-			size_t GetPageCapacity() const noexcept;
-			size_t GetDataSize() const noexcept;
+			std::size_t GetPageCapacity() const noexcept;
+			std::size_t GetDataSize() const noexcept;
 			bool IsPageEmpty() const noexcept;
 			bool IsProtected() const noexcept;
-			bool IsCompromised() const;
+			bool IsCompromised() const noexcept;
 
 		private:
-			friend struct _PROTECTED_MEMORY_STATE;
 			std::shared_ptr<void> m_pState;
 		};
 
@@ -3277,31 +3717,41 @@ typedef struct _PEB {
 
 		class ProtectedRange {
 		public:
-			explicit ProtectedRange(size_t unSize);
-			ProtectedRange(void* pAddress, size_t unSize);
-			~ProtectedRange();
-			ProtectedRange(const ProtectedRange&) = delete;
+			explicit ProtectedRange(std::size_t unSize);
+			ProtectedRange(void* pAddress, std::size_t unSize);
+			~ProtectedRange() noexcept;
+
+		public:
+			ProtectedRange(ProtectedRange const&) = delete;
 			ProtectedRange(ProtectedRange&&) = delete;
-			ProtectedRange& operator=(const ProtectedRange&) = delete;
+			ProtectedRange& operator=(ProtectedRange const&) = delete;
 			ProtectedRange& operator=(ProtectedRange&&) = delete;
 
 		public:
-			void* Alloc(size_t unSize, size_t unSizeAlign = 1, size_t unAddressAlign = alignof(void*));
-			void* ZeroAlloc(size_t unSize, size_t unSizeAlign = 1, size_t unAddressAlign = alignof(void*));
+			void* Alloc(std::size_t unSize, std::size_t unSizeAlign = 1, std::size_t unAddressAlign = alignof(void*));
+			void* ZeroAlloc(std::size_t unSize, std::size_t unSizeAlign = 1, std::size_t unAddressAlign = alignof(void*));
 			bool DeAlloc(void* pAddress);
 			bool DeAllocAll();
 			bool Release();
 
 		public:
+#if defined(_WIN32)
+			bool GetProtection(DWORD* const pProtection) const noexcept;
+			bool SetProtection(const DWORD unProtection) noexcept;
+#elif defined(__linux__)
+			bool GetProtection(int* const pProtection) const noexcept;
+			bool SetProtection(const int nProtection) noexcept;
+#endif
+
+		public:
 			void* GetRangeAddress() const noexcept;
-			size_t GetRangeSize() const noexcept;
-			size_t GetDataSize() const noexcept;
+			std::size_t GetRangeSize() const noexcept;
+			std::size_t GetDataSize() const noexcept;
 			bool IsRangeEmpty() const noexcept;
 			bool IsProtected() const noexcept;
-			bool IsCompromised() const;
+			bool IsCompromised() const noexcept;
 
 		private:
-			friend struct _PROTECTED_MEMORY_STATE;
 			std::shared_ptr<void> m_pState;
 		};
 
@@ -3311,30 +3761,46 @@ typedef struct _PEB {
 
 		class ProtectedStorage {
 		public:
-			explicit ProtectedStorage(size_t unTotalCapacity = 0);
-			~ProtectedStorage();
-			ProtectedStorage(const ProtectedStorage&) = delete;
+			explicit ProtectedStorage(std::size_t unTotalCapacity = 0);
+			~ProtectedStorage() noexcept;
+
+		public:
+			ProtectedStorage(ProtectedStorage const&) = delete;
 			ProtectedStorage(ProtectedStorage&&) = delete;
-			ProtectedStorage& operator=(const ProtectedStorage&) = delete;
+			ProtectedStorage& operator=(ProtectedStorage const&) = delete;
 			ProtectedStorage& operator=(ProtectedStorage&&) = delete;
 
 		public:
-			void* Alloc(size_t unSize);
-			void* ZeroAlloc(size_t unSize);
+			void* Alloc(std::size_t unSize);
+			void* ZeroAlloc(std::size_t unSize);
 			bool DeAlloc(void* pAddress);
 			bool DeAllocAll();
 
 		public:
-			size_t GetStorageCapacity() const noexcept;
-			size_t GetDataSize() const noexcept;
+#if defined(_WIN32)
+			bool GetProtection(DWORD* const pProtection) const noexcept;
+			bool SetProtection(const DWORD unProtection) noexcept;
+#elif defined(__linux__)
+			bool GetProtection(int* const pProtection) const noexcept;
+			bool SetProtection(const int nProtection) noexcept;
+#endif
+
+		public:
+			std::size_t GetStorageCapacity() const noexcept;
+			std::size_t GetDataSize() const noexcept;
 			bool IsStorageEmpty() const noexcept;
 			bool IsProtected() const noexcept;
-			bool IsCompromised() const;
+			bool IsCompromised() const noexcept;
 
 		private:
-			size_t m_unTotalCapacity;
-			size_t m_unUsedSpace;
-			std::list<std::unique_ptr<ProtectedRange>> m_vecRanges;
+			std::size_t m_unTotalCapacity;
+			std::size_t m_unUsedSpace;
+#if defined(_WIN32)
+			DWORD m_unProtection;
+#elif defined(__linux__)
+			int m_nProtection;
+#endif
+			std::list<std::unique_ptr<ProtectedRange>> m_lstRanges;
 		};
 
 		// ----------------------------------------------------------------
@@ -3347,16 +3813,22 @@ typedef struct _PEB {
 			~ProtectedMemoryManager() = default;
 
 		public:
+			ProtectedMemoryManager(ProtectedMemoryManager const&) = delete;
+			ProtectedMemoryManager(ProtectedMemoryManager&&) noexcept = default;
+			ProtectedMemoryManager& operator=(ProtectedMemoryManager const&) = delete;
+			ProtectedMemoryManager& operator=(ProtectedMemoryManager&&) noexcept = default;
+
+		public:
 			ProtectedPage* CreatePage();
-			ProtectedStorage* CreateStorage(size_t unTotalCapacity = 0);
+			ProtectedStorage* CreateStorage(std::size_t unTotalCapacity = 0);
 
 		public:
 			bool DestroyPage(ProtectedPage* pPage);
 			bool DestroyStorage(ProtectedStorage* pStorage);
 
 		private:
-			std::deque<std::unique_ptr<ProtectedPage>> m_vecPages;
-			std::deque<std::unique_ptr<ProtectedStorage>> m_vecStorages;
+			std::deque<std::unique_ptr<ProtectedPage>> m_deqPages;
+			std::deque<std::unique_ptr<ProtectedStorage>> m_deqStorages;
 		};
 
 		// ----------------------------------------------------------------
@@ -3366,27 +3838,38 @@ typedef struct _PEB {
 		class SecurePage {
 		public:
 			SecurePage();
-			SecurePage(void* pAddress, size_t unSize);
-			~SecurePage();
-			SecurePage(const SecurePage&) = delete;
+			SecurePage(void* pAddress, std::size_t unSize);
+			~SecurePage() noexcept;
+
+		public:
+			SecurePage(SecurePage const&) = delete;
 			SecurePage(SecurePage&&) = delete;
-			SecurePage& operator=(const SecurePage&) = delete;
+			SecurePage& operator=(SecurePage const&) = delete;
 			SecurePage& operator=(SecurePage&&) = delete;
 
 		public:
-			void* Alloc(size_t unSize, size_t unSizeAlign = 1, size_t unAddressAlign = alignof(void*));
-			void* ZeroAlloc(size_t unSize, size_t unSizeAlign = 1, size_t unAddressAlign = alignof(void*));
+			void* Alloc(std::size_t unSize, std::size_t unSizeAlign = 1, std::size_t unAddressAlign = alignof(void*));
+			void* ZeroAlloc(std::size_t unSize, std::size_t unSizeAlign = 1, std::size_t unAddressAlign = alignof(void*));
 			bool DeAlloc(void* pAddress);
 			bool DeAllocAll();
 			bool Release();
 
 		public:
+#if defined(_WIN32)
+			bool GetProtection(DWORD* const pProtection) const noexcept;
+			bool SetProtection(const DWORD unProtection) noexcept;
+#elif defined(__linux__)
+			bool GetProtection(int* const pProtection) const noexcept;
+			bool SetProtection(const int nProtection) noexcept;
+#endif
+
+		public:
 			void* GetPageAddress() const noexcept;
-			size_t GetPageCapacity() const noexcept;
-			size_t GetDataSize() const noexcept;
+			std::size_t GetPageCapacity() const noexcept;
+			std::size_t GetDataSize() const noexcept;
 			bool IsPageEmpty() const noexcept;
 			bool IsSecured() const noexcept;
-			bool IsCompromised() const;
+			bool IsCompromised() const noexcept;
 
 		private:
 			std::shared_ptr<void> m_pState;
@@ -3398,28 +3881,39 @@ typedef struct _PEB {
 
 		class SecureRange {
 		public:
-			explicit SecureRange(size_t unSize);
-			SecureRange(void* pAddress, size_t unSize);
-			~SecureRange();
-			SecureRange(const SecureRange&) = delete;
+			explicit SecureRange(std::size_t unSize);
+			SecureRange(void* pAddress, std::size_t unSize);
+			~SecureRange() noexcept;
+
+		public:
+			SecureRange(SecureRange const&) = delete;
 			SecureRange(SecureRange&&) = delete;
-			SecureRange& operator=(const SecureRange&) = delete;
+			SecureRange& operator=(SecureRange const&) = delete;
 			SecureRange& operator=(SecureRange&&) = delete;
 
 		public:
-			void* Alloc(size_t unSize, size_t unSizeAlign = 1, size_t unAddressAlign = alignof(void*));
-			void* ZeroAlloc(size_t unSize, size_t unSizeAlign = 1, size_t unAddressAlign = alignof(void*));
+			void* Alloc(std::size_t unSize, std::size_t unSizeAlign = 1, std::size_t unAddressAlign = alignof(void*));
+			void* ZeroAlloc(std::size_t unSize, std::size_t unSizeAlign = 1, std::size_t unAddressAlign = alignof(void*));
 			bool DeAlloc(void* pAddress);
 			bool DeAllocAll();
 			bool Release();
 
 		public:
+#if defined(_WIN32)
+			bool GetProtection(DWORD* const pProtection) const noexcept;
+			bool SetProtection(const DWORD unProtection) noexcept;
+#elif defined(__linux__)
+			bool GetProtection(int* const pProtection) const noexcept;
+			bool SetProtection(const int nProtection) noexcept;
+#endif
+
+		public:
 			void* GetRangeAddress() const noexcept;
-			size_t GetRangeSize() const noexcept;
-			size_t GetDataSize() const noexcept;
+			std::size_t GetRangeSize() const noexcept;
+			std::size_t GetDataSize() const noexcept;
 			bool IsRangeEmpty() const noexcept;
 			bool IsSecured() const noexcept;
-			bool IsCompromised() const;
+			bool IsCompromised() const noexcept;
 
 		private:
 			std::shared_ptr<void> m_pState;
@@ -3431,30 +3925,46 @@ typedef struct _PEB {
 
 		class SecureStorage {
 		public:
-			explicit SecureStorage(size_t unTotalCapacity = 0);
-			~SecureStorage();
-			SecureStorage(const SecureStorage&) = delete;
+			explicit SecureStorage(std::size_t unTotalCapacity = 0);
+			~SecureStorage() noexcept;
+
+		public:
+			SecureStorage(SecureStorage const&) = delete;
 			SecureStorage(SecureStorage&&) = delete;
-			SecureStorage& operator=(const SecureStorage&) = delete;
+			SecureStorage& operator=(SecureStorage const&) = delete;
 			SecureStorage& operator=(SecureStorage&&) = delete;
 
 		public:
-			void* Alloc(size_t unSize);
-			void* ZeroAlloc(size_t unSize);
+			void* Alloc(std::size_t unSize);
+			void* ZeroAlloc(std::size_t unSize);
 			bool DeAlloc(void* pAddress);
 			bool DeAllocAll();
 
 		public:
-			size_t GetStorageCapacity() const noexcept;
-			size_t GetDataSize() const noexcept;
+#if defined(_WIN32)
+			bool GetProtection(DWORD* const pProtection) const noexcept;
+			bool SetProtection(const DWORD unProtection) noexcept;
+#elif defined(__linux__)
+			bool GetProtection(int* const pProtection) const noexcept;
+			bool SetProtection(const int nProtection) noexcept;
+#endif
+
+		public:
+			std::size_t GetStorageCapacity() const noexcept;
+			std::size_t GetDataSize() const noexcept;
 			bool IsStorageEmpty() const noexcept;
 			bool IsSecured() const noexcept;
-			bool IsCompromised() const;
+			bool IsCompromised() const noexcept;
 
 		private:
-			size_t m_unTotalCapacity;
-			size_t m_unUsedSpace;
-			std::list<std::unique_ptr<SecureRange>> m_vecRanges;
+			std::size_t m_unTotalCapacity;
+			std::size_t m_unUsedSpace;
+#if defined(_WIN32)
+			DWORD m_unProtection;
+#elif defined(__linux__)
+			int m_nProtection;
+#endif
+			std::list<std::unique_ptr<SecureRange>> m_lstRanges;
 		};
 
 		// ----------------------------------------------------------------
@@ -3467,16 +3977,22 @@ typedef struct _PEB {
 			~SecureMemoryManager() = default;
 
 		public:
+			SecureMemoryManager(SecureMemoryManager const&) = delete;
+			SecureMemoryManager(SecureMemoryManager&&) noexcept = default;
+			SecureMemoryManager& operator=(SecureMemoryManager const&) = delete;
+			SecureMemoryManager& operator=(SecureMemoryManager&&) noexcept = default;
+
+		public:
 			SecurePage* CreatePage();
-			SecureStorage* CreateStorage(size_t unTotalCapacity = 0);
+			SecureStorage* CreateStorage(std::size_t unTotalCapacity = 0);
 
 		public:
 			bool DestroyPage(SecurePage* pPage);
 			bool DestroyStorage(SecureStorage* pStorage);
 
 		private:
-			std::deque<std::unique_ptr<SecurePage>> m_vecPages;
-			std::deque<std::unique_ptr<SecureStorage>> m_vecStorages;
+			std::deque<std::unique_ptr<SecurePage>> m_deqPages;
+			std::deque<std::unique_ptr<SecureStorage>> m_deqStorages;
 		};
 	} // namespace Memory
 
@@ -3487,12 +4003,14 @@ typedef struct _PEB {
 	namespace Exception {
 
 #if defined(__linux__)
+		constexpr std::size_t kSignalExceptionInformationCount = 4;
+
 		typedef struct _SIGNAL_EXCEPTION_RECORD {
 			int m_nSignal;
 			int m_nSignalCode;
 			void* m_pSignalAddress;
 			void* m_pExceptionAddress;
-			size_t m_unExceptionInformation[4];
+			std::size_t m_unExceptionInformation[kSignalExceptionInformationCount];
 		} SIGNAL_EXCEPTION_RECORD, *PSIGNAL_EXCEPTION_RECORD;
 #endif
 
@@ -3501,9 +4019,9 @@ typedef struct _PEB {
 		// ----------------------------------------------------------------
 
 #if defined(_WIN32)
-		using fnExceptionCallBack = bool (*)(const EXCEPTION_RECORD& Exception, CONTEXT* const pCTX);
+		using fnExceptionCallBack = bool(*)(EXCEPTION_RECORD const& Exception, CONTEXT* const pCTX);
 #elif defined(__linux__)
-		using fnExceptionCallBack = bool (*)(const SIGNAL_EXCEPTION_RECORD& Exception, ucontext_t* const pCTX);
+		using fnExceptionCallBack = bool(*)(SIGNAL_EXCEPTION_RECORD const& Exception, ucontext_t* const pCTX);
 #endif
 
 		// ----------------------------------------------------------------
@@ -3513,27 +4031,41 @@ typedef struct _PEB {
 		class ExceptionListener {
 		public:
 			ExceptionListener();
-			~ExceptionListener();
+			~ExceptionListener() noexcept;
+
+		public:
+			ExceptionListener(ExceptionListener const&) = delete;
+			ExceptionListener(ExceptionListener&&) = delete;
+			ExceptionListener& operator=(ExceptionListener const&) = delete;
+			ExceptionListener& operator=(ExceptionListener&&) = delete;
 
 		public:
 			bool EnableHandler();
 			bool DisableHandler();
 			bool RefreshHandler();
-			bool AddCallBack(const fnExceptionCallBack pCallBack);
-			bool RemoveCallBack(const fnExceptionCallBack pCallBack);
+			bool AddCallBack(fnExceptionCallBack const pCallBack);
+			bool RemoveCallBack(fnExceptionCallBack const pCallBack);
 
 		public:
+			// Legacy mutable access. The listener must be disabled and callers must
+			// provide external synchronization while using the returned reference.
 			std::deque<fnExceptionCallBack>& GetCallBacks();
+			std::deque<fnExceptionCallBack> GetCallBackSnapshot() const;
 
 		private:
+#if defined(__linux__)
+			static bool RefreshForkState();
+#endif
+
 #if defined(_WIN32)
 			HANDLE m_hVEH;
 #elif defined(__linux__)
 			void* m_pVEH;
 #endif
-			std::deque<fnExceptionCallBack> m_vecCallBacks;
+			std::deque<fnExceptionCallBack> m_deqCallBacks;
 		};
 
+		// Process-wide exception listener.
 		extern ExceptionListener g_ExceptionListener;
 	} // namespace Exception
 
@@ -3541,7 +4073,16 @@ typedef struct _PEB {
 	// rddisasm
 	// ----------------------------------------------------------------
 
-	namespace rddisasm {
+#if defined(__clang__)
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wgnu-anonymous-struct"
+#pragma clang diagnostic ignored "-Wnested-anon-types"
+#elif defined(__GNUC__)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wpedantic"
+#endif
+
+namespace rddisasm {
 
 		typedef enum _RD_OPERARD_TYPE {
 			RD_OP_NOT_PRESENT = 0,
@@ -6483,6 +7024,12 @@ typedef struct _PEB {
 		void* RdGetAddressFromRelOrDisp(void* pAddress);
 	} // namespace rddisasm
 
+#if defined(__clang__)
+#pragma clang diagnostic pop
+#elif defined(__GNUC__)
+#pragma GCC diagnostic pop
+#endif
+
 	// ----------------------------------------------------------------
 	// Hook
 	// ----------------------------------------------------------------
@@ -6493,7 +7040,7 @@ typedef struct _PEB {
 		// Hardware Hook Register
 		// ----------------------------------------------------------------
 
-		typedef enum _HARDWARE_HOOK_REGISTER : unsigned char {
+		typedef enum HARDWARE_HOOK_REGISTER_TAG : unsigned char {
 			REGISTER_DR0 = 0,
 			REGISTER_DR1 = 1,
 			REGISTER_DR2 = 2,
@@ -6504,7 +7051,7 @@ typedef struct _PEB {
 		// Hardware Hook Type
 		// ----------------------------------------------------------------
 
-		typedef enum _HARDWARE_HOOK_TYPE : unsigned char {
+		typedef enum HARDWARE_HOOK_TYPE_TAG : unsigned char {
 			TYPE_EXECUTE = 0,
 			TYPE_WRITE = 1,
 			TYPE_ACCESS = 3
@@ -6514,39 +7061,29 @@ typedef struct _PEB {
 		// Hardware Hook CallBack
 		// ----------------------------------------------------------------
 
-		using fnHardwareHookCallBack = void (*)(
 #if defined(_WIN32)
-		    CONTEXT* const pCTX
+		using PDetoursContext = CONTEXT*;
+		using DetoursHardwareThreadID = DWORD;
 #elif defined(__linux__)
-		    ucontext_t* const pCTX
+		using PDetoursContext = ucontext_t*;
+		using DetoursHardwareThreadID = unsigned int;
 #endif
-		);
+
+		using fnHardwareHookCallBack = void(*)(PDetoursContext const pCTX);
 
 		// ----------------------------------------------------------------
 		// Hardware Hook
 		// ----------------------------------------------------------------
 
-		bool HookHardware(
-#if defined(_WIN32)
-		    DWORD unThreadID,
-#elif defined(__linux__)
-		    unsigned int unThreadID,
-#endif
-		    HARDWARE_HOOK_REGISTER unRegister, const fnHardwareHookCallBack pCallBack, void* pAddress, HARDWARE_HOOK_TYPE unType, unsigned char unSize = 1);
+		bool HookHardware(DetoursHardwareThreadID unThreadID, HARDWARE_HOOK_REGISTER unRegister, fnHardwareHookCallBack const pCallBack, void* pAddress, HARDWARE_HOOK_TYPE unType, unsigned char unSize = 1);
 
-		bool UnHookHardware(
-#if defined(_WIN32)
-		    DWORD unThreadID,
-#elif defined(__linux__)
-		    unsigned int unThreadID,
-#endif
-		    HARDWARE_HOOK_REGISTER unRegister);
+		bool UnHookHardware(DetoursHardwareThreadID unThreadID, HARDWARE_HOOK_REGISTER unRegister);
 
 		// ----------------------------------------------------------------
 		// Memory Hook Operation
 		// ----------------------------------------------------------------
 
-		typedef enum _MEMORY_HOOK_OPERATION : unsigned char {
+		typedef enum MEMORY_HOOK_OPERATION_TAG : unsigned char {
 			MEMORY_READ = 0,
 			MEMORY_WRITE = 1,
 			MEMORY_EXECUTE = 2
@@ -6556,39 +7093,27 @@ typedef struct _PEB {
 		// Memory Hook CallBack
 		// ----------------------------------------------------------------
 
-		using fnMemoryHookCallBack = void (*)(
-#if defined(_WIN32)
-		    CONTEXT* const pCTX,
-#elif defined(__linux__)
-		    ucontext_t* const pCTX,
-#endif
-		    const void* pExceptionAddress, MEMORY_HOOK_OPERATION unOperation, const void* pAddress, const void* pAccessAddress);
+		using fnMemoryHookCallBack = void(*)(PDetoursContext const pCTX, void const* pExceptionAddress, MEMORY_HOOK_OPERATION unOperation, void const* pAddress, void const* pAccessAddress);
 
 		// ----------------------------------------------------------------
 		// Memory Hook
 		// ----------------------------------------------------------------
 
-		bool HookMemory(const fnMemoryHookCallBack pCallBack, void* pAddress, size_t unSize, const fnMemoryHookCallBack pPostCallBack = nullptr, bool bAllowVirtual = false);
-		bool UnHookMemory(const fnMemoryHookCallBack pCallBack, void* pAddress);
+		bool HookMemory(fnMemoryHookCallBack const fnCallBack, void* const pAddress, const std::size_t unSize, fnMemoryHookCallBack const fnPostCallBack = nullptr, const bool bAllowVirtual = false);
+		bool UnHookMemory(fnMemoryHookCallBack const fnCallBack, void* const pAddress);
 
 		// ----------------------------------------------------------------
 		// Interrupt Hook CallBack
 		// ----------------------------------------------------------------
 
-		using fnInterruptHookCallBack = bool (*)(
-#if defined(_WIN32)
-		    CONTEXT* const pCTX,
-#elif defined(__linux__)
-		    ucontext_t* const pCTX,
-#endif
-		    const unsigned char unInterrupt);
+		using fnInterruptHookCallBack = bool(*)(PDetoursContext const pCTX, unsigned char const unInterrupt);
 
 		// ----------------------------------------------------------------
 		// Interrupt Hook
 		// ----------------------------------------------------------------
 
-		bool HookInterrupt(const fnInterruptHookCallBack pCallBack, unsigned char unInterrupt = 0x7E);
-		bool UnHookInterrupt(const fnInterruptHookCallBack pCallBack);
+		bool HookInterrupt(fnInterruptHookCallBack const pCallBack, unsigned char unInterrupt = 0x7E);
+		bool UnHookInterrupt(fnInterruptHookCallBack const pCallBack);
 
 		// ----------------------------------------------------------------
 		// VTable Function Hook
@@ -6597,15 +7122,17 @@ typedef struct _PEB {
 		class VTableFunctionHook {
 		public:
 			VTableFunctionHook();
-			VTableFunctionHook(void** pVTable, size_t unIndex);
-			~VTableFunctionHook();
-			VTableFunctionHook(const VTableFunctionHook&) = delete;
+			VTableFunctionHook(void** pVTable, std::size_t unIndex);
+			~VTableFunctionHook() noexcept;
+
+		public:
+			VTableFunctionHook(VTableFunctionHook const&) = delete;
 			VTableFunctionHook(VTableFunctionHook&&) = delete;
-			VTableFunctionHook& operator=(const VTableFunctionHook&) = delete;
+			VTableFunctionHook& operator=(VTableFunctionHook const&) = delete;
 			VTableFunctionHook& operator=(VTableFunctionHook&&) = delete;
 
 		public:
-			bool Set(void** pVTable, size_t unIndex);
+			bool Set(void** pVTable, std::size_t unIndex);
 			bool Release();
 
 		public:
@@ -6617,11 +7144,27 @@ typedef struct _PEB {
 			bool IsHooked() const noexcept;
 
 		private:
+			bool FindPreviousOwner(VTableFunctionHook** ppPreviousOwner) noexcept;
+			bool RegisterOwnership(VTableFunctionHook* pPreviousOwner, bool bOwnsSlot) noexcept;
+			void UnlinkSlotOwnership() noexcept;
+			void UnregisterOwnership() noexcept;
+			bool DetachObscuredOwnership() noexcept;
+
+		private:
 			bool m_bInitialized;
 			bool m_bHooked;
+			bool m_bOriginalWritten;
+			bool m_bOwnershipRegistered;
+			bool m_bSlotOwnershipRegistered;
 			void** m_pVTable;
-			size_t m_unIndex;
+			std::size_t m_unIndex;
 			void* m_pOriginal;
+			void* m_pHook;
+			std::unique_ptr<Memory::Protection> m_pTargetProtection;
+			VTableFunctionHook* m_pPreviousOwner;
+			VTableFunctionHook* m_pNextOwner;
+			VTableFunctionHook* m_pRegistryPrevious;
+			VTableFunctionHook* m_pRegistryNext;
 		};
 
 		// ----------------------------------------------------------------
@@ -6631,15 +7174,17 @@ typedef struct _PEB {
 		class VTableHook {
 		public:
 			VTableHook();
-			VTableHook(void** pVTable, size_t unCount);
-			~VTableHook();
-			VTableHook(const VTableHook&) = delete;
+			VTableHook(void** pVTable, std::size_t unCount);
+			~VTableHook() noexcept;
+
+		public:
+			VTableHook(VTableHook const&) = delete;
 			VTableHook(VTableHook&&) = delete;
-			VTableHook& operator=(const VTableHook&) = delete;
+			VTableHook& operator=(VTableHook const&) = delete;
 			VTableHook& operator=(VTableHook&&) = delete;
 
 		public:
-			bool Set(void** pVTable, size_t unCount);
+			bool Set(void** pVTable, std::size_t unCount);
 			bool Release();
 
 		public:
@@ -6647,12 +7192,12 @@ typedef struct _PEB {
 			bool UnHook();
 
 		public:
-			std::vector<std::unique_ptr<VTableFunctionHook>>& GetHookingFunctions() noexcept;
+			std::vector<std::unique_ptr<VTableFunctionHook>> const& GetHookingFunctions() const noexcept;
 
 		private:
 			bool m_bInitialized;
 			void** m_pVTable;
-			size_t m_unCount;
+			std::size_t m_unCount;
 			std::vector<std::unique_ptr<VTableFunctionHook>> m_vecHookingFunctions;
 		};
 
@@ -6664,10 +7209,12 @@ typedef struct _PEB {
 		public:
 			InlineHook();
 			InlineHook(void* pAddress);
-			~InlineHook();
-			InlineHook(const InlineHook&) = delete;
+			~InlineHook() noexcept;
+
+		public:
+			InlineHook(InlineHook const&) = delete;
 			InlineHook(InlineHook&&) = delete;
-			InlineHook& operator=(const InlineHook&) = delete;
+			InlineHook& operator=(InlineHook const&) = delete;
 			InlineHook& operator=(InlineHook&&) = delete;
 
 		public:
@@ -6684,9 +7231,13 @@ typedef struct _PEB {
 		private:
 			bool m_bInitialized;
 			void* m_pAddress;
+			void* m_pHookAddress;
+			std::size_t m_unHookSize;
 			void* m_pTrampoline;
-			size_t m_unOriginalBytes;
+			std::size_t m_unOriginalBytes;
 			std::unique_ptr<unsigned char[]> m_pOriginalBytes;
+			std::unique_ptr<unsigned char[]> m_pHookBytes;
+			std::unique_ptr<Memory::Protection> m_pTargetProtection;
 		};
 
 		// ----------------------------------------------------------------
@@ -6697,10 +7248,12 @@ typedef struct _PEB {
 		public:
 			InlineWrapperHook();
 			InlineWrapperHook(void* pAddress);
-			~InlineWrapperHook();
-			InlineWrapperHook(const InlineWrapperHook&) = delete;
+			~InlineWrapperHook() noexcept;
+
+		public:
+			InlineWrapperHook(InlineWrapperHook const&) = delete;
 			InlineWrapperHook(InlineWrapperHook&&) = delete;
-			InlineWrapperHook& operator=(const InlineWrapperHook&) = delete;
+			InlineWrapperHook& operator=(InlineWrapperHook const&) = delete;
 			InlineWrapperHook& operator=(InlineWrapperHook&&) = delete;
 
 		public:
@@ -6718,14 +7271,21 @@ typedef struct _PEB {
 			bool m_bInitialized;
 			void* m_pAddress;
 			void* m_pWrapper;
+			void* m_pHookAddress;
+			std::size_t m_unHookSize;
 			void* m_pTrampoline;
-			size_t m_unOriginalBytes;
+			std::size_t m_unOriginalBytes;
 			std::unique_ptr<unsigned char[]> m_pOriginalBytes;
+			std::unique_ptr<unsigned char[]> m_pHookBytes;
+			std::unique_ptr<Memory::Protection> m_pTargetProtection;
 		};
 
 		// ----------------------------------------------------------------
 		// RAW_CONTEXT
 		// ----------------------------------------------------------------
+
+		constexpr std::size_t kRawContext32SIMDRegisterCount = 8;
+		constexpr std::size_t kRawContext64SIMDRegisterCount = 32;
 
 #if defined(_WIN32)
 #pragma pack(push, r1, 1)
@@ -6733,17 +7293,23 @@ typedef struct _PEB {
 #pragma pack(push, 1)
 #endif
 
-		typedef struct _RAW_CONTEXT_STACK {
+		typedef struct _RAW_CONTEXT_STACK_TAG {
 			template <typename T = void*>
-			inline void Push(const T Value) {
-				m_pAddress = reinterpret_cast<void*>(reinterpret_cast<size_t>(m_pAddress) - sizeof(T));
-				*reinterpret_cast<T*>(m_pAddress) = Value;
+			inline void Push(T const Value) noexcept {
+				static_assert(std::is_trivially_copyable<T>::value, "RAW_CONTEXT_STACK supports trivially copyable values only");
+
+				m_pAddress = static_cast<unsigned char*>(m_pAddress) - sizeof(T);
+				std::memcpy(m_pAddress, &Value, sizeof(T));
 			}
 
 			template <typename T = void*>
-			inline T& Pop() {
-				T& Value = *reinterpret_cast<T*>(m_pAddress);
-				m_pAddress = reinterpret_cast<void*>(reinterpret_cast<size_t>(m_pAddress) + sizeof(T));
+			inline T Pop() noexcept {
+				static_assert(std::is_trivially_copyable<T>::value, "RAW_CONTEXT_STACK supports trivially copyable values only");
+				static_assert(std::is_default_constructible<T>::value, "RAW_CONTEXT_STACK requires default-constructible values");
+
+				T Value {};
+				std::memcpy(&Value, m_pAddress, sizeof(T));
+				m_pAddress = static_cast<unsigned char*>(m_pAddress) + sizeof(T);
 				return Value;
 			}
 
@@ -6761,7 +7327,7 @@ typedef struct _PEB {
 
 		static_assert(sizeof(RAW_CONTEXT_STACK) == sizeof(void*), "RAW_CONTEXT_STACK must contain exactly one native pointer");
 
-		typedef union _RAW_CONTEXT_FPU_REGISTER {
+		typedef union RAW_CONTEXT_FPU_REGISTER_TAG {
 			unsigned char m_unRAW[10];
 			double m_f64;
 			float m_f32;
@@ -6769,48 +7335,53 @@ typedef struct _PEB {
 
 		static_assert(sizeof(RAW_CONTEXT_FPU_REGISTER) == 10, "RAW_CONTEXT_FPU_REGISTER must match the x87 register format");
 
-		typedef struct _RAW_CONTEXT_FPU {
+		typedef struct _RAW_CONTEXT_FPU_CONTROL_WORD_TAG {
+			unsigned short m_unInvalidOperation : 1;
+			unsigned short m_unDenormalizedOperand : 1;
+			unsigned short m_unDivideByZero : 1;
+			unsigned short m_unOverflow : 1;
+			unsigned short m_unUnderflow : 1;
+			unsigned short m_unPrecision : 1;
+			unsigned short m_unReserved6 : 1;
+			unsigned short m_unReserved7 : 1;
+			unsigned short m_unPrecisionControl0 : 1;
+			unsigned short m_unPrecisionControl1 : 1;
+			unsigned short m_unRoundingControl0 : 1;
+			unsigned short m_unRoundingControl1 : 1;
+			unsigned short m_unInfinityControl : 1;
+		} RAW_CONTEXT_FPU_CONTROL_WORD, *PRAW_CONTEXT_FPU_CONTROL_WORD;
+
+		typedef struct _RAW_CONTEXT_FPU_STATUS_WORD_TAG {
+			unsigned short m_unInvalidOperation : 1;
+			unsigned short m_unDenormalizedOperand : 1;
+			unsigned short m_unDivideByZero : 1;
+			unsigned short m_unOverflow : 1;
+			unsigned short m_unUnderflow : 1;
+			unsigned short m_unPrecision : 1;
+			unsigned short m_unStackFault : 1;
+			unsigned short m_unExceptionSummary : 1;
+			unsigned short m_unCondition0 : 1;
+			unsigned short m_unCondition1 : 1;
+			unsigned short m_unCondition2 : 1;
+			unsigned short m_unTop : 3;
+			unsigned short m_unCondition3 : 1;
+			unsigned short m_unFPUBusy : 1;
+		} RAW_CONTEXT_FPU_STATUS_WORD, *PRAW_CONTEXT_FPU_STATUS_WORD;
+
+		static_assert(sizeof(RAW_CONTEXT_FPU_CONTROL_WORD) == sizeof(unsigned short), "RAW_CONTEXT_FPU control-word bits must occupy 16 bits");
+		static_assert(sizeof(RAW_CONTEXT_FPU_STATUS_WORD) == sizeof(unsigned short), "RAW_CONTEXT_FPU status-word bits must occupy 16 bits");
+
+		typedef struct _RAW_CONTEXT_FPU_TAG {
 			union {
 				unsigned short m_unControlWord;
-
-				struct {
-					unsigned short m_unInvalidOperation : 1;
-					unsigned short m_unDenormalizedOperand : 1;
-					unsigned short m_unDivideByZero : 1;
-					unsigned short m_unOverflow : 1;
-					unsigned short m_unUnderflow : 1;
-					unsigned short m_unPrecision : 1;
-					unsigned short m_unReserved6 : 1;
-					unsigned short m_unReserved7 : 1;
-					unsigned short m_unPrecisionControl0 : 1;
-					unsigned short m_unPrecisionControl1 : 1;
-					unsigned short m_unRoundingControl0 : 1;
-					unsigned short m_unRoundingControl1 : 1;
-					unsigned short m_unInfinityControl : 1;
-				} ControlWord;
+				RAW_CONTEXT_FPU_CONTROL_WORD ControlWord;
 			};
 
 			unsigned short m_unReserved1;
 
 			union {
 				unsigned short m_unStatusWord;
-
-				struct {
-					unsigned short m_unInvalidOperation : 1;
-					unsigned short m_unDenormalizedOperand : 1;
-					unsigned short m_unDivideByZero : 1;
-					unsigned short m_unOverflow : 1;
-					unsigned short m_unUnderflow : 1;
-					unsigned short m_unPrecision : 1;
-					unsigned short m_unStackFault : 1;
-					unsigned short m_unExceptionSummary : 1;
-					unsigned short m_unCondition0 : 1;
-					unsigned short m_unCondition1 : 1;
-					unsigned short m_unCondition2 : 1;
-					unsigned short m_unTop : 3;
-					unsigned short m_unCondition3 : 1;
-					unsigned short m_unFPUBusy : 1;
-				} StatusWord;
+				RAW_CONTEXT_FPU_STATUS_WORD StatusWord;
 			};
 
 			unsigned short m_unReserved2;
@@ -6832,7 +7403,7 @@ typedef struct _PEB {
 		static_assert(offsetof(RAW_CONTEXT_FPU, m_Registers) == 28, "RAW_CONTEXT_FPU register offset is invalid");
 		static_assert(sizeof(RAW_CONTEXT_FPU) == 108, "RAW_CONTEXT_FPU must match the 32-bit FSAVE format");
 
-		typedef union _RAW_CONTEXT_M128 {
+		typedef union RAW_CONTEXT_M128_TAG {
 			unsigned long long m_un64[2];
 			unsigned int m_un32[4];
 			unsigned short m_un16[8];
@@ -6845,7 +7416,7 @@ typedef struct _PEB {
 			float m_f32[4];
 		} RAW_CONTEXT_M128, *PRAW_CONTEXT_M128;
 
-		typedef union _RAW_CONTEXT_M256 {
+		typedef union RAW_CONTEXT_M256_TAG {
 			unsigned long long m_un64[4];
 			unsigned int m_un32[8];
 			unsigned short m_un16[16];
@@ -6858,7 +7429,7 @@ typedef struct _PEB {
 			float m_f32[8];
 		} RAW_CONTEXT_M256, *PRAW_CONTEXT_M256;
 
-		typedef union _RAW_CONTEXT_M512 {
+		typedef union RAW_CONTEXT_M512_TAG {
 			unsigned long long m_un64[8];
 			unsigned int m_un32[16];
 			unsigned short m_un16[32];
@@ -6881,7 +7452,20 @@ typedef struct _PEB {
 #pragma pack(pop)
 #endif
 
-		typedef struct _RAW_NATIVE_CONTEXT32 {
+		// Anonymous register views preserve the public ABI and byte-accurate aliases
+		// supported by the targeted MSVC, GCC, and Clang toolchains.
+#if defined(__clang__)
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wgnu-anonymous-struct"
+#pragma clang diagnostic ignored "-Winvalid-offsetof"
+#pragma clang diagnostic ignored "-Wnested-anon-types"
+#elif defined(__GNUC__)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Winvalid-offsetof"
+#pragma GCC diagnostic ignored "-Wpedantic"
+#endif
+
+		typedef struct _RAW_NATIVE_CONTEXT32_TAG {
 
 			// ----------------------------------------------------------------
 			// Flags
@@ -6997,7 +7581,7 @@ typedef struct _PEB {
 			};
 		} RAW_NATIVE_CONTEXT32, *PRAW_NATIVE_CONTEXT32;
 
-		typedef struct _RAW_CONTEXT32 : public RAW_NATIVE_CONTEXT32 {
+		typedef struct _RAW_CONTEXT32_TAG : public RAW_NATIVE_CONTEXT32 {
 
 			// ----------------------------------------------------------------
 			// Registers (SIMD)
@@ -7081,7 +7665,7 @@ typedef struct _PEB {
 			RAW_CONTEXT_FPU m_FPU;
 		} RAW_CONTEXT32, *PRAW_CONTEXT32;
 
-		typedef struct _RAW_NATIVE_CONTEXT64 {
+		typedef struct _RAW_NATIVE_CONTEXT64_TAG {
 
 			// ----------------------------------------------------------------
 			// Flags
@@ -7271,7 +7855,7 @@ typedef struct _PEB {
 			};
 		} RAW_NATIVE_CONTEXT64, *PRAW_NATIVE_CONTEXT64;
 
-		typedef struct _RAW_CONTEXT64 : public RAW_NATIVE_CONTEXT64 {
+		typedef struct _RAW_CONTEXT64_TAG : public RAW_NATIVE_CONTEXT64 {
 
 			// ----------------------------------------------------------------
 			// Registers (SIMD)
@@ -7499,6 +8083,37 @@ typedef struct _PEB {
 			RAW_CONTEXT_FPU m_FPU;
 		} RAW_CONTEXT64, *PRAW_CONTEXT64;
 
+		static_assert(
+			(offsetof(RAW_CONTEXT32, m_ZMM7) - offsetof(RAW_CONTEXT32, m_ZMM0)) ==
+				((kRawContext32SIMDRegisterCount - 1) * sizeof(RAW_CONTEXT_M512)),
+			"RAW_CONTEXT32 SIMD register layout is invalid");
+		static_assert(
+			(offsetof(RAW_CONTEXT32, m_FPU) - offsetof(RAW_CONTEXT32, m_ZMM0)) ==
+				(kRawContext32SIMDRegisterCount * sizeof(RAW_CONTEXT_M512)),
+			"RAW_CONTEXT32 SIMD register span is invalid");
+		static_assert(
+			(offsetof(RAW_CONTEXT64, m_ZMM31) - offsetof(RAW_CONTEXT64, m_ZMM0)) ==
+				((kRawContext64SIMDRegisterCount - 1) * sizeof(RAW_CONTEXT_M512)),
+			"RAW_CONTEXT64 SIMD register layout is invalid");
+		static_assert(
+			(offsetof(RAW_CONTEXT64, m_FPU) - offsetof(RAW_CONTEXT64, m_ZMM0)) ==
+				(kRawContext64SIMDRegisterCount * sizeof(RAW_CONTEXT_M512)),
+			"RAW_CONTEXT64 SIMD register span is invalid");
+
+#if defined(__clang__)
+#pragma clang diagnostic pop
+#elif defined(__GNUC__)
+#pragma GCC diagnostic pop
+#endif
+
+		static_assert(CHAR_BIT == 8, "RAW_CONTEXT requires 8-bit bytes");
+		static_assert(sizeof(unsigned short) == 2, "RAW_CONTEXT requires 16-bit unsigned short values");
+		static_assert(sizeof(unsigned int) == 4, "RAW_CONTEXT requires 32-bit unsigned int values");
+		static_assert(sizeof(unsigned long long) == 8, "RAW_CONTEXT requires 64-bit unsigned long long values");
+		static_assert(std::is_trivially_copyable<RAW_NATIVE_CONTEXT32>::value, "RAW_NATIVE_CONTEXT32 must be trivially copyable");
+		static_assert(std::is_trivially_copyable<RAW_CONTEXT32>::value, "RAW_CONTEXT32 must be trivially copyable");
+		static_assert(std::is_trivially_copyable<RAW_NATIVE_CONTEXT64>::value, "RAW_NATIVE_CONTEXT64 must be trivially copyable");
+		static_assert(std::is_trivially_copyable<RAW_CONTEXT64>::value, "RAW_CONTEXT64 must be trivially copyable");
 #if defined(DETOURS_ARCH_X64)
 		typedef RAW_NATIVE_CONTEXT64 RAW_NATIVE_CONTEXT;
 		typedef RAW_CONTEXT64 RAW_CONTEXT;
@@ -7518,7 +8133,7 @@ typedef struct _PEB {
 #elif defined(_WIN32) && defined(DETOURS_ARCH_X86)
 		using fnRawHookCallBack = bool(__cdecl*)(PRAW_CONTEXT pCTX);
 #elif defined(__linux__)
-		using fnRawHookCallBack = bool (*)(PRAW_CONTEXT pCTX);
+		using fnRawHookCallBack = bool(*)(PRAW_CONTEXT pCTX);
 #endif
 
 		// ----------------------------------------------------------------
@@ -7529,10 +8144,12 @@ typedef struct _PEB {
 		public:
 			RawHook();
 			RawHook(void* pAddress);
-			~RawHook();
-			RawHook(const RawHook&) = delete;
+			~RawHook() noexcept;
+
+		public:
+			RawHook(RawHook const&) = delete;
 			RawHook(RawHook&&) = delete;
-			RawHook& operator=(const RawHook&) = delete;
+			RawHook& operator=(RawHook const&) = delete;
 			RawHook& operator=(RawHook&&) = delete;
 
 		public:
@@ -7540,45 +8157,39 @@ typedef struct _PEB {
 			bool Release();
 
 		public:
-			bool Hook(const fnRawHookCallBack pCallBack, bool bNative = false, const unsigned int unReservedStackSize = 0, bool bSingleInstructionOnly = false, bool bWaitForHook = true);
-			bool UnHook(bool bWaitForUnHook = true);
+			bool Hook(fnRawHookCallBack const pCallBack, const bool bNative = false, const unsigned int unReservedStackSize = 0, const bool bSingleInstructionOnly = false, const bool bWaitForHook = true);
+			bool UnHook(const bool bWaitForUnHook = true);
 
 		public:
 			void* GetTrampoline() const noexcept;
-			void CallTrampoline(PRAW_CONTEXT pCTX) const;
+			void CallAddress(void* const pAddress, PRAW_CONTEXT const pCTX) const;
+			void CallTrampoline(PRAW_CONTEXT const pCTX) const;
 			unsigned char GetFirstInstructionSize() const noexcept;
 
 		private:
 			bool m_bInitialized;
 			void* m_pAddress;
 			void* m_pWrapper;
+			void* m_pRuntimeFunction;
 			void* m_pRestore;
 			void* m_pCallTrampoline;
 			unsigned char m_unFirstInstructionSize;
 			void* m_pTrampoline;
-			size_t m_unContextSize;
-			size_t m_unContextCopySize;
-			size_t m_unOriginalBytes;
+			std::size_t m_unContextSize;
+			std::size_t m_unContextCopySize;
+			std::size_t m_unOriginalBytes;
 			std::unique_ptr<unsigned char[]> m_pOriginalBytes;
+			std::unique_ptr<unsigned char[]> m_pHookBytes;
+			std::unique_ptr<Memory::Protection> m_pTargetProtection;
 		};
 
 		// ----------------------------------------------------------------
 		// Raw Context
 		// ----------------------------------------------------------------
 		// Captures the context of the calling thread into pCTX. On failure pCTX is
-		// zeroed. Stack is converted to a caller-owned slot suitable for a later
+		// zeroed. m_Stack is converted to a caller-owned slot suitable for a later
 		// CallAddress call; use a separate writable stack for stack arguments.
-#if defined(_MSC_VER)
-#define DETOURS_NOINLINE __declspec(noinline)
-#elif defined(__GNUC__) || defined(__clang__)
-#define DETOURS_NOINLINE __attribute__((noinline))
-#else
-#define DETOURS_NOINLINE
-#endif
-
 		DETOURS_NOINLINE void GetCurrentContext(PRAW_CONTEXT pCTX);
-
-#undef DETOURS_NOINLINE
 
 		// ----------------------------------------------------------------
 		// Call Address
@@ -7586,8 +8197,8 @@ typedef struct _PEB {
 
 		// Calls pAddress with the state represented by pCTX and writes the returned
 		// state back to the same RAW_CONTEXT. This function may be used outside a
-		// RawHook callback. If Stack is null, a temporary ABI-aligned stack is used;
-		// provide a writable Stack mapping when passing arguments on the stack.
+		// RawHook callback. If m_Stack is null, a temporary ABI-aligned stack is used;
+		// provide a writable m_Stack mapping when passing arguments on the stack.
 		// pCTX must not be a native-only context.
 		void CallAddress(void* pAddress, PRAW_CONTEXT pCTX);
 	} // namespace Hook
@@ -7596,5 +8207,4 @@ typedef struct _PEB {
 #if defined(_WIN32)
 #pragma warning(pop)
 #endif
-
-#endif // !_DETOURS_H_
+#endif // _DETOURSDETOURS_H_

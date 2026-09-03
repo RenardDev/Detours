@@ -3,18 +3,25 @@ setlocal EnableExtensions EnableDelayedExpansion
 
 set "CLANG=C:\Program Files\LLVM\bin\clang-format.exe"
 
+if not "%~1"=="" (
+	"%CLANG%" -style=file %*
+	exit /b !ERRORLEVEL!
+)
+
 set /a OK=0, ERR=0
 
-for /R "%~dp0" %%F in (*.h *.hh *.hpp *.hxx *.inl *.tpp *.c *.cc *.cpp *.cxx *.ixx) do (
-    set "P=%%~fF"
-    echo Processing %%F...
-    "%CLANG%" -i -style=file "%%F"
-    if errorlevel 1 (
-        echo [FAIL] %%F
-        set /a ERR+=1
-    ) else (
-        set /a OK+=1
-    )
+for %%F in (Detours.h Detours.cpp main.cpp) do (
+	set "FILE=%~dp0%%F"
+	if exist "!FILE!" (
+		echo Processing !FILE!...
+		"%CLANG%" -i -style=file "!FILE!"
+		if errorlevel 1 (
+			echo [FAIL] !FILE!
+			set /a ERR+=1
+		) else (
+			set /a OK+=1
+		)
+	)
 )
 
 echo.

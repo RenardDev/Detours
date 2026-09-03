@@ -4,22 +4,110 @@ on:
   push:
     branches: [ "main" ]
     paths-ignore:
-     - LICENSE
-     - README.md
-#  pull_request:
-#    branches: [ "main" ]
+      - LICENSE
+      - README.md
+  pull_request:
+    branches: [ "main" ]
 
 env:
   SOLUTION_FILE_PATH: .
 
 permissions:
   contents: read
-  actions: write
 
 jobs:
+  source-policy:
+    name: Verifying source policy
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Rejecting thread-local storage
+        shell: bash
+        working-directory: ${{ github.workspace }}
+        run: |
+          set -euo pipefail
+          pattern='\b(thread_local|_Thread_local|__thread)\b|__declspec\s*\(\s*thread\s*\)|\b(TlsAlloc|TlsFree|TlsGetValue|TlsSetValue|FlsAlloc|FlsFree|FlsGetValue|FlsSetValue|pthread_key_create|pthread_key_delete|pthread_getspecific|pthread_setspecific)\b'
+          set +e
+          matches="$(rg -n "$pattern" \
+            Detours.h \
+            Detours.cpp \
+            main.cpp)"
+          status=$?
+          set -e
+          if [[ $status -eq 0 ]]; then
+            printf '%s\n' "$matches"
+            echo "Thread-local storage is not allowed in project-owned sources."
+            exit 1
+          fi
+          if [[ $status -ne 1 ]]; then
+            echo "The source-policy search failed with status $status."
+            exit "$status"
+          fi
+
+      - name: Verifying Protected and Secure source invariants
+        shell: bash
+        working-directory: ${{ github.workspace }}
+        run: |
+          python - <<'PY'
+          import pathlib
+          import re
+
+          implementation = pathlib.Path("Detours.cpp").read_text(encoding="utf-8")
+          header = pathlib.Path("Detours.h").read_text(encoding="utf-8")
+
+          definitions = {
+              "OpenProtectedMemoryShadowMetaData": re.compile(
+                  r"static\s+PPROTECTED_MEMORY_SHADOW_METADATA\s+"
+                  r"OpenProtectedMemoryShadowMetaData\s*\([^;{}]*\)\s*noexcept\s*\{"),
+              "CloseProtectedMemoryShadowMetaData": re.compile(
+                  r"static\s+bool\s+CloseProtectedMemoryShadowMetaData\s*"
+                  r"\([^;{}]*\)\s*noexcept\s*\{"),
+          }
+          matches = {}
+          for name, pattern in definitions.items():
+              found = list(pattern.finditer(implementation))
+              if len(found) != 1:
+                  raise SystemExit(f"expected one {name} definition, found {len(found)}")
+              matches[name] = found[0]
+              if re.search(rf"\b{name}\b", implementation[:found[0].start()]):
+                  raise SystemExit(f"{name} has a declaration, alias, or use before its definition")
+
+          if matches["OpenProtectedMemoryShadowMetaData"].start() >= matches[
+              "CloseProtectedMemoryShadowMetaData"
+          ].start():
+              raise SystemExit("OpenProtectedMemoryShadowMetaData must precede CloseProtectedMemoryShadowMetaData")
+
+          classes = (
+              "ProtectedPage",
+              "ProtectedRange",
+              "ProtectedStorage",
+              "SecurePage",
+              "SecureRange",
+              "SecureStorage",
+          )
+          for name in classes:
+              begin = header.find(f"class {name}")
+              if begin < 0:
+                  raise SystemExit(f"class {name} was not found")
+              next_positions = [
+                  position
+                  for position in (header.find(f"class {candidate}", begin + 1) for candidate in classes)
+                  if position >= 0
+              ]
+              end = min(next_positions) if next_positions else len(header)
+              class_text = header[begin:end]
+              get_position = class_text.find("GetProtection(")
+              set_position = class_text.find("SetProtection(")
+              if (get_position < 0) or (set_position < 0) or (get_position >= set_position):
+                  raise SystemExit(f"{name} must declare GetProtection before SetProtection")
+          PY
+
   building-and-testing-linux:
     name: Building and testing Linux (${{ matrix.configuration }})
     runs-on: ubuntu-latest
+    needs: source-policy
 
     strategy:
       fail-fast: false
@@ -27,16 +115,16 @@ jobs:
         configuration: [ Debug, Release ]
 
     steps:
-      - uses: actions/checkout@v4.1.7
+      - uses: actions/checkout@v6
 
       - name: Building Linux (${{ matrix.configuration }})
         env:
           CONFIGURATION: ${{ matrix.configuration }}
         shell: bash
-        working-directory: ${{env.GITHUB_WORKSPACE}}
+        working-directory: ${{ github.workspace }}
         run: |
           set -euo pipefail
-          flags=(-std=c++17 -pthread -I.)
+          flags=(-std=c++17 -Wall -Wextra -Wpedantic -Werror -pthread -I. -DDETOURS_ARCH_X64=1 -DDETOURS_NOINLINE=)
           if [[ "$CONFIGURATION" == "Debug" ]]; then
             flags+=(-O0 -g3 -D_DEBUG)
           else
@@ -44,36 +132,37 @@ jobs:
           fi
           output="build/linux/x86_64/$CONFIGURATION"
           mkdir -p "$output"
-          g++ "${flags[@]}" Detours.cpp main.cpp -ldl -o "$output/Detours"
+          g++ "${flags[@]}" -c Detours.cpp -o "$output/Detours.o"
+          g++ "${flags[@]}" -c main.cpp -o "$output/main.o"
+          g++ "$output/Detours.o" "$output/main.o" -ldl -pthread -o "$output/Detours"
 
       - name: Testing Linux (${{ matrix.configuration }})
-        timeout-minutes: 3
+        timeout-minutes: 10
         env:
           CONFIGURATION: ${{ matrix.configuration }}
         shell: bash
-        working-directory: ${{env.GITHUB_WORKSPACE}}
-        run: build/linux/x86_64/$CONFIGURATION/Detours --test-suite=Detours::Memory --no-skip
+        working-directory: ${{ github.workspace }}
+        run: build/linux/x86_64/$CONFIGURATION/Detours
 
   building-debug-x86:
     name: Building Debug (x86)
     runs-on: windows-latest
+    needs: source-policy
 
     steps:
-      - uses: actions/checkout@v4.1.7
+      - uses: actions/checkout@v6
 
       - name: Add MSBuild to PATH
-        uses: microsoft/setup-msbuild@v1.1.3
-
-      - name: Restore NuGet packages
-        working-directory: ${{env.GITHUB_WORKSPACE}}
-        run: dotnet restore ${{env.SOLUTION_FILE_PATH}}
+        uses: microsoft/setup-msbuild@v3
+        with:
+          msbuild-architecture: x64
 
       - name: Building Debug (x86)
-        working-directory: ${{env.GITHUB_WORKSPACE}}
+        working-directory: ${{ github.workspace }}
         run: msbuild /m /p:Configuration=Debug /p:Platform=x86 ${{env.SOLUTION_FILE_PATH}}
 
       - name: Uploading build
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: BuildDebug32
           path: |
@@ -84,23 +173,22 @@ jobs:
   building-debug-x86-64:
     name: Building Debug (x86_64)
     runs-on: windows-latest
+    needs: source-policy
 
     steps:
-      - uses: actions/checkout@v4.1.7
+      - uses: actions/checkout@v6
 
       - name: Add MSBuild to PATH
-        uses: microsoft/setup-msbuild@v1.1.3
-
-      - name: Restore NuGet packages
-        working-directory: ${{env.GITHUB_WORKSPACE}}
-        run: dotnet restore ${{env.SOLUTION_FILE_PATH}}
+        uses: microsoft/setup-msbuild@v3
+        with:
+          msbuild-architecture: x64
 
       - name: Building Debug (x86_64)
-        working-directory: ${{env.GITHUB_WORKSPACE}}
+        working-directory: ${{ github.workspace }}
         run: msbuild /m /p:Configuration=Debug /p:Platform=x64 ${{env.SOLUTION_FILE_PATH}}
 
       - name: Uploading build
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: BuildDebug64
           path: |
@@ -111,23 +199,22 @@ jobs:
   building-release-x86:
     name: Building Release (x86)
     runs-on: windows-latest
+    needs: source-policy
 
     steps:
-      - uses: actions/checkout@v4.1.7
+      - uses: actions/checkout@v6
 
       - name: Add MSBuild to PATH
-        uses: microsoft/setup-msbuild@v1.1.3
-
-      - name: Restore NuGet packages
-        working-directory: ${{env.GITHUB_WORKSPACE}}
-        run: dotnet restore ${{env.SOLUTION_FILE_PATH}}
+        uses: microsoft/setup-msbuild@v3
+        with:
+          msbuild-architecture: x64
 
       - name: Building Release (x86)
-        working-directory: ${{env.GITHUB_WORKSPACE}}
+        working-directory: ${{ github.workspace }}
         run: msbuild /m /p:Configuration=Release /p:Platform=x86 ${{env.SOLUTION_FILE_PATH}}
 
       - name: Uploading build
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: BuildRelease32
           path: |
@@ -138,23 +225,22 @@ jobs:
   building-release-x86-64:
     name: Building Release (x86_64)
     runs-on: windows-latest
+    needs: source-policy
 
     steps:
-      - uses: actions/checkout@v4.1.7
+      - uses: actions/checkout@v6
 
       - name: Add MSBuild to PATH
-        uses: microsoft/setup-msbuild@v1.1.3
-
-      - name: Restore NuGet packages
-        working-directory: ${{env.GITHUB_WORKSPACE}}
-        run: dotnet restore ${{env.SOLUTION_FILE_PATH}}
+        uses: microsoft/setup-msbuild@v3
+        with:
+          msbuild-architecture: x64
 
       - name: Building Release (x86_64)
-        working-directory: ${{env.GITHUB_WORKSPACE}}
+        working-directory: ${{ github.workspace }}
         run: msbuild /m /p:Configuration=Release /p:Platform=x64 ${{env.SOLUTION_FILE_PATH}}
 
       - name: Uploading build
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: BuildRelease64
           path: |
@@ -169,15 +255,15 @@ jobs:
 
     steps:
       - name: Downloading Debug (x86)
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: BuildDebug32
           path: |
             ${{env.SOLUTION_FILE_PATH}}\build
 
       - name: Testing Debug (x86)
-        timeout-minutes: 3
-        working-directory: ${{env.GITHUB_WORKSPACE}}
+        timeout-minutes: 10
+        working-directory: ${{ github.workspace }}
         run: ${{env.SOLUTION_FILE_PATH}}\build\x86\Debug\Detours.exe
 
   testing-debug-x86-64:
@@ -187,15 +273,15 @@ jobs:
 
     steps:
       - name: Downloading Debug (x86_64)
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: BuildDebug64
           path: |
             ${{env.SOLUTION_FILE_PATH}}\build
 
       - name: Testing Debug (x86_64)
-        timeout-minutes: 3
-        working-directory: ${{env.GITHUB_WORKSPACE}}
+        timeout-minutes: 10
+        working-directory: ${{ github.workspace }}
         run: ${{env.SOLUTION_FILE_PATH}}\build\x86_64\Debug\Detours.exe
 
   testing-release-x86:
@@ -205,15 +291,15 @@ jobs:
 
     steps:
       - name: Downloading Release (x86)
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: BuildRelease32
           path: |
             ${{env.SOLUTION_FILE_PATH}}\build
 
       - name: Testing Release (x86)
-        timeout-minutes: 3
-        working-directory: ${{env.GITHUB_WORKSPACE}}
+        timeout-minutes: 10
+        working-directory: ${{ github.workspace }}
         run: ${{env.SOLUTION_FILE_PATH}}\build\x86\Release\Detours.exe
 
   testing-release-x86-64:
@@ -223,13 +309,13 @@ jobs:
 
     steps:
       - name: Downloading Release (x86_64)
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: BuildRelease64
           path: |
             ${{env.SOLUTION_FILE_PATH}}\build
 
       - name: Testing Release (x86_64)
-        timeout-minutes: 3
-        working-directory: ${{env.GITHUB_WORKSPACE}}
+        timeout-minutes: 10
+        working-directory: ${{ github.workspace }}
         run: ${{env.SOLUTION_FILE_PATH}}\build\x86_64\Release\Detours.exe
