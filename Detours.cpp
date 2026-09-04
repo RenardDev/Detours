@@ -3,6 +3,7 @@
 // General
 #if defined(_WIN32)
 #include <DbgHelp.h>
+#include <TlHelp32.h>
 #pragma comment(lib, "DbgHelp.lib")
 #elif defined(__linux__)
 #if defined(__GLIBCXX__)
@@ -10432,31 +10433,13 @@ namespace Detours {
 	constexpr std::size_t kWindowsThreadStateReaperControlStallSpinCount = 100'000'000;
 	constexpr std::size_t kWindowsThreadStateReaperPauseStallSpinCount = 100'000'000;
 	constexpr std::size_t kWindowsHardwareOperationStallSpinCount = 10'000'000;
-	constexpr NTSTATUS kWindowsThreadStateReaperWaitSuccess = 0;
-	constexpr NTSTATUS kWindowsThreadStateReaperWaitTimeout = 0x102;
 	constexpr NTSTATUS kWindowsNativeNoMoreEntries = static_cast<NTSTATUS>(0x8000001A);
-	constexpr LONGLONG kWindowsThreadStateReaperWaitInterval = -10'000;
-	constexpr LONGLONG kWindowsThreadStateReaperStopWaitInterval = -300'000'000;
+	constexpr DWORD kWindowsThreadStateReaperWaitMilliseconds = 1;
+	constexpr DWORD kWindowsThreadStateReaperStopWaitMilliseconds = 30'000;
 	constexpr ULONG kWindowsHardwareOperationSuspendCountUnknown = std::numeric_limits<ULONG>::max();
 	constexpr ULONG kWindowsSuspenderCountUnknown = std::numeric_limits<ULONG>::max();
-	constexpr std::size_t kWindowsNativeImageHeaderLimit = 0x100000;
-	constexpr ULONG kWindowsNativeMaximumSystemCallNumber = 0xFFFF;
-#if defined(DETOURS_ARCH_X64)
-	constexpr std::size_t kWindowsNativeSystemCallStubSize = 24;
-	constexpr std::size_t kWindowsNativeSystemCallStubPrefixSize = 4;
-	constexpr std::size_t kWindowsNativeSystemCallStubSuffixSize = 16;
-	constexpr unsigned char kWindowsNativeSystemCallStubPrefix[kWindowsNativeSystemCallStubPrefixSize] = { 0x4C, 0x8B, 0xD1, 0xB8 };
-	constexpr unsigned char kWindowsNativeSystemCallStubSuffix[kWindowsNativeSystemCallStubSuffixSize] = {
-		0xF6, 0x04, 0x25, 0x08, 0x03, 0xFE, 0x7F, 0x01,
-		0x75, 0x03, 0x0F, 0x05, 0xC3, 0xCD, 0x2E, 0xC3
-	};
-
-	static_assert((kWindowsNativeSystemCallStubPrefixSize + sizeof(ULONG) + kWindowsNativeSystemCallStubSuffixSize) == kWindowsNativeSystemCallStubSize, "unexpected native system-call stub size");
-#elif defined(DETOURS_ARCH_X86)
-	constexpr std::size_t kWindowsNativeSystemCallStubSize = 15;
-	constexpr std::size_t kWindowsNativeSystemCallThunkSize = 6;
-#endif
 	constexpr std::size_t kInterruptHookSnapshotEpochCount = 2;
+	constexpr DWORD kWindowsInvalidThreadSuspendCount = std::numeric_limits<DWORD>::max();
 	constexpr std::size_t kHardwareDebugRegisterCount = 4;
 	constexpr DWORD_PTR kDebugRegisterBreakpointStatusMask = 0xF;
 	constexpr DWORD_PTR kWindowsHardwareContextBreakpointInstructionSize = 1;
@@ -10521,7 +10504,146 @@ namespace Detours {
 	static_assert(offsetof(THREAD_BASIC_INFORMATION, Priority) == kWindowsThreadBasicInformationPriorityOffset, "unexpected THREAD_BASIC_INFORMATION::Priority offset");
 	static_assert(offsetof(THREAD_BASIC_INFORMATION, BasePriority) == kWindowsThreadBasicInformationBasePriorityOffset, "unexpected THREAD_BASIC_INFORMATION::BasePriority offset");
 
-	using fnNtQueryInformationThread = NTSTATUS(__stdcall*)(HANDLE hThread, THREADINFOCLASS InformationClass, PVOID pThreadInformationOut, ULONG unThreadInformationLength, PULONG pReturnLengthOut);
+	using fnNtQueryInformationThread = NTSTATUS(NTAPI*)(HANDLE hThread, THREADINFOCLASS InformationClass, PVOID pThreadInformationOut, ULONG unThreadInformationLength, PULONG pReturnLengthOut);
+
+	static bool IsWindowsMemoryProtectionReadable(const DWORD unProtection) noexcept {
+		constexpr DWORD kProtectionTypeMask = 0xFF;
+
+		if (unProtection & (PAGE_GUARD | PAGE_NOACCESS)) {
+			return false;
+		}
+
+		switch (unProtection & kProtectionTypeMask) {
+			case PAGE_READONLY:
+			case PAGE_READWRITE:
+			case PAGE_WRITECOPY:
+			case PAGE_EXECUTE_READ:
+			case PAGE_EXECUTE_READWRITE:
+			case PAGE_EXECUTE_WRITECOPY:
+				return true;
+
+			default:
+				return false;
+		}
+	}
+
+	static bool IsWindowsMemoryProtectionExecutable(const DWORD unProtection) noexcept {
+		constexpr DWORD kProtectionTypeMask = 0xFF;
+
+		switch (unProtection & kProtectionTypeMask) {
+			case PAGE_EXECUTE:
+			case PAGE_EXECUTE_READ:
+			case PAGE_EXECUTE_READWRITE:
+			case PAGE_EXECUTE_WRITECOPY:
+				return true;
+
+			default:
+				return false;
+		}
+	}
+
+	static bool QueryCurrentWindowsMemoryRange(void const* const pAddress, const std::size_t unSize, MEMORY_BASIC_INFORMATION* const pMemoryInformationOut) noexcept {
+		static_assert(sizeof(SIZE_T) <= sizeof(std::uintptr_t), "Windows memory size must fit in an address-sized integer");
+		static_assert(sizeof(std::size_t) <= sizeof(std::uintptr_t), "C++ memory size must fit in an address-sized integer");
+
+		if (!pAddress || !unSize || !pMemoryInformationOut) {
+			return false;
+		}
+
+		const std::uintptr_t unAddress = reinterpret_cast<std::uintptr_t>(pAddress);
+		const std::uintptr_t unSizeValue = static_cast<std::uintptr_t>(unSize);
+		if (unSizeValue > (std::numeric_limits<std::uintptr_t>::max() - unAddress)) {
+			return false;
+		}
+
+		MEMORY_BASIC_INFORMATION MemoryInformation {};
+		if (VirtualQuery(pAddress, &MemoryInformation, sizeof(MemoryInformation)) != sizeof(MemoryInformation)) {
+			return false;
+		}
+
+		const std::uintptr_t unRegionAddress = reinterpret_cast<std::uintptr_t>(MemoryInformation.BaseAddress);
+		const std::uintptr_t unRegionSize = static_cast<std::uintptr_t>(MemoryInformation.RegionSize);
+		if ((MemoryInformation.State != MEM_COMMIT) || !unRegionSize ||
+			(unRegionSize > (std::numeric_limits<std::uintptr_t>::max() - unRegionAddress))) {
+			return false;
+		}
+
+		const std::uintptr_t unRegionEndAddress = unRegionAddress + unRegionSize;
+		if ((unAddress < unRegionAddress) ||
+			(unAddress > (std::numeric_limits<std::uintptr_t>::max() - unSizeValue)) ||
+			((unAddress + unSizeValue) > unRegionEndAddress) ||
+			(MemoryInformation.Protect & (PAGE_GUARD | PAGE_NOACCESS))) {
+			return false;
+		}
+
+		*pMemoryInformationOut = MemoryInformation;
+		return true;
+	}
+
+	static bool ReadCurrentWindowsMemory(void const* const pAddress, void* const pBufferOut, const std::size_t unSize) noexcept {
+		if (!pBufferOut || !unSize) {
+			return false;
+		}
+
+		MEMORY_BASIC_INFORMATION MemoryInformation {};
+		if (!QueryCurrentWindowsMemoryRange(pAddress, unSize, &MemoryInformation)) {
+			return false;
+		}
+
+		const bool bReadable = IsWindowsMemoryProtectionReadable(MemoryInformation.Protect);
+		const bool bExecutable = IsWindowsMemoryProtectionExecutable(MemoryInformation.Protect);
+		DWORD unPreviousProtection = 0;
+		if (!bReadable && (!bExecutable ||
+			!VirtualProtect(const_cast<void*>(pAddress), unSize, PAGE_EXECUTE_READ, &unPreviousProtection))) {
+			return false;
+		}
+
+		bool bCopied = false;
+		__try {
+			std::memcpy(pBufferOut, pAddress, unSize);
+			bCopied = true;
+		} __except (EXCEPTION_EXECUTE_HANDLER) {
+			bCopied = false;
+		}
+
+		DWORD unDiscardedProtection = 0;
+		const bool bProtectionRestored = bReadable ||
+			(VirtualProtect(const_cast<void*>(pAddress), unSize, unPreviousProtection, &unDiscardedProtection) != FALSE);
+		return bCopied && bProtectionRestored;
+	}
+
+#if defined(DETOURS_ARCH_X64)
+	static bool WriteCurrentWindowsMemory(void* const pAddress, void const* const pData, const std::size_t unSize) noexcept {
+		if (!pData || !unSize) {
+			return false;
+		}
+
+		MEMORY_BASIC_INFORMATION MemoryInformation {};
+		if (!QueryCurrentWindowsMemoryRange(pAddress, unSize, &MemoryInformation)) {
+			return false;
+		}
+
+		const bool bExecutable = IsWindowsMemoryProtectionExecutable(MemoryInformation.Protect);
+		const DWORD unWritableProtection = bExecutable ? PAGE_EXECUTE_READWRITE : PAGE_READWRITE;
+		DWORD unPreviousProtection = 0;
+		if (!VirtualProtect(pAddress, unSize, unWritableProtection, &unPreviousProtection)) {
+			return false;
+		}
+
+		bool bCopied = false;
+		__try {
+			std::memcpy(pAddress, pData, unSize);
+			bCopied = true;
+		} __except (EXCEPTION_EXECUTE_HANDLER) {
+			bCopied = false;
+		}
+
+		DWORD unDiscardedProtection = 0;
+		const bool bProtectionRestored = VirtualProtect(pAddress, unSize, unPreviousProtection, &unDiscardedProtection) != FALSE;
+		const bool bInstructionCacheFlushed = !bExecutable || (FlushInstructionCache(GetCurrentProcess(), pAddress, unSize) != FALSE);
+		return bCopied && bProtectionRestored && bInstructionCacheFlushed;
+	}
+#endif
 
 	// ----------------------------------------------------------------
 	// HardwareHookRecord
@@ -10820,66 +10942,6 @@ namespace Detours {
 		TARGET_RESUMED
 	};
 
-	struct WindowsNativeSystemCalls final {
-		WindowsNativeSystemCalls() noexcept;
-
-		ULONG m_unWaitForSingleObject;
-		ULONG m_unClose;
-		ULONG m_unSetEvent;
-		ULONG m_unSuspendThread;
-		ULONG m_unResumeThread;
-		ULONG m_unGetContextThread;
-		ULONG m_unSetContextThread;
-		ULONG m_unGetNextThread;
-		ULONG m_unQueryInformationThread;
-		ULONG m_unReadVirtualMemory;
-		ULONG m_unQueryVirtualMemory;
-		ULONG m_unReleaseMutant;
-		ULONG m_unProtectVirtualMemory;
-#if defined(DETOURS_ARCH_X86)
-		void* m_pSystemCallGate;
-#endif
-	};
-
-	WindowsNativeSystemCalls::WindowsNativeSystemCalls() noexcept {
-		m_unWaitForSingleObject = 0;
-		m_unClose = 0;
-		m_unSetEvent = 0;
-		m_unSuspendThread = 0;
-		m_unResumeThread = 0;
-		m_unGetContextThread = 0;
-		m_unSetContextThread = 0;
-		m_unGetNextThread = 0;
-		m_unQueryInformationThread = 0;
-		m_unReadVirtualMemory = 0;
-		m_unQueryVirtualMemory = 0;
-		m_unReleaseMutant = 0;
-		m_unProtectVirtualMemory = 0;
-#if defined(DETOURS_ARCH_X86)
-		m_pSystemCallGate = nullptr;
-#endif
-	}
-
-	struct WindowsNativeThreadBasicInformation {
-		NTSTATUS m_nExitStatus;
-		PTEB m_pTEB;
-		CLIENT_ID m_ClientID;
-		ULONG_PTR m_unAffinityMask;
-		LONG m_nPriority;
-		LONG m_nBasePriority;
-	};
-
-	static_assert(std::is_standard_layout_v<WindowsNativeThreadBasicInformation>, "WindowsNativeThreadBasicInformation must remain standard-layout");
-	static_assert(std::is_trivially_copyable_v<WindowsNativeThreadBasicInformation>, "WindowsNativeThreadBasicInformation must remain trivially copyable");
-	static_assert(sizeof(WindowsNativeThreadBasicInformation) == kWindowsThreadBasicInformationSize, "unexpected WindowsNativeThreadBasicInformation size");
-	static_assert(alignof(WindowsNativeThreadBasicInformation) == kWindowsThreadBasicInformationAlignment, "unexpected WindowsNativeThreadBasicInformation alignment");
-	static_assert(offsetof(WindowsNativeThreadBasicInformation, m_nExitStatus) == 0, "unexpected WindowsNativeThreadBasicInformation::m_nExitStatus offset");
-	static_assert(offsetof(WindowsNativeThreadBasicInformation, m_pTEB) == kWindowsThreadBasicInformationTEBBaseAddressOffset, "unexpected WindowsNativeThreadBasicInformation::m_pTEB offset");
-	static_assert(offsetof(WindowsNativeThreadBasicInformation, m_ClientID) == kWindowsThreadBasicInformationClientIDOffset, "unexpected WindowsNativeThreadBasicInformation::m_ClientID offset");
-	static_assert(offsetof(WindowsNativeThreadBasicInformation, m_unAffinityMask) == kWindowsThreadBasicInformationAffinityMaskOffset, "unexpected WindowsNativeThreadBasicInformation::m_unAffinityMask offset");
-	static_assert(offsetof(WindowsNativeThreadBasicInformation, m_nPriority) == kWindowsThreadBasicInformationPriorityOffset, "unexpected WindowsNativeThreadBasicInformation::m_nPriority offset");
-	static_assert(offsetof(WindowsNativeThreadBasicInformation, m_nBasePriority) == kWindowsThreadBasicInformationBasePriorityOffset, "unexpected WindowsNativeThreadBasicInformation::m_nBasePriority offset");
-
 	enum class WindowsHardwareOperationType : unsigned int {
 		NONE = 0,
 		RECLAIM,
@@ -10934,7 +10996,6 @@ namespace Detours {
 	static_assert(std::atomic<void*>::is_always_lock_free, "Windows protected-memory containment pointers must be lock-free");
 	static_assert(std::atomic<std::uintptr_t>::is_always_lock_free, "Windows Suspender instruction-pointer updates must be lock-free");
 	static_assert(std::atomic<unsigned long long>::is_always_lock_free, "Windows hardware-operation owner tokens must be lock-free");
-	static_assert(std::atomic<WindowsNativeSystemCalls*>::is_always_lock_free, "Windows native system-call publication must be lock-free");
 
 	struct MemoryHookFrameContext final {
 		MemoryHookFrameContext() noexcept;
@@ -11271,7 +11332,6 @@ namespace Detours {
 	static HANDLE g_hWindowsThreadStateReaper = nullptr;
 	static HANDLE g_hWindowsThreadStateReaperEvent = nullptr;
 	static LPTHREAD_START_ROUTINE g_fnWindowsThreadStateReaperStartAddress = nullptr;
-	static std::atomic<WindowsNativeSystemCalls*> g_pPublishedWindowsNativeSystemCalls = nullptr;
 	static std::atomic<WindowsThreadStateReaperStatus> g_WindowsThreadStateReaperStatus = WindowsThreadStateReaperStatus::STOPPED;
 	static std::atomic<unsigned int> g_unWindowsThreadStateReaperPauseGeneration = 0;
 	static std::atomic<unsigned int> g_unWindowsThreadStateReaperPauseAcknowledgement = 0;
@@ -11288,549 +11348,108 @@ namespace Detours {
 	static std::atomic<unsigned int> g_unWindowsHardwareHookRecordGeneration = 0;
 	KUSER_SHARED_DATA const volatile& g_KUserSharedData = *reinterpret_cast<PKUSER_SHARED_DATA>(kKUserSharedDataAddress);
 	KUSER_SHARED_DATA const volatile& KUserSharedData = g_KUserSharedData;
-
-	// Resolve eagerly so hook-time thread queries never perform loader lookups.
-	static fnNtQueryInformationThread const g_fnNtQueryInformationThread = []() noexcept -> fnNtQueryInformationThread {
-		HMODULE const hNTDLL = GetModuleHandle(_T("ntdll.dll"));
-		return hNTDLL ? reinterpret_cast<fnNtQueryInformationThread>(GetProcAddress(hNTDLL, "NtQueryInformationThread")) : nullptr;
-	} ();
-
-	extern "C" void WindowsHardwareContextBreakpoint(void* pFrame);
-	extern "C" void const* const WindowsHardwareContextBreakpointAddress;
+	// This breakpoint helper is copied into a writable Storage allocation and
+	// switched to execute-read after copying, matching the pWrapper/trampoline
+	// allocation lifecycle. All synchronization, thread, and memory operations
+	// use documented Win32 APIs; the remote-TEB compatibility query below is the
+	// only optional ntdll export and never depends on a syscall number or gate.
 #if defined(DETOURS_ARCH_X64)
-	extern "C" NTSTATUS __cdecl DetoursWindowsTwoArgumentNativeSystemCall(HANDLE hObject, void* pArgument, ULONG unSystemCallNumber) noexcept;
-	extern "C" NTSTATUS __cdecl DetoursWindowsThreeArgumentNativeSystemCall(HANDLE hObject, BOOLEAN bAlertable, LARGE_INTEGER* pTimeout, ULONG unSystemCallNumber) noexcept;
-	extern "C" NTSTATUS __cdecl DetoursWindowsFiveArgumentNativeSystemCall(HANDLE hProcess, void** ppBaseAddressInOut, SIZE_T* pRegionSizeInOut, ULONG unNewProtection, ULONG* pOldProtectionOut, ULONG unSystemCallNumber) noexcept;
-	extern "C" NTSTATUS __cdecl DetoursWindowsQueryThreadNativeSystemCall(HANDLE hThread, ULONG unInformationClass, void* pInformationOut, ULONG unInformationSize, ULONG* pReturnSizeOut, ULONG unSystemCallNumber) noexcept;
-	extern "C" NTSTATUS __cdecl DetoursWindowsReadVirtualMemoryNativeSystemCall(HANDLE hProcess, void const* pBaseAddress, void* pBufferOut, SIZE_T unSize, SIZE_T* pBytesReadOut, ULONG unSystemCallNumber) noexcept;
-	extern "C" NTSTATUS __cdecl DetoursWindowsSixArgumentNativeSystemCall(HANDLE hProcess, HANDLE hPreviousThread, ACCESS_MASK unDesiredAccess, ULONG unHandleAttributes, ULONG unFlags, HANDLE* phThreadOut, ULONG unSystemCallNumber) noexcept;
-	extern "C" NTSTATUS __cdecl DetoursWindowsQueryVirtualMemoryNativeSystemCall(HANDLE hProcess, void const* pBaseAddress, ULONG unInformationClass, void* pInformationOut, SIZE_T unInformationSize, SIZE_T* pReturnSizeOut, ULONG unSystemCallNumber) noexcept;
+	using fnWindowsHardwareContextBreakpoint = void(__cdecl*)(void* pFrame);
+
+	constexpr unsigned char kWindowsHardwareContextBreakpointCode[] = { 0xCC, 0xC3 };
 #elif defined(DETOURS_ARCH_X86)
-	extern "C" NTSTATUS __cdecl DetoursWindowsTwoArgumentNativeSystemCall(HANDLE hObject, void* pArgument, ULONG unSystemCallNumber, void* pSystemCallGate) noexcept;
-	extern "C" NTSTATUS __cdecl DetoursWindowsThreeArgumentNativeSystemCall(HANDLE hObject, BOOLEAN bAlertable, LARGE_INTEGER* pTimeout, ULONG unSystemCallNumber, void* pSystemCallGate) noexcept;
-	extern "C" NTSTATUS __cdecl DetoursWindowsFiveArgumentNativeSystemCall(HANDLE hProcess, void** ppBaseAddressInOut, SIZE_T* pRegionSizeInOut, ULONG unNewProtection, ULONG* pOldProtectionOut, ULONG unSystemCallNumber, void* pSystemCallGate) noexcept;
-	extern "C" NTSTATUS __cdecl DetoursWindowsQueryThreadNativeSystemCall(HANDLE hThread, ULONG unInformationClass, void* pInformationOut, ULONG unInformationSize, ULONG* pReturnSizeOut, ULONG unSystemCallNumber, void* pSystemCallGate) noexcept;
-	extern "C" NTSTATUS __cdecl DetoursWindowsReadVirtualMemoryNativeSystemCall(HANDLE hProcess, void const* pBaseAddress, void* pBufferOut, SIZE_T unSize, SIZE_T* pBytesReadOut, ULONG unSystemCallNumber, void* pSystemCallGate) noexcept;
-	extern "C" NTSTATUS __cdecl DetoursWindowsSixArgumentNativeSystemCall(HANDLE hProcess, HANDLE hPreviousThread, ACCESS_MASK unDesiredAccess, ULONG unHandleAttributes, ULONG unFlags, HANDLE* phThreadOut, ULONG unSystemCallNumber, void* pSystemCallGate) noexcept;
-	extern "C" NTSTATUS __cdecl DetoursWindowsQueryVirtualMemoryNativeSystemCall(HANDLE hProcess, void const* pBaseAddress, ULONG unInformationClass, void* pInformationOut, SIZE_T unInformationSize, SIZE_T* pReturnSizeOut, ULONG unSystemCallNumber, void* pSystemCallGate) noexcept;
+	using fnWindowsHardwareContextBreakpoint = void(__cdecl*)(void* pFrame);
+
+	constexpr unsigned char kWindowsHardwareContextBreakpointCode[] = { 0x8B, 0x44, 0x24, 0x04, 0xCC, 0xC3 };
 #endif
 
-	static bool GetWindowsNativeImageRange(HMODULE const hModule, unsigned char const** const ppImageBaseOut, std::size_t* const pImageSizeOut) noexcept {
-		constexpr std::size_t kMinimumNTHeadersOffset = sizeof(IMAGE_DOS_HEADER);
-		constexpr std::size_t kNTHeadersSize = sizeof(IMAGE_NT_HEADERS);
-
-		static_assert(kNTHeadersSize <= kWindowsNativeImageHeaderLimit, "native image header limit is too small");
-
-		if (!hModule || !ppImageBaseOut || !pImageSizeOut) {
-			return false;
-		}
-
-		__try {
-			unsigned char const* const pImageBase = reinterpret_cast<unsigned char const*>(hModule);
-			IMAGE_DOS_HEADER DOSHeader {};
-			std::memcpy(&DOSHeader, pImageBase, sizeof(DOSHeader));
-
-			if (DOSHeader.e_magic != IMAGE_DOS_SIGNATURE) {
-				return false;
-			}
-
-			const LONG nNTHeadersOffset = DOSHeader.e_lfanew;
-			if (nNTHeadersOffset < 0) {
-				return false;
-			}
-
-			const std::size_t unNTHeadersOffset = static_cast<std::size_t>(nNTHeadersOffset);
-			if ((unNTHeadersOffset < kMinimumNTHeadersOffset) ||
-				(unNTHeadersOffset > (kWindowsNativeImageHeaderLimit - kNTHeadersSize))) {
-				return false;
-			}
-
-			const std::uintptr_t unImageBaseAddress = reinterpret_cast<std::uintptr_t>(pImageBase);
-			if (unNTHeadersOffset > (std::numeric_limits<std::uintptr_t>::max() - unImageBaseAddress)) {
-				return false;
-			}
-
-			const std::uintptr_t unNTHeadersAddress = unImageBaseAddress + unNTHeadersOffset;
-			if (kNTHeadersSize > (std::numeric_limits<std::uintptr_t>::max() - unNTHeadersAddress)) {
-				return false;
-			}
-
-			IMAGE_NT_HEADERS NTHeaders {};
-			std::memcpy(&NTHeaders, reinterpret_cast<void const*>(unNTHeadersAddress), sizeof(NTHeaders));
-
-			if ((NTHeaders.Signature != IMAGE_NT_SIGNATURE) ||
-				(NTHeaders.FileHeader.SizeOfOptionalHeader < sizeof(IMAGE_OPTIONAL_HEADER)) ||
-				(NTHeaders.OptionalHeader.Magic != IMAGE_NT_OPTIONAL_HDR_MAGIC)) {
-				return false;
-			}
-
-			const std::size_t unMinimumImageHeaderSize = unNTHeadersOffset + kNTHeadersSize;
-			const std::size_t unImageHeaderSize = static_cast<std::size_t>(NTHeaders.OptionalHeader.SizeOfHeaders);
-			const std::size_t unImageSize = static_cast<std::size_t>(NTHeaders.OptionalHeader.SizeOfImage);
-			if ((!unImageSize) ||
-				(unImageHeaderSize < unMinimumImageHeaderSize) ||
-				(unImageSize < unImageHeaderSize) ||
-				(unImageSize > (std::numeric_limits<std::uintptr_t>::max() - unImageBaseAddress))) {
-				return false;
-			}
-
-			*ppImageBaseOut = pImageBase;
-			*pImageSizeOut = unImageSize;
-			return true;
-		} __except (EXCEPTION_EXECUTE_HANDLER) {
-			return false;
-		}
-	}
-
-	static bool IsWindowsNativeImageRangeValid(unsigned char const* const pImageBase, const std::size_t unImageSize, void const* const pAddress, const std::size_t unSize) noexcept {
-		if (!pImageBase || !unImageSize || !pAddress || !unSize) {
-			return false;
-		}
-
-		const std::uintptr_t unImageBaseAddress = reinterpret_cast<std::uintptr_t>(pImageBase);
-		if (unImageSize > (std::numeric_limits<std::uintptr_t>::max() - unImageBaseAddress)) {
-			return false;
-		}
-
-		const std::uintptr_t unTargetAddress = reinterpret_cast<std::uintptr_t>(pAddress);
-		if ((unTargetAddress < unImageBaseAddress) ||
-			(unSize > unImageSize) ||
-			((unTargetAddress - unImageBaseAddress) > (unImageSize - unSize))) {
-			return false;
-		}
-
-		return true;
-	}
-
-	static bool IsWindowsNativeImageSectionRangeValid(unsigned char const* const pImageBase, const std::size_t unImageSize, void const* const pAddress, const std::size_t unSize, const bool bExecutable) noexcept {
-		constexpr std::size_t kDOSHeaderSize = sizeof(IMAGE_DOS_HEADER);
-		constexpr std::size_t kNTHeadersSize = sizeof(IMAGE_NT_HEADERS);
-		constexpr std::size_t kOptionalHeaderOffset = offsetof(IMAGE_NT_HEADERS, OptionalHeader);
-		constexpr std::size_t kOptionalHeaderSize = sizeof(IMAGE_OPTIONAL_HEADER);
-		constexpr std::size_t kSectionHeaderSize = sizeof(IMAGE_SECTION_HEADER);
-
-		static_assert(kOptionalHeaderSize <= kNTHeadersSize, "optional header exceeds the native NT header");
-		static_assert(kOptionalHeaderOffset <= (kNTHeadersSize - kOptionalHeaderSize), "optional-header range exceeds the native NT header");
-
-		if (!IsWindowsNativeImageRangeValid(pImageBase, unImageSize, pAddress, unSize)) {
-			return false;
-		}
-
-		__try {
-			if (unImageSize < kDOSHeaderSize) {
-				return false;
-			}
-
-			IMAGE_DOS_HEADER DOSHeader {};
-			std::memcpy(&DOSHeader, pImageBase, sizeof(DOSHeader));
-
-			if (DOSHeader.e_magic != IMAGE_DOS_SIGNATURE) {
-				return false;
-			}
-
-			const LONG nNTHeadersOffset = DOSHeader.e_lfanew;
-			if (nNTHeadersOffset < 0) {
-				return false;
-			}
-
-			const std::size_t unNTHeadersOffset = static_cast<std::size_t>(nNTHeadersOffset);
-			if ((unNTHeadersOffset > unImageSize) ||
-				(kNTHeadersSize > (unImageSize - unNTHeadersOffset))) {
-				return false;
-			}
-
-			const std::uintptr_t unImageBaseAddress = reinterpret_cast<std::uintptr_t>(pImageBase);
-			const std::uintptr_t unNTHeadersAddress = unImageBaseAddress + unNTHeadersOffset;
-			IMAGE_NT_HEADERS NTHeaders {};
-			std::memcpy(&NTHeaders, reinterpret_cast<void const*>(unNTHeadersAddress), sizeof(NTHeaders));
-
-			if ((NTHeaders.Signature != IMAGE_NT_SIGNATURE) ||
-				(NTHeaders.FileHeader.SizeOfOptionalHeader < kOptionalHeaderSize) ||
-				(NTHeaders.OptionalHeader.Magic != IMAGE_NT_OPTIONAL_HDR_MAGIC)) {
-				return false;
-			}
-
-			const std::size_t unOptionalHeaderOffset = unNTHeadersOffset + kOptionalHeaderOffset;
-			const std::size_t unOptionalHeaderSize = static_cast<std::size_t>(NTHeaders.FileHeader.SizeOfOptionalHeader);
-			if ((unOptionalHeaderOffset > unImageSize) ||
-				(unOptionalHeaderSize > (unImageSize - unOptionalHeaderOffset))) {
-				return false;
-			}
-
-			const std::size_t unSectionTableOffset = unOptionalHeaderOffset + unOptionalHeaderSize;
-			const std::size_t unSectionCount = static_cast<std::size_t>(NTHeaders.FileHeader.NumberOfSections);
-			if (unSectionCount > (std::numeric_limits<std::size_t>::max() / kSectionHeaderSize)) {
-				return false;
-			}
-
-			const std::size_t unSectionTableSize = unSectionCount * kSectionHeaderSize;
-			if ((unSectionTableOffset > unImageSize) ||
-				(unSectionTableSize > (unImageSize - unSectionTableOffset))) {
-				return false;
-			}
-
-			const std::uintptr_t unTargetAddress = reinterpret_cast<std::uintptr_t>(pAddress);
-			const std::size_t unAddressOffset = static_cast<std::size_t>(unTargetAddress - unImageBaseAddress);
-			for (std::size_t unIndex = 0; unIndex < unSectionCount; ++unIndex) {
-				const std::size_t unSectionEntryOffset = unSectionTableOffset + unIndex * kSectionHeaderSize;
-				IMAGE_SECTION_HEADER SectionHeader {};
-				std::memcpy(&SectionHeader, reinterpret_cast<void const*>(unImageBaseAddress + unSectionEntryOffset), sizeof(SectionHeader));
-
-				const std::size_t unSectionOffset = static_cast<std::size_t>(SectionHeader.VirtualAddress);
-				const std::size_t unSectionSize = std::max<std::size_t>(SectionHeader.Misc.VirtualSize, SectionHeader.SizeOfRawData);
-				if ((!unSectionSize) || (unSectionOffset > unImageSize) ||
-					(unSectionSize > (unImageSize - unSectionOffset)) ||
-					(unAddressOffset < unSectionOffset) ||
-					(unSize > unSectionSize) ||
-					((unAddressOffset - unSectionOffset) > (unSectionSize - unSize))) {
-					continue;
-				}
-
-				const DWORD unRequiredCharacteristics = IMAGE_SCN_MEM_READ | (bExecutable ? IMAGE_SCN_MEM_EXECUTE : 0);
-				return (SectionHeader.Characteristics & unRequiredCharacteristics) == unRequiredCharacteristics;
-			}
-		} __except (EXCEPTION_EXECUTE_HANDLER) {
-			return false;
-		}
-
-		return false;
-	}
-
+	constexpr std::size_t kWindowsEmbeddedHardwareBreakpointNoSizeAlignment = 1;
+	constexpr std::size_t kWindowsEmbeddedHardwareBreakpointCodeAlignment = alignof(void*);
 #if defined(DETOURS_ARCH_X64)
-	static bool GetWindowsNativeSystemCallNumber(unsigned char const* const pImageBase, const std::size_t unImageSize, void const* const pAddress, const unsigned char, ULONG* const pSystemCallNumberOut, void** const) noexcept {
-		constexpr std::size_t kSystemCallNumberOffset = sizeof(kWindowsNativeSystemCallStubPrefix);
-		constexpr std::size_t kStubSuffixOffset = kSystemCallNumberOffset + sizeof(ULONG);
-
-		static_assert((kStubSuffixOffset + sizeof(kWindowsNativeSystemCallStubSuffix)) == kWindowsNativeSystemCallStubSize, "native system-call stub layout mismatch");
-
-		if ((!pSystemCallNumberOut) ||
-			(!IsWindowsNativeImageSectionRangeValid(pImageBase, unImageSize, pAddress, kWindowsNativeSystemCallStubSize, true))) {
-			return false;
-		}
-
-		__try {
-			unsigned char const* const pStub = reinterpret_cast<unsigned char const*>(pAddress);
-			if ((std::memcmp(pStub, kWindowsNativeSystemCallStubPrefix, sizeof(kWindowsNativeSystemCallStubPrefix)) != 0) ||
-				(std::memcmp(pStub + kStubSuffixOffset, kWindowsNativeSystemCallStubSuffix, sizeof(kWindowsNativeSystemCallStubSuffix)) != 0)) {
-				return false;
-			}
-
-			ULONG unSystemCallNumber = 0;
-			std::memcpy(&unSystemCallNumber, pStub + kSystemCallNumberOffset, sizeof(unSystemCallNumber));
-			if (unSystemCallNumber > kWindowsNativeMaximumSystemCallNumber) {
-				return false;
-			}
-
-			*pSystemCallNumberOut = unSystemCallNumber;
-			return true;
-		} __except (EXCEPTION_EXECUTE_HANDLER) {
-			return false;
-		}
-	}
+	constexpr std::size_t kWindowsHardwareContextBreakpointInstructionOffset = 0;
 #elif defined(DETOURS_ARCH_X86)
-	static bool IsWindowsNativeGateExecutable(void* const pGate) noexcept {
-		constexpr DWORD kBaseProtectionMask = 0xFF;
+	constexpr std::size_t kWindowsHardwareContextBreakpointInstructionOffset = 4;
+#endif
+	constexpr std::size_t kWindowsEmbeddedHardwareBreakpointCodeSize = sizeof(kWindowsHardwareContextBreakpointCode);
 
-		if (!pGate) {
-			return false;
+	struct WindowsEmbeddedHardwareBreakpointState final {
+		WindowsEmbeddedHardwareBreakpointState() noexcept;
+
+		WindowsEmbeddedHardwareBreakpointState(WindowsEmbeddedHardwareBreakpointState const&) = delete;
+		WindowsEmbeddedHardwareBreakpointState& operator=(WindowsEmbeddedHardwareBreakpointState const&) = delete;
+		WindowsEmbeddedHardwareBreakpointState(WindowsEmbeddedHardwareBreakpointState&&) = delete;
+		WindowsEmbeddedHardwareBreakpointState& operator=(WindowsEmbeddedHardwareBreakpointState&&) = delete;
+
+		Storage m_Storage;
+		void* m_pCode;
+		void const* m_pBreakpointInstruction;
+		fnWindowsHardwareContextBreakpoint m_fnHardwareContextBreakpoint;
+	};
+
+	WindowsEmbeddedHardwareBreakpointState::WindowsEmbeddedHardwareBreakpointState() noexcept :
+		m_Storage(kWindowsEmbeddedHardwareBreakpointCodeSize, kWindowsEmbeddedHardwareBreakpointCodeSize),
+		m_pCode(nullptr),
+		m_pBreakpointInstruction(nullptr),
+		m_fnHardwareContextBreakpoint(nullptr)
+	{
+		unsigned char* const pCode = reinterpret_cast<unsigned char*>(m_Storage.Alloc(kWindowsEmbeddedHardwareBreakpointCodeSize, kWindowsEmbeddedHardwareBreakpointNoSizeAlignment, kWindowsEmbeddedHardwareBreakpointCodeAlignment));
+		if (!pCode) {
+			return;
 		}
 
-		MEMORY_BASIC_INFORMATION MemoryInformation {};
-		if (VirtualQuery(pGate, &MemoryInformation, sizeof(MemoryInformation)) != sizeof(MemoryInformation)) {
-			return false;
+		std::size_t unOffset = 0;
+		auto CopyCode = [&pCode, &unOffset](auto const& Code) noexcept -> unsigned char* {
+			unsigned char* const pCodeEntry = pCode + unOffset;
+			std::memcpy(pCodeEntry, Code, sizeof(Code));
+			unOffset += sizeof(Code);
+			return pCodeEntry;
+		};
+
+		unsigned char* const pBreakpoint = CopyCode(kWindowsHardwareContextBreakpointCode);
+		m_fnHardwareContextBreakpoint = reinterpret_cast<fnWindowsHardwareContextBreakpoint>(pBreakpoint);
+		m_pBreakpointInstruction = pBreakpoint + kWindowsHardwareContextBreakpointInstructionOffset;
+
+		Protection CodeProtection(pCode, kWindowsEmbeddedHardwareBreakpointCodeSize, false);
+		if (!CodeProtection.Change(PAGE_EXECUTE_READ)) {
+			m_Storage.DeAllocAll();
+			return;
 		}
 
-		const DWORD unProtection = MemoryInformation.Protect & kBaseProtectionMask;
-		const bool bExecutable =
-			(unProtection == PAGE_EXECUTE) ||
-			(unProtection == PAGE_EXECUTE_READ) ||
-			(unProtection == PAGE_EXECUTE_READWRITE) ||
-			(unProtection == PAGE_EXECUTE_WRITECOPY);
-		return (MemoryInformation.State == MEM_COMMIT) && (MemoryInformation.Type == MEM_IMAGE) && bExecutable;
+		m_pCode = pCode;
 	}
 
-	static bool GetWindowsNativeSystemCallNumber(unsigned char const* const pImageBase, const std::size_t unImageSize, void const* const pAddress, const unsigned char unArgumentBytes, ULONG* const pSystemCallNumberOut, void** const ppSystemCallGateOut) noexcept {
-		constexpr std::size_t kMoveSystemCallNumberOpcodeIndex = 0;
-		constexpr unsigned char kMoveImmediateToEAXOpcode = 0xB8;
-		constexpr std::size_t kSystemCallNumberOffset = 1;
-		constexpr std::size_t kMoveThunkAddressOpcodeIndex = 5;
-		constexpr unsigned char kMoveImmediateToEDXOpcode = 0xBA;
-		constexpr std::size_t kThunkAddressOffset = 6;
-		constexpr std::size_t kCallEDXOpcodeIndex = 10;
-		constexpr unsigned char kCallOpcode = 0xFF;
-		constexpr std::size_t kCallEDXModRMIndex = 11;
-		constexpr unsigned char kCallEDXModRM = 0xD2;
-		constexpr std::size_t kReturnOpcodeIndex = 12;
-		constexpr unsigned char kReturnImmediateOpcode = 0xC2;
-		constexpr std::size_t kArgumentBytesIndex = 13;
-		constexpr std::size_t kArgumentBytesHighIndex = 14;
-		constexpr std::size_t kThunkJumpOpcodeIndex = 0;
-		constexpr unsigned char kJumpOpcode = 0xFF;
-		constexpr std::size_t kThunkJumpModRMIndex = 1;
-		constexpr unsigned char kAbsoluteIndirectJumpModRM = 0x25;
-		constexpr std::size_t kGateSlotAddressOffset = 2;
-		constexpr unsigned long kTEBSystemCallGateOffset = 0xC0;
-
-		static_assert((kSystemCallNumberOffset + sizeof(ULONG)) <= kWindowsNativeSystemCallStubSize, "system-call number exceeds the native stub");
-		static_assert((kThunkAddressOffset + sizeof(std::uintptr_t)) <= kWindowsNativeSystemCallStubSize, "thunk address exceeds the native stub");
-		static_assert(kArgumentBytesHighIndex < kWindowsNativeSystemCallStubSize, "argument-byte field exceeds the native stub");
-		static_assert(kThunkJumpModRMIndex < kWindowsNativeSystemCallThunkSize, "jump opcode exceeds the native thunk");
-		static_assert((kGateSlotAddressOffset + sizeof(std::uintptr_t)) <= kWindowsNativeSystemCallThunkSize, "gate-slot address exceeds the native thunk");
-
-			if ((!pSystemCallNumberOut) ||
-				(!ppSystemCallGateOut) ||
-				(!IsWindowsNativeImageSectionRangeValid(pImageBase, unImageSize, pAddress, kWindowsNativeSystemCallStubSize, true))) {
-			return false;
-		}
-
-		__try {
-			unsigned char const* const pStub = reinterpret_cast<unsigned char const*>(pAddress);
-			if ((pStub[kMoveSystemCallNumberOpcodeIndex] != kMoveImmediateToEAXOpcode) ||
-				(pStub[kMoveThunkAddressOpcodeIndex] != kMoveImmediateToEDXOpcode) ||
-				(pStub[kCallEDXOpcodeIndex] != kCallOpcode) ||
-				(pStub[kCallEDXModRMIndex] != kCallEDXModRM) ||
-				(pStub[kReturnOpcodeIndex] != kReturnImmediateOpcode) ||
-				(pStub[kArgumentBytesIndex] != unArgumentBytes) ||
-					(pStub[kArgumentBytesHighIndex] != 0)) {
-				return false;
+	static WindowsEmbeddedHardwareBreakpointState* GetWindowsEmbeddedHardwareBreakpointState() noexcept {
+		// Keep the executable allocation for the process lifetime; VEH and hook
+		// teardown paths can still call these stubs during static destruction.
+		static WindowsEmbeddedHardwareBreakpointState* const pState = []() noexcept -> WindowsEmbeddedHardwareBreakpointState* {
+			try {
+				return new WindowsEmbeddedHardwareBreakpointState();
+			} catch (...) {
+				return nullptr;
 			}
+		} ();
 
-			ULONG unSystemCallNumber = 0;
-			std::uintptr_t unThunkAddress = 0;
-			std::memcpy(&unSystemCallNumber, pStub + kSystemCallNumberOffset, sizeof(unSystemCallNumber));
-			std::memcpy(&unThunkAddress, pStub + kThunkAddressOffset, sizeof(unThunkAddress));
-
-			if (!IsWindowsNativeImageSectionRangeValid(pImageBase, unImageSize, reinterpret_cast<void const*>(unThunkAddress), kWindowsNativeSystemCallThunkSize, true)) {
-				return false;
-			}
-
-			unsigned char const* const pThunk = reinterpret_cast<unsigned char const*>(unThunkAddress);
-			if ((pThunk[kThunkJumpOpcodeIndex] != kJumpOpcode) ||
-				(pThunk[kThunkJumpModRMIndex] != kAbsoluteIndirectJumpModRM)) {
-				return false;
-			}
-
-			std::uintptr_t unGateSlotAddress = 0;
-			std::memcpy(&unGateSlotAddress, pThunk + kGateSlotAddressOffset, sizeof(unGateSlotAddress));
-			if (!IsWindowsNativeImageSectionRangeValid(pImageBase, unImageSize, reinterpret_cast<void const*>(unGateSlotAddress), sizeof(void*), false)) {
-				return false;
-			}
-
-			void* pSystemCallGate = nullptr;
-			std::memcpy(&pSystemCallGate, reinterpret_cast<void const*>(unGateSlotAddress), sizeof(pSystemCallGate));
-
-			void* const pTEBSystemCallGate = reinterpret_cast<void*>(static_cast<std::uintptr_t>(__readfsdword(kTEBSystemCallGateOffset)));
-			if ((!pSystemCallGate) ||
-				(pSystemCallGate != pTEBSystemCallGate) ||
-				(!IsWindowsNativeGateExecutable(pSystemCallGate))) {
-				return false;
-			}
-
-			*pSystemCallNumberOut = unSystemCallNumber;
-			*ppSystemCallGateOut = pSystemCallGate;
-			return true;
-		} __except (EXCEPTION_EXECUTE_HANDLER) {
-			return false;
-		}
-	}
-#endif
-
-	static bool EnsureWindowsNativeSystemCalls() noexcept {
-		constexpr std::size_t kNativeSystemCallEntryCount = 13;
-		constexpr unsigned char kX86NativeArgumentSlotBytes = 4;
-		constexpr unsigned char kOneArgumentBytes = kX86NativeArgumentSlotBytes;
-		constexpr unsigned char kTwoArgumentBytes = kX86NativeArgumentSlotBytes * 2;
-		constexpr unsigned char kThreeArgumentBytes = kX86NativeArgumentSlotBytes * 3;
-		constexpr unsigned char kFiveArgumentBytes = kX86NativeArgumentSlotBytes * 5;
-		constexpr unsigned char kSixArgumentBytes = kX86NativeArgumentSlotBytes * 6;
-#if defined(DETOURS_ARCH_X86)
-		constexpr unsigned long kTEBSystemCallGateOffset = 0xC0;
-#endif
-
-		if (g_pPublishedWindowsNativeSystemCalls.load(std::memory_order_acquire)) {
-			return true;
-		}
-
-#if defined(DETOURS_ARCH_X86)
-		BOOL bWOW64Process = FALSE;
-		if ((!IsWow64Process(GetCurrentProcess(), &bWOW64Process)) ||
-			(!bWOW64Process) ||
-			(!__readfsdword(kTEBSystemCallGateOffset))) {
-			return g_pPublishedWindowsNativeSystemCalls.load(std::memory_order_acquire) != nullptr;
-		}
-#endif
-
-		WindowsNativeSystemCalls ResolvedSystemCalls {};
-
-		HMODULE const hNTDLL = GetModuleHandleW(L"ntdll.dll");
-		unsigned char const* pImageBase = nullptr;
-		std::size_t unImageSize = 0;
-		bool bResolved = hNTDLL && GetWindowsNativeImageRange(hNTDLL, &pImageBase, &unImageSize);
-#if defined(DETOURS_ARCH_X86)
-		void* pSystemCallGate = nullptr;
-#endif
-		if (bResolved) {
-			struct NativeSystemCallEntry final {
-				char const* m_pszName;
-				unsigned char m_unArgumentBytes;
-				ULONG* m_pSystemCallNumberOut;
-			};
-
-			NativeSystemCallEntry const arrEntries[kNativeSystemCallEntryCount] = {
-				{ "NtWaitForSingleObject", kThreeArgumentBytes, &ResolvedSystemCalls.m_unWaitForSingleObject },
-				{ "NtClose", kOneArgumentBytes, &ResolvedSystemCalls.m_unClose },
-				{ "NtSetEvent", kTwoArgumentBytes, &ResolvedSystemCalls.m_unSetEvent },
-				{ "NtSuspendThread", kTwoArgumentBytes, &ResolvedSystemCalls.m_unSuspendThread },
-				{ "NtResumeThread", kTwoArgumentBytes, &ResolvedSystemCalls.m_unResumeThread },
-				{ "NtGetContextThread", kTwoArgumentBytes, &ResolvedSystemCalls.m_unGetContextThread },
-				{ "NtSetContextThread", kTwoArgumentBytes, &ResolvedSystemCalls.m_unSetContextThread },
-				{ "NtGetNextThread", kSixArgumentBytes, &ResolvedSystemCalls.m_unGetNextThread },
-				{ "NtQueryInformationThread", kFiveArgumentBytes, &ResolvedSystemCalls.m_unQueryInformationThread },
-				{ "NtReadVirtualMemory", kFiveArgumentBytes, &ResolvedSystemCalls.m_unReadVirtualMemory },
-				{ "NtQueryVirtualMemory", kSixArgumentBytes, &ResolvedSystemCalls.m_unQueryVirtualMemory },
-				{ "NtReleaseMutant", kTwoArgumentBytes, &ResolvedSystemCalls.m_unReleaseMutant },
-				{ "NtProtectVirtualMemory", kFiveArgumentBytes, &ResolvedSystemCalls.m_unProtectVirtualMemory }
-			};
-
-			for (auto const& SystemCallEntry : arrEntries) {
-				FARPROC const fnSystemCall = GetProcAddress(hNTDLL, SystemCallEntry.m_pszName);
-				void* pEntrySystemCallGate = nullptr;
-				if ((!fnSystemCall) ||
-					(!GetWindowsNativeSystemCallNumber(pImageBase, unImageSize, reinterpret_cast<void const*>(fnSystemCall), SystemCallEntry.m_unArgumentBytes, SystemCallEntry.m_pSystemCallNumberOut, &pEntrySystemCallGate))) {
-					bResolved = false;
-					break;
-				}
-#if defined(DETOURS_ARCH_X86)
-				if (pSystemCallGate && (pEntrySystemCallGate != pSystemCallGate)) {
-					bResolved = false;
-					break;
-				}
-
-				pSystemCallGate = pEntrySystemCallGate;
-#endif
-			}
-		}
-
-#if defined(DETOURS_ARCH_X86)
-		if (bResolved) {
-			ResolvedSystemCalls.m_pSystemCallGate = pSystemCallGate;
-		}
-#endif
-
-		if (!bResolved) {
-			return g_pPublishedWindowsNativeSystemCalls.load(std::memory_order_acquire) != nullptr;
-		}
-
-		std::unique_ptr<WindowsNativeSystemCalls> pResolvedSystemCalls(new (std::nothrow) WindowsNativeSystemCalls(ResolvedSystemCalls));
-		if (!pResolvedSystemCalls) {
-			return g_pPublishedWindowsNativeSystemCalls.load(std::memory_order_acquire) != nullptr;
-		}
-
-		WindowsNativeSystemCalls* const pResolvedSystemCallsRaw = pResolvedSystemCalls.get();
-		WindowsNativeSystemCalls* pExpectedSystemCalls = nullptr;
-		if (g_pPublishedWindowsNativeSystemCalls.compare_exchange_strong(pExpectedSystemCalls, pResolvedSystemCallsRaw, std::memory_order_release, std::memory_order_acquire)) {
-			// Ownership transfers to the published process-wide state.
-			pResolvedSystemCalls.release();
-			return true;
-		}
-
-		return pExpectedSystemCalls != nullptr;
+		return pState;
 	}
 
-	static NTSTATUS CallWindowsTwoArgumentNativeSystemCall(HANDLE const hObject, void* const pArgument, const ULONG unSystemCallNumber) noexcept {
-		WindowsNativeSystemCalls const* const pSystemCalls = g_pPublishedWindowsNativeSystemCalls.load(std::memory_order_acquire);
-		if (!hObject || (hObject == INVALID_HANDLE_VALUE) || !pSystemCalls) {
-			return kWindowsNativeCallNotAttempted;
-		}
-
-#if defined(DETOURS_ARCH_X64)
-		return DetoursWindowsTwoArgumentNativeSystemCall(hObject, pArgument, unSystemCallNumber);
-#elif defined(DETOURS_ARCH_X86)
-		return DetoursWindowsTwoArgumentNativeSystemCall(hObject, pArgument, unSystemCallNumber, pSystemCalls->m_pSystemCallGate);
-#endif
+	static WindowsEmbeddedHardwareBreakpointState* GetWindowsEmbeddedHardwareBreakpointReadyState() noexcept {
+		WindowsEmbeddedHardwareBreakpointState* const pState = GetWindowsEmbeddedHardwareBreakpointState();
+		return (pState && pState->m_pCode) ? pState : nullptr;
 	}
 
-	static NTSTATUS WaitForWindowsThreadStateHandleNoHook(HANDLE const hObject, const LONGLONG nWaitInterval, const bool bInfinite) noexcept {
-		WindowsNativeSystemCalls const* const pSystemCalls = g_pPublishedWindowsNativeSystemCalls.load(std::memory_order_acquire);
-		if (!hObject || (hObject == INVALID_HANDLE_VALUE) || !pSystemCalls) {
-			return kWindowsNativeCallNotAttempted;
-		}
-
-		LARGE_INTEGER WaitInterval {};
-		WaitInterval.QuadPart = nWaitInterval;
-		PLARGE_INTEGER const pWaitInterval = bInfinite ? nullptr : &WaitInterval;
-#if defined(DETOURS_ARCH_X64)
-		return DetoursWindowsThreeArgumentNativeSystemCall(hObject, FALSE, pWaitInterval, pSystemCalls->m_unWaitForSingleObject);
-#elif defined(DETOURS_ARCH_X86)
-		return DetoursWindowsThreeArgumentNativeSystemCall(hObject, FALSE, pWaitInterval, pSystemCalls->m_unWaitForSingleObject, pSystemCalls->m_pSystemCallGate);
-#endif
+	static void const* GetWindowsHardwareContextBreakpointAddress() noexcept {
+		WindowsEmbeddedHardwareBreakpointState* const pState = GetWindowsEmbeddedHardwareBreakpointReadyState();
+		return pState ? pState->m_pBreakpointInstruction : nullptr;
 	}
 
-	static bool ReleaseWindowsMutantNoHook(HANDLE const hMutex) noexcept {
-		WindowsNativeSystemCalls const* const pSystemCalls = g_pPublishedWindowsNativeSystemCalls.load(std::memory_order_acquire);
-		if (!pSystemCalls) {
-			return false;
+	static void WindowsHardwareContextBreakpoint(void* pFrame) {
+		WindowsEmbeddedHardwareBreakpointState* const pState = GetWindowsEmbeddedHardwareBreakpointReadyState();
+		if (pState && pState->m_fnHardwareContextBreakpoint) {
+			pState->m_fnHardwareContextBreakpoint(pFrame);
 		}
-
-		return CallWindowsTwoArgumentNativeSystemCall(hMutex, nullptr, pSystemCalls->m_unReleaseMutant) >= 0;
 	}
 
-	static bool SetWindowsThreadStateEventNoHook(HANDLE const hEvent) noexcept {
-		WindowsNativeSystemCalls const* const pSystemCalls = g_pPublishedWindowsNativeSystemCalls.load(std::memory_order_acquire);
-		if (!pSystemCalls) {
-			return false;
-		}
-
-		return CallWindowsTwoArgumentNativeSystemCall(hEvent, nullptr, pSystemCalls->m_unSetEvent) >= 0;
-	}
-
-	static bool ResumeWindowsThreadStateHandleNoHook(HANDLE const hThread) noexcept {
-		WindowsNativeSystemCalls const* const pSystemCalls = g_pPublishedWindowsNativeSystemCalls.load(std::memory_order_acquire);
-		if (!pSystemCalls) {
-			return false;
-		}
-
-		return CallWindowsTwoArgumentNativeSystemCall(hThread, nullptr, pSystemCalls->m_unResumeThread) >= 0;
-	}
-
-	static NTSTATUS SuspendWindowsThreadNoHook(HANDLE const hThread, ULONG* const pPreviousSuspendCountOut) noexcept {
-		WindowsNativeSystemCalls const* const pSystemCalls = g_pPublishedWindowsNativeSystemCalls.load(std::memory_order_acquire);
-		if (!pSystemCalls || !pPreviousSuspendCountOut) {
-			return kWindowsNativeCallNotAttempted;
-		}
-
-		return CallWindowsTwoArgumentNativeSystemCall(hThread, pPreviousSuspendCountOut, pSystemCalls->m_unSuspendThread);
-	}
-
-	static NTSTATUS ResumeWindowsThreadNoHook(HANDLE const hThread, ULONG* const pPreviousSuspendCountOut) noexcept {
-		WindowsNativeSystemCalls const* const pSystemCalls = g_pPublishedWindowsNativeSystemCalls.load(std::memory_order_acquire);
-		if (!pSystemCalls || !pPreviousSuspendCountOut) {
-			return kWindowsNativeCallNotAttempted;
-		}
-
-		return CallWindowsTwoArgumentNativeSystemCall(hThread, pPreviousSuspendCountOut, pSystemCalls->m_unResumeThread);
-	}
-
-	static NTSTATUS GetWindowsThreadContextNoHook(HANDLE const hThread, PCONTEXT const pContextInOut) noexcept {
-		WindowsNativeSystemCalls const* const pSystemCalls = g_pPublishedWindowsNativeSystemCalls.load(std::memory_order_acquire);
-		if (!pSystemCalls || !pContextInOut) {
-			return kWindowsNativeCallNotAttempted;
-		}
-
-		return CallWindowsTwoArgumentNativeSystemCall(hThread, pContextInOut, pSystemCalls->m_unGetContextThread);
-	}
-
-	static NTSTATUS SetWindowsThreadContextNoHook(HANDLE const hThread, CONTEXT const* const pContext) noexcept {
-		WindowsNativeSystemCalls const* const pSystemCalls = g_pPublishedWindowsNativeSystemCalls.load(std::memory_order_acquire);
-		if (!pSystemCalls || !pContext) {
-			return kWindowsNativeCallNotAttempted;
-		}
-
-		// The native ABI uses a mutable pointer but reads the supplied context.
-		return CallWindowsTwoArgumentNativeSystemCall(hThread, const_cast<CONTEXT*>(pContext), pSystemCalls->m_unSetContextThread);
-	}
-
-	static NTSTATUS GetNextWindowsThreadNoHook(HANDLE const hPreviousThread, HANDLE* const phThreadOut) noexcept {
+	static NTSTATUS EnumerateNextWindowsThread(HANDLE const hPreviousThread, HANDLE* const phThreadOut) noexcept {
 		constexpr ACCESS_MASK kDesiredAccess =
 			THREAD_QUERY_INFORMATION |
 			THREAD_QUERY_LIMITED_INFORMATION |
@@ -11838,158 +11457,54 @@ namespace Detours {
 			THREAD_SUSPEND_RESUME |
 			THREAD_GET_CONTEXT |
 			THREAD_SET_CONTEXT;
-		constexpr LONG_PTR kCurrentProcessPseudoHandleValue = -1;
-		constexpr ULONG kNoHandleAttributes = 0;
-		constexpr ULONG kNoThreadFlags = 0;
+		constexpr DWORD kThreadSnapshotFlags = TH32CS_SNAPTHREAD;
 
-		WindowsNativeSystemCalls const* const pSystemCalls = g_pPublishedWindowsNativeSystemCalls.load(std::memory_order_acquire);
-		if (!pSystemCalls || !phThreadOut) {
+		if (!phThreadOut) {
 			return kWindowsNativeCallNotAttempted;
 		}
 
-		HANDLE const hCurrentProcess = reinterpret_cast<HANDLE>(kCurrentProcessPseudoHandleValue);
 		*phThreadOut = nullptr;
-#if defined(DETOURS_ARCH_X64)
-		return DetoursWindowsSixArgumentNativeSystemCall(hCurrentProcess, hPreviousThread, kDesiredAccess, kNoHandleAttributes, kNoThreadFlags, phThreadOut, pSystemCalls->m_unGetNextThread);
-#elif defined(DETOURS_ARCH_X86)
-		return DetoursWindowsSixArgumentNativeSystemCall(hCurrentProcess, hPreviousThread, kDesiredAccess, kNoHandleAttributes, kNoThreadFlags, phThreadOut, pSystemCalls->m_unGetNextThread, pSystemCalls->m_pSystemCallGate);
-#endif
-	}
-
-	static bool QueryWindowsThreadBasicInformationNoHook(HANDLE const hThread, WindowsNativeThreadBasicInformation* const pThreadInformationOut) noexcept {
-		constexpr std::size_t kThreadInformationSize = sizeof(WindowsNativeThreadBasicInformation);
-
-		static_assert(kThreadInformationSize <= std::numeric_limits<ULONG>::max(), "thread information size exceeds ULONG");
-
-		WindowsNativeSystemCalls const* const pSystemCalls = g_pPublishedWindowsNativeSystemCalls.load(std::memory_order_acquire);
-		if (!hThread || (hThread == INVALID_HANDLE_VALUE) || !pThreadInformationOut || !pSystemCalls) {
-			return false;
+		DWORD unPreviousThreadID = 0;
+		if (hPreviousThread) {
+			unPreviousThreadID = GetThreadId(hPreviousThread);
+			if (!unPreviousThreadID) {
+				return kWindowsNativeCallNotAttempted;
+			}
 		}
 
-		*pThreadInformationOut = {};
-#if defined(DETOURS_ARCH_X64)
-		const NTSTATUS nStatus = DetoursWindowsQueryThreadNativeSystemCall(hThread, static_cast<ULONG>(ThreadBasicInformation), pThreadInformationOut, static_cast<ULONG>(kThreadInformationSize), nullptr, pSystemCalls->m_unQueryInformationThread);
-#elif defined(DETOURS_ARCH_X86)
-		const NTSTATUS nStatus = DetoursWindowsQueryThreadNativeSystemCall(hThread, static_cast<ULONG>(ThreadBasicInformation), pThreadInformationOut, static_cast<ULONG>(kThreadInformationSize), nullptr, pSystemCalls->m_unQueryInformationThread, pSystemCalls->m_pSystemCallGate);
-#endif
-		return nStatus >= 0;
-	}
-
-	static bool GetWindowsThreadIDNoHook(HANDLE const hThread, DWORD* const pThreadIDOut) noexcept {
-		if (!pThreadIDOut) {
-			return false;
+		HANDLE const hSnapshot = CreateToolhelp32Snapshot(kThreadSnapshotFlags, 0);
+		if (hSnapshot == INVALID_HANDLE_VALUE) {
+			return kWindowsNativeCallNotAttempted;
 		}
 
-		WindowsNativeThreadBasicInformation ThreadInformation {};
-		if ((!QueryWindowsThreadBasicInformationNoHook(hThread, &ThreadInformation)) ||
-			(!ThreadInformation.m_ClientID.UniqueThread)) {
-			return false;
+		THREADENTRY32 ThreadEntry {};
+		ThreadEntry.dwSize = sizeof(ThreadEntry);
+		bool bAfterPreviousThread = !hPreviousThread;
+		if (Thread32First(hSnapshot, &ThreadEntry)) {
+			do {
+				if (ThreadEntry.th32OwnerProcessID != GetCurrentProcessId()) {
+					continue;
+				}
+
+				if (!bAfterPreviousThread) {
+					if (ThreadEntry.th32ThreadID == unPreviousThreadID) {
+						bAfterPreviousThread = true;
+					}
+
+					continue;
+				}
+
+				HANDLE const hThread = OpenThread(kDesiredAccess, FALSE, ThreadEntry.th32ThreadID);
+				if (hThread) {
+					CloseHandle(hSnapshot);
+					*phThreadOut = hThread;
+					return 0;
+				}
+			} while (Thread32Next(hSnapshot, &ThreadEntry));
 		}
 
-		const ULONG_PTR unThreadID = static_cast<ULONG_PTR>(ThreadInformation.m_ClientID.UniqueThread);
-		if (unThreadID > std::numeric_limits<DWORD>::max()) {
-			return false;
-		}
-
-		*pThreadIDOut = static_cast<DWORD>(unThreadID);
-		return true;
-	}
-
-	static bool ReadCurrentWindowsProcessMemoryNoHook(void const* const pBaseAddress, void* const pBufferOut, const SIZE_T unSize) noexcept {
-		constexpr LONG_PTR kCurrentProcessPseudoHandleValue = -1;
-
-		WindowsNativeSystemCalls const* const pSystemCalls = g_pPublishedWindowsNativeSystemCalls.load(std::memory_order_acquire);
-		if (!pBaseAddress || !pBufferOut || !unSize || !pSystemCalls) {
-			return false;
-		}
-
-		HANDLE const hCurrentProcess = reinterpret_cast<HANDLE>(kCurrentProcessPseudoHandleValue);
-		SIZE_T unBytesRead = 0;
-#if defined(DETOURS_ARCH_X64)
-		const NTSTATUS nStatus = DetoursWindowsReadVirtualMemoryNativeSystemCall(hCurrentProcess, pBaseAddress, pBufferOut, unSize, &unBytesRead, pSystemCalls->m_unReadVirtualMemory);
-#elif defined(DETOURS_ARCH_X86)
-		const NTSTATUS nStatus = DetoursWindowsReadVirtualMemoryNativeSystemCall(hCurrentProcess, pBaseAddress, pBufferOut, unSize, &unBytesRead, pSystemCalls->m_unReadVirtualMemory, pSystemCalls->m_pSystemCallGate);
-#endif
-		return (nStatus >= 0) && (unBytesRead == unSize);
-	}
-
-	static bool QueryCurrentWindowsProcessMemoryNoHook(void const* const pBaseAddress, MEMORY_BASIC_INFORMATION* const pMemoryInformationOut) noexcept {
-		constexpr LONG_PTR kCurrentProcessPseudoHandleValue = -1;
-		constexpr ULONG kMemoryBasicInformationClass = 0;
-			constexpr SIZE_T kMemoryInformationSize = sizeof(MEMORY_BASIC_INFORMATION);
-
-		WindowsNativeSystemCalls const* const pSystemCalls = g_pPublishedWindowsNativeSystemCalls.load(std::memory_order_acquire);
-		if (!pBaseAddress || !pMemoryInformationOut || !pSystemCalls) {
-			return false;
-		}
-
-		HANDLE const hCurrentProcess = reinterpret_cast<HANDLE>(kCurrentProcessPseudoHandleValue);
-		*pMemoryInformationOut = {};
-		SIZE_T unReturnSize = 0;
-#if defined(DETOURS_ARCH_X64)
-		const NTSTATUS nStatus = DetoursWindowsQueryVirtualMemoryNativeSystemCall(hCurrentProcess, pBaseAddress, kMemoryBasicInformationClass, pMemoryInformationOut, kMemoryInformationSize, &unReturnSize, pSystemCalls->m_unQueryVirtualMemory);
-#elif defined(DETOURS_ARCH_X86)
-		const NTSTATUS nStatus = DetoursWindowsQueryVirtualMemoryNativeSystemCall(hCurrentProcess, pBaseAddress, kMemoryBasicInformationClass, pMemoryInformationOut, kMemoryInformationSize, &unReturnSize, pSystemCalls->m_unQueryVirtualMemory, pSystemCalls->m_pSystemCallGate);
-#endif
-		return (nStatus >= 0) && (unReturnSize >= kMemoryInformationSize);
-	}
-
-	static bool CloseWindowsThreadStateHandleNoHook(HANDLE const hObject) noexcept {
-		WindowsNativeSystemCalls const* const pSystemCalls = g_pPublishedWindowsNativeSystemCalls.load(std::memory_order_acquire);
-		if (!pSystemCalls) {
-			return false;
-		}
-
-		return CallWindowsTwoArgumentNativeSystemCall(hObject, nullptr, pSystemCalls->m_unClose) >= 0;
-	}
-
-	static bool SetWindowsProtectedMemoryProtectionNoHook(void* const pAddress, const SIZE_T unSize, const ULONG unProtection) noexcept {
-		constexpr LONG_PTR kCurrentProcessPseudoHandleValue = -1;
-
-		if (!pAddress || !unSize) {
-			return false;
-		}
-
-		const std::uintptr_t unRequestedAddress = reinterpret_cast<std::uintptr_t>(pAddress);
-		if (unSize > (std::numeric_limits<std::uintptr_t>::max() - unRequestedAddress)) {
-			return false;
-		}
-
-		if (!EnsureWindowsNativeSystemCalls()) {
-			return false;
-		}
-
-		WindowsNativeSystemCalls const* const pSystemCalls = g_pPublishedWindowsNativeSystemCalls.load(std::memory_order_acquire);
-		if (!pSystemCalls) {
-			return false;
-		}
-
-		HANDLE const hCurrentProcess = reinterpret_cast<HANDLE>(kCurrentProcessPseudoHandleValue);
-		void* pProtectedBaseAddress = pAddress;
-		SIZE_T unProtectedRegionSize = unSize;
-		ULONG unOldProtection = 0;
-#if defined(DETOURS_ARCH_X64)
-		const NTSTATUS nStatus = DetoursWindowsFiveArgumentNativeSystemCall(hCurrentProcess, &pProtectedBaseAddress, &unProtectedRegionSize, unProtection, &unOldProtection, pSystemCalls->m_unProtectVirtualMemory);
-#elif defined(DETOURS_ARCH_X86)
-		const NTSTATUS nStatus = DetoursWindowsFiveArgumentNativeSystemCall(hCurrentProcess, &pProtectedBaseAddress, &unProtectedRegionSize, unProtection, &unOldProtection, pSystemCalls->m_unProtectVirtualMemory, pSystemCalls->m_pSystemCallGate);
-#endif
-		if ((nStatus < 0) || !pProtectedBaseAddress || !unProtectedRegionSize) {
-			return false;
-		}
-
-		const std::uintptr_t unProtectedBaseAddress = reinterpret_cast<std::uintptr_t>(pProtectedBaseAddress);
-		if ((unProtectedBaseAddress > unRequestedAddress) ||
-			(unProtectedRegionSize > (std::numeric_limits<std::uintptr_t>::max() - unProtectedBaseAddress)) ||
-			((unRequestedAddress - unProtectedBaseAddress) > unProtectedRegionSize)) {
-			return false;
-		}
-
-		const SIZE_T unOffset = static_cast<SIZE_T>(unRequestedAddress - unProtectedBaseAddress);
-		return unSize <= (unProtectedRegionSize - unOffset);
-	}
-
-	static bool EnsureWindowsHardwareNativeContextFunctions() noexcept {
-		return EnsureWindowsNativeSystemCalls();
+		CloseHandle(hSnapshot);
+		return kWindowsNativeNoMoreEntries;
 	}
 
 	static DWORD GetCurrentWindowsThreadStateReaperThreadID() noexcept {
@@ -12066,18 +11581,16 @@ namespace Detours {
 	}
 
 	static WindowsThreadLiveness GetWindowsThreadLiveness(HANDLE const hThread) noexcept {
-		constexpr LONGLONG kPollWaitInterval = 0;
-
 		if (!hThread || (hThread == INVALID_HANDLE_VALUE)) {
 			return WindowsThreadLiveness::UNKNOWN;
 		}
 
-		const NTSTATUS nWaitStatus = WaitForWindowsThreadStateHandleNoHook(hThread, kPollWaitInterval, false);
-		if (nWaitStatus == kWindowsThreadStateReaperWaitSuccess) {
+		const DWORD unWaitResult = WaitForSingleObject(hThread, 0);
+		if (unWaitResult == WAIT_OBJECT_0) {
 			return WindowsThreadLiveness::TERMINATED;
 		}
 
-		if (nWaitStatus == kWindowsThreadStateReaperWaitTimeout) {
+		if (unWaitResult == WAIT_TIMEOUT) {
 			return WindowsThreadLiveness::LIVE;
 		}
 
@@ -12381,7 +11894,12 @@ namespace Detours {
 		pFrame->m_unPreviousSuspendCount = kWindowsSuspenderCountUnknown;
 		pFrame->m_Step.store(WindowsSuspenderFrameStep::SUSPENDING, std::memory_order_release);
 		HANDLE const hTargetThread = pFrame->m_hTargetThread.load(std::memory_order_acquire);
-		pFrame->m_nSuspendStatus = SuspendWindowsThreadNoHook(hTargetThread, &pFrame->m_unPreviousSuspendCount);
+		const DWORD unPreviousSuspendCount = SuspendThread(hTargetThread);
+		pFrame->m_nSuspendStatus = unPreviousSuspendCount == kWindowsInvalidThreadSuspendCount ? kWindowsNativeCallNotAttempted : 0;
+		if (pFrame->m_nSuspendStatus >= 0) {
+			pFrame->m_unPreviousSuspendCount = unPreviousSuspendCount;
+		}
+
 		if (pFrame->m_nSuspendStatus < 0) {
 			pFrame->m_unPreviousSuspendCount = kWindowsSuspenderCountUnknown;
 			pFrame->m_Step.store(WindowsSuspenderFrameStep::NONE, std::memory_order_release);
@@ -12392,7 +11910,7 @@ namespace Detours {
 
 		*pContextOut = {};
 		pContextOut->ContextFlags = CONTEXT_FULL;
-		pFrame->m_nGetContextStatus = GetWindowsThreadContextNoHook(hTargetThread, pContextOut);
+		pFrame->m_nGetContextStatus = GetThreadContext(hTargetThread, pContextOut) ? 0 : kWindowsNativeCallNotAttempted;
 		if (pFrame->m_nGetContextStatus < 0) {
 			return false;
 		}
@@ -12426,7 +11944,7 @@ namespace Detours {
 		if (unDesiredInstructionPointer) {
 			CONTEXT CurrentContext {};
 			CurrentContext.ContextFlags = CONTEXT_CONTROL;
-			pFrame->m_nGetContextStatus = GetWindowsThreadContextNoHook(pFrame->m_hTargetThread.load(std::memory_order_acquire), &CurrentContext);
+			pFrame->m_nGetContextStatus = GetThreadContext(pFrame->m_hTargetThread.load(std::memory_order_acquire), &CurrentContext) ? 0 : kWindowsNativeCallNotAttempted;
 			if (pFrame->m_nGetContextStatus < 0) {
 				return false;
 			}
@@ -12437,7 +11955,7 @@ namespace Detours {
 			CurrentContext.Eip = static_cast<DWORD>(unDesiredInstructionPointer);
 #endif
 
-			pFrame->m_nSetContextStatus = SetWindowsThreadContextNoHook(pFrame->m_hTargetThread.load(std::memory_order_acquire), &CurrentContext);
+			pFrame->m_nSetContextStatus = SetThreadContext(pFrame->m_hTargetThread.load(std::memory_order_acquire), &CurrentContext) ? 0 : kWindowsNativeCallNotAttempted;
 			if (pFrame->m_nSetContextStatus < 0) {
 				return false;
 			}
@@ -12445,7 +11963,12 @@ namespace Detours {
 
 		pFrame->m_Step.store(WindowsSuspenderFrameStep::RESUMING, std::memory_order_release);
 		HANDLE const hTargetThread = pFrame->m_hTargetThread.load(std::memory_order_acquire);
-		pFrame->m_nResumeStatus = ResumeWindowsThreadNoHook(hTargetThread, &pFrame->m_unPreviousResumeCount);
+		const DWORD unPreviousResumeCount = ResumeThread(hTargetThread);
+		pFrame->m_nResumeStatus = unPreviousResumeCount == kWindowsInvalidThreadSuspendCount ? kWindowsNativeCallNotAttempted : 0;
+		if (pFrame->m_nResumeStatus >= 0) {
+			pFrame->m_unPreviousResumeCount = unPreviousResumeCount;
+		}
+
 		if (pFrame->m_nResumeStatus < 0) {
 			pFrame->m_unPreviousResumeCount = kWindowsSuspenderCountUnknown;
 			pFrame->m_Step.store(WindowsSuspenderFrameStep::TARGET_SUSPENDED, std::memory_order_release);
@@ -12464,10 +11987,14 @@ namespace Detours {
 			return false;
 		}
 
-		HANDLE const hTargetThread = pFrame->m_hTargetThread.exchange(nullptr, std::memory_order_acq_rel);
-		if (hTargetThread && (hTargetThread != INVALID_HANDLE_VALUE) && !CloseWindowsThreadStateHandleNoHook(hTargetThread)) {
+		HANDLE hTargetThread = pFrame->m_hTargetThread.load(std::memory_order_acquire);
+		while (hTargetThread && !pFrame->m_hTargetThread.compare_exchange_weak(hTargetThread, nullptr, std::memory_order_acq_rel, std::memory_order_acquire)) {
+		}
+
+		if (hTargetThread && (hTargetThread != INVALID_HANDLE_VALUE) && !CloseHandle(hTargetThread)) {
 			HANDLE hExpectedTargetThread = nullptr;
 			// Preserve a concurrent replacement and restore this handle only while the slot remains empty.
+#pragma warning(suppress: 6001) // The handle was obtained from the atomic thread-state exchange above.
 			pFrame->m_hTargetThread.compare_exchange_strong(hExpectedTargetThread, hTargetThread, std::memory_order_release, std::memory_order_relaxed);
 			return false;
 		}
@@ -12536,10 +12063,14 @@ namespace Detours {
 			}
 
 			if (State == WindowsSuspenderFrameState::PREPARING) {
-				HANDLE const hTargetThread = Frame.m_hTargetThread.exchange(nullptr, std::memory_order_acq_rel);
-				if (hTargetThread && (hTargetThread != INVALID_HANDLE_VALUE) && !CloseWindowsThreadStateHandleNoHook(hTargetThread)) {
+				HANDLE hTargetThread = Frame.m_hTargetThread.load(std::memory_order_acquire);
+				while (hTargetThread && !Frame.m_hTargetThread.compare_exchange_weak(hTargetThread, nullptr, std::memory_order_acq_rel, std::memory_order_acquire)) {
+				}
+
+				if (hTargetThread && (hTargetThread != INVALID_HANDLE_VALUE) && !CloseHandle(hTargetThread)) {
 					HANDLE hExpectedTargetThread = nullptr;
 					// Preserve a concurrent replacement and restore this handle only while the slot remains empty.
+#pragma warning(suppress: 6001) // The handle was obtained from the atomic thread-state exchange above.
 					Frame.m_hTargetThread.compare_exchange_strong(hExpectedTargetThread, hTargetThread, std::memory_order_release, std::memory_order_relaxed);
 					bSuccess = false;
 					continue;
@@ -12735,7 +12266,7 @@ namespace Detours {
 		HANDLE const hThread = pThreadState->m_hThread.exchange(nullptr, std::memory_order_acq_rel);
 		if (hThread && (hThread != INVALID_HANDLE_VALUE)) {
 			// Slot retirement cannot propagate cleanup status, so this close is intentionally best-effort.
-			CloseWindowsThreadStateHandleNoHook(hThread);
+			CloseHandle(hThread);
 		}
 
 		pThreadState->m_unSlotState.store(static_cast<unsigned int>(WindowsThreadStateSlotStatus::FREE), std::memory_order_release);
@@ -13164,7 +12695,6 @@ namespace Detours {
 
 	static bool StartWindowsThreadStateReaper(LPTHREAD_START_ROUTINE const fnStartAddress) noexcept {
 		constexpr unsigned int kCounterIncrement = 1;
-		constexpr LONGLONG kImmediateWaitInterval = 0;
 
 		if (g_unWindowsThreadStateReaperThreadID.load(std::memory_order_acquire) == GetCurrentWindowsThreadStateReaperThreadID()) {
 			return g_WindowsThreadStateReaperStatus.load(std::memory_order_acquire) == WindowsThreadStateReaperStatus::RUNNING;
@@ -13180,37 +12710,33 @@ namespace Detours {
 			g_bWindowsThreadStateReaperConfigured.store(true, std::memory_order_release);
 		}
 
-		if (!EnsureWindowsNativeSystemCalls()) {
-			g_WindowsThreadStateReaperStatus.store(WindowsThreadStateReaperStatus::STOPPED, std::memory_order_release);
-			return false;
-		}
-
 		if (g_hWindowsThreadStateReaper) {
 			const WindowsThreadStateReaperStatus CurrentStatus = g_WindowsThreadStateReaperStatus.load(std::memory_order_acquire);
 			const unsigned int unRunGeneration = g_unWindowsThreadStateReaperRunGeneration.load(std::memory_order_acquire);
-			NTSTATUS nWaitStatus = WaitForWindowsThreadStateHandleNoHook(g_hWindowsThreadStateReaper, kImmediateWaitInterval, false);
+			DWORD unWaitResult = WaitForSingleObject(g_hWindowsThreadStateReaper, 0);
 			if ((CurrentStatus == WindowsThreadStateReaperStatus::STOPPING) &&
-				(nWaitStatus == kWindowsThreadStateReaperWaitTimeout)) {
-				if (!ResumeWindowsThreadStateHandleNoHook(g_hWindowsThreadStateReaper) || !SetWindowsThreadStateEventNoHook(g_hWindowsThreadStateReaperEvent)) {
+				(unWaitResult == WAIT_TIMEOUT)) {
+				if ((ResumeThread(g_hWindowsThreadStateReaper) == kWindowsInvalidThreadSuspendCount) ||
+					!SetEvent(g_hWindowsThreadStateReaperEvent)) {
 					return false;
 				}
 
-				nWaitStatus = WaitForWindowsThreadStateHandleNoHook(g_hWindowsThreadStateReaper, kWindowsThreadStateReaperStopWaitInterval, false);
+				unWaitResult = WaitForSingleObject(g_hWindowsThreadStateReaper, kWindowsThreadStateReaperStopWaitMilliseconds);
 			}
 
 			if ((CurrentStatus == WindowsThreadStateReaperStatus::STARTING) &&
-				(nWaitStatus == kWindowsThreadStateReaperWaitTimeout) &&
-				(!ResumeWindowsThreadStateHandleNoHook(g_hWindowsThreadStateReaper))) {
+				(unWaitResult == WAIT_TIMEOUT) &&
+				(ResumeThread(g_hWindowsThreadStateReaper) == kWindowsInvalidThreadSuspendCount)) {
 				return false;
 			}
 
 			if (((CurrentStatus == WindowsThreadStateReaperStatus::STARTING) ||
 				(CurrentStatus == WindowsThreadStateReaperStatus::RUNNING)) &&
-				(nWaitStatus == kWindowsThreadStateReaperWaitTimeout)) {
+				(unWaitResult == WAIT_TIMEOUT)) {
 				return true;
 			}
 
-			if (!unRunGeneration || (nWaitStatus != kWindowsThreadStateReaperWaitSuccess)) {
+			if (!unRunGeneration || (unWaitResult != WAIT_OBJECT_0)) {
 				return false;
 			}
 
@@ -13219,7 +12745,7 @@ namespace Detours {
 			HANDLE const hRetiredThread = g_hWindowsThreadStateReaper;
 			g_unWindowsThreadStateReaperThreadID.store(0, std::memory_order_release);
 			g_WindowsThreadStateReaperStatus.store(WindowsThreadStateReaperStatus::STOPPED, std::memory_order_release);
-			if (!CloseWindowsThreadStateHandleNoHook(hRetiredThread)) {
+			if (!CloseHandle(hRetiredThread)) {
 				return false;
 			}
 
@@ -13261,7 +12787,16 @@ namespace Detours {
 
 		g_hWindowsThreadStateReaper = hThread;
 		g_unWindowsThreadStateReaperStartCount.fetch_add(kCounterIncrement, std::memory_order_acq_rel);
-		return ResumeWindowsThreadStateHandleNoHook(hThread);
+		if (ResumeThread(hThread) != kWindowsInvalidThreadSuspendCount) {
+			return true;
+		}
+
+		g_hWindowsThreadStateReaper = nullptr;
+		g_WindowsThreadStateReaperStatus.store(WindowsThreadStateReaperStatus::STOPPED, std::memory_order_release);
+		// The thread handle is no longer published; cleanup failure cannot make
+		// the failed reaper start usable.
+		CloseHandle(hThread);
+		return false;
 	}
 
 	static bool PrepareWindowsThreadStateReaperForSuspend() noexcept {
@@ -13968,14 +13503,17 @@ namespace Detours {
 			return true;
 		}
 
-		auto* const pSystemCalls = g_pPublishedWindowsNativeSystemCalls.load(std::memory_order_acquire);
-		if (!pSystemCalls) {
+		if (!pFrame->m_pRecord) {
 			return false;
 		}
 
 		pFrame->m_Step.store(WindowsHardwareOperationStep::RESUMING_TARGET, std::memory_order_release);
+		const DWORD unPreviousResumeCount = ResumeThread(pFrame->m_pRecord->m_hThread);
+		pFrame->m_nResumeStatus = unPreviousResumeCount == kWindowsInvalidThreadSuspendCount ? kWindowsNativeCallNotAttempted : 0;
+		if (pFrame->m_nResumeStatus >= 0) {
+			pFrame->m_unPreviousResumeCount = unPreviousResumeCount;
+		}
 
-		pFrame->m_nResumeStatus = CallWindowsTwoArgumentNativeSystemCall(pFrame->m_pRecord->m_hThread, &pFrame->m_unPreviousResumeCount, pSystemCalls->m_unResumeThread);
 		if (pFrame->m_nResumeStatus < 0) {
 			return false;
 		}
@@ -14005,15 +13543,6 @@ namespace Detours {
 			return pFrame->m_bContextMutationSucceeded;
 		}
 
-		if (!EnsureWindowsHardwareNativeContextFunctions()) {
-			return false;
-		}
-
-		auto* const pSystemCalls = g_pPublishedWindowsNativeSystemCalls.load(std::memory_order_acquire);
-		if (!pSystemCalls) {
-			return false;
-		}
-
 		if ((pFrame->m_unPreviousSuspendCount == kWindowsHardwareOperationSuspendCountUnknown) ||
 			(pFrame->m_unPreviousResumeCount != kWindowsHardwareOperationSuspendCountUnknown)) {
 			pFrame->m_unPreviousSuspendCount = kWindowsHardwareOperationSuspendCountUnknown;
@@ -14021,7 +13550,12 @@ namespace Detours {
 
 			pFrame->m_Step.store(WindowsHardwareOperationStep::SUSPENDING_TARGET, std::memory_order_release);
 
-			pFrame->m_nSuspendStatus = CallWindowsTwoArgumentNativeSystemCall(pRecord->m_hThread, &pFrame->m_unPreviousSuspendCount, pSystemCalls->m_unSuspendThread);
+			const DWORD unPreviousSuspendCount = SuspendThread(pRecord->m_hThread);
+			pFrame->m_nSuspendStatus = unPreviousSuspendCount == kWindowsInvalidThreadSuspendCount ? kWindowsNativeCallNotAttempted : 0;
+			if (pFrame->m_nSuspendStatus >= 0) {
+				pFrame->m_unPreviousSuspendCount = unPreviousSuspendCount;
+			}
+
 			if (pFrame->m_nSuspendStatus < 0) {
 				return false;
 			}
@@ -14034,7 +13568,7 @@ namespace Detours {
 
 		pFrame->m_Step.store(WindowsHardwareOperationStep::READING_CONTEXT, std::memory_order_release);
 
-		pFrame->m_nGetContextStatus = CallWindowsTwoArgumentNativeSystemCall(pRecord->m_hThread, &pFrame->m_OriginalContext, pSystemCalls->m_unGetContextThread);
+		pFrame->m_nGetContextStatus = GetThreadContext(pRecord->m_hThread, &pFrame->m_OriginalContext) ? 0 : kWindowsNativeCallNotAttempted;
 		if (pFrame->m_nGetContextStatus < 0) {
 			// The context read already failed; resuming the target is best-effort cleanup.
 			ResumeWindowsHardwareOperationTarget(pFrame);
@@ -14073,14 +13607,14 @@ namespace Detours {
 
 		pFrame->m_Step.store(WindowsHardwareOperationStep::SETTING_CONTEXT, std::memory_order_release);
 
-		pFrame->m_nSetContextStatus = CallWindowsTwoArgumentNativeSystemCall(pRecord->m_hThread, &pFrame->m_DesiredContext, pSystemCalls->m_unSetContextThread);
+		pFrame->m_nSetContextStatus = SetThreadContext(pRecord->m_hThread, &pFrame->m_DesiredContext) ? 0 : kWindowsNativeCallNotAttempted;
 
 		pFrame->m_VerificationContext = {};
 		pFrame->m_VerificationContext.ContextFlags = CONTEXT_DEBUG_REGISTERS;
 
 		pFrame->m_Step.store(WindowsHardwareOperationStep::VERIFYING_CONTEXT, std::memory_order_release);
 
-		pFrame->m_nVerificationStatus = CallWindowsTwoArgumentNativeSystemCall(pRecord->m_hThread, &pFrame->m_VerificationContext, pSystemCalls->m_unGetContextThread);
+		pFrame->m_nVerificationStatus = GetThreadContext(pRecord->m_hThread, &pFrame->m_VerificationContext) ? 0 : kWindowsNativeCallNotAttempted;
 		if (pFrame->m_nVerificationStatus >= 0) {
 			pFrame->m_FinalSlotState = GetWindowsHardwareOperationSlotState(pFrame->m_VerificationContext, pRecord, pFrame->m_unDRIndex);
 		} else {
@@ -14104,7 +13638,7 @@ namespace Detours {
 		if ((!pExceptionRecord) ||
 			(!pWindowsContext) ||
 			(pExceptionRecord->ExceptionCode != EXCEPTION_BREAKPOINT) ||
-			(pExceptionRecord->ExceptionAddress != WindowsHardwareContextBreakpointAddress)) {
+			(pExceptionRecord->ExceptionAddress != GetWindowsHardwareContextBreakpointAddress())) {
 			return false;
 		}
 
@@ -14337,12 +13871,20 @@ namespace Detours {
 			return nullptr;
 		}
 
-		if (!g_fnNtQueryInformationThread) {
+		// Windows has no documented API that returns another thread's TEB. Resolve
+		// this one compatibility export on demand; no syscall number or gate is used.
+		HMODULE const hNTDLL = GetModuleHandleW(L"ntdll.dll");
+		if (!hNTDLL) {
+			return nullptr;
+		}
+
+		fnNtQueryInformationThread const fnQueryInformationThread = reinterpret_cast<fnNtQueryInformationThread>(GetProcAddress(hNTDLL, "NtQueryInformationThread"));
+		if (!fnQueryInformationThread) {
 			return nullptr;
 		}
 
 		THREAD_BASIC_INFORMATION ThreadInformation {};
-		const NTSTATUS nStatus = g_fnNtQueryInformationThread(hThread, ThreadBasicInformation, &ThreadInformation, static_cast<ULONG>(kThreadInformationSize), nullptr);
+		const NTSTATUS nStatus = fnQueryInformationThread(hThread, ThreadBasicInformation, &ThreadInformation, static_cast<ULONG>(kThreadInformationSize), nullptr);
 		if (nStatus != 0) {
 			return nullptr;
 		}
@@ -14872,11 +14414,8 @@ namespace Detours {
 			const std::size_t unByteCount = unEntryCount * kShadowStackEntrySize;
 			vecCallStack.resize(unEntryCount);
 
-			SIZE_T unBytesRead = 0;
-			const SIZE_T unBytesToRead = static_cast<SIZE_T>(unByteCount);
-			if (unBytesToRead != 0) {
-				const BOOL bRead = ReadProcessMemory(GetCurrentProcess(), pShadowStack, vecCallStack.data(), unBytesToRead, &unBytesRead);
-				if (!bRead || (unBytesRead != unBytesToRead)) {
+			if (unByteCount != 0) {
+				if (!ReadCurrentWindowsMemory(pShadowStack, vecCallStack.data(), unByteCount)) {
 					vecCallStack.clear();
 				}
 			}
@@ -23792,18 +23331,8 @@ namespace Detours {
 		}
 
 		bool Mutex::Lock(const DWORD unMilliseconds) {
-			constexpr LONGLONG kHundredNanosecondIntervalsPerMillisecond = 10'000;
-
 			if (!m_hMutex || (m_hMutex == INVALID_HANDLE_VALUE)) {
 				return false;
-			}
-
-			if (g_pPublishedWindowsNativeSystemCalls.load(std::memory_order_acquire)) {
-				const bool bInfinite = unMilliseconds == INFINITE;
-				const LONGLONG nWaitMilliseconds = static_cast<LONGLONG>(unMilliseconds);
-				const LONGLONG nWaitInterval = bInfinite ? 0 : (-nWaitMilliseconds * kHundredNanosecondIntervalsPerMillisecond);
-				const NTSTATUS nStatus = WaitForWindowsThreadStateHandleNoHook(m_hMutex, nWaitInterval, bInfinite);
-				return (nStatus == kWindowsThreadStateReaperWaitSuccess) || (nStatus == static_cast<NTSTATUS>(WAIT_ABANDONED));
 			}
 
 			const DWORD unWaitResult = WaitForSingleObject(m_hMutex, unMilliseconds);
@@ -23819,15 +23348,7 @@ namespace Detours {
 				return false;
 			}
 
-			if (g_pPublishedWindowsNativeSystemCalls.load(std::memory_order_acquire)) {
-				return ReleaseWindowsMutantNoHook(m_hMutex);
-			}
-
-			if (!ReleaseMutex(m_hMutex)) {
-				return false;
-			}
-
-			return true;
+			return ReleaseMutex(m_hMutex) != FALSE;
 		}
 
 		// ----------------------------------------------------------------
@@ -24331,24 +23852,7 @@ namespace Detours {
 		// ----------------------------------------------------------------
 
 		static bool IsWindowsStackProtectionReadable(const DWORD unProtection) noexcept {
-			constexpr DWORD kProtectionTypeMask = 0xFF;
-
-			if (unProtection & (PAGE_GUARD | PAGE_NOACCESS)) {
-				return false;
-			}
-
-			switch (unProtection & kProtectionTypeMask) {
-				case PAGE_READONLY:
-				case PAGE_READWRITE:
-				case PAGE_WRITECOPY:
-				case PAGE_EXECUTE_READ:
-				case PAGE_EXECUTE_READWRITE:
-				case PAGE_EXECUTE_WRITECOPY:
-					return true;
-
-				default:
-					return false;
-			}
+			return IsWindowsMemoryProtectionReadable(unProtection);
 		}
 
 		static bool IsWindowsThreadContextReferencingRange(CONTEXT const& WindowsContext, void const* const pAddress, const std::size_t unSize) noexcept {
@@ -24394,13 +23898,13 @@ namespace Detours {
 				return true;
 			}
 
-			WindowsNativeThreadBasicInformation ThreadBasicInformation {};
-			if (!QueryWindowsThreadBasicInformationNoHook(hThread, &ThreadBasicInformation) || !ThreadBasicInformation.m_pTEB) {
+			PTEB const pTEB = GetTEB(hThread);
+			if (!pTEB) {
 				return true;
 			}
 
 			NT_TIB ThreadInformation {};
-			if (!ReadCurrentWindowsProcessMemoryNoHook(ThreadBasicInformation.m_pTEB, &ThreadInformation, sizeof(ThreadInformation))) {
+			if (!ReadCurrentWindowsMemory(pTEB, &ThreadInformation, sizeof(ThreadInformation))) {
 				return true;
 			}
 
@@ -24431,7 +23935,7 @@ namespace Detours {
 
 			while (unStackCursorAddress < unStackEndAddress) {
 				MEMORY_BASIC_INFORMATION MemoryInformation {};
-				if (!QueryCurrentWindowsProcessMemoryNoHook(reinterpret_cast<void const*>(unStackCursorAddress), &MemoryInformation)) {
+				if (VirtualQuery(reinterpret_cast<void const*>(unStackCursorAddress), &MemoryInformation, sizeof(MemoryInformation)) < sizeof(MemoryInformation)) {
 					return true;
 				}
 
@@ -24458,7 +23962,7 @@ namespace Detours {
 				while ((unRegionEndAddress - unStackCursorAddress) >= sizeof(std::uintptr_t)) {
 					const std::size_t unReadableEntryCount = static_cast<std::size_t>((unRegionEndAddress - unStackCursorAddress) / sizeof(std::uintptr_t));
 					const std::size_t unReadSize = std::min(sizeof(arrCandidateAddresses), unReadableEntryCount * sizeof(std::uintptr_t));
-					if (!ReadCurrentWindowsProcessMemoryNoHook(reinterpret_cast<void const*>(unStackCursorAddress), arrCandidateAddresses, unReadSize)) {
+					if (!ReadCurrentWindowsMemory(reinterpret_cast<void const*>(unStackCursorAddress), arrCandidateAddresses, unReadSize)) {
 						return true;
 					}
 
@@ -24470,7 +23974,8 @@ namespace Detours {
 
 						const std::size_t unCandidateOffset = static_cast<std::size_t>(arrCandidateAddresses[unIndex] - unRangeAddress);
 						auto ReadCode = [unRangeAddress](const std::size_t unOffset, unsigned char* const pCodeOut, const std::size_t unCodeSize) noexcept -> bool {
-							return ReadCurrentWindowsProcessMemoryNoHook(reinterpret_cast<void const*>(unRangeAddress + unOffset), pCodeOut, unCodeSize);
+							return (unOffset <= (std::numeric_limits<std::uintptr_t>::max() - unRangeAddress)) &&
+								ReadCurrentWindowsMemory(reinterpret_cast<void const*>(unRangeAddress + unOffset), pCodeOut, unCodeSize);
 						};
 						const StackReturnAddressValidationResult ValidationResult = ValidateDecodedStackReturnAddress(unCandidateOffset, unSize, ReadCode);
 						if (ValidationResult != StackReturnAddressValidationResult::NOT_RETURN_ADDRESS) {
@@ -24667,7 +24172,10 @@ namespace Detours {
 
 		bool Suspender::PrepareWindowsThread(const DWORD unThreadID, HANDLE const hThread, bool* const pAddedOut) {
 			if (!pAddedOut) {
-				CloseWindowsThreadStateHandleNoHook(hThread);
+				if (hThread && (hThread != INVALID_HANDLE_VALUE)) {
+					CloseHandle(hThread);
+				}
+
 				return false;
 			}
 
@@ -24677,14 +24185,20 @@ namespace Detours {
 				!m_pThreads ||
 				!m_unThreadStateReaperPauseOwnerToken ||
 				(m_unThreadCount >= kWindowsSuspenderThreadCapacity)) {
-				CloseWindowsThreadStateHandleNoHook(hThread);
+				if (hThread && (hThread != INVALID_HANDLE_VALUE)) {
+					CloseHandle(hThread);
+				}
+
 				return false;
 			}
 
 			std::size_t unFrameIndex = 0;
 			auto* const pFrame = ReserveWindowsSuspenderFrame(m_unThreadStateReaperPauseOwnerToken, unThreadID, hThread, &unFrameIndex);
 			if (!pFrame) {
-				CloseWindowsThreadStateHandleNoHook(hThread);
+				if (hThread && (hThread != INVALID_HANDLE_VALUE)) {
+					CloseHandle(hThread);
+				}
+
 				return false;
 			}
 
@@ -25050,10 +24564,11 @@ namespace Detours {
 			bool bPreviousThreadOwnedByFrame = false;
 			for (;;) {
 				HANDLE hThread = nullptr;
-				const NTSTATUS nStatus = GetNextWindowsThreadNoHook(hPreviousThread, &hThread);
-				if (hPreviousThread && !bPreviousThreadOwnedByFrame && !CloseWindowsThreadStateHandleNoHook(hPreviousThread)) {
-					if (hThread) {
-						CloseWindowsThreadStateHandleNoHook(hThread);
+				const NTSTATUS nStatus = EnumerateNextWindowsThread(hPreviousThread, &hThread);
+				if (hPreviousThread && !bPreviousThreadOwnedByFrame && !CloseHandle(hPreviousThread)) {
+					if (hThread && (hThread != INVALID_HANDLE_VALUE)) {
+#pragma warning(suppress: 6001) // EnumerateNextWindowsThread initializes the output handle before returning.
+						CloseHandle(hThread);
 					}
 
 					return kSuspendSnapshotFailure;
@@ -25064,7 +24579,7 @@ namespace Detours {
 
 				if (nStatus == kWindowsNativeNoMoreEntries) {
 					if (hThread) {
-						CloseWindowsThreadStateHandleNoHook(hThread);
+						CloseHandle(hThread);
 						return kSuspendSnapshotFailure;
 					}
 
@@ -25073,15 +24588,15 @@ namespace Detours {
 
 				if ((nStatus < 0) || !hThread) {
 					if (hThread) {
-						CloseWindowsThreadStateHandleNoHook(hThread);
+						CloseHandle(hThread);
 					}
 
 					return kSuspendSnapshotFailure;
 				}
 
-				DWORD unThreadID = 0;
-				if (!GetWindowsThreadIDNoHook(hThread, &unThreadID)) {
-					CloseWindowsThreadStateHandleNoHook(hThread);
+				const DWORD unThreadID = GetThreadId(hThread);
+				if (!unThreadID) {
+					CloseHandle(hThread);
 					return kSuspendSnapshotFailure;
 				}
 
@@ -25095,7 +24610,7 @@ namespace Detours {
 
 				const WindowsThreadLiveness ThreadLiveness = GetWindowsThreadLiveness(hThread);
 				if (ThreadLiveness == WindowsThreadLiveness::UNKNOWN) {
-					CloseWindowsThreadStateHandleNoHook(hThread);
+					CloseHandle(hThread);
 					return kSuspendSnapshotFailure;
 				}
 
@@ -25108,7 +24623,7 @@ namespace Detours {
 				bool bIdentityKnown = false;
 				const bool bPrepared = IsWindowsThreadPrepared(unThreadID, &bIdentityKnown);
 				if (!bIdentityKnown) {
-					CloseWindowsThreadStateHandleNoHook(hThread);
+					CloseHandle(hThread);
 					return kSuspendSnapshotFailure;
 				}
 
@@ -25133,7 +24648,7 @@ namespace Detours {
 				}
 			}
 
-			if (hPreviousThread && !bPreviousThreadOwnedByFrame && !CloseWindowsThreadStateHandleNoHook(hPreviousThread)) {
+			if (hPreviousThread && !bPreviousThreadOwnedByFrame && !CloseHandle(hPreviousThread)) {
 				return kSuspendSnapshotFailure;
 			}
 
@@ -36104,10 +35619,6 @@ namespace Detours {
 			}
 
 #if defined(_WIN32)
-			if (!EnsureWindowsNativeSystemCalls()) {
-				return nullptr;
-			}
-
 			// Seed the CFG bitmap while the new payload is still empty, then remove
 			// execute access before the allocation becomes observable.
 			void* const pAddress = VirtualAlloc(nullptr, unSize, MEM_COMMIT | MEM_RESERVE, PAGE_EXECUTE_READ);
@@ -36115,7 +35626,8 @@ namespace Detours {
 				return nullptr;
 			}
 
-			if (!SetWindowsProtectedMemoryProtectionNoHook(pAddress, unSize, kProtectedMemoryMaintenanceProtection)) {
+			ULONG unOldProtection = 0;
+			if (!VirtualProtect(pAddress, unSize, kProtectedMemoryMaintenanceProtection, &unOldProtection)) {
 				VirtualFree(pAddress, 0, MEM_RELEASE);
 				return nullptr;
 			}
@@ -36159,7 +35671,13 @@ namespace Detours {
 			}
 
 #if defined(_WIN32)
-			return SetWindowsProtectedMemoryProtectionNoHook(pAddress, unSize, unProtection);
+			const std::uintptr_t unRequestedAddress = reinterpret_cast<std::uintptr_t>(pAddress);
+			if (unSize > (std::numeric_limits<std::uintptr_t>::max() - unRequestedAddress)) {
+				return false;
+			}
+
+			ULONG unOldProtection = 0;
+			return VirtualProtect(pAddress, unSize, unProtection, &unOldProtection) != FALSE;
 #elif defined(__linux__)
 			return MProtectRange(pAddress, unSize, nProtection);
 #endif
@@ -39361,7 +38879,7 @@ namespace Detours {
 			}
 
 #if defined(_WIN32)
-			if (!EnsureWindowsNativeSystemCalls() || !Exception::EnableInternalHookExceptionHandler()) {
+			if (!Exception::EnableInternalHookExceptionHandler()) {
 				if (bOwnsMemory) {
 					FreeProtectedMemoryPages(pAddress, unProtectedSize);
 				}
@@ -43797,9 +43315,9 @@ namespace Detours {
 				}
 
 				const HANDLE hEvent = g_hWindowsThreadStateReaperEvent;
-				const NTSTATUS nWaitStatus = WaitForWindowsThreadStateHandleNoHook(hEvent, kWindowsThreadStateReaperWaitInterval, false);
-				if ((nWaitStatus != kWindowsThreadStateReaperWaitSuccess) &&
-					(nWaitStatus != kWindowsThreadStateReaperWaitTimeout)) {
+				const DWORD unWaitResult = WaitForSingleObject(hEvent, kWindowsThreadStateReaperWaitMilliseconds);
+				if ((unWaitResult != WAIT_OBJECT_0) &&
+					(unWaitResult != WAIT_TIMEOUT)) {
 					break;
 				}
 			}
@@ -43813,7 +43331,6 @@ namespace Detours {
 		}
 
 		static bool StopWindowsThreadStateReaper() noexcept {
-			constexpr LONGLONG kImmediateWaitInterval = 0;
 			if (g_unWindowsThreadStateReaperThreadID.load(std::memory_order_acquire) == GetCurrentWindowsThreadStateReaperThreadID()) {
 				return false;
 			}
@@ -43830,7 +43347,7 @@ namespace Detours {
 			const HANDLE hThread = g_hWindowsThreadStateReaper;
 			const HANDLE hEvent = g_hWindowsThreadStateReaperEvent;
 			if (!hThread) {
-				if (hEvent && !CloseWindowsThreadStateHandleNoHook(hEvent)) {
+				if (hEvent && !CloseHandle(hEvent)) {
 					return false;
 				}
 
@@ -43846,17 +43363,17 @@ namespace Detours {
 				return false;
 			}
 
-			NTSTATUS nWaitStatus = WaitForWindowsThreadStateHandleNoHook(hThread, kImmediateWaitInterval, false);
-			if (nWaitStatus == kWindowsThreadStateReaperWaitTimeout) {
-				if (!ResumeWindowsThreadStateHandleNoHook(hThread) ||
-					!SetWindowsThreadStateEventNoHook(hEvent)) {
+			DWORD unWaitResult = WaitForSingleObject(hThread, 0);
+			if (unWaitResult == WAIT_TIMEOUT) {
+				if ((ResumeThread(hThread) == kWindowsInvalidThreadSuspendCount) ||
+					!SetEvent(hEvent)) {
 					return false;
 				}
 
-				nWaitStatus = WaitForWindowsThreadStateHandleNoHook(hThread, kWindowsThreadStateReaperStopWaitInterval, false);
+				unWaitResult = WaitForSingleObject(hThread, kWindowsThreadStateReaperStopWaitMilliseconds);
 			}
 
-			if (nWaitStatus != kWindowsThreadStateReaperWaitSuccess) {
+			if (unWaitResult != WAIT_OBJECT_0) {
 				return false;
 			}
 
@@ -43867,13 +43384,13 @@ namespace Detours {
 				return false;
 			}
 
-			if (!CloseWindowsThreadStateHandleNoHook(hThread)) {
+			if (!CloseHandle(hThread)) {
 				return false;
 			}
 
 			g_hWindowsThreadStateReaper = nullptr;
 
-			if (hEvent && !CloseWindowsThreadStateHandleNoHook(hEvent)) {
+			if (hEvent && !CloseHandle(hEvent)) {
 				return false;
 			}
 
@@ -44519,9 +44036,8 @@ namespace Detours {
 			}
 
 			unsigned char arrCode[kInterruptInstructionSize] {};
-			SIZE_T unRead = 0;
-			const BOOL bRead = ReadProcessMemory(GetCurrentProcess(), Exception.ExceptionAddress, arrCode, sizeof(arrCode), &unRead);
-			if (!bRead || (unRead != sizeof(arrCode)) || (arrCode[kInterruptOpcodeOffset] != kInterruptOpcode)) {
+			if (!ReadCurrentWindowsMemory(Exception.ExceptionAddress, arrCode, sizeof(arrCode)) ||
+				(arrCode[kInterruptOpcodeOffset] != kInterruptOpcode)) {
 				return false;
 			}
 
@@ -44572,9 +44088,7 @@ namespace Detours {
 						}
 
 						const DWORD64 unResumeAddress = static_cast<DWORD64>(unExceptionAddress + kInterruptInstructionSize);
-						SIZE_T unWritten = 0;
-						if (!WriteProcessMemory(GetCurrentProcess(), reinterpret_cast<void*>(pContext->Rsp - sizeof(unResumeAddress)), &unResumeAddress, sizeof(unResumeAddress), &unWritten) ||
-							(unWritten != sizeof(unResumeAddress))) {
+						if (!WriteCurrentWindowsMemory(reinterpret_cast<void*>(pContext->Rsp - sizeof(unResumeAddress)), &unResumeAddress, sizeof(unResumeAddress))) {
 							bHandled = false;
 							continue;
 						}
@@ -77593,7 +77107,6 @@ namespace rddisasm {
 
 		bool UnHookHardware(const DetoursHardwareThreadID unThreadID, const HARDWARE_HOOK_REGISTER Register) {
 #if defined(_WIN32)
-			constexpr LONGLONG kImmediateWaitInterval = 0;
 			unsigned char unDRIndex = 0;
 			if (!unThreadID || !GetHardwareHookRegisterIndex(Register, &unDRIndex)) {
 				return false;
@@ -77660,7 +77173,7 @@ namespace rddisasm {
 					return GetLastError() == ERROR_INVALID_PARAMETER;
 				}
 
-				const bool bTerminated = WaitForWindowsThreadStateHandleNoHook(hThread, kImmediateWaitInterval, false) == kWindowsThreadStateReaperWaitSuccess;
+			const bool bTerminated = WaitForSingleObject(hThread, 0) == WAIT_OBJECT_0;
 				CloseHandle(hThread);
 				return bTerminated;
 			}
@@ -77724,14 +77237,14 @@ namespace rddisasm {
 			}
 
 			const bool bRestored = ExecuteWindowsHardwareOperationFrame(pFrame, true) && (pFrame->m_FinalSlotState == WindowsHardwareSlotState::ORIGINAL);
-			const NTSTATUS nWaitStatus = bRestored ? kWindowsThreadStateReaperWaitTimeout : WaitForWindowsThreadStateHandleNoHook(pTargetRecord->m_hThread, kImmediateWaitInterval, false);
-			const bool bTargetTerminated = nWaitStatus == kWindowsThreadStateReaperWaitSuccess;
+			const DWORD unWaitResult = bRestored ? WAIT_TIMEOUT : WaitForSingleObject(pTargetRecord->m_hThread, 0);
+			const bool bTargetTerminated = unWaitResult == WAIT_OBJECT_0;
 			const bool bTargetSuspended = !pFrame->m_bCurrentTarget &&
 				(pFrame->m_unPreviousSuspendCount != kWindowsHardwareOperationSuspendCountUnknown) &&
 				(pFrame->m_unPreviousResumeCount == kWindowsHardwareOperationSuspendCountUnknown);
 
 			// Release publishes any incomplete frame state to the recovery path before returning.
-			if (bTargetSuspended || (!bRestored && !bTargetTerminated && (nWaitStatus != kWindowsThreadStateReaperWaitTimeout))) {
+			if (bTargetSuspended || (!bRestored && !bTargetTerminated && (unWaitResult != WAIT_TIMEOUT))) {
 				pThreadState->m_bRecoveryPending.store(true, std::memory_order_release);
 				return false;
 			}
@@ -78074,13 +77587,7 @@ namespace rddisasm {
 			}
 
 #if defined(_WIN32)
-			__try {
-				std::memcpy(punBytesOut, pAddress, unSize);
-			} __except (EXCEPTION_EXECUTE_HANDLER) {
-				return false;
-			}
-
-			return true;
+			return ReadCurrentWindowsMemory(pAddress, punBytesOut, unSize);
 #elif defined(__linux__)
 			const std::uintptr_t unEndAddress = unAddress + unSize;
 			for (std::uintptr_t unCursorAddress = unAddress; unCursorAddress < unEndAddress;) {
@@ -78332,11 +77839,9 @@ namespace rddisasm {
 			constexpr std::size_t kInlineWrapperHookShortJumpBytes = 2;
 
 			void* pCurrentAddress = pHookAddress;
-			HANDLE const hProcess = GetCurrentProcess();
 			for (std::size_t unJumpIndex = 0; unJumpIndex < kInlineHookCallbackJumpLimit; ++unJumpIndex) {
 				unsigned char arrCode[kInlineWrapperHookInstructionBytes] {};
-				SIZE_T unBytesRead = 0;
-				if (!ReadProcessMemory(hProcess, pCurrentAddress, arrCode, sizeof(arrCode), &unBytesRead) || (unBytesRead != sizeof(arrCode))) {
+				if (!ReadCurrentWindowsMemory(pCurrentAddress, arrCode, sizeof(arrCode))) {
 					return nullptr;
 				}
 
@@ -78365,8 +77870,7 @@ namespace rddisasm {
 					std::memcpy(&unPointerAddress, arrCode + 2, sizeof(unPointerAddress));
 					void* const pPointerAddress = reinterpret_cast<void*>(unPointerAddress);
 #endif
-					unBytesRead = 0;
-					if (!ReadProcessMemory(hProcess, pPointerAddress, &pNextAddress, sizeof(pNextAddress), &unBytesRead) || (unBytesRead != sizeof(pNextAddress))) {
+					if (!ReadCurrentWindowsMemory(pPointerAddress, &pNextAddress, sizeof(pNextAddress))) {
 						return nullptr;
 					}
 #if defined(DETOURS_ARCH_X86)
@@ -78377,8 +77881,7 @@ namespace rddisasm {
 					}
 
 					unsigned char unFinalOpcode = 0;
-					unBytesRead = 0;
-					if (!ReadProcessMemory(hProcess, pFinalOpcodeAddress, &unFinalOpcode, sizeof(unFinalOpcode), &unBytesRead) || (unBytesRead != sizeof(unFinalOpcode))) {
+					if (!ReadCurrentWindowsMemory(pFinalOpcodeAddress, &unFinalOpcode, sizeof(unFinalOpcode))) {
 						return nullptr;
 					}
 
@@ -78423,10 +77926,10 @@ namespace rddisasm {
 			}
 		}
 
-		static bool IsInlineWrapperHookCompilerPadding(const HANDLE hProcess, const std::uintptr_t unRegionAddress, const std::size_t unRegionSize, const std::size_t unOffset) noexcept {
+		static bool IsInlineWrapperHookCompilerPadding(const std::uintptr_t unRegionAddress, const std::size_t unRegionSize, const std::size_t unOffset) noexcept {
 			static_assert(sizeof(std::uintptr_t) == sizeof(std::size_t), "inline wrapper address and size widths must match");
 
-			if (!hProcess || (unOffset >= unRegionSize) || (unOffset > (std::numeric_limits<std::uintptr_t>::max() - unRegionAddress))) {
+			if ((unOffset >= unRegionSize) || (unOffset > (std::numeric_limits<std::uintptr_t>::max() - unRegionAddress))) {
 				return false;
 			}
 
@@ -78438,8 +77941,7 @@ namespace rddisasm {
 			}
 
 			unsigned char arrPadding[kInlineWrapperHookCompilerPaddingAlignment] {};
-			SIZE_T unBytesRead = 0;
-			if (!ReadProcessMemory(hProcess, reinterpret_cast<void*>(unAddress), arrPadding, unPaddingSize, &unBytesRead) || (unBytesRead != unPaddingSize)) {
+			if (!ReadCurrentWindowsMemory(reinterpret_cast<void*>(unAddress), arrPadding, unPaddingSize)) {
 				return false;
 			}
 
@@ -78476,7 +77978,6 @@ namespace rddisasm {
 				std::size_t unMinimumOffset = static_cast<std::size_t>(unHookAddress - unRegionAddress);
 				std::size_t unMaximumOffset = unMinimumOffset;
 				bool bDecodedInstruction = false;
-				const HANDLE hProcess = GetCurrentProcess();
 
 				while (!vecPendingOffsets.empty()) {
 					std::size_t unOffset = vecPendingOffsets.back();
@@ -78488,8 +77989,7 @@ namespace rddisasm {
 
 						const std::size_t unAvailableSize = std::min<std::size_t>(RD_MAX_INSTRUCTION_LENGTH, unRegionSize - unOffset);
 						unsigned char arrCode[RD_MAX_INSTRUCTION_LENGTH] {};
-						SIZE_T unBytesRead = 0;
-						if (!ReadProcessMemory(hProcess, reinterpret_cast<void*>(unRegionAddress + static_cast<std::uintptr_t>(unOffset)), arrCode, unAvailableSize, &unBytesRead) || (unBytesRead != unAvailableSize)) {
+						if (!ReadCurrentWindowsMemory(reinterpret_cast<void*>(unRegionAddress + static_cast<std::uintptr_t>(unOffset)), arrCode, unAvailableSize)) {
 							return false;
 						}
 
@@ -78551,7 +78051,7 @@ namespace rddisasm {
 							}
 						} else if (Instruction.BranchInfo.IsBranch &&
 							(Instruction.Category != Detours::rddisasm::RD_CAT_CALL)) {
-							if ((Instruction.Instruction == Detours::rddisasm::RD_INS_INT3) && IsInlineWrapperHookCompilerPadding(hProcess, unRegionAddress, unRegionSize, unOffset)) {
+							if ((Instruction.Instruction == Detours::rddisasm::RD_INS_INT3) && IsInlineWrapperHookCompilerPadding(unRegionAddress, unRegionSize, unOffset)) {
 								break;
 							}
 

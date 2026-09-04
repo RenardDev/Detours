@@ -55,14 +55,4 @@
 		ret
 	TryRead endp
 
-	WindowsHardwareContextBreakpoint proc
-		mov eax, dword ptr [esp+04h]
-		WindowsHardwareContextBreakpointInstruction label byte
-		int 3
-		ret
-	WindowsHardwareContextBreakpoint endp
-
-.const
-	public WindowsHardwareContextBreakpointAddress
-	WindowsHardwareContextBreakpointAddress dd offset WindowsHardwareContextBreakpointInstruction
 end

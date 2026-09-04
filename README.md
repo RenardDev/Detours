@@ -78,20 +78,24 @@ The Linux port uses POSIX/Linux APIs such as `pthread`, `semaphore`, `signal`, `
 
 ### Windows example
 
-```bat
-cl /std:c++17 /EHsc /O2 your_code.cpp Detours.cpp
-```
+The production library is self-contained: `Detours.cpp` embeds only the small architecture-specific hardware-breakpoint helper as shellcode and allocates it through the same executable `Storage` path used by `pWrapper`. Synchronization, thread, and thread-enumeration operations use documented Win32 APIs. Current-process memory reads use `VirtualQuery` followed by a guarded direct copy, while writes temporarily switch protection, copy directly, flush executable pages, and restore the original protection. The library does not depend on hard-coded syscall numbers, gates, or MASM production objects. The only native export lookup is the optional `NtQueryInformationThread` compatibility path required by the public `GetTEB(HANDLE)` API, because Windows exposes no documented equivalent for a remote thread's TEB.
 
-For test programs that use the provided assembly helpers, build the matching assembly file too:
+The optional interrupt helpers are used only by the repository test executable:
+
+| Target | Test-only assembly file |
+|---|---|
+| Win32 | `interrupts32.asm` |
+| x64 | `interrupts64.asm` |
+
+For an x64 consumer:
 
 ```bat
-ml64 /c interrupts64.asm
 cl /std:c++17 /EHsc /c Detours.cpp /Fo:Detours.obj
-cl /std:c++17 /EHsc /c main.cpp /Fo:main.obj
-link Detours.obj main.obj interrupts64.obj /OUT:Detours.exe
+cl /std:c++17 /EHsc /O2 /c your_code.cpp /Fo:your_code.obj
+link Detours.obj your_code.obj /OUT:your_app.exe
 ```
 
-Use `interrupts32.asm` for 32-bit builds.
+For a Win32 consumer, use `Detours.cpp` and `your_code.cpp` in the same way. To build the repository tests, assemble the matching `interrupts*.asm` file and link it with `main.cpp`; it provides only the test-facing `CallInterrupt` and `TryRead` helpers. Do not compile the assembly file as C++.
 
 ### Linux example
 
@@ -440,7 +444,7 @@ When `Context.m_Stack.GetAddress()` is null, `CallAddress` supplies a temporary 
 
 ```text
 Detours.h          Public API and declarations
-Detours.cpp        Implementation and embedded machine-code byte arrays
+Detours.cpp        Implementation and the embedded hardware-breakpoint byte array
 README.md          Project documentation
 main.cpp           Windows and Linux doctest harness
 doctest.h          Test framework

@@ -37,12 +37,6 @@
     <MASM Include="interrupts64.asm">
       <Filter>Исходные файлы</Filter>
     </MASM>
-    <MASM Include="native32.asm">
-      <Filter>Исходные файлы</Filter>
-    </MASM>
-    <MASM Include="native64.asm">
-      <Filter>Исходные файлы</Filter>
-    </MASM>
   </ItemGroup>
   <ItemGroup>
     <None Include="asm.asm">

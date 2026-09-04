@@ -80,13 +80,4 @@
 		ret
 	TryRead endp
 
-	WindowsHardwareContextBreakpoint proc
-		WindowsHardwareContextBreakpointInstruction label byte
-		int 3
-		ret
-	WindowsHardwareContextBreakpoint endp
-
-.const
-	public WindowsHardwareContextBreakpointAddress
-	WindowsHardwareContextBreakpointAddress dq offset WindowsHardwareContextBreakpointInstruction
 end
