@@ -23398,9 +23398,11 @@ namespace Detours {
 				}
 			}
 
+		public:
 			SuspenderMutexUnlockGuard(SuspenderMutexUnlockGuard const&) = delete;
 			SuspenderMutexUnlockGuard& operator=(SuspenderMutexUnlockGuard const&) = delete;
 
+		public:
 			void Release() noexcept {
 				m_pMutex = nullptr;
 			}
@@ -34944,6 +34946,7 @@ namespace Detours {
 				Clear();
 			}
 
+		public:
 			ObfuscatedMemory(ObfuscatedMemory const&) = delete;
 			ObfuscatedMemory(ObfuscatedMemory&&) = delete;
 			ObfuscatedMemory& operator=(ObfuscatedMemory const&) = delete;
@@ -35277,11 +35280,13 @@ namespace Detours {
 			explicit ProtectedMemoryRegistryLock(ProtectedMemoryRegistryState& Registry) noexcept;
 			~ProtectedMemoryRegistryLock() noexcept;
 
+		public:
 			ProtectedMemoryRegistryLock(ProtectedMemoryRegistryLock const&) = delete;
 			ProtectedMemoryRegistryLock& operator=(ProtectedMemoryRegistryLock const&) = delete;
 			ProtectedMemoryRegistryLock(ProtectedMemoryRegistryLock&&) = delete;
 			ProtectedMemoryRegistryLock& operator=(ProtectedMemoryRegistryLock&&) = delete;
 
+		public:
 			bool IsLocked() const noexcept {
 #if defined(_WIN32)
 				return m_pRegistry && m_pFrame && (m_pFrame->m_State.load(std::memory_order_acquire) == WindowsProtectedMemoryRegistryLockFrameState::OWNED);
@@ -35367,11 +35372,13 @@ namespace Detours {
 
 			~ProtectedMemoryStateLock() noexcept;
 
+		public:
 			ProtectedMemoryStateLock(ProtectedMemoryStateLock const&) = delete;
 			ProtectedMemoryStateLock& operator=(ProtectedMemoryStateLock const&) = delete;
 			ProtectedMemoryStateLock(ProtectedMemoryStateLock&&) = delete;
 			ProtectedMemoryStateLock& operator=(ProtectedMemoryStateLock&&) = delete;
 
+		public:
 #if defined(__linux__)
 			static bool HasOwnedStateForCurrentThread() noexcept;
 			static bool IsActiveForCurrentThread(ProtectedMemoryState const* const pState) noexcept;
@@ -41656,9 +41663,11 @@ namespace Detours {
 				explicit WindowsExceptionThreadStateLease(const bool bCreate) noexcept;
 				~WindowsExceptionThreadStateLease() noexcept;
 
+			public:
 				WindowsExceptionThreadStateLease(WindowsExceptionThreadStateLease const&) = delete;
 				WindowsExceptionThreadStateLease& operator=(WindowsExceptionThreadStateLease const&) = delete;
 
+			public:
 				void Release() noexcept {
 					if (!m_pThreadState) {
 						return;
@@ -45192,9 +45201,11 @@ namespace Detours {
 				explicit LinuxExceptionSignalMaskGuard(const bool bBlockAllSignals = false) noexcept;
 				~LinuxExceptionSignalMaskGuard() noexcept;
 
+			public:
 				LinuxExceptionSignalMaskGuard(LinuxExceptionSignalMaskGuard const&) = delete;
 				LinuxExceptionSignalMaskGuard& operator=(LinuxExceptionSignalMaskGuard const&) = delete;
 
+			public:
 				bool Block() noexcept {
 					if (m_bBlocked) {
 						return true;
@@ -45954,9 +45965,11 @@ namespace Detours {
 				explicit LinuxExceptionCallBackSnapshotReadGuard(const unsigned int unSnapshotEpoch) noexcept;
 				~LinuxExceptionCallBackSnapshotReadGuard() noexcept;
 
+			public:
 				LinuxExceptionCallBackSnapshotReadGuard(LinuxExceptionCallBackSnapshotReadGuard const&) = delete;
 				LinuxExceptionCallBackSnapshotReadGuard& operator=(LinuxExceptionCallBackSnapshotReadGuard const&) = delete;
 
+			public:
 				void Release() noexcept {
 					if (!m_bActive) {
 						return;
@@ -45987,6 +46000,7 @@ namespace Detours {
 				LinuxExceptionCallBackDispatchGuard(LinuxExceptionThreadSlot* const pThreadSlot, LinuxExceptionCallBackGeneration* const pGeneration, const unsigned int unSnapshotEpoch) noexcept;
 				~LinuxExceptionCallBackDispatchGuard() noexcept;
 
+			public:
 				LinuxExceptionCallBackDispatchGuard(LinuxExceptionCallBackDispatchGuard const&) = delete;
 				LinuxExceptionCallBackDispatchGuard& operator=(LinuxExceptionCallBackDispatchGuard const&) = delete;
 
@@ -78834,7 +78848,6 @@ namespace rddisasm {
 		}
 
 		// ----------------------------------------------------------------
-		// ----------------------------------------------------------------
 		// Hook storage execution guard
 		// ----------------------------------------------------------------
 
@@ -78843,6 +78856,7 @@ namespace rddisasm {
 			HookStorageExecutionGuard(void* const pAddress, const std::size_t unSize) noexcept;
 			~HookStorageExecutionGuard() noexcept;
 
+		public:
 			HookStorageExecutionGuard(HookStorageExecutionGuard const&) = delete;
 			HookStorageExecutionGuard& operator=(HookStorageExecutionGuard const&) = delete;
 
