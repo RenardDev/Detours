@@ -1,6 +1,6 @@
 # Code Style Guide
 
-> Warning: this file is large for AI-agent processing. Read it by section, prefer targeted searches, and use the numbered headings as navigation anchors.
+> AI-agent navigation: read this guide completely before analyzing or modifying project code, including after context loss. Sequential section reads are allowed; targeted searches and the quick reference do not replace the full read. Then process one bounded chunk of one file at a time, as specified in section 25.5.
 
 This document describes a reusable coding style for projects that need:
 
@@ -22,23 +22,28 @@ This is not the "one true style" for every language or domain. It is a **general
 
 ## Quick reference for AI agents
 
-If you only have time for the essentials, follow these. The detailed numbered rule takes precedence over this summary, and language, ABI, security, and toolchain correctness take precedence over presentation rules.
+This summary is a navigation aid, not a reduced compliance checklist. The detailed numbered rule takes precedence over this summary, and language, ABI, security, and toolchain correctness take precedence over presentation rules. C++-specific rules apply only to C++; the JavaScript profile in section 2.6 defines the corresponding project conventions.
 
 A project that adopts this guide should enforce the mechanically checkable parts with a formatter, linter, style-audit script, review checklist, or a combination of those tools:
 
-- Indent code with **tabs**, never spaces. In Markdown, indent prose with spaces and fenced code blocks according to the target language style.
+- Use **tabs for source/script indentation**; use spaces only for local alignment or formats that require them. In Markdown, indent prose with spaces and fenced code blocks according to the target language style.
 - Use K&R / 1TBS braces on the same line and braces around every `if` / `for` / `while` / `else` body.
 - Use **west const** for simple scalar types: `const int nA`, `const float flB`, `const std::size_t unSize`. For compound declarations, keep `const` adjacent to the qualified type or pointer/reference as required by the declaration.
-- Use systems Hungarian names for scalar, pointer, handle, buffer, and common container categories; use semantic PascalCase role names for domain value objects. A pointer to a primitive scalar or C string combines `p` with the value prefix (`pn`, `pun`, `pb`, `pfl`, `pdbl`, `pch`, `pwch`, `psz`); every additional pointer level adds another leading `p` (`ppn`, `ppun`, `ppb`, `ppfl`, `ppdbl`, `ppch`, `ppwch`, `ppsz`). A pointer to an object, user-defined/non-primitive type, opaque value, or `void` uses only the required number of `p` characters.
-- Reserve `k`-prefixed names for named `constexpr` constants. Macros use a module-specific `UPPER_SNAKE_CASE` name.
+- Use **Systems Hungarian + a PascalCase role** for project-owned variables and value parameters, including documentation signatures/tables, fields, callbacks, lambda variables, and loop bindings. Choose the category from the actual type or runtime contract; keep the established scalar, pointer, container, and iterator categories in section 8.2, and `fn` for function pointers and callback parameters. Named lambdas follow the object rule without `fn`, even when passed as callbacks. Objects without a more specific category use PascalCase directly, with no object-category prefix; scope prefixes remain (`g_Manager`, `m_State`). Named functions/types remain PascalCase; constant, direct-import, and external-contract exceptions follow sections 2.6 and 8. A primitive scalar or C-string address combines `p` with its category (`pn`, `pun`, `pb`, `pfl`, `pdbl`, `pch`, `pwch`, `psz`); every extra indirection adds another `p`. An object, user-defined/non-primitive, opaque, or `void` address uses only the required number of `p` characters.
+- Use complete words in project-owned C++ and JavaScript names: `Initialize`, `Allocate`, `Deinitialize`, and `Deallocate`, not shortened verbs. Do not split linguistic prefixes inside a word: use `Unload`, `Reload`, `Readjust`, and `Preload`. Keep `Reset`, `ResetPendingOperationSlot`, and `Resettable` unsplit. Preserve semantic category prefixes, standard acronyms, and required external names and lifecycle keys; see sections 8.5 and 8.15.
+- For the controlled value/bitfield layout in section 14.2, use `typedef union _FLAGS { ... } FLAGS, *PFLAGS;` with an anonymous structure exposing the bitfields directly. Do not replace it with a separate `FlagBits` type and named `m_Bits` member; document required compiler support and ABI assumptions.
+- For an unscoped enum at a documented C/ABI boundary, use `typedef enum _TAG : UnderlyingType { ... } TAG, *PTAG;`. Specify the actual integral underlying type required by the value range and ABI; `unsigned char` is only an example. See section 9.5 for the reserved-tag exception and language/toolchain constraints.
+- Reserve C++ `k`-prefixed names for named `constexpr` constants. Macros use a module-specific `UPPER_SNAKE_CASE` name. Import JavaScript PascalCase and UPPER_CASE exports directly when their names are unique in the relevant scope; use a unique alias only for an actual binding collision. `const` alone does not make every JavaScript binding an uppercase constant. See section 2.6 for external-name exceptions and safe reference updates.
 - Use `auto` for iterators and range-loop elements, and for local domain values returned directly by a project function when repeating the return type adds no ownership or ABI information. Prefer an explicit type for ownership-bearing allocations and ABI/system records. For simple scalar values, write the type explicitly with leading `const` when the value is const; for complex pointers, prefer a `P*` alias or `auto*` as described below.
 - When a declaration can copy- or conversion-initialize a value from an expression without changing semantics, use `Type Name = Expression;`. Do not spell that copy as `Type Name { Expression };` or `Type Name(Expression);`. Keep `{}` for value/default initialization and use direct or list initialization only when the language or intended constructor semantics require it.
 - In a function with an explicit return type, return an empty value-initialized result as `return {};`. Do not repeat the return type as `return Type {};` or `return Type();`.
+- Initialize an ordinary C++ boolean explicitly as `bool bHasKeyName = false;`, not `bool bHasKeyName {};`. Constructor initializer lists still follow section 10.3.
+- In C++ and JavaScript, parenthesize comparisons used as operands of `&&` or `||`, and preserve nested logical groups. Do not wrap simple flags, member accesses, calls, or unary-negation checks merely for decoration. In ternary result arms, write `? (A && B) : C`, not `? ((A) && (B)) : (C)`; see section 7.5.
 - Keep control flow flat with guard clauses, explicit success/failure returns, and cleanup close to ownership.
 - Make ownership, nullability, buffer extent, and lifetime visible in the type, signature, or immediately adjacent documentation.
 - Validate ranges before pointer arithmetic, validate integer operations before overflow, and verify ABI layouts with `static_assert`.
 - Do not use C-style casts, reserved project identifiers outside documented compatibility exceptions, hidden dynamic global initialization, or `volatile` as synchronization.
-- Keep one blank line between completed phases. A standalone closing `}` followed by an ordinary statement/declaration must have one blank line after it, except before another `}`, `else`, `catch`, `while`, a required semicolon, a preprocessor directive, or an already blank line. Do not use trailing whitespace or two consecutive blank lines. Keep `#elif`, `#else`, and `#endif` directly adjacent to the preceding line of their preprocessor branch; do not insert a blank line before these directives.
+- Keep one blank line between completed phases. A standalone closing `}` followed by an ordinary statement/declaration must have one blank line after it. Do not insert one before another `}`, an attached `else` / `catch` / `do`-`while` continuation, a required syntax delimiter, or a preprocessor directive; an existing blank line already satisfies the rule. An independent `while` loop starts a new phase. Do not use trailing whitespace or two consecutive blank lines. Keep `#elif`, `#else`, and `#endif` directly adjacent to the preceding line of their preprocessor branch; do not insert a blank line before these directives.
 - Inside an early-exit branch, keep its one final call, assignment, declaration, or other single action directly adjacent to the simple one-line `return` that completes that branch. Do not insert a blank line between the action and the early return. On the main path, keep a final output/result commit and the final success return as separate phases with one blank line between them.
 - Call qualified standard algorithms directly: use `std::max(...)` and `std::min(...)`, never `(std::max)(...)` or `(std::min)(...)`. Resolve platform macro collisions at the include boundary or by the documented preprocessor rules.
 - Do not use integer-literal suffixes such as `U`, `UL`, `ULL`, `L`, `u`, `ul`, `ull`, or `l` unless the code materially requires the literal type, range, overload, shift, ABI, or constant-evaluation behavior.
@@ -52,12 +57,16 @@ The numbered sections below are the full specification; use their headings as se
 - [Quick reference for AI agents](#quick-reference-for-ai-agents)
 - [1. Core Principles](#1-core-principles)
 - [2. Scope](#2-scope)
+  - [2.6. JavaScript, Packages, and API Examples](#26-javascript-packages-and-api-examples)
+  - [Direct Named Imports](#direct-named-imports)
+  - [2.7. Adopting This Guide in Another Project](#27-adopting-this-guide-in-another-project)
 - [3. Overall Character of the Style](#3-overall-character-of-the-style)
 - [4. File Organization](#4-file-organization)
 - [5. Braces](#5-braces)
 - [6. Indentation and Vertical Rhythm](#6-indentation-and-vertical-rhythm)
 - [7. Spacing and Micro-Style](#7-spacing-and-micro-style)
 - [8. Naming](#8-naming)
+  - [Complete Words and Operation Names](#complete-words-and-operation-names)
 - [9. Types, Declarations, and Qualifiers](#9-types-declarations-and-qualifiers)
 - [10. `class` and `struct` Organization](#10-class-and-struct-organization)
 - [11. Function Body Style](#11-function-body-style)
@@ -113,6 +122,10 @@ The examples assume **C++20** unless a project explicitly documents another base
 
 A C++17 or earlier project may adopt the style, but it must replace unavailable language/library features deliberately instead of emulating them through unrelated macros or unsafe casts.
 
+This guide is not tied to a particular repository, game engine, JavaScript runtime, operating system, or build tool. C++ and JavaScript rules apply only where those languages are present. Other languages and configuration formats follow the shared readability and verification principles where their syntax permits them; do not force tabs into a format that requires spaces.
+
+Names and paths in examples, including `GetRawModule`, `internal/runtime`, `paths`, `ADDON_ROOT`, `netchannel`, V8 handles, and Windows SDK types, illustrate a rule. They do not require another project to provide those APIs, packages, directories, or platforms. Use the adopting project's real equivalents and supported contracts. Snippets with ellipses or omitted surrounding declarations illustrate a local shape and are not standalone programs; complete executable examples still need valid control flow and all required dependencies.
+
 ### 2.2. Rule Precedence
 
 When two rules appear to conflict, apply this order:
@@ -136,7 +149,7 @@ A named compiler/platform profile may deliberately accept a documented portabili
 
 New files should follow the guide completely. Modified code should follow it within the edited responsibility, but do not combine a behavior change with a repository-wide style rewrite unless the user explicitly asks for both.
 
-Inside one file, preserve a single visual convention. If a legacy file uses west `const`, spaces, or another established shape, either preserve it for a focused behavioral patch or migrate the complete file in a dedicated style-only change. Do not create a mixed intermediate state.
+Inside one file, preserve a single visual convention. If a legacy file uses a different `const` placement, space indentation, or another established shape, either preserve it for a focused behavioral patch or migrate the complete file in a dedicated style-only change. Do not create a mixed intermediate state.
 
 Public APIs, callback signatures, serialized formats, ABI-bound layouts, command-line flags, and generated-file contracts remain stable unless a breaking change is explicitly requested.
 
@@ -181,9 +194,101 @@ Each project adopting this guide should maintain a short local ownership map tha
 
 The style-audit and formatter entry points must exclude vendored and protected paths by default. An override may make a protected path visible for diagnosis, but it must never silently authorize modification.
 
-Some projects need a documented compiler, platform, or ABI compatibility profile. Such a profile may permit a narrowly defined ISO-reserved identifier shape when an external contract requires it. This guide's canonical include guard is the documented `_SOMELIBSOMEHEADER_H_` form; the `_TAG` form remains available only for a C-compatible structure typedef such as `typedef struct _TAG { ... } TAG, *PTAG;`.
+Some projects need a documented compiler, platform, or ABI compatibility profile. Such a profile may permit a narrowly defined ISO-reserved identifier shape when an external contract requires it. This guide's canonical include guard is the documented `_SOMELIBSOMEHEADER_H_` form; the `_TAG` form remains available only for the boundary typedefs in section 9.5: `typedef struct _TAG { ... } TAG, *PTAG;`, `typedef union _TAG { ... } TAG, *PTAG;`, and `typedef enum _TAG : UnderlyingType { ... } TAG, *PTAG;`. The enum form requires an explicit integral underlying type and the documented language/toolchain contract.
 
 Do not use a leading underscore followed by an uppercase letter or `__` in ordinary project-owned names. If an external ABI requires another reserved spelling, document that exact exception in the project's compatibility profile and do not broaden it to unrelated identifiers.
+
+### 2.6. JavaScript, Packages, and API Examples
+
+Project-owned JavaScript, packages, templates, test helpers, and executable documentation examples follow the shared brace, indentation, expression-grouping, naming, phase-separation, and verification rules. C++-only constructs such as `constexpr`, pointer declarators, constructor initializer lists, include groups, and header/source placement do not apply to JavaScript.
+
+For project-owned JavaScript:
+
+- Use `const` for a binding that is not reassigned and `let` when reassignment is required. A `const` binding does not imply that its object is immutable.
+- Use Systems Hungarian + a PascalCase role for variables and parameters: `bReady`, `nResult` for a signed value or negative sentinel, `unCount` for a nonnegative count, `strName`, `vecItems`, and `fnCallback` for a callback parameter. Objects use PascalCase without an object-category prefix: `Options`, `Manager`. Named arrow/function-expression bindings follow the lambda/object rule, without `fn`, even when passed as callbacks. Choose the category from the actual runtime contract, not from the name alone. Module-scope implementation state retains `g_`, including `g_Manager`. Direct named imports are an exception: preserve their PascalCase or UPPER_CASE exported name without an automatic scope/category alias. Named functions and types use PascalCase unless an existing runtime or external contract requires another spelling.
+- Preserve established uppercase constant exports when destructuring and using them. This guide uses `UPPER_CASE` and `UPPER_SNAKE_CASE` for the same uppercase-with-underscores convention. Runtime acquisition does not change the spelling of `ADDON_ROOT`, and `const` alone does not require an ordinary binding to be uppercase. A real name collision permits a local alias under the named-import rule below.
+- A multi-line destructuring list, array, or object record is allowed when it presents a substantial inventory. Keep one entry per line and a trailing comma in such lists. This does not authorize splitting every argument of a simple call onto a separate line.
+- All API synopsis parameters and parameter-table labels follow the same Systems Hungarian + PascalCase rules as implementation parameters, including unprefixed PascalCase object roles. For an API accepting a nonnegative numeric address and a string path, write `netchannel.RequestFile(unChannelAddress, strFilePath)`. For string player/Steam identifiers and a JavaScript manager object, use `strPlayerName`, `strSteamID64`, and `Manager`. Check the actual category first: an identifier is not necessarily numeric, and an object is not a native address. Reuse the same spelling in signatures, parameter tables, descriptions, callback parameters, and examples. Executable examples use actual declared bindings; placeholders do not rename exports or property keys.
+- Preserve the exact current module exports, property names, lifecycle callbacks, and serialized keys. A public spelling is not changed by applying a local-variable prefix. Verify examples against the implementation when that documentation chunk is reviewed.
+- Use `Address` / `address` in project-owned names and descriptions of native addresses instead of `Pointer` / `pointer`. This naming rule does not change external SDK/V8 identifiers or the meaning of the C++ technical term "pointer". An address represented as a number must not be treated as a JavaScript object reference.
+- Preserve evaluation order, short-circuiting, and returned operand values when formatting `&&`, `||`, `!`, or `?:`. Do not add a boolean conversion or replace an explicit null/type check merely to shorten it.
+- Do not translate C++ `return {};` into a JavaScript failure convention. In JavaScript it returns a new object; preserve the API's actual `null`, `undefined`, boolean, numeric, or object result.
+
+Correct constant imports and their use (a shortened inventory):
+
+```js
+const {
+	ADDON_ROOT,
+	AUTH_CONFIG_ROOT,
+	AUTH_PARENTS_FILE,
+} = require("paths");
+
+const g_vecRuntimePaths = [
+	ADDON_ROOT,
+	AUTH_CONFIG_ROOT,
+	AUTH_PARENTS_FILE,
+];
+```
+
+Incorrect replacement of those established constant bindings when no name collision exists:
+
+```js
+const { ADDON_ROOT: g_strAddonRoot } = require("paths");
+const g_vecRuntimePaths = [g_strAddonRoot];
+```
+
+JavaScript module imports and explicit module setup are not C++ dynamic global initialization. Keep their dependencies and side effects visible, but do not defer or reorder them solely to imitate C++ initialization rules.
+
+#### Direct Named Imports
+
+Destructure a project export directly and call or use its exported name when that name is PascalCase or UPPER_CASE and is unique in the relevant lexical scope. Do not alias every imported function, constant, class, or object merely to add a category or module-scope prefix. This applies to source files, packages, tests, templates, and executable documentation examples.
+
+Correct when `GetRawModule` has no conflicting binding:
+
+```js
+const { GetRawModule } = require("internal/runtime");
+
+const g_RawModule = GetRawModule("memory");
+```
+
+Incorrect without a name collision:
+
+```js
+const { GetRawModule: g_fnGetRawModule } = require("internal/runtime");
+
+const g_RawModule = g_fnGetRawModule("memory");
+```
+
+An alias is permitted when an existing import, declaration, parameter, or required enclosing binding would otherwise conflict with or be shadowed by the imported name. The alias must itself be unique and describe the imported value's role. For example, when `GetRawModule` already denotes another binding that must remain, this declaration is allowed:
+
+```js
+const { GetRawModule: g_fnGetRawModule } = require("internal/runtime");
+
+const g_RawModule = g_fnGetRawModule("memory");
+```
+
+If `g_fnGetRawModule` is also occupied, choose a more specific role such as `g_fnGetRuntimeRawModule`; do not create a second collision. Use the corresponding category for a non-function alias. A matching name in an unrelated scope, comment, string, or object property is not a binding collision and does not justify an alias. Do not manufacture a collision to retain a redundant alias.
+
+When removing an alias, update all references that resolve to that binding, including closures and shorthand object members. Preserve public property keys, exports, receiver semantics, and module-loading order; do not perform a text-only replacement that renames unrelated bindings or serialized keys. Direct use means `GetRawModule(...)` after the import, not repeated `require(...)` calls or a new forwarding wrapper.
+
+New project-owned exports should have a unique semantic PascalCase name for functions/classes/objects or an established UPPER_CASE constant name. External and compatibility-bound exports keep their required spelling; do not silently rename the public API or invent a style-only alias. This is a contract exception, not an alternative naming style for project-owned variables or parameters. An API rename requires its own authorized contract migration.
+
+The examples use CommonJS syntax, but the same name-uniqueness rule applies to named ES-module imports. Keep the project's existing module system: do not migrate `require` to `import`, or conversely, as a naming cleanup. For an ES-module collision, use the language's `as` alias syntax instead of the destructuring `:` syntax.
+
+### 2.7. Adopting This Guide in Another Project
+
+Keep portable style rules in this guide and repository-specific facts in a short adoption profile, such as an existing contributor document. The profile should state:
+
+- languages and supported versions, including the JavaScript runtime and module system when applicable;
+- supported platforms, compilers, architectures, configurations, and dependency versions;
+- the ownership map from section 2.5, including the real generated, vendored, protected, fixture, and output paths;
+- public naming, ABI, serialization, lifecycle, and compatibility contracts that must keep an external spelling;
+- documented exceptions and the exact guide rule each exception refines;
+- actual build, test, lint, formatting, generation, and documentation-check commands.
+
+A local profile may select applicable language/domain sections and document a necessary contract exception; it must not silently weaken safety rules or pretend an applicable rule has been verified. A project with no C++ need not adopt C++ include guards, ABI records, or compiler pragmas. A project with no JavaScript need not introduce packages or a JavaScript runtime. Example path names and tool commands are not an ownership map or a build configuration for another repository.
+
+When reusing this guide, preserve its common rules and fill in the profile from the adopting repository's actual structure and checks. Do not copy another project's module names, export inventory, engine branches, deployment paths, host addresses, or build commands as requirements. Adapt examples to real local APIs without changing the style rule they demonstrate.
 
 ---
 
@@ -214,7 +319,7 @@ Header files may use:
 
 Prefer one project-wide policy. Public or portable libraries should keep a conventional include guard even if `#pragma once` is also used.
 
-Project-owned identifiers must not use reserved forms. In particular, do not create names that contain `__` or begin with `_` followed by an uppercase letter, except for the canonical include guard and the C-compatible `typedef struct _TAG` form documented below. Compiler and platform macros such as `_MSC_VER` and `_M_X64` are external identifiers and are not renamed.
+Project-owned identifiers must not use reserved forms. In particular, do not create names that contain `__` or begin with `_` followed by an uppercase letter, except for the canonical include guard and the `typedef struct _TAG` / `typedef union _TAG` / `typedef enum _TAG : UnderlyingType` boundary forms documented in section 9.5. Compiler and platform macros such as `_MSC_VER` and `_M_X64` are external identifiers and are not renamed.
 
 Any reserved-identifier exception must be documented by the project's compatibility profile from section 2.5. It does not permit any other reserved identifier spelling.
 
@@ -229,7 +334,6 @@ Canonical pattern:
 #define _SOMELIBSOMEHEADER_H_
 
 ...
-
 #endif // _SOMELIBSOMEHEADER_H_
 ```
 
@@ -240,14 +344,14 @@ Do not omit the leading or trailing underscore from the canonical guard, and do 
 Recommended order:
 
 1. the file's own header;
-2. `General` headers: platform, operating-system, compiler, and other non-C/C++/STL dependencies;
+2. `General` headers: platform, operating-system, compiler, and SDK headers;
 3. `C` headers: C runtime and platform C headers that use their C or platform spelling;
 4. `C++` headers: C++ language/runtime headers, C++ wrappers for the C library, and core utility facilities;
 5. `STL` headers: standard-library containers, algorithms, traits, memory/ownership facilities, character utilities, limits, allocation helpers, and other generic-library facilities;
 6. third-party library headers;
 7. project-local headers.
 
-Groups must be separated by one blank line and labeled with a short thematic comment. Use the labels `// General`, `// C`, `// C++`, `// STL`, `// Third-party`, and `// Project` when the corresponding groups are present. Keep headers alphabetized inside a group unless dependency order or platform requirements make another order necessary. A temporary configuration define belongs immediately before the include it configures and does not replace the group label.
+Groups must be separated by one blank line and labeled with a short thematic comment. Use the labels `// General`, `// C`, `// C++`, `// STL`, `// Third-party`, and `// Project` when the corresponding groups are present. A dependency-specific configuration block uses the dependency's name instead of the generic label, as specified in section 4.3. Keep headers alphabetized inside a group unless dependency order or platform requirements make another order necessary. A temporary configuration define belongs immediately before the include it configures and does not replace its descriptive comment.
 
 Use this project classification consistently:
 
@@ -308,20 +412,22 @@ For platform headers that require temporary configuration, keep the configuratio
 
 ```cpp
 // General
-#if defined(PLATFORM_NO_LEGACY_NAMES)
-#define SOME_MODULE_PLATFORM_NO_LEGACY_NAMES_WAS_DEFINED
-#endif
+#if !defined(PLATFORM_NO_LEGACY_NAMES)
+#define SOME_MODULE_DEFINED_PLATFORM_NO_LEGACY_NAMES
 #define PLATFORM_NO_LEGACY_NAMES
-#include <PlatformSdk.h>
-#if !defined(SOME_MODULE_PLATFORM_NO_LEGACY_NAMES_WAS_DEFINED)
-#undef PLATFORM_NO_LEGACY_NAMES
 #endif
-#undef SOME_MODULE_PLATFORM_NO_LEGACY_NAMES_WAS_DEFINED
+#include <PlatformSdk.h>
+#if defined(SOME_MODULE_DEFINED_PLATFORM_NO_LEGACY_NAMES)
+#undef PLATFORM_NO_LEGACY_NAMES
+#undef SOME_MODULE_DEFINED_PLATFORM_NO_LEGACY_NAMES
+#endif
+#include <PlatformDebug.h>
 #include <PlatformInternals.h>
 #include <PlatformProcess.h>
 #include <PlatformText.h>
-#include <PlatformDebug.h>
 ```
+
+The dependent platform headers follow the configured SDK include; they are alphabetized within that dependency boundary. If the caller already defined the configuration macro, preserve its original value and do not redefine or remove it.
 
 ### 4.3. Include-Time Configuration Defines
 
@@ -330,7 +436,7 @@ A dependency may require a feature-selection macro before it is included. This i
 Rules:
 
 1. A configuration `#define` for an included header must appear immediately before the `#include` it configures.
-2. The configuration define should be visually grouped with that include, usually with a small comment.
+2. Group the configuration define, configured include, and any required cleanup under a comment naming that dependency, such as `// Dependency` or `// CompileTimeStamp`. This is the dependency-specific exception to the generic include-group labels in section 4.2; do not replace it with `// Third-party` or an invented suffix such as `// DependencyConfig`.
 3. Do not place unrelated constants, helper macros, globals, or functions between the configuration define and the configured include.
 4. If the configuration macro is private to the current header or translation unit, `#undef` it after the last required use.
 5. If the configuration macro is part of the public include contract, leave it documented and stable.
@@ -381,27 +487,27 @@ This order reduces accidental reordering mistakes, makes responsibility boundari
 Correct:
 
 ```cpp
-int Sum2(const int nA, const int nB) {
-	return nA * nB + 1;
+bool IsPositive(const int nValue) {
+	return nValue > 0;
 }
 
-int Sum(const int nA, const int nB) {
-	return Sum2(nA, nB);
+bool CanProcessValue(const int nValue) {
+	return IsPositive(nValue);
 }
 ```
 
 Incorrect:
 
 ```cpp
-int Sum2(const int nA, const int nB);
-int Sum(const int nA, const int nB);
+bool IsPositive(const int nValue);
+bool CanProcessValue(const int nValue);
 
-int Sum(const int nA, const int nB) {
-	return Sum2(nA, nB);
+bool CanProcessValue(const int nValue) {
+	return IsPositive(nValue);
 }
 
-int Sum2(const int nA, const int nB) {
-	return nA * nB + 1;
+bool IsPositive(const int nValue) {
+	return nValue > 0;
 }
 ```
 
@@ -455,7 +561,7 @@ Large logical blocks inside a file should be separated by section banners.
 
 The separator line must contain exactly 64 `=` or `-` characters after the `// ` prefix. Use the same width for both banner styles.
 
-Use long `=` banners for top-level file or namespace sections:
+Use `=` banners for top-level file or namespace sections:
 
 ```cpp
 // ================================================================
@@ -463,7 +569,7 @@ Use long `=` banners for top-level file or namespace sections:
 // ================================================================
 ```
 
-Use shorter `-` banners for ordinary sections inside a file:
+Use `-` banners of the same width for ordinary sections inside a file:
 
 ```cpp
 // ----------------------------------------------------------------
@@ -506,7 +612,7 @@ Temporary compiler helper macros must use a module-specific name and be cleaned 
 #if defined(_MSC_VER)
 #define SOMEUTILITY_FORCE_INLINE __forceinline
 #elif defined(__GNUC__) || defined(__clang__)
-#define SOMEUTILITY_FORCE_INLINE __attribute__((always_inline))
+#define SOMEUTILITY_FORCE_INLINE inline __attribute__((always_inline))
 #else
 #define SOMEUTILITY_FORCE_INLINE inline
 #endif
@@ -531,9 +637,10 @@ Canonical shape:
 
 // STL
 #include <bit>
+#include <limits>
 #include <type_traits>
 
-// DependencyConfig
+// Dependency
 #define DEPENDENCY_USE_FEATURE
 #include "Dependency.h"
 #undef DEPENDENCY_USE_FEATURE
@@ -560,7 +667,9 @@ namespace SomeUtility {
 	constexpr std::size_t kBlockSize = 16;
 
 	SOMEUTILITY_FORCE_INLINE constexpr unsigned int RotateLeft(const unsigned int unValue, const unsigned int unBits) noexcept {
-		return std::rotl(unValue, static_cast<int>(unBits));
+		constexpr unsigned int kValueBits = std::numeric_limits<unsigned int>::digits;
+
+		return std::rotl(unValue, static_cast<int>(unBits % kValueBits));
 	}
 
 	class Object {
@@ -572,7 +681,6 @@ namespace SomeUtility {
 #define SOME_UTILITY(VALUE) ...
 
 #undef SOMEUTILITY_FORCE_INLINE
-
 #endif // _SOMELIBSOMEUTILITY_H_
 ```
 
@@ -590,7 +698,7 @@ Rules:
 6. `#undef` temporary helper macros immediately after their final use.
 7. Feature switches that configure a dependency appear immediately before the affected `#include`.
 8. Do not use macros to replace ordinary typed constants, functions, or templates when those constructs preserve all required information.
-9. Never create project-owned identifiers beginning with `_` followed by an uppercase letter or containing `__`, except for the canonical include guard and the documented `typedef struct _TAG` compatibility form.
+9. Never create project-owned identifiers beginning with `_` followed by an uppercase letter or containing `__`, except for the canonical include guard and the documented `typedef struct _TAG` / `typedef union _TAG` / `typedef enum _TAG : UnderlyingType` compatibility forms from section 9.5.
 10. Platform headers that expose colliding macros must be configured or cleaned up deliberately. Prefer the platform's documented feature-selection macros when compatible with the translation unit; otherwise `#undef` only the known colliding names after inclusion.
 11. When a platform header defines a function-like macro such as `LoadImage`, `GetObject`, `CreateEvent`, `min`, or `max`, remove the collision before calling a project function with that spelling. Such a macro can rewrite a qualified call and produce a link-time failure.
 12. A simple low-level cleanup macro may use a direct guarded statement when its contract is intentionally statement-like. Do not add a `do { ... } while (false)` wrapper merely to normalize such an established macro.
@@ -750,7 +858,7 @@ if (!pData)
 Correct:
 
 ```cpp
-switch (KindInfo) {
+switch (KindValue) {
 	case Kind::A:
 		return 1;
 
@@ -767,7 +875,7 @@ switch (KindInfo) {
 Incorrect (compact body sharing the label line):
 
 ```cpp
-switch (KindInfo) {
+switch (KindValue) {
 	case Kind::A: return 1;
 	case Kind::B: return 2;
 	default: return 0;
@@ -782,7 +890,7 @@ switch (KindInfo) {
 
 Use tabs as the primary indentation unit.
 
-Spaces may be used for local visual alignment inside tables, macro blocks, or bit layouts, but indentation itself is tab-based for code and script files. Markdown prose, lists, and tables use spaces for indentation, while fenced code blocks inside `*.md` must use tabs for code indentation.
+Spaces may be used for local visual alignment inside tables, macro blocks, or bit layouts. Code and script indentation is tab-based where the language permits it; space-only formats retain their required spaces. Markdown prose, lists, and tables use spaces for indentation, while fenced code blocks inside `*.md` follow their target language's indentation rules.
 
 ### 6.2. Blank Lines
 
@@ -794,7 +902,6 @@ if (!pAddress) {
 }
 
 void* pBase = ResolveBase(pAddress);
-
 if (!pBase) {
 	return false;
 }
@@ -804,12 +911,12 @@ return Commit(pBase);
 
 Put a blank line before an `if` when it follows a completed declaration, assignment, stream emit, function call, or other statement.
 
-Do not put a blank line when one local variable is declared or assigned and the immediately following statement is the only direct operation that consumes, validates, or iterates over that value. This includes an `if`, a `for`, or one direct call/assignment that performs that operation. Treat the declaration/assignment and its direct operation as one compact phase:
+Do not put a blank line when one local variable is declared or assigned and the immediately following statement is the direct operation that consumes, validates, or iterates over that value. This includes an `if`, a `for`, or one direct call/assignment that performs that operation; later uses of the validated value do not invalidate this compact phase. This exception does not join a completed main-path phase to the function's final return. Treat the declaration/assignment and its direct operation as one compact phase:
 
 ```cpp
-HANDLE hParentProcess = OpenProcess(PROCESS_CREATE_PROCESS, FALSE, unParentPID);
-if (!hParentProcess || (hParentProcess == INVALID_HANDLE_VALUE)) {
-	hParentProcess = nullptr;
+const DWORD unParentPID = GetProcessId(hParentProcess);
+if (unParentPID == 0) {
+	return false;
 }
 
 NTSTATUS nStatus = NtResumeProcess(hProcess);
@@ -859,9 +966,9 @@ Do not add a blank line when the `if` is:
 - the `if` in an `else if` chain;
 - part of a compact cleanup sequence deliberately documented as one phase.
 
-Do not put a blank line between `}` and a syntactically attached `else`, `catch`, `while`, or required semicolon.
+Do not put a blank line between `}` and a syntactically attached `else`, `catch`, the `while` of a `do` loop, or a required closing delimiter such as `;`, `);`, or `,`. Keep attached tokens on the brace line when their syntax permits it.
 
-A standalone closing `}` that completes a block and is followed by an ordinary statement, declaration, or expression at the same or an outer readable phase must be followed by exactly one blank line. This makes the end of the completed block visually distinct from the code that follows it. Do not require this blank line when the next non-empty line begins with another closing `}`, `else`, `catch`, `while`, a required semicolon, or a preprocessor directive; these forms either continue/close the surrounding syntax or belong to the preprocessor structure.
+A standalone closing `}` that completes a block and is followed by an ordinary statement, declaration, or expression at the same or an outer readable phase must be followed by exactly one blank line. This also applies when the closing brace has a trailing comment. Do not require this blank line before another closing `}`, a syntactically attached `else` / `catch` / `do`-`while` continuation, a required closing delimiter, or a preprocessor directive. An existing blank line already satisfies the rule; do not insert a second one. An independent `while` loop is an ordinary new statement and does require the separator. A checker must distinguish syntax continuations from new statements, not exempt every line beginning with `while`.
 
 Correct:
 
@@ -914,19 +1021,25 @@ Local `constexpr` constants and tables belong at the beginning of a function bod
 Put one blank line between ordinary local variables and a following stream object, and one blank line after declaring the stream object before writing into it:
 
 ```cpp
-std::string const strName = ShortenIdentifier(strRawName, 48);
+constexpr std::size_t kMaximumIdentifierLength = 48;
+
+std::string const strName = ShortenIdentifier(strRawName, kMaximumIdentifierLength);
 
 std::ostringstream OutputStream;
 
 OutputStream << "Rewrite_" << unIndex << "_" << strName;
 ```
 
-A short cleanup block may remain dense when every line belongs to one action:
+A short cleanup sequence inside an early-exit branch may remain dense when every line belongs to its terminal action. This is not an exception for the function's main-path final return:
+
+The following example removes only the operation-owned temporary log. Removal is best-effort: a cleanup error may leave that temporary file behind but does not change the cancellation result.
 
 ```cpp
-std::error_code ErrorCode;
-std::filesystem::remove(PathLog, ErrorCode);
-return 0;
+if (bCancelled) {
+	std::error_code ErrorCode;
+	std::filesystem::remove(PathLog, ErrorCode);
+	return 0;
+}
 ```
 
 Never use two consecutive blank lines in source or script files.
@@ -963,7 +1076,7 @@ Do not expand such a call into one argument per line merely to make the call app
 
 The same rule applies to short boolean predicates and boolean returns. Keep the complete function signature on one line. A chain of simple pointer checks, atomic loads, comparisons, and logical operators may wrap at logical operators when the complete expression is long, but each direct operand and each simple `load`, `store`, `exchange`, or comparison call must remain intact on one physical line. Do not split inside a simple call merely to align its arguments.
 
-When a boolean expression is long enough to wrap, preserve its grouping explicitly. Break at top-level logical operators and keep nested `&&` / `||` groups parenthesized so the reader does not need to reconstruct precedence. Parenthesize a direct operand only when it is itself a comparison or nested logical/arithmetic expression whose grouping must remain explicit. Do not add an outer pair of parentheses around a simple boolean name, pointer check, unary-negation check, or function-call result merely because it is a direct operand: write `!m_pState`, not `(!m_pState)`, including on a continuation line. Continuation lines use one additional tab of indentation. Formatting must not change the expression's semantics.
+When a boolean expression is long enough to wrap, preserve its grouping explicitly. Break at top-level logical operators and keep nested `&&` / `||` groups parenthesized so the reader does not need to reconstruct precedence. Apply the same operand-grouping rules as for a one-line expression in section 7.5: parenthesize comparisons and nested logical/arithmetic groups, not every operand. Do not add an outer pair of parentheses around a simple boolean name, pointer check, unary-negation check, or function-call result merely because it is a direct operand: write `!m_pState`, not `(!m_pState)`, including on a continuation line. Continuation lines use one additional tab of indentation. Formatting must not change the expression's semantics.
 
 Correct simple direct operands:
 
@@ -985,7 +1098,8 @@ if (((bReady && bHasData) || bForced) &&
 Incorrect:
 
 ```cpp
-if (bReady && bHasData || bForced && !bCancelled || bTimedOut) {
+if ((bReady && bHasData || bForced) &&
+	(!bCancelled || bTimedOut)) {
 	return true;
 }
 ```
@@ -1065,22 +1179,24 @@ Correct wrapped call:
 
 ```cpp
 LogError(
-	_T("Loader exception FirstChance=%s Code=0x%08X Address=%p ThreadID=%lu"),
-	ExceptionInfo.dwFirstChance ? _T("true") : _T("false"), ExceptionInfo.ExceptionRecord.ExceptionCode,
-	ExceptionInfo.ExceptionRecord.ExceptionAddress, unThreadID);
+	_T("Loader exception FirstChance=%s Status=0x%08X Address=%p Thread=%lu"),
+	ExceptionInformation.dwFirstChance ? _T("true") : _T("false"), static_cast<unsigned int>(ExceptionInformation.ExceptionRecord.ExceptionCode),
+	ExceptionInformation.ExceptionRecord.ExceptionAddress, unThreadID);
 ```
 
 The wrapped form is an exception for a complex payload. Do not apply it to calls such as `store`, `load`, `exchange`, `std::move`, `std::forward`, or an iterator lookup with a named predicate when those calls remain simple.
 
 Function declarations and definitions in project C/C++ code must keep the complete signature, including all parameters, on one physical line. Do not place each parameter on a separate line, even when the signature is long. Preserve the opening `{` on that same line for ordinary functions; the constructor initializer-list exception in section 5.1 remains applicable.
 
+The UTF-8 conversion examples assume a non-empty source whose length has been checked against `std::numeric_limits<int>::max()` before conversion to the `int` binding `nTextLength`. Handle a zero result from `MultiByteToWideChar` at the call site; these are formatting fragments, not complete conversion routines.
+
 Correct:
 
 ```cpp
-BuildResult BuildProject(ProjectInfo const& Project, BuildOptions const& Options, ToolchainInfo const& Toolchain);
-const int nSize = MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, strText.data(), static_cast<int>(strText.size()), nullptr, 0);
+BuildResult BuildProject(ProjectInformation const& Project, BuildOptions const& Options, ToolchainInformation const& Toolchain);
+const int nSize = MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, strText.data(), nTextLength, nullptr, 0);
 return StartsWith(strLower, "error") || StartsWith(strLower, "warning") || (strLower == "done") || (strLower == "skipped");
-RecordInfo.m_unOrdinal = (ExportInfo.m_unOrdinal == 0) ? AllocateOrdinal(setOrdinals, unNextOrdinal) : ExportInfo.m_unOrdinal;
+RecordInformation.m_unOrdinal = (ExportInformation.m_unOrdinal == 0) ? AllocateOrdinal(setOrdinals, unNextOrdinal) : ExportInformation.m_unOrdinal;
 ```
 
 Incorrect:
@@ -1090,7 +1206,7 @@ const int nSize = MultiByteToWideChar(
 	CP_UTF8,
 	MB_ERR_INVALID_CHARS,
 	strText.data(),
-	static_cast<int>(strText.size()),
+	nTextLength,
 	nullptr,
 	0);
 ```
@@ -1109,11 +1225,7 @@ OutputStream
 	<< "#define " << szGuardName << "\n";
 ```
 
-Do not hide a leading blank line inside a literal shaped like `"
-...text...
-"`. Emit the blank line and text as separate chunks. A final `"
-
-"` chunk is acceptable when it terminates the chain.
+Do not hide a leading blank line inside a literal shaped like `"\n...text...\n"`. Emit the blank line and text as separate chunks. A final `"\n\n"` chunk is acceptable when it terminates the chain.
 
 Generated C++ must still follow the same one-line expression, indentation, naming, and brace rules as hand-written C++.
 
@@ -1161,10 +1273,12 @@ if ( pAddress && unSize ) {
 Use spaces around ordinary binary and assignment operators:
 
 ```cpp
-unOffset = unBase + unIndex * 4;
+constexpr std::size_t kIndexStride = 4;
+
+unOffset = unBase + unIndex * kIndexStride;
 ```
 
-Do not put a space before `,`, `;`, `)`, `]`, or `}`. Put one space after a comma in ordinary expressions and declarations.
+Do not put a space before `,`, `;`, `)`, or `]`. Put one space after a comma in ordinary expressions and declarations. Block-closing braces follow section 5.2. For a non-empty one-line initializer or JavaScript object/destructuring list, put one space inside each brace, as in `{ GetRawModule }` or `{ 1, 2 }`; keep an empty initializer as `{}`. This spacing rule does not make a semantically unnecessary brace initializer valid under section 7.9.
 
 Keep unary operators attached to their operand:
 
@@ -1185,35 +1299,73 @@ Extra parentheses are allowed and often useful when:
 - addresses, offsets, or ranges are involved;
 - operator precedence should be visually frozen.
 
-For a wrapped expression, these parentheses are required when they preserve a comparison, arithmetic operand, or nested logical group. They are not required around a simple boolean name, pointer check, unary-negation check, or function call. Do not rely on the precedence relationship between `&&` and `||` in a large expression, and do not remove meaningful grouping parentheses merely because the compiler accepts the shorter form.
+These grouping rules apply to both one-line and wrapped C++ and JavaScript expressions. Parenthesize each comparison used as an operand of `&&` or `||`, including equality, inequality, relational, and JavaScript strict-equality comparisons. Parenthesize nested logical groups when combining `&&` and `||`; do not rely on their relative precedence. Preserve required arithmetic grouping. Do not add a pair around a simple boolean name, member access, pointer check, unary-negation check, or function-call result. Wrapping changes indentation, not which operands require parentheses.
+
+Correct comparison operands and a simple call:
+
+```js
+if ((g_HookType === null) || (typeof g_HookType !== "object") || Array.isArray(g_HookType)) {
+	return false;
+}
+```
+
+Incorrect missing comparison grouping:
+
+```js
+if (g_HookType === null || typeof g_HookType !== "object" || Array.isArray(g_HookType)) {
+	return false;
+}
+```
+
+The required parentheses of `if (...)`, `while (...)`, or a function call already delimit a sole comparison. Write `if (unCount == 0)`, not `if ((unCount == 0))`. A negation of a compound expression still needs its grouping: `!(bReady && bActive)` is not equivalent to `!bReady && bActive`.
 
 Simple expressions should not be wrapped only for decoration. Do not add parentheses around a simple arithmetic expression when its precedence is already clear: use `const std::uint64_t unEnd = unBegin + unSize;`, not `const std::uint64_t unEnd = (unBegin + unSize);`. Likewise, use `if (!pValue)` rather than `if ((!pValue))`, and write a wrapped operand as `!pValue ||`, not `(!pValue) ||`.
+
+The same applies to a negated call: write `!MatrixLike.HasMemoryAddress()`, not `(!MatrixLike.HasMemoryAddress())`. Never remove call-argument parentheses or macro-protection parentheses under this rule; macros follow section 4.7.
 
 Call qualified standard algorithms directly. Use `std::max(...)` and `std::min(...)`; do not wrap the qualified function name as `(std::max)(...)` or `(std::min)(...)`. If a platform header defines a colliding function-like macro, resolve that collision at the include boundary or with the narrow preprocessor cleanup permitted by section 4.7.
 
 When a comparison contains arithmetic on one side, parenthesize the arithmetic part:
 
 ```cpp
-if (unEntryOffset > (std::numeric_limits<std::uint32_t>::max() - 5)) {
+constexpr std::uint32_t kRequiredRemainingSize = 5;
+
+if (unEntryOffset > (std::numeric_limits<std::uint32_t>::max() - kRequiredRemainingSize)) {
 	return false;
 }
 ```
 
 For ternary expressions:
 
-1. direct ternaries use no outer parentheses around a simple flag, member, or function-call condition;
-2. simple function-call results are not wrapped;
+1. direct ternaries use no outer parentheses around a simple flag, member, function-call, or unary-negation condition;
+2. simple flag, member, indexed-value, function-call, and unary-negation result arms are not wrapped;
 3. comparison, logical, or arithmetic conditions are grouped before `?`;
-4. arithmetic result arms are grouped;
-5. if the complete ternary is embedded inside another expression, group the complete ternary;
+4. arithmetic and compound logical result arms are grouped as a whole, without additional pairs around their simple operands;
+5. if the complete ternary is an operand of another operator, group the complete ternary; a direct assignment, return, or function argument does not require an additional pair solely for enclosing the ternary;
 6. keep inner arithmetic grouping where it clarifies precedence.
 
+The following formatting fragments assume array indices and arithmetic operands have already passed the bounds and overflow checks in sections 14.3 and 14.9. They are not complete range-handling routines.
+
 ```cpp
-return m_bUnicode ? kUnicodeFrames[unFrame] : kAsciiFrames[unFrame];
+return m_bUnicode ? kUnicodeFrames[unFrame] : kASCIIFrames[unFrame];
 const std::size_t unGap = (unSafeColumns > (unLineColumns + unElapsedColumns)) ? (unSafeColumns - unLineColumns - unElapsedColumns) : 1;
 std::string const strSize = std::to_string(unSize) + ((unSize == 1) ? " byte" : " bytes");
 const std::uint64_t unEnd = (unRangeEnd <= unRangeBegin) ? std::min(unLimitEnd, unRangeBegin + 1) : unRangeEnd;
 ```
+
+Correct JavaScript ternary arms:
+
+```js
+const bSendHooksInstalled = bUseBitBuffer ? (HOOK_STATUS.BitBufferBeginInstalled && HOOK_STATUS.BitBufferEndInstalled) : HOOK_STATUS.ProtobufSendInstalled;
+```
+
+Incorrect decorative pairs around individual flags and a simple arm:
+
+```js
+const bSendHooksInstalled = bUseBitBuffer ? ((HOOK_STATUS.BitBufferBeginInstalled) && (HOOK_STATUS.BitBufferEndInstalled)) : (HOOK_STATUS.ProtobufSendInstalled);
+```
+
+If a genuinely complex surrounding expression requires line breaks, the result-arm shape remains `? (A && B)` followed by `: C`. Moving `?` and `:` onto continuation lines does not justify parentheses around `A`, `B`, or `C` individually. Comparisons inside a compound arm still follow the comparison rule above. Do not rewrite the condition, reorder operands, or coerce the result while applying these presentation rules.
 
 ### 7.6. Numeric Literals
 
@@ -1242,16 +1394,36 @@ Do not use unexplained magic numbers. Give repeated values, limits, masks, offse
 
 ### 7.7. Initialization and Null Values
 
-Prefer brace initialization for zero/default initialization and when narrowing must be rejected:
+Prefer brace initialization for zero/default initialization of records and storage, and when narrowing must be rejected. Ordinary boolean declarations use the explicit value form below:
 
 ```cpp
+constexpr std::size_t kKeySize = 32;
+
 PROCESS_HEAP_ENTRY HeapEntry {};
-std::array<unsigned char, 32> arrKey {};
+std::array<unsigned char, kKeySize> arrKey {};
 ```
 
 Do not use a one-expression brace initializer merely as an alternative spelling for copying or converting a value. When copy-initialization is valid and preserves the intended construction, use the `=` form from section 7.9.
 
 Use `nullptr` for null pointers, `false` for C++ booleans, and `0` for numeric zero. Use `NULL`, `TRUE`, and `FALSE` only at an external API boundary where those spellings are required or improve consistency with the platform signature.
+
+Initialize an ordinary C++ boolean with `= false`, `= true`, or its actual source expression. Do not hide a false initial state behind empty braces or parentheses.
+
+Correct:
+
+```cpp
+bool bHasKeyName = false;
+const bool bReady = IsReady();
+```
+
+Incorrect:
+
+```cpp
+bool bHasKeyName {};
+bool bReady(false);
+```
+
+In a constructor body, write `m_bHasKeyName = false;` when that member uses body initialization under section 10.3. Required constructor initializer lists, aggregate/ABI-record value initialization, and generic value initialization remain governed by their own rules; this boolean declaration rule does not forbid `Record {}` merely because the record contains a boolean.
 
 Do not use `memset` to construct non-trivial C++ objects. Zeroing a raw byte buffer or an explicitly verified trivial layout is allowed.
 
@@ -1291,7 +1463,7 @@ Correct:
 ```cpp
 v8::Local<v8::Object> const LocalShatterSurfaceObject = v8::Object::New(pIsolate);
 std::string const strName = szName;
-SomeValue Value = BuildValue();
+SomeValue Value = OtherValue;
 ```
 
 Incorrect:
@@ -1299,12 +1471,14 @@ Incorrect:
 ```cpp
 v8::Local<v8::Object> const LocalShatterSurfaceObject { v8::Object::New(pIsolate) };
 std::string const strName(szName);
-SomeValue Value(BuildValue());
+SomeValue Value(OtherValue);
 ```
 
 Do not use `Type Name { Expression };` or `Type Name(Expression);` as an alternative visual style for a copy or conversion that can use `=`. This includes declarations whose initializer is a function call, factory result, cast, member access, indexed value, dereferenced value, or another named object.
 
-Keep `{}` for zero/default/value initialization. Direct or list initialization remains permitted only when copy-initialization is ill-formed or would change the intended semantics, such as an `explicit` constructor, required narrowing rejection, a genuine aggregate or initializer-list construction, or another overload-resolution contract. Constructor initializer lists follow section 10.3. Do not mechanically replace these semantically distinct cases with `=`.
+Choose an explicit type or `auto` according to section 11.4 independently of the initializer spelling. For a local domain object returned by a project factory, `auto Value = BuildValue();` satisfies both rules; do not repeat its type solely to demonstrate the `=` form. The binding still follows section 8.1, including PascalCase object roles without an object-category prefix.
+
+Keep `{}` for zero/default/value initialization, with the explicit boolean declaration rule from section 7.7. Direct or list initialization remains permitted only when copy-initialization is ill-formed or would change the intended semantics, such as an `explicit` constructor, required narrowing rejection, a genuine aggregate or initializer-list construction, or another overload-resolution contract. Constructor initializer lists follow section 10.3. Do not mechanically replace these semantically distinct cases with `=`.
 
 ### 7.10. Empty Return Value Initialization
 
@@ -1333,9 +1507,11 @@ The function signature already establishes the result type. Do not repeat that t
 
 Names should be semantic, stable, predictable, and searchable. A reader should understand the role without guessing the underlying category.
 
-Use **systems Hungarian notation** for scalar values, pointers, handles, buffers, raw strings, and common containers. After the prefix, use a `PascalCase` tail:
+Project-owned C++/JavaScript variables and value parameters follow **Systems Hungarian + a PascalCase role**, with objects using a PascalCase role without an object-category prefix. This includes locals, fields, globals, static state, callbacks, lambda variables, loop bindings, generated code, and documentation parameters. Unprefixed camelCase is not an alternative. Category prefixes such as `str` and `fn` remain lowercase: `strPlayerName` is the required prefixed form.
 
-For a pointer to a primitive scalar value, combine `p` with the scalar's ordinary prefix: `pn...`, `pun...`, `pb...`, `pfl...`, `pdbl...`, `pch...`, or `pwch...`. Use `sz...` for a null-terminated string value or fixed C-string buffer and `psz...` for a pointer to a null-terminated string or to a character range within one.
+Choose the most specific category supported by the declared type or documented runtime contract. Do not infer a category from the role name alone. For example, use `strSteamID64` when the identifier is a string, not a numeric category merely because it represents an ID. References retain the referred value's category; deducing a type with `auto` does not remove the naming requirement.
+
+For a pointer to a primitive scalar value, combine `p` with the scalar's ordinary prefix: `pn...`, `pun...`, `pb...`, `pfl...`, `pdbl...`, `pch...`, or `pwch...`. Use `sz...` for fixed C-string array storage or a reference to that array, and `psz...` for a pointer to a null-terminated string or to a character range within one. A pointer does not become an `sz...` value merely because it points to a string literal.
 
 Use the bare `p...` prefix when the pointee is an object, class, structure, union, enum, user-defined/non-primitive type, opaque platform type, or untyped `void` storage. Do not append an artificial type abbreviation to such pointers: the PascalCase tail describes the semantic role.
 
@@ -1352,25 +1528,29 @@ strOutput
 vecBytes
 ```
 
-Domain value objects whose type already carries the category may use a semantic PascalCase role name instead of an artificial prefix:
+Domain objects, records, wrappers, JavaScript objects, and generic values without a more specific known category use PascalCase directly. Do not add an `obj` prefix. Object references follow the same rule; the existing specific categories for strings, containers, iterators, and C++ addresses remain applicable:
 
 ```cpp
 BuildOptions const& Options
 std::filesystem::path const PathOutput
 std::error_code ErrorCode
-ProjectInfo const& Project
+ProjectInformation const& Project
 ```
 
-Do not repeat the complete type name as the variable name when a shorter role is clearer. Do not invent a meaningless prefix merely to satisfy the table.
+For a JavaScript manager object use `Manager`; for a C++ object address use `pManager`. Compose scope + applicable category + role: `g_Manager`, `m_State`, `m_pManager`, and `s_unGeneration`. Objects retain scope prefixes without an object-category prefix. Do not repeat the complete type name when a shorter role is clearer, and do not invent a category merely to satisfy the table.
+
+Named functions, methods, types, and namespaces remain PascalCase. Named lambdas are objects: use `Predicate` or `NeedRegister`, without `fn`, even when used as callbacks. Applicable scope prefixes remain (`m_Predicate`, `g_Predicate`, `s_Predicate`). Named `constexpr` constants retain `k` under section 8.6. Established UPPER_CASE exports/macros, direct named imports under section 2.6, and exact external/ABI/serialization spellings retain their specific contracts. Syntax placeholders such as `Type Name = Expression;` describe grammar, not concrete variable names. Lowercase keywords, paths, and prose are not variable names.
 
 ### 8.2. Basic Prefixes
 
+This table describes implementation categories, not a mandate to rename public exports. JavaScript module bindings and direct-import exceptions follow section 2.6; do not add a scope/category alias to an otherwise unique PascalCase or UPPER_CASE import.
+
 | Prefix | Meaning | Examples |
 | --- | --- | --- |
-| `m_` | class/struct member, followed by the category prefix | `m_pAddress`, `m_bActive` |
-| `g_` | namespace/file-scope mutable state | `g_Storage`, `g_Suspender` |
+| `m_` | class/struct member, followed by the category when applicable | `m_pAddress`, `m_bActive`, `m_State` |
+| `g_` | namespace/file-scope mutable state, followed by the category when applicable | `g_Storage`, `g_Suspender` |
 | `s_` | function-local static state | `s_unGeneration` |
-| `k` | named `constexpr` constant only | `kPageSize`, `kMaxRecords` |
+| `k` | named `constexpr` constant only | `kPageSize`, `kMaximumRecords` |
 | `p` | pointer to an object, user-defined/non-primitive type, opaque type, or `void` storage | `pRecord`, `pContext`, `pAddress` |
 | `pp` | pointer-to-pointer to an object, opaque type, or `void` storage when the indirection is part of the API | `ppRecordOut`, `ppContextOut` |
 | `pn` | pointer to a signed integer | `pnResult`, `pnOffsetOut` |
@@ -1388,23 +1568,17 @@ Do not repeat the complete type name as the variable name when a shorter role is
 | `ppsz` | pointer-to-pointer to a null-terminated C string or character range | `ppszNameOut`, `ppszArguments` |
 | `un` | unsigned integer, size, count, index, identifier | `unSize`, `unOffset`, `unIndex` |
 | `n` | signed integer | `nResult`, `nBufferSize` |
-| `b` | C++ boolean | `bSuccess`, `bNative` |
+| `b` | C++ or JavaScript boolean | `bSuccess`, `bNative` |
 | `fl` | `float` value | `flScale`, `flOpacity` |
 | `dbl` | `double` value | `dblDistance`, `dblRatio` |
 | `h` | operating-system or library handle | `hThread`, `hModule` |
 | `ch` | narrow character | `chSeparator`, `chOpcode` |
 | `wch` | wide character | `wchSeparator` |
-| `sz` | null-terminated C string or fixed C-string buffer | `szName`, `szModuleName` |
+| `sz` | fixed C-string array storage or a reference to that array | `szName`, `szModuleName` |
 | `str` | owning string | `strName`, `strOutput` |
 | `wstr` | owning wide string | `wstrPath` |
 | `strv` | non-owning string view | `strvToken`, `strvName` |
-| `vec` | vector-like dynamic sequence | `vecPages`, `vecResults` |
-| `arr` | fixed-size array or `std::array` | `arrBytes`, `arrRegisters` |
-| `spn` | non-owning contiguous `std::span` | `spnBytes`, `spnRecords` |
-| `map` | map-like associative container | `mapModules`, `mapSymbols` |
-| `set` | set-like associative container | `setOrdinals`, `setNames` |
-| `it` | iterator, followed by its role | `itRecord`, `itModule` |
-| `fn` | function pointer type alias or callback object role | `fnCallBack`, `fnThreadProc` |
+| `fn` | function pointer alias/value or callback parameter; not a named lambda object | `fnCallback`, `fnThreadProcedure` |
 
 The pointer prefix describes both indirection and the primitive pointee category. Do not drop the pointee category from a primitive pointer: use `punCount`, not `pCount`, and `pflScale`, not `pScale`. Conversely, do not encode a class or custom type name into the prefix: use `pRecord` for `RECORD*` and `pWidget` for `Widget*`, not `pRecordType` or `pWidgetObject`.
 
@@ -1433,9 +1607,13 @@ void* pContext = nullptr;
 For example, both the string parameter and a pointer that walks through it use `psz...`:
 
 ```cpp
-TString QuoteCommandLineArgument(TCHAR const* const pszArgument) {
+void ProcessArgumentCharacters(TCHAR const* const pszArgument) {
+	if (!pszArgument) {
+		return;
+	}
+
 	for (TCHAR const* pszCharacter = pszArgument; *pszCharacter; ++pszCharacter) {
-		// Process the string character by character.
+		ProcessCharacter(*pszCharacter);
 	}
 }
 ```
@@ -1443,6 +1621,34 @@ TString QuoteCommandLineArgument(TCHAR const* const pszArgument) {
 Do not use a bare `it`, `i`, `j`, `buf`, `ctx`, or `idx` in project-owned code when a complete role name remains practical.
 
 External ABI fields, generated schema names, public command-line flags, and standard domain abbreviations keep their required spelling.
+
+#### Containers, Iterators, and Views
+
+Use these categories in both C++ and JavaScript where the representation applies. Prefer the specific container category over the unprefixed-object fallback; a container does not lose its prefix merely because it is an object.
+
+| Prefix | Category / representative type | Example |
+| --- | --- | --- |
+| `it` | Iterator, including const and reverse iterators | `itRecord`, `itReverseRecord` |
+| `vec` | Dynamic sequence / vector: `std::vector`, dynamic JavaScript arrays | `vecPlayers` |
+| `arr` | Fixed array: raw arrays, `std::array` | `arrBytes` |
+| `deq` | Double-ended queue: `std::deque` | `deqPendingRequests` |
+| `lst` | List: `std::list` | `lstRequests` |
+| `flst` | Singly linked / forward list: `std::forward_list` | `flstEntries` |
+| `set` | Set: `std::set`, JavaScript `Set` | `setNames` |
+| `mset` | Multiset: `std::multiset` | `msetScores` |
+| `uset` | Unordered set: `std::unordered_set` | `usetIdentifiers` |
+| `umset` | Unordered multiset: `std::unordered_multiset` | `umsetValues` |
+| `map` | Associative map: `std::map`, JavaScript `Map` | `mapPlayers` |
+| `mmap` | Multimap: `std::multimap` | `mmapHandlers` |
+| `umap` | Unordered map: `std::unordered_map` | `umapPlayers` |
+| `ummap` | Unordered multimap: `std::unordered_multimap` | `ummapHandlers` |
+| `stk` | Stack adaptor: `std::stack` | `stkFrames` |
+| `que` | Queue adaptor: `std::queue` | `queRequests` |
+| `pque` | Priority-queue adaptor: `std::priority_queue` | `pqueTasks` |
+| `spn` | Non-owning contiguous span: `std::span` | `spnData` |
+| `bset` | Fixed bitset: `std::bitset` | `bsetFeatures` |
+
+This catalog covers the standard C++20 container families and adaptors, plus iterators, spans, and bitsets; it does not require introducing those types or changing a project's language baseline. Strings and string views keep their separate categories above. For another library's container, use the closest documented category only when its contract matches; otherwise document the category in the adoption profile. A prose label such as "list" does not determine the storage type. Dynamic JavaScript arrays retain `vec`, including `g_vecRuntimePaths`. Scope prefixes compose normally, for example `m_deqPendingRequests`, `g_umapPlayers`, and `s_queRequests`.
 
 ### 8.3. Extended Member Prefixes
 
@@ -1463,6 +1669,8 @@ For members, retain the same pointee-category composition after `m_`:
 - `m_vec...` / `m_arr...` - sequence storage
 - `m_spn...` - non-owning contiguous view
 - `m_map...` / `m_set...` - associative container
+- `m_` + PascalCase role - object member without a more specific category, for example `m_State`
+- `m_fn...` - function-pointer member; a named lambda object instead uses `m_` + PascalCase
 
 Examples:
 
@@ -1490,7 +1698,7 @@ Type names commonly take one of two forms:
 
 ### 8.5. Function and Method Names
 
-Functions and methods should use verb-based `PascalCase` names.
+Functions and methods should use verb-based `PascalCase` names with complete words, not shortened verbs such as `Init` or `Alloc`.
 
 Typical families:
 
@@ -1499,18 +1707,41 @@ Typical families:
 - `Find...`
 - `Encode...`
 - `Decode...`
-- `Alloc...`
-- `DeAlloc...`
+- `Allocate...`
+- `Deallocate...`
+- `Initialize...`
+- `Deinitialize...`
+- `Reinitialize...`
 - `Open...`
 - `Close...`
 - `Load...`
+- `Unload...`
+- `Reload...`
 - `Save...`
 - `Reset...`
 - `Dump...`
 
-Historical forms such as `UnLock`, `DeAlloc`, and `ReLink` are acceptable if they are part of a project's established convention.
+#### Complete Words and Operation Names
 
-If a project treats `Re...` as two visible words in PascalCase identifiers or generated filenames, apply that convention consistently: `ReBuild`, `ReLink`, `ReLoad`, and `VerifyReBuild.cpp`. Lower-case ordinary words such as `rebuild`, `rebuilt`, and paths like `build/rebuilt` stay lower-case.
+Use complete English operation names in project-owned C++ and JavaScript identifiers. Write `Initialize`, `Allocate`, `Deinitialize`, `Reinitialize`, and `Deallocate`, not `Init`, `Alloc`, `Deinit`, `Reinit`, or `Dealloc`. Removing an artificial capital letter does not make an abbreviated word acceptable.
+
+Do not introduce a PascalCase boundary after a linguistic prefix such as `un`, `re`, `de`, `pre`, or `post` inside one word. Use `Unload`, `Unlock`, `Unregister`, `Uninstall`, `Reload`, `Rebuild`, `Readjust`, `Relink`, `Reopen`, `Reapply`, `Preload`, and `Postprocess`. Capitalize the next actual word in a compound identifier: `ReloadConfiguration`, `OnUnload`, `g_fnReloadConfiguration`, and `VerifyRebuild.cpp`.
+
+| Correct | Incorrect |
+| --- | --- |
+| `Initialize`, `Allocate` | `Init`, `Alloc` |
+| `Deinitialize`, `Reinitialize`, `Deallocate` | `Deinit`, `DeInit`, `Reinit`, `ReInit`, `Dealloc`, `DeAlloc` |
+| `Unload`, `Unlock`, `Unregister`, `Uninstall` | `UnLoad`, `UnLock`, `UnRegister`, `UnInstall` |
+| `Reload`, `Rebuild`, `Readjust` | `ReLoad`, `ReBuild`, `ReAdjust` |
+| `Relink`, `Reopen`, `Reapply` | `ReLink`, `ReOpen`, `ReApply` |
+| `Preload`, `Postprocess` | `PreLoad`, `PostProcess` |
+| `Reset`, `ResetPendingOperationSlot`, `Resettable` | `ReSet`, `ReSetPendingOperationSlot`, `ReSettable` |
+
+Keep `Reset` and its derivatives as one word: `Reset`, `ResetPendingOperationSlot`, `Resettable`, and `IsPendingOperationSlotResettable`. Never split this family into `ReSet` or `ReSettable`.
+
+This rule removes artificial capitalization inside words, not the semantic category prefixes in section 8.2 or the standard acronyms in section 8.9. Keep ordinary compound names such as `ProcessCommand` and `FilePath` in PascalCase. Lower-case prose and ordinary paths retain their normal spelling. Apply the complete-name rule from section 8.15 to the remaining role words as well.
+
+External SDK/library names, required lifecycle callbacks, public exports, serialized keys, and compatibility-bound filenames keep their exact contract under sections 2.3 and 2.6. For example, an implementation may be named `Unload` while its required JavaScript export stays `module.exports = { unload: Unload };`. A naming cleanup must not change the `unload` key or make the runtime stop finding its callback. Do not rename or add a style-only alias for an external `Init` or `Alloc` API; an authorized public API migration is a separate contract change.
 
 ### 8.6. Compile-Time Constants
 
@@ -1521,17 +1752,19 @@ The `k` prefix is reserved only for named `constexpr` constants. Do not use `k` 
 Correct:
 
 ```cpp
-constexpr std::size_t kMaxRecords = 64;
+constexpr std::size_t kMaximumRecords = 64;
+constexpr std::size_t kKeySize = 32;
 constexpr unsigned int kPageSize = 0x1000;
-constexpr unsigned char kBaseKey[32] {};
+constexpr unsigned char kBaseKey[kKeySize] {};
 
-char szBuffer[kMaxRecords] {};
+char szBuffer[kMaximumRecords] {};
 ```
 
 Large compile-time lookup tables, fixed limits, array sizes, masks, and offsets should also use `k` when they are expressed as `constexpr` objects:
 
 ```cpp
-constexpr unsigned char kSBox[256] = { ... };
+constexpr std::size_t kSubstitutionBoxSize = 256;
+constexpr unsigned char kSBox[kSubstitutionBoxSize] = { ... };
 constexpr std::size_t kPlainBytes = kLength * sizeof(T);
 ```
 
@@ -1548,7 +1781,7 @@ Incorrect:
 
 ```cpp
 const std::size_t kRuntimeSize = GetRuntimeSize();
-#define kMaxRecords 64
+#define kMaximumRecords 64
 unsigned int kIndex = 0;
 constexpr bool kIsSpace(const char chValue);
 template <std::size_t kLength> class Buffer;
@@ -1561,10 +1794,10 @@ Macros use `UPPER_SNAKE_CASE`.
 Examples:
 
 ```cpp
-DEFINE_SECTION
-LINKER_OPTION
-DISABLE_OPTIMIZATION_BEGIN
-RD_FLAG_MODRM
+SOME_MODULE_DEFINE_SECTION
+SOME_MODULE_LINKER_OPTION
+SOME_MODULE_DISABLE_OPTIMIZATION_BEGIN
+SOME_MODULE_FLAG_MODRM
 ```
 
 Macro APIs should be split into two layers when possible:
@@ -1574,13 +1807,13 @@ Macro APIs should be split into two layers when possible:
 
 For compile-time literal helpers, the macro body may use an immediately invoked lambda to preserve expression-like syntax, but the algorithm itself should live in named C++ types and functions inside a namespace.
 
-Temporary macros for compiler attributes, packing, warnings, or include configuration must have a narrow lifetime. Define them near the top-level section where they are needed and `#undef` them when the section/header is finished.
+Temporary macros for compiler attributes, packing, warnings, or include configuration must have a narrow lifetime. Define them near their required use and `#undef` file-owned helpers immediately after their final required use; do not retain them until the section/header ends unnecessarily. Preserve caller-defined values and documented public include contracts under section 4.7.
 
 Macro arguments may use uppercase names to make macro substitution visually distinct:
 
 ```cpp
-#define HASH_STRING(STRING) ...
-#define MAKE_ARRAY(ARRAY) ...
+#define SOME_MODULE_HASH_STRING(STRING) ...
+#define SOME_MODULE_MAKE_ARRAY(ARRAY) ...
 ```
 
 ### 8.8. Template Parameters and Type Aliases
@@ -1621,7 +1854,7 @@ Do not expose STL-like lower-case aliases as broad public project types unless t
 Keep standard acronyms uppercase where that improves recognizability:
 
 ```cpp
-GetCPUInfo
+GetCPUInformation
 DumpRTTI
 CRC32
 AESState
@@ -1646,7 +1879,7 @@ enum class OP : unsigned char {
 
 Rules for project-owned enums:
 
-1. use `enum class` unless an external ABI requires an unscoped enum;
+1. use `enum class` unless a documented C/ABI boundary requires an unscoped enum; at that boundary, follow the `typedef enum _TAG : UnderlyingType { ... } TAG, *PTAG;` form and compatibility rules in section 9.5;
 2. initialize only the first ordinary value to zero and let later sequential values auto-increment;
 3. assign every value explicitly when the numeric representation is an external contract or intentionally sparse;
 4. use a stable `INVALID`, `UNKNOWN`, or `NONE` value when callers need a failure/sentinel state;
@@ -1666,7 +1899,7 @@ RESOURCE_<INDEX>_<ID>.bin
 TEMPLATE_<INDEX>.<ext>
 ```
 
-Generated file names may use an uppercase role prefix when the file is machine-owned: `TABLE_<INDEX>.cpp`, `SECTION_<INDEX>.asm`, `METADATA_<INDEX>.json`. Extensions stay in the normal spelling for the platform or toolchain. User-editable files should stand apart with ordinary role names such as `UserConfig.cpp`, `Hooks.asm`, `custom_rules.json`, or a documented `user/` directory.
+Generated file names may use an uppercase role prefix when the file is machine-owned: `TABLE_<INDEX>.cpp`, `SECTION_<INDEX>.asm`, `METADATA_<INDEX>.json`. Extensions stay in the normal spelling for the platform or toolchain. User-editable files should stand apart with ordinary role names such as `UserConfiguration.cpp`, `Hooks.asm`, `custom_rules.json`, or a documented `user/` directory.
 
 If hexadecimal values appear in generated file names, use one documented spelling across the project. Uppercase hexadecimal without `0x` is recommended for sortable generated names. Fixed-width fields should keep the same width across one generated set, and the width rule should be explicit.
 
@@ -1682,8 +1915,8 @@ Large generated artifacts should be split by a documented policy:
 Generated file headers, README summaries, and reports should use key/value text for machine-readable facts such as addresses, sizes, schema versions, hashes, and source paths. Include units and encodings where ambiguity is possible:
 
 ```text
-kind=table index=2 begin=00001000 end=00001FFF size=00001000
-schema=3 source=assets/input.bin hash=4F8C2A10
+kind=table index=2 begin=0x00001000 end_inclusive=0x00001FFF size_bytes=4096
+schema=3 source=assets/input.bin hash_algorithm=CRC32 hash=4F8C2A10
 ```
 
 Command-line help and parser logic should present and handle primary options in a stable order. A good default order is:
@@ -1707,7 +1940,7 @@ Generated code is still code. It should follow the same style rules as hand-writ
 
 Every generated project or generated output tree should define ownership boundaries:
 
-- generated-only files may be overwritten at any time;
+- generated-only files may be regenerated by their owning generator within an authorized workflow; edit the available generator rather than its outputs under section 2.5;
 - user-editable files are never overwritten unless the user explicitly asks for regeneration;
 - mixed files must use stable generated regions with clear begin/end markers;
 - public extension points stay small, typed, and documented;
@@ -1778,7 +2011,9 @@ Machine-owned generated files may use an uppercase role prefix as described in 8
 
 ### 8.15. Abbreviations
 
-Use complete, searchable names unless an abbreviation is a standard project, ABI, CPU, platform, file-format, or library term.
+Use complete, searchable words for project-owned functions, methods, types, variables, members, and generated names. Do not shorten an ordinary word merely because the abbreviation is familiar or already appears elsewhere in the project. Standard domain acronyms, the semantic category prefixes from section 8.2, and required external spellings remain narrow exceptions; they do not justify shortened role words.
+
+For example, use `Initialize`, `InitializeState`, `Deinitialize`, `Reinitialize`, `AllocateBuffer`, and `DeallocateBuffer`, not `Init`, `InitState`, `Deinit`, `Reinit`, `AllocBuffer`, or `DeallocBuffer`. Apply the complete-word spelling inside longer identifiers as well, and follow section 8.5 without artificially splitting a linguistic prefix from its word.
 
 Bad:
 
@@ -1798,8 +2033,15 @@ std::size_t unIndex = 0;
 unsigned char* punBuffer = nullptr;
 ```
 
-Recommended replacements include:
+Required replacements for ordinary project-owned words include:
 
+- `init` -> `initialize` for a verb, or `initialization` for a noun;
+- `deinit` -> `deinitialize`;
+- `reinit` -> `reinitialize`;
+- `alloc` -> `allocate` for a verb, or `allocation` for a noun;
+- `dealloc` -> `deallocate`;
+- `config` -> `configuration`;
+- `info` -> `information`;
 - `disp` -> `displacement`;
 - `rel` -> `relative` when it is not a standard relocation term;
 - `addr` -> `address`;
@@ -1820,13 +2062,13 @@ Do not rename established terms such as `RVA`, `VA`, `TLS`, `PE`, `ELF`, `COFF`,
 
 ### 9.1. Explicit Types
 
-Signatures should be as explicit as needed.
+Signatures expose their types and contracts explicitly. Use type deduction only in the cases permitted by section 11.4; a general preference for brevity is not an exception.
 
-Do not over-rely on:
+Do not use:
 
-- auto return types without a reason;
-- non-obvious type deduction;
-- "smart" hiding of types where the type matters to understanding the API.
+- deduced return types outside section 11.4's explicit exceptions;
+- unexplained or non-obvious type deduction;
+- wrappers or aliases that hide types needed to understand ownership or the ABI.
 
 ### 9.2. `const` Style
 
@@ -1841,10 +2083,10 @@ const std::size_t unSize = 0;
 For compound declarations, place `const` next to the qualified type or pointer/reference as required by the declaration:
 
 ```cpp
-char const* pszName;
-wchar_t const* pszModuleName;
-Block const& BlockValue;
-void const* const pAddress;
+char const* pszName = nullptr;
+wchar_t const* pszModuleName = nullptr;
+Block const& BlockValue = ExistingBlock;
+void const* const pAddress = nullptr;
 ```
 
 Do not choose a spelling that obscures pointer constness, pointee constness, reference binding, ownership, or the ABI type. A legacy file may retain its established spelling during a focused behavioral patch, but a dedicated migration should apply this rule consistently within the edited file.
@@ -1877,11 +2119,9 @@ Do not use spaced forms such as:
 void * pAddress
 ```
 
-Declare one pointer or reference variable per statement when multiple declarators would make binding unclear.
-
 Every declaration in project C/C++ code must declare exactly one variable or object. Do not combine variables, arrays, pointers, or references of the same type in one declaration. Write `char szName[kNameCapacity] {};` and `char szExtension[kExtensionCapacity] {};` as two separate declarations instead of `char szName[kNameCapacity] {}, szExtension[kExtensionCapacity] {};`.
 
-### 9.5. `typedef struct` and `typedef enum`
+### 9.5. `typedef struct`, `typedef union`, and `typedef enum`
 
 For C-compatible, ABI-facing, and layout-sensitive data, use the project typedef form with a leading-underscore tag and pointer alias:
 
@@ -1892,7 +2132,20 @@ typedef struct _SOME_RECORD {
 } SOME_RECORD, *PSOME_RECORD;
 ```
 
-The `_TAG` spelling is reserved for this exact C-compatible structure-tag pattern. Do not use leading-underscore tags for ordinary C++ classes, variables, functions, or unrelated types.
+Use the corresponding `typedef union _TAG { ... } TAG, *PTAG;` spelling for a union. Section 14.2 shows the canonical union with directly exposed anonymous-structure bitfields. The `_TAG` spelling is reserved for these exact structure, union, and unscoped-enum typedef patterns under the documented compatibility profile. Do not use leading-underscore tags for ordinary C++ classes, scoped enums, variables, functions, or unrelated types.
+
+For an unscoped enum at this boundary, use `typedef enum _TAG : UnderlyingType { ... } TAG, *PTAG;`. Both the leading-underscore tag and an explicit integral underlying type are required, along with the value and pointer aliases. Write the actual type after `:`, not a placeholder.
+
+Correct when `unsigned char` is the required underlying type:
+
+```cpp
+typedef enum _SOME_MODE : unsigned char {
+	SOME_MODE_DISABLED = 0,
+	SOME_MODE_ENABLED
+} SOME_MODE, *PSOME_MODE;
+```
+
+Incorrect because the tag lacks the required prefix and the underlying type is implicit:
 
 ```cpp
 typedef enum SOME_MODE {
@@ -1901,7 +2154,9 @@ typedef enum SOME_MODE {
 } SOME_MODE, *PSOME_MODE;
 ```
 
-The leading-underscore tag is permitted here only because it is part of the required C-compatible structure typedef convention.
+Select the underlying type from the enum's value range, signedness, and ABI or serialization contract. `unsigned char` is an example, not a universal default. Do not narrow an existing enum or change its representation merely to copy this example; preserve its required size, alignment, and numeric values, and verify the relied-on properties.
+
+The example uses C++ syntax with a fixed underlying type. The C-style typedef convention does not guarantee compatibility with every C language version or compiler; a header shared with C must follow its documented language/toolchain and ABI contract under section 2.2. The reserved `_TAG` spelling is a narrowly documented compatibility-profile exception, not a generally portable identifier form.
 
 For pure C++ interfaces, prefer an ordinary `struct`, `enum class`, or type alias unless the C-compatible spelling is part of the boundary convention.
 
@@ -1910,7 +2165,7 @@ For pure C++ interfaces, prefer an ordinary `struct`, `enum class`, or type alia
 For callbacks and function pointer aliases, prefer:
 
 ```cpp
-using fnCallBack = bool(*)(void* pData);
+using fnCallback = bool(*)(void* pData);
 ```
 
 ### 9.7. `noexcept`
@@ -1931,11 +2186,13 @@ Do not mark a function `noexcept` merely because its name begins with `Get`, `Fi
 
 ### 9.8. Default Arguments
 
-Default arguments belong in declarations, not definitions:
+When a function has a separate declaration and definition, default arguments belong in the declaration and must not be repeated in the definition:
 
 ```cpp
 bool Wait(DWORD unMilliseconds = INFINITE);
 ```
+
+If the definition is the first and only declaration, a default argument may appear there. This includes required caller-visible template definitions. Do not introduce a redundant forward prototype solely to move a default argument out of an otherwise valid definition; preserve the dependency order in section 4.4.
 
 ### 9.9. Size and Index Types
 
@@ -1977,13 +2234,13 @@ Every non-trivial array bound should come from a named `constexpr` constant:
 
 ```cpp
 struct ParserLimits {
-	static constexpr std::size_t kMaxLines = 2048;
-	static constexpr std::size_t kMaxTokens = 8;
+	static constexpr std::size_t kMaximumLines = 2048;
+	static constexpr std::size_t kMaximumTokens = 8;
 };
 
 struct Line {
 	std::size_t m_unTokenCount;
-	Token m_Tokens[ParserLimits::kMaxTokens];
+	Token m_arrTokens[ParserLimits::kMaximumTokens];
 };
 ```
 
@@ -2013,7 +2270,7 @@ Example:
 
 ```cpp
 static_assert((sizeof(T) == 1) || (sizeof(T) == 2) || (sizeof(T) == 4), "Unsupported element size");
-static_assert(kBufferBytes <= kMaxBufferBytes, "buffer too large");
+static_assert(kBufferBytes <= kMaximumBufferBytes, "buffer too large");
 ```
 
 Put one blank line between the constant/layout declaration and its first `static_assert`. Group related assertions together.
@@ -2038,8 +2295,13 @@ std::uint32_t unValue = (std::uint32_t)nValue;
 Good:
 
 ```cpp
-	WriteFile();
-	const std::uint32_t unValue = static_cast<std::uint32_t>(nValue);
+WriteFile();
+
+if (!std::in_range<std::uint32_t>(nValue)) {
+	return false;
+}
+
+const std::uint32_t unValue = static_cast<std::uint32_t>(nValue);
 ```
 
 Call a function normally when its return value is intentionally not needed. Handle status-returning APIs when the status affects correctness; do not add a cast only to discard a result or suppress an unused-result warning. Add a short comment when ignoring the result is not self-evidently safe.
@@ -2155,7 +2417,7 @@ Keep access labels at the class indentation level and indent every member declar
 ```cpp
 class Page {
 public:
-	Page(void* const pBaseAddress, const bool bAutoRestore, const bool bCommitPage = false);
+	Page(void* const pBaseAddress, const bool bAutomaticRestore, const bool bCommitPage = false);
 	Page(void* const pDesiredAddress = nullptr);
 	~Page() noexcept;
 
@@ -2181,11 +2443,13 @@ Recommended order:
 
 Do not use in-class/default member initializers for ordinary project-owned classes or structs. Declare constructors in the header and define them in the source file. When the language permits assignment after construction, initialize the default state in the constructor body with explicit assignments, one member per statement:
 
-The header/source rule applies to every non-template constructor definition, including a delegating constructor and its initializer list. Keep the declaration in the header and put the complete definition, initializer list, and state initialization in the `.cpp` file. Do not place a non-template constructor body or initializer list in a public header merely because the declaration is short.
+The header/source rule applies to ordinary non-template runtime constructor definitions, including a delegating constructor and its initializer list. Keep the declaration in the header and put the complete definition, initializer list, and state initialization in the `.cpp` file. Do not place such a constructor body or initializer list in a public header merely because the declaration is short.
 
-There is one narrow template exception: a function-template constructor whose definition must be visible for caller-side deduction may remain in the header. Such a definition must be a thin forwarding adapter; the non-template constructor that performs the real initialization is still declared in the header and defined in the `.cpp` file. Do not move a required template definition to the `.cpp`, and do not duplicate the full constructor implementation in the template adapter. When the template definition is also its first declaration, a default argument may appear there; do not repeat that default on another declaration or out-of-class definition.
+For an ordinary runtime class, a function-template constructor whose definition must be visible for caller-side instantiation may remain in the header as a thin forwarding adapter; the non-template constructor that performs the real initialization is still declared in the header and defined in the `.cpp` file. Do not move a required template definition to the `.cpp`, and do not duplicate the full constructor implementation in the template adapter. When the template definition is also its first declaration, a default argument may appear there under section 9.8; do not repeat that default elsewhere.
 
-Correct complete example:
+Language-required visibility is a separate, narrow exception under section 2.2. A constructor used in caller-side constant evaluation must have its definition available there. A constructor of a dependent class template must likewise be visible for caller-side instantiation, unless the project's supported runtime instantiations can be provided correctly through explicit instantiations. Keep only the required template/compile-time implementation in the header. Do not label an ordinary runtime constructor `constexpr`, make it a template, or declare a component header-only solely to bypass the normal header/source rule.
+
+Correct header/source placement (platform includes, resource helpers, and destructor implementation omitted):
 
 ```cpp
 // SharedClient.h
@@ -2195,7 +2459,7 @@ public:
 	SharedClient(TCHAR const* pszSharedName, std::size_t unCapacity, bool bIsGlobal = false);
 
 	template <std::size_t unCapacity>
-	SharedClient(TCHAR const (&szSharedName)[unCapacity], bool bIsGlobal = false) :
+	SharedClient(TCHAR const(&szSharedName)[unCapacity], bool bIsGlobal = false) :
 		SharedClient(szSharedName, unCapacity, bIsGlobal)
 	{
 	}
@@ -2203,7 +2467,7 @@ public:
 	SharedClient(char const* pszSharedName, std::size_t unCapacity, bool bIsGlobal = false);
 
 	template <std::size_t unCapacity>
-	SharedClient(char const (&szSharedName)[unCapacity], bool bIsGlobal = false) :
+	SharedClient(char const(&szSharedName)[unCapacity], bool bIsGlobal = false) :
 		SharedClient(szSharedName, unCapacity, bIsGlobal)
 	{
 	}
@@ -2218,7 +2482,7 @@ private:
 };
 ```
 
-The template adapters above are allowed because the compiler must see them to deduce `unCapacity` from an array reference. They do exactly one thing: forward the array and its extent to the non-template constructor. They must not allocate, validate, mutate state, acquire a handle, or duplicate platform-specific initialization.
+The template adapter declarations let the compiler deduce `unCapacity` from an array reference; their visible definitions then allow it to instantiate the forwarding constructor. They do exactly one thing: forward the array and its extent to the non-template constructor. They must not allocate, validate, mutate state, acquire a handle, or duplicate platform-specific initialization.
 
 The real constructors and all member initialization belong in the source file:
 
@@ -2289,9 +2553,11 @@ public:
 	SomeType(SomeDependency& Dependency) noexcept;
 
 private:
+	static constexpr std::size_t kByteCapacity = 16;
+
 	SomeDependency& m_Dependency;
 	const int m_nLimit;
-	BYTE m_arrBytes[16];
+	BYTE m_arrBytes[kByteCapacity];
 	void* m_pAddress;
 };
 ```
@@ -2374,9 +2640,9 @@ SomeGuard(SomeGuard&& Other) noexcept;
 SomeGuard& operator=(SomeGuard&&) noexcept = default;
 ```
 
-Define a parameterized, copy, or move constructor in the source file, or delete it when the operation is not supported. Do not write a parameterized, copy, or move constructor as `= default`.
+Define an ordinary runtime parameterized, copy, or move constructor in the source file, or delete it when the operation is not supported. Required template/constant-evaluation visibility follows section 10.3. Do not write a parameterized, copy, or move constructor as `= default`.
 
-A zero-argument `= default` constructor is an intentional in-header definition and is the only non-template, non-forwarding-adapter constructor-definition exception to the header/source rule.
+A zero-argument `= default` constructor is an intentional in-header definition. It is the ordinary runtime exception to the header/source rule; it does not remove the separate language-required visibility cases in section 10.3.
 
 A resource-owning type should normally be non-copyable. It may be movable only when the moved-from state is valid, empty, and safely destructible.
 
@@ -2400,7 +2666,7 @@ Keep these wrappers boring:
 
 ### 11.1. Guard Clauses
 
-Functions should begin with invariant and input validation.
+Functions should begin with required invariant and input validation. A private leaf may rely on preconditions already established by its caller under section 13.6; do not mistake this narrow contract for permission to leave public inputs unchecked.
 
 Example:
 
@@ -2430,7 +2696,7 @@ Blank lines between phases are required. Inside an early-exit branch, its final 
 
 ### 11.4. `auto`
 
-Use `auto` for every iterator declaration and use the range-loop forms defined below. Use `auto` for a local domain value initialized directly from a project function or factory when the return type is the intended contract and the variable name already communicates the role; for example, write `auto ModuleFileName = GetDebugModuleName(unProcessID, pImageBase);` instead of repeating `TStringOptional`. Prefer an explicit type whenever the declaration exposes ownership, ABI layout, or initialization semantics. Apply section 7.9 to the initializer: use `=` whenever copy- or conversion-initialization is valid and semantics-preserving, and reserve direct `(...)` or list `{ Expression }` initialization for cases that require their distinct construction semantics. Do not use `auto` merely to shorten a simple scalar, ownership-bearing allocation, or platform ABI record.
+Use `auto` for every iterator declaration and use the range-loop forms defined below. Use `auto` for a local domain value initialized directly from a project function or factory when the return type is the intended contract and the variable name already communicates the role; for example, write `auto ModuleFileName = GetDebugModuleName(unProcessID, pImageBase);` instead of repeating the optional-string wrapper type `TStringOptional`. Deduced bindings still follow section 8.1, including PascalCase object roles without an object-category prefix. Prefer an explicit type whenever the declaration exposes ownership, ABI layout, or initialization semantics. Apply section 7.9 to the initializer: use `=` whenever copy- or conversion-initialization is valid and semantics-preserving, and reserve direct `(...)` or list `{ Expression }` initialization for cases that require their distinct construction semantics. Do not use `auto` merely to shorten a simple scalar, ownership-bearing allocation, or platform ABI record.
 
 For simple scalar values, write the scalar type explicitly with west `const` when applicable. For pointers to complex types with multiple qualifiers, prefer the platform or project pointer alias whose name begins with `P` (for example, `PRecord`). If no suitable `P*` alias exists, use `auto*` when the initializer determines the pointer type without hiding ownership or ABI semantics. Pointers to simple character types remain explicit, including qualified forms such as `char const* const` and `wchar_t const* const`; do not replace these with `auto*`. Do not use `auto` for a pointer merely to shorten a simple scalar or handle declaration.
 
@@ -2450,9 +2716,9 @@ Use this decision matrix:
 | Simple scalar outside a range | explicit scalar type | `const unsigned int unCount = GetCount();` |
 | Complex pointer with a suitable `P*` alias | explicit alias | `PRecord pRecord = GetRecord();` |
 | Complex pointer without a suitable alias | `auto*` with required qualifiers | `auto* const pRecord = GetComplexRecord();` |
-| Local domain value returned by a project function or factory | `auto` | `auto ModuleFileName = GetDebugModuleName(unProcessID, pImageBase);` |
+| Local domain value returned by a project function or factory | `auto` | `auto ModuleFileName = GetDebugModuleName(unProcessID, pImageBase);` for an optional-string wrapper |
 | Named local lambda | `auto` | `auto Predicate = [&](Record const& RecordValue) -> bool { ... };` |
-| Generated/dependent object type that cannot be named usefully | `auto` | `auto strValue = COMPILE_TIME_TEXT("value");` |
+| Generated/dependent object type that cannot be named usefully | `auto` | `auto Value = COMPILE_TIME_TEXT("value");` |
 | Ownership-bearing allocation or smart pointer | explicit owner type | `std::unique_ptr<char[]> pBuffer(new (std::nothrow) char[unSize]);` |
 | ABI/system record | explicit record type | `PROCESS_RECORD ProcessInformation {};` |
 
@@ -2462,7 +2728,7 @@ Use `auto const&` as the default range form because it avoids an unintended copy
 
 Named local lambdas and narrow compile-time or macro facades whose generated type cannot be named use `auto`. Range-based `for` elements use `auto` with the required `const` and reference qualifiers; do not spell their value type through `decltype(...)`, `std::remove_reference_t`, `value_type`, or another container-derived type. This keeps the loop coupled to the expression being traversed without exposing implementation-specific container details.
 
-Use `decltype` only when it preserves a genuinely expression-dependent type that cannot be stated clearly by an explicit type or the approved `auto` rules. Do not use `decltype` as a general replacement for `auto` or to spell a type that is already clear from the initializer and surrounding contract. Iterator variables and results from iterator-returning algorithms must use `auto`, for example `auto it = std::find_if(...)`; do not write `decltype(Container.begin()) it` or another `decltype`-based iterator declaration. A scalar algorithm result still uses its explicit scalar type when that type is part of the local contract.
+Use `decltype` only when it preserves a genuinely expression-dependent type that cannot be stated clearly by an explicit type or the approved `auto` rules. Do not use `decltype` as a general replacement for `auto` or to spell a type that is already clear from the initializer and surrounding contract. Iterator variables and results from iterator-returning algorithms must use `auto` and a semantic iterator name, for example `auto itRecord = std::find_if(...)`; do not write `decltype(vecRecords.begin()) itRecord` or another `decltype`-based iterator declaration. A scalar algorithm result still uses its explicit scalar type when that type is part of the local contract.
 
 `decltype(auto)` follows the same restriction. It is allowed only in a forwarding or adapter function whose contract must preserve the exact value/reference category of an expression and where neither an explicit return type nor ordinary `auto` is correct. Do not use `decltype(auto)` for local variables, iterator declarations, range elements, or as a convenience return type.
 
@@ -2493,7 +2759,7 @@ auto NeedRegister = [&](int& nRegisterOut, std::string_view const strvToken) -> 
 Iterator declarations always use `auto`, especially for nested associative containers:
 
 ```cpp
-auto itModule = g_Modules.find(unProcessID);
+auto itModule = g_mapModules.find(unProcessID);
 ```
 
 Range-based loops and algorithm results follow the same rule:
@@ -2503,7 +2769,7 @@ for (auto const& RegistryEntry : Registry.m_mapStates) {
 	...
 }
 
-auto it = std::find_if(vecReferenceCounts.begin(), vecReferenceCounts.end(), Predicate);
+auto itReferenceCount = std::find_if(vecReferenceCounts.begin(), vecReferenceCounts.end(), Predicate);
 ```
 
 Do not spell an iterator or range-loop element through a container-derived type:
@@ -2513,26 +2779,26 @@ for (std::remove_reference_t<decltype(Registry.m_mapStates)>::value_type const& 
 	...
 }
 
-decltype(vecReferenceCounts.begin()) it = std::find_if(...);
+decltype(vecReferenceCounts.begin()) itReferenceCount = std::find_if(...);
 ```
 
-Prefer explicit object initialization when the type is known:
+Use explicit types for ownership-bearing allocations and ABI/system records; a known return type alone does not override the domain-factory deduction rule above. In this local shape, the caller has already validated `unLength` so adding the terminating character cannot overflow:
 
 ```cpp
 SYSTEMTIME SystemTime {};
 TString strName = szName;
 std::unique_ptr<char[]> pCommandLine(new (std::nothrow) char[unLength + 1]);
-PROCESS_STARTUP_INFO StartupInfo {};
+PROCESS_STARTUP_INFORMATION StartupInformation {};
 PROCESS_RECORD ProcessInformation {};
 ```
 
-`auto` remains appropriate for iterators and for an object whose generated or dependent type cannot be named usefully. Do not extend it to ownership-bearing allocations or ABI/system records merely to shorten the declaration.
+`auto` remains appropriate for iterators, permitted local domain-factory values, named lambdas, and objects whose generated or dependent type cannot be named usefully. Do not extend it to ownership-bearing allocations or ABI/system records merely to shorten the declaration.
 
 Do not use structured bindings when they would hide important field names or types. An explicit record object is preferred in systems code.
 
 ### 11.5. Explicit `return true;` / `return false;`
 
-Even when the logic is obvious, end the function with an explicit return value.
+In a value-returning function, return the documented result explicitly on every path that completes normally. For boolean status APIs, use `return true;` and `return false;` for fixed success/failure outcomes; a direct boolean predicate such as `return IsReady();` remains valid. Do not expand a predicate into redundant branches solely to return boolean literals. This rule does not add value returns to constructors, destructors, or `void` functions, and it does not replace a JavaScript API's documented result with a boolean.
 
 ### 11.6. Cleanup and Ownership Near the Failure Point
 
@@ -2548,7 +2814,8 @@ Local lambdas are allowed when they make a long function flatter and more phase-
 
 Rules:
 
-- give the lambda a semantic `PascalCase` name;
+- name the lambda object with a PascalCase role and no category prefix, for example `Predicate` or `NeedRegister`; an ordinary named function also remains PascalCase;
+- passing a lambda as a callback does not add `fn`: name the lambda object by its representation, not its use; actual function-pointer aliases/values and callback parameters follow section 8.2;
 - keep it close to the phase where it is used;
 - keep captures obvious and narrow;
 - do not hide ownership transfer, allocation, locking, or cleanup inside an innocent-looking helper.
@@ -2637,14 +2904,14 @@ For compile-time interpreters, parsers, assemblers, or generators, prefer a resu
 - output data;
 - a stable error code or message.
 
-Example:
+Runtime diagnostic carrier example; this non-`constexpr` constructor is not suitable for constructing a result during constant evaluation:
 
 ```cpp
 // Error.h
 struct Error {
 	Error() noexcept;
 
-	char const* m_pMessage;
+	char const* m_pszMessage;
 	int m_nLine;
 };
 
@@ -2659,7 +2926,7 @@ enum class STAGE : unsigned char {
 ```cpp
 // Error.cpp
 Error::Error() noexcept {
-	m_pMessage = nullptr;
+	m_pszMessage = nullptr;
 	m_nLine = -1;
 }
 ```
@@ -2697,7 +2964,7 @@ The generic wrapper must select the variant predictably and must not silently co
 Callback APIs expose the callback type clearly:
 
 ```cpp
-using fnEnumCallback = bool(*)(void* pEntry, void* pUserData);
+using fnEnumerationCallback = bool(*)(void* pEntry, void* pUserData);
 ```
 
 Prefer explicit `pUserData` over hidden captures at ABI boundaries. Document callback lifetime, calling thread, lock state, reentrancy, and whether returning `false` stops enumeration.
@@ -2720,7 +2987,7 @@ A getter should not allocate, block, mutate observable state, or transfer owners
 Every API boundary must make ownership and lifetime understandable from the type, name, or adjacent contract.
 
 - raw pointers are non-owning by default;
-- `std::unique_ptr` transfers or owns one heap object;
+- `std::unique_ptr<T>` owns one object, and `std::unique_ptr<T[]>` owns an array; moving the owner transfers its responsibility to the destination;
 - `std::span` and `std::string_view` are non-owning views;
 - a returned handle must state who closes it;
 - a returned pointer/view must not outlive its source;
@@ -2787,14 +3054,32 @@ Their use does not waive range, lifetime, aliasing, alignment, or error checks.
 
 If a structure represents an external binary layout, layout accuracy takes priority over abstract object-oriented neatness.
 
+For a union that exposes a complete value and individual bitfields, use the C-compatible `typedef union _TAG { ... } TAG, *PTAG;` form. Keep the bitfields in an anonymous structure inside the union, with one blank line between the complete-value member and the structure. Do not add a named `m_Bits` member or extract a separate `FlagBits` type merely to restyle this layout.
+
+Correct:
+
 ```cpp
-union FLAGS {
+typedef union _FLAGS {
 	unsigned int m_unValue;
 
 	struct {
 		unsigned int m_unA : 1;
 		unsigned int m_unB : 1;
 	};
+} FLAGS, *PFLAGS;
+```
+
+Incorrect for this layout convention:
+
+```cpp
+struct FlagBits {
+	unsigned int m_unA : 1;
+	unsigned int m_unB : 1;
+};
+
+union FLAGS {
+	unsigned int m_unValue;
+	FlagBits m_Bits;
 };
 ```
 
@@ -2805,14 +3090,18 @@ static_assert(sizeof(FLAGS) == sizeof(unsigned int), "unexpected FLAGS size");
 static_assert(offsetof(SOME_RECORD, m_unSize) == kSomeRecordSizeOffset, "unexpected field offset");
 ```
 
-Remember that C++ bitfield allocation order is implementation-defined. Use bitfields only when the compiler/ABI contract is controlled; otherwise read and write masks explicitly.
+The canonical spelling exposes `m_unA` and `m_unB` directly, not through `m_Bits`. Preserve an existing public member-access or ABI contract during migration; changing that contract is not a presentation-only edit.
+
+Remember that C++ bitfield allocation order is implementation-defined, and the anonymous-structure form above requires support from the selected compiler profile. Record that requirement in the adoption profile from section 2.7; do not present this C++ extension as a guarantee for every toolchain. If a supported compiler diagnoses the intentional extension, apply only the adjacent, narrowly justified diagnostic procedure from section 9.12. A target that does not support the layout needs an explicitly documented representation decision, not a silent rewrite into the incorrect example.
+
+Use bitfields only when the compiler/ABI contract is controlled; otherwise read and write masks explicitly. The example illustrates layout, not permission to read an inactive union member: writing `m_unValue` and then reading `m_unA` or `m_unB` is not portable type punning. Follow section 9.13 for representation access.
 
 ### 14.3. Address and Range Validation
 
 Validate the complete range before dereferencing or copying. Prefer subtraction-based checks that avoid overflow:
 
 ```cpp
-if (unOffset > unBufferSize || unDataSize > (unBufferSize - unOffset)) {
+if ((unOffset > unBufferSize) || (unDataSize > (unBufferSize - unOffset))) {
 	return false;
 }
 ```
@@ -2868,16 +3157,19 @@ Each concrete fixed-width reader should perform its own bounds check and build t
 
 ```cpp
 static bool ReadU32LE(std::vector<std::uint8_t> const& vecBytes, const std::uint64_t unOffset, std::uint32_t& unValueOut) noexcept {
-	const std::uint64_t unFileSize = static_cast<std::uint64_t>(vecBytes.size());
-	const std::uint64_t unByteCount = static_cast<std::uint64_t>(sizeof(std::uint32_t));
+	constexpr std::uint64_t kByteCount = static_cast<std::uint64_t>(sizeof(std::uint32_t));
+	constexpr unsigned int kBitsPerByte = 8;
 
-	if ((unOffset > unFileSize) || ((unFileSize - unOffset) < unByteCount)) {
+	static_assert(sizeof(std::size_t) <= sizeof(std::uint64_t), "Unsupported size_t width");
+
+	const std::uint64_t unFileSize = static_cast<std::uint64_t>(vecBytes.size());
+	if ((unOffset > unFileSize) || ((unFileSize - unOffset) < kByteCount)) {
 		return false;
 	}
 
 	std::uint32_t unValue = 0;
-	for (std::uint64_t unIndex = 0; unIndex < unByteCount; ++unIndex) {
-		const unsigned int unShift = static_cast<unsigned int>(unIndex * 8);
+	for (std::uint64_t unIndex = 0; unIndex < kByteCount; ++unIndex) {
+		const unsigned int unShift = static_cast<unsigned int>(unIndex * kBitsPerByte);
 		unValue |= static_cast<std::uint32_t>(static_cast<std::uint32_t>(vecBytes[static_cast<std::size_t>(unOffset + unIndex)]) << unShift);
 	}
 
@@ -3006,7 +3298,7 @@ Destructors must not throw. Cleanup should tolerate an empty or moved-from state
 
 ### 15.2. Manual Lifecycle
 
-Manual `Init` / `Release` style is allowed when explicit lifecycle fits the domain better than constructor ownership, especially for injected modules, platform callbacks, global subsystem state, or APIs that need recoverable initialization.
+Manual `Initialize` / `Release` style is allowed when explicit lifecycle fits the domain better than constructor ownership, especially for injected modules, platform callbacks, global subsystem state, or APIs that need recoverable initialization.
 
 Rules:
 
@@ -3014,7 +3306,7 @@ Rules:
 - make `Release` safe to call after partial initialization;
 - make repeated `Release` calls harmless when practical;
 - restore the object to a known empty state;
-- prevent use before `Init` and after `Release`;
+- prevent use before `Initialize` and after `Release`;
 - do not mix implicit RAII ownership and undocumented manual ownership for the same resource.
 
 ### 15.3. Owning Pointers and Handles
@@ -3179,14 +3471,15 @@ Header-only compile-time utilities should be built as typed C++ first and macro 
 5. high-level `constexpr` / `consteval` entry points;
 6. a public macro facade only when needed.
 
-Header-only status does not override section 10.3 for ordinary constructors. A required caller-visible function-template constructor may remain in the header as a thin forwarding adapter with its delegating initializer; the real non-template constructor definition and state initialization remain `.cpp` responsibilities.
+Header-only status does not override section 10.3 for ordinary runtime constructors. A required caller-visible function-template constructor may remain in the header as a thin forwarding adapter; its ordinary non-template runtime implementation remains a `.cpp` responsibility. Separately, retain the definitions that callers genuinely need for dependent template instantiation or constant evaluation under section 10.3. A reusable compile-time utility must not lose those capabilities merely to enforce runtime-only placement rules.
 
 ### 18.2. Compile-Time Tables
 
 Compile-time tables should be `constexpr`, explicitly typed, named with `k`, placed before use, and grouped with the owning algorithm.
 
 ```cpp
-constexpr std::uint32_t kCRC32Table[256] = {
+constexpr std::size_t kCRC32TableSize = 256;
+constexpr std::uint32_t kCRC32Table[kCRC32TableSize] = {
 	...
 };
 ```
@@ -3195,18 +3488,23 @@ Large tables should have a generation source or documented derivation. Add `stat
 
 ### 18.3. Byte Serialization Helpers
 
-For compile-time strings, arrays, hashes, VMs, and binary-format utilities, byte serialization should be explicit:
+For compile-time strings, arrays, hashes, VMs, and binary-format utilities, byte serialization should be explicit. This helper intentionally serializes the low 16 bits of integral input in little-endian order and requires eight-bit bytes:
 
 ```cpp
 template <typename T, std::size_t unSize>
 struct ByteIO {
-	static_assert(unSize == 2, "unsupported byte width");
+	static constexpr std::size_t kByteCount = 2;
+	static constexpr unsigned int kBitsPerByte = 8;
+	static constexpr unsigned short kByteMask = 0xFF;
+
+	static_assert(unSize == kByteCount, "unsupported byte count");
+	static_assert(std::numeric_limits<unsigned char>::digits == kBitsPerByte, "unsupported byte width");
+	static_assert(std::is_integral_v<T>, "input must be integral");
 
 	static constexpr void To(T const Value, unsigned char(&arrOutput)[unSize]) noexcept {
 		const unsigned short unValue = static_cast<unsigned short>(Value);
-
-		arrOutput[0] = static_cast<unsigned char>(unValue & 0xFF);
-		arrOutput[1] = static_cast<unsigned char>((unValue >> 8) & 0xFF);
+		arrOutput[0] = static_cast<unsigned char>(unValue & kByteMask);
+		arrOutput[1] = static_cast<unsigned char>((unValue >> kBitsPerByte) & kByteMask);
 	}
 };
 ```
@@ -3226,12 +3524,13 @@ A macro is acceptable as a public compile-time API when it preserves syntax or i
 The macro delegates to typed implementation code:
 
 ```cpp
-#define COMPILE_TIME_TEXT(S)                                                                                                             \
-	([]() -> auto {                                                                                                                      \
-		constexpr std::size_t kLength = std::extent_v<std::remove_reference_t<decltype(S)>>;                                             \
+#define COMPILE_TIME_TEXT(S)                                                                                                                   \
+	([]() -> auto {                                                                                                                            \
+		constexpr std::size_t kLength = std::extent_v<std::remove_reference_t<decltype(S)>>;                                                   \
 		constexpr auto kEncoded = CompileTimeText::Encoded<kLength, CompileTimeText::CharacterType<decltype(S[0])>, __LINE__, __COUNTER__>(S); \
-		return kEncoded.Decode();                                                                                                        \
-	} ())
+		                                                                                                                                       \
+		return kEncoded.Decode();                                                                                                              \
+	}())
 ```
 
 The two `decltype` expressions are required to preserve the literal extent and element type. The `constexpr auto` object and `-> auto` return are also limited to this narrow facade because their generated types intentionally depend on the literal expression.
@@ -3352,22 +3651,25 @@ This style dislikes:
 
 ### 21.1. Canonical Function
 
+Local shape requiring `<memory>`: the already-declared `AllocateBuffer`, `CopyBuffer`, and `ReleaseBuffer` helpers are non-throwing. Allocation returns distinct storage or null, copying cannot fail, and `ReleaseBuffer(void*) noexcept` releases matching storage and accepts null. The caller supplies at least `unSize` readable bytes. Attach the new allocation to an owner before copying, then transfer ownership only when committing the result.
+
 ```cpp
+using fnBufferReleaser = void(*)(void*) noexcept;
+
 bool SomeObject::SetBuffer(void const* const pBuffer, const std::size_t unSize) noexcept {
 	if (!pBuffer || !unSize) {
 		return false;
 	}
 
-	void* const pNewBuffer = AllocBuffer(unSize);
-
-	if (!pNewBuffer) {
+	std::unique_ptr<void, fnBufferReleaser> NewBuffer(AllocateBuffer(unSize), ReleaseBuffer);
+	if (!NewBuffer) {
 		return false;
 	}
 
-	CopyBuffer(pNewBuffer, pBuffer, unSize);
+	CopyBuffer(NewBuffer.get(), pBuffer, unSize);
 
 	ReleaseBuffer(m_pBuffer);
-	m_pBuffer = pNewBuffer;
+	m_pBuffer = NewBuffer.release();
 	m_unSize = unSize;
 
 	return true;
@@ -3389,7 +3691,7 @@ public:
 	SomeObject& operator=(SomeObject&& Other) noexcept;
 
 public:
-	bool Init() noexcept;
+	bool Initialize() noexcept;
 	void Release() noexcept;
 
 public:
@@ -3445,9 +3747,6 @@ static_assert(std::is_trivially_copyable_v<SOME_RECORD>, "SOME_RECORD must remai
 #include <cstddef>
 #include <cstdint>
 
-// STL
-#include <type_traits>
-
 // ----------------------------------------------------------------
 // General definitions
 // ----------------------------------------------------------------
@@ -3464,22 +3763,21 @@ static_assert(std::is_trivially_copyable_v<SOME_RECORD>, "SOME_RECORD must remai
 
 namespace CompileTimeUtility {
 
-	template <typename T>
-	using CleanType = std::remove_const_t<std::remove_reference_t<T>>;
-
 	constexpr std::uint32_t kFNV32OffsetBasis = static_cast<std::uint32_t>(2166136261);
 	constexpr std::uint32_t kFNV32Prime = 16777619;
 
 	COMPILETIMEUTILITY_FORCE_INLINE constexpr std::uint32_t HashByte(const std::uint32_t unState, const unsigned char unByte) noexcept {
+		// FNV-1 intentionally keeps the low 32 bits of the product.
 		return (unState * kFNV32Prime) ^ unByte;
 	}
+
+#undef COMPILETIMEUTILITY_FORCE_INLINE
 
 	template <std::size_t unLength>
 	consteval std::uint32_t Hash(char const(&szText)[unLength]) noexcept {
 		static_assert(unLength > 0, "string extent must include a terminator");
 
 		std::uint32_t unHash = kFNV32OffsetBasis;
-
 		for (std::size_t unIndex = 0; unIndex < (unLength - 1); ++unIndex) {
 			unHash = HashByte(unHash, static_cast<unsigned char>(szText[unIndex]));
 		}
@@ -3491,8 +3789,6 @@ namespace CompileTimeUtility {
 
 #define COMPILE_TIME_HASH(STRING) CompileTimeUtility::Hash(STRING)
 
-#undef COMPILETIMEUTILITY_FORCE_INLINE
-
 #endif // _SOMELIBCOMPILETIMEUTILITY_H_
 ```
 
@@ -3500,15 +3796,21 @@ namespace CompileTimeUtility {
 
 ## 22. Rules in MUST / SHOULD / MAY Form
 
+Apply C++-specific items only to C++ and the section 2.6 rules to JavaScript. Use the adopting project's actual contracts and ownership map under section 2.7, not the example repository names. This summary does not override detailed rules or their documented exceptions.
+
 ### MUST
 
 - Put `{` on the same line as the controlling construct or ordinary function signature; use the documented constructor-initializer-list exception.
 - Use braces for every branch and loop body.
 - Use tabs as the primary code indentation unit.
 - Follow the repository ownership map: never style-edit vendored dependencies or protected compatibility files without explicit authorization.
-- Use the canonical include-group labels and classification, and obey the first-line own-header/empty-line rule for translation units.
+- Use the canonical include-group labels and classification, with dependency-name comments for configuration blocks under section 4.3, and obey the first-line own-header/empty-line rule for translation units.
 - Keep one naming convention inside a file and use semantic role names. Primitive pointers combine `p` with the pointee category (`pn`, `pun`, `pb`, `pfl`, `pdbl`, `pch`, `pwch`, `psz`); object, user-defined/non-primitive, opaque, and `void` pointers use bare `p`.
+- Use complete words in C++ and JavaScript identifiers under sections 8.5 and 8.15, including `Initialize`, `Allocate`, `Deinitialize`, and `Deallocate`. Use normal unsplit words such as `Unload`, `Reload`, `Readjust`, `Preload`, and `Reset`, not artificial capitalization after linguistic prefixes. Preserve semantic category prefixes, standard acronyms, external contracts, and required lifecycle keys.
+- Use the section 9.5 structure/union/enum typedef spelling at documented C/ABI boundaries. An unscoped enum typedef requires the `_TAG` tag, an explicit integral underlying type, and the value/pointer aliases; preserve the required representation and document language/toolchain support. Use the anonymous-structure bitfield union from section 14.2 for that controlled layout, preserving direct field access and documenting compiler/ABI requirements.
 - Reserve `k` only for named `constexpr` constants.
+- Import and use JavaScript PascalCase or UPPER_CASE exports directly when their names are unique in the relevant scope. Use an alias only for a real binding collision, ensure the alias is unique, and update bound references without changing public keys or loading behavior. Preserve compatibility-bound external spellings under section 2.6.
+- Apply Systems Hungarian + PascalCase consistently to variables and value parameters in implementation, API synopses, parameter tables, callbacks, and executable examples under sections 2.6 and 8.1. Objects without a more specific category use PascalCase directly; retain scope prefixes and exact public/external contracts. Choose each prefix from the actual type or runtime contract, not the role name alone.
 - Use west `const` for simple scalar values and the compound-type placement from section 9.2 for pointers and references.
 - Call qualified standard algorithms as `std::max(...)` and `std::min(...)`; never as `(std::max)(...)` or `(std::min)(...)`.
 - Do not use integer-literal suffixes such as `U`, `UL`, `ULL`, `L`, or their lower-case/combined variants unless the code materially requires them for type, range, overload, shift, ABI, or constant-evaluation correctness.
@@ -3518,9 +3820,11 @@ namespace CompileTimeUtility {
 - Declare exactly one variable or object per declaration statement.
 - Use `Type Name = Expression;` for every copy or conversion initialization where that form is well-formed and semantics-preserving; do not spell the same initialization as `Type Name { Expression };` or `Type Name(Expression);`. Use the narrow semantic exceptions from section 7.9 only when required.
 - In an explicitly typed function, use `return {};` for an empty value-initialized result whenever that form is well-formed and semantics-preserving; do not repeat the return type.
+- Initialize ordinary C++ boolean declarations with `= false`, `= true`, or their source expression; do not use empty braces for a false initial state. Respect constructor-list and aggregate initialization contracts from sections 7.7 and 10.3.
 - Keep project C/C++ function signatures on one physical line and keep simple calls on one line.
-- Keep short boolean predicates and boolean returns on one physical line when their operands are direct checks, loads, comparisons, or logical operators; wrap only genuinely complex expressions. When wrapping a boolean expression, break at logical operators, preserve comparisons and nested logical/arithmetic groups with parentheses, and do not add an outer pair around a simple boolean name, pointer check, unary-negation check, or function-call result, as described in section 6.4.
-- Put exactly one blank line after a standalone closing `}` before the next ordinary statement, declaration, or expression; do not insert that blank line before another `}`, `else`, `catch`, `while`, a required semicolon, a preprocessor directive, or an existing blank line, as specified in section 6.2.
+- Keep short boolean predicates and boolean returns on one physical line when their operands are direct checks, loads, comparisons, or logical operators. Long or nested expressions may wrap when needed for auditability. When wrapping a boolean expression, break at logical operators, preserve comparisons and nested logical/arithmetic groups with parentheses, and do not add an outer pair around a simple boolean name, pointer check, unary-negation check, or function-call result, as described in section 6.4.
+- Apply comparison and nested-group parentheses in both one-line and wrapped C++/JavaScript expressions. In ternary result arms, group a compound expression as a whole without wrapping its simple operands or a simple alternative arm: `? (A && B) : C`, not `? ((A) && (B)) : (C)`; see section 7.5.
+- Put exactly one blank line after a standalone closing `}` before the next ordinary statement, declaration, or expression, including an independent `while` loop. Do not insert that blank line before another `}`, an attached `else` / `catch` / `do`-`while` continuation, a required syntax delimiter, or a preprocessor directive. An existing blank line already satisfies the rule; see section 6.2.
 - Inside an early-exit branch, keep its single final call, assignment, declaration, diagnostic, cleanup, or other action directly adjacent to the simple one-line return that completes that branch. Keep one blank line between a final main-path output/result commit and the function's final success return.
 - Use `auto` for iterators and range elements with the required qualifiers; use `decltype` only for a genuinely expression-dependent type that the approved explicit-type or `auto` forms cannot express correctly.
 - Use an explicit ownership type for allocations/smart pointers and an explicit type for ABI/system records.
@@ -3534,7 +3838,7 @@ namespace CompileTimeUtility {
 - Reject unsupported architectures, formats, versions, and widths clearly.
 - Initialize every variable, object, array, structure, class, and member before its first use; never read indeterminate storage.
 - Use `= default` for constructors only when they have no arguments and the generated construction leaves every member in a valid state.
-- Declare non-template constructors in headers and define them in source files; keep their initializer lists and bodies in the `.cpp`, use body assignment or an initializer list exactly as required by section 10.3, and do not use in-class/default member initializers. A required caller-visible constructor template may remain as a thin forwarding adapter in the header, but its real non-template constructor definition still belongs in the `.cpp`.
+- Declare ordinary non-template runtime constructors in headers and define them in source files; use body assignment or an initializer list as required by section 10.3, and do not use in-class/default member initializers. Keep required forwarding adapters thin and preserve the narrow template/constant-evaluation visibility exceptions from that section.
 - Remove declarations that are unused in every supported configuration; use only adjacent, case-specific warning suppression for a required conditional/ABI declaration and restore diagnostics immediately.
 - Use the canonical logging severity vocabulary, keep severity prefixes out of `Log*` message text, and preserve the same diagnostic fields in terminal and file output.
 - For state-changing CLI commands, print exactly one documented success or failure marker only after a syntactically valid operation has run; malformed input prints help without a result marker.
@@ -3608,7 +3912,7 @@ When cleaning code:
 Generated source, scripts, configuration, and examples follow the same style rules as hand-written files.
 
 - generated-only files may be overwritten and should say so in a header comment when users may open them;
-- user-editable files live in an obvious `user/` or `custom/` area or in stable generated regions;
+- user-editable content lives in an obvious `user/` or `custom/` area or in clearly delimited user-owned regions of mixed files, separate from generated regions;
 - mixed generated/user files preserve user regions exactly unless a documented migration rewrites them;
 - regeneration removes stale files only from the same generated family;
 - public generated APIs stay small and typed;
@@ -3704,11 +4008,15 @@ Use spaces for Markdown prose indentation. Inside fenced code blocks, follow the
 
 Large Markdown files should start with an AI-processing/navigation note and include a table of contents. Do not invent architecture that is not present in code or supported by the referenced source.
 
+Keep API documentation, package examples, templates, and test doubles aligned with the current implementation. Check export names, argument order and meaning, result shape, failure sentinels, lifecycle behavior, and branch/platform availability. A renamed symbol is not fully migrated while prose or a copyable example still teaches its old contract. All documentation parameters follow Systems Hungarian + PascalCase under sections 2.6 and 8.1, including C++/JavaScript API synopses, tables, callback signatures, and examples. Objects without a more specific category use PascalCase directly. Verify the actual type/category and reuse the same parameter spelling throughout. Preserve exact external declarations, exports, property keys, and serialization contracts; placeholders do not authorize a contract rename.
+
 ### 25.5. AI-Agent Editing Rules
 
 An AI agent must:
 
-- read the relevant implementation, declarations, tests, and local instructions before editing;
+- read this guide completely before analyzing or modifying project code; a summary or search result is not a substitute;
+- read only the current bounded chunk of one file, with the minimum related definition or usage needed to understand its contract; do not preload or batch-review later chunks;
+- review, correct, and verify that chunk against every applicable rule, check that its edits are related and behavior-preserving, and mark it complete before reading the next chunk;
 - make direct structural edits instead of appending a one-off normalization pass;
 - process huge generated files and output trees by focused sections;
 - preserve unrelated dirty work and user-owned regions;
@@ -3717,6 +4025,12 @@ An AI agent must:
 - update tests and documentation when behavior or generated contracts change;
 - run the smallest useful verification first, then broaden only as the affected surface requires;
 - report what was verified and what was not verified without inventing success.
+
+For a full-project compliance task, keep a concise coverage record: completed files/chunks, the current chunk, remaining paths, recurring fixes, and checks run. Small helpers, repeated boilerplate, templates, and generated-looking files are not exemptions; apply the ownership classification in section 2.5 when each file becomes current.
+
+After context compaction, reset, recovery, or other context loss, reread the entire guide before continuing. Reconstruct progress from actual files, repository status, the current diff, and the coverage record; do not rely on remembered rules or an assumed last completed chunk. If the user updates the guide, fully read the new version before resuming project-code work.
+
+Complete the main pass, then perform a full verification pass one chunk at a time. If any verification pass or subsequent check-driven fix changes project code, templates, or documentation, run another full verification pass from the beginning. A repository-wide goal is complete only after a full pass produces zero changes, relevant checks are run, and the final diff is reviewed. Search results and successful builds alone do not establish full coverage. Temporary progress/scratch files must stay out of the final diff and be removed before goal completion.
 
 ### 25.6. Builds, Warnings, and Tests
 
@@ -3736,9 +4050,9 @@ Tests are the executable contract for the project and generated output.
 
 ### 25.7. Mechanical Enforcement
 
-The project's canonical high-confidence audit entry point should be a read-only command documented by the repository. For example:
+The project's canonical high-confidence audit entry point should be a read-only command documented by the repository. Replace this non-executable placeholder with the repository's actual command:
 
-```powershell
+```text
 <project-style-check-command>
 ```
 
@@ -3754,12 +4068,12 @@ A project adopting this guide should maintain:
 - compile-time layout checks for ABI records;
 - CI jobs that run formatting/style checks, builds, focused tests, and required architecture matrices.
 
-At minimum, a style verification pass must check:
+At minimum, a style verification pass must check the following, applying C++-specific checks only to C++ and shared/JavaScript rules according to section 2.6:
 
-1. tabs for code indentation and no leading-space indentation in project C/C++ files;
+1. tabs for source-code indentation, with spaces only for permitted local alignment or space-only languages/formats under sections 2.1 and 6.1;
 2. no trailing whitespace, no accidental repeated blank lines, and a final newline;
 3. exact 64-character `=` / `-` section banners;
-4. only the canonical include-group labels and the project header classification from section 4.2;
+4. canonical include-group labels and the project header classification from section 4.2, allowing dependency-name comments on configuration blocks under section 4.3;
 5. no `[[maybe_unused]]`, ignored-result casts, C-style casts, or broad warning suppressions;
 6. `auto` for iterators and range elements according to the section 11.4 matrix;
 7. no `decltype` used as an iterator/range/object spelling shortcut;
@@ -3769,14 +4083,23 @@ At minimum, a style verification pass must check:
 11. `return {};` for every well-formed, semantics-preserving empty value-initialized result in an explicitly typed function, with no redundant repeated return type;
 12. direct qualified standard algorithm calls as `std::max(...)` / `std::min(...)`, with no `(std::max)(...)` / `(std::min)(...)` spelling;
 13. no redundant integer-literal suffixes such as `U`, `UL`, `ULL`, `L`, or their lower-case/combined variants unless code requires them materially;
-14. one-line signatures and one-line simple calls, with only justified complex wrapping;
-15. exactly one blank line after a standalone closing `}` before the next ordinary statement/declaration/expression, excluding another `}`, `else`, `catch`, `while`, a required semicolon, a preprocessor directive, or an existing blank line;
+14. one-line signatures and one-line simple calls, with expression wrapping justified by auditability under section 6.4;
+15. exactly one blank line after a standalone closing `}` before the next ordinary statement/declaration/expression, including an independent `while` loop; exclude another `}`, an attached `else` / `catch` / `do`-`while` continuation, a required syntax delimiter, or a preprocessor directive, and never duplicate an existing blank line;
 16. no blank line between one final action and the simple one-line return that completes an early-exit branch, plus one blank line between a final main-path output/result commit and the function's final success return;
 17. constructor declaration/definition placement, initializer ordering, and initialization of every member;
 18. no message-level severity prefix passed to `Log*` functions;
 19. no unused warnings in every supported build configuration;
 20. clean repository diff with no generated or dependency changes outside the requested scope;
-21. guide self-consistency: positive/canonical examples follow the guide, negative examples are explicitly labeled, and the MUST/SHOULD/MAY summary remains synchronized with detailed rules.
+21. guide self-consistency: positive/canonical examples follow the guide, negative examples are explicitly labeled, and the MUST/SHOULD/MAY summary remains synchronized with detailed rules;
+22. comparison operands and nested logical groups are parenthesized in both one-line and wrapped C++/JavaScript expressions, without decorative pairs around simple flags, members, calls, or unary checks;
+23. ternary arms follow `? (A && B) : C`, including in wrapped expressions, without individual pairs around simple operands or a simple arm;
+24. ordinary C++ boolean declarations use `= false`, `= true`, or their source expression, with section 7.7 exceptions respected;
+25. JavaScript PascalCase/UPPER_CASE exports are imported directly when unique in the relevant scope; each alias resolves a real collision and is itself unique, with all bound uses updated and public keys preserved; variables and value parameters, including synopses, tables, callbacks, and executable examples, follow Systems Hungarian + PascalCase under sections 2.6 and 8.1, with unprefixed PascalCase object roles, the actual type/category, and exact external contracts preserved; container/view categories match the section 8.2 catalog;
+26. full-project coverage and a zero-change final verification pass are supported by the chunk progress record, with temporary tracking files absent from the final diff;
+27. the adopting project's language/platform profile, ownership map, dependencies, and check commands come from its actual repository, not from this guide's illustrative names or another project's environment;
+28. C++ and JavaScript identifiers use complete words under sections 8.5 and 8.15 (`Initialize`, `Allocate`, `Deinitialize`, `Deallocate`) and normal unsplit operation names (`Unload`, `Reload`, `Readjust`, `Preload`, `Reset`, `ResetPendingOperationSlot`, `Resettable`); semantic category prefixes, standard acronyms, external names, lifecycle export keys, prose, and compatibility-bound paths retain their required spelling;
+29. C-compatible union typedefs include the tag and pointer alias, and the value/bitfield layout uses the directly exposed anonymous structure from section 14.2 with its compiler/ABI requirements documented, not a separate `FlagBits` / `m_Bits` replacement.
+30. unscoped enum typedefs at documented C/ABI boundaries use `typedef enum _TAG : UnderlyingType { ... } TAG, *PTAG;`, with an explicit integral underlying type selected for the required range and representation, the section 9.5 reserved-tag exception, and verified language/toolchain compatibility.
 
 Useful first-pass searches include:
 
@@ -3786,11 +4109,11 @@ git diff --check
 rg -n "\[\[maybe_unused\]\]|static_cast<void>\s*\(" -g "*.{c,cc,cpp,cxx,h,hh,hpp,hxx}" .
 rg -n "decltype\s*\([^)]*\.(begin|end)\s*\(" -g "*.{c,cc,cpp,cxx,h,hh,hpp,hxx}" .
 rg -n "remove_reference_t\s*<\s*decltype|value_type\s+const&" -g "*.{c,cc,cpp,cxx,h,hh,hpp,hxx}" .
-rg -n "^// (C\+\+ standard library|Standard|Runtime)$" -g "*.{c,cc,cpp,cxx,h,hh,hpp,hxx}" .
-rg -n "^// [=-]+$" -g "*.{c,cc,cpp,cxx,h,hh,hpp,hxx}" .
-rg -n "^// (={64}|-{64})$" -g "*.{c,cc,cpp,cxx,h,hh,hpp,hxx}" .
+rg --crlf -n "^// (C\+\+ standard library|Standard|Runtime)$" -g "*.{c,cc,cpp,cxx,h,hh,hpp,hxx}" .
+rg --crlf -n "^// [=-]+$" -g "*.{c,cc,cpp,cxx,h,hh,hpp,hxx}" .
+rg --crlf -n "^// (={64}|-{64})$" -g "*.{c,cc,cpp,cxx,h,hh,hpp,hxx}" .
 rg -n "^ +\S" -g "*.{c,cc,cpp,cxx,h,hh,hpp,hxx}" .
-rg -n "[ \t]+$" .
+rg --crlf -n "[ \t]+$" .
 rg -U -n "\r?\n\r?\n\r?\n" -g "*.{c,cc,cpp,cxx,h,hh,hpp,hxx}" .
 rg -n "Log(Debug|Info|Warning|Error)\([^\n]*\b(DEBUG|INFO|WARNING|ERROR):" -g "*.{c,cc,cpp,cxx,h,hh,hpp,hxx}" .
 rg -n "#pragma (warning|GCC diagnostic|clang diagnostic)" -g "*.{c,cc,cpp,cxx,h,hh,hpp,hxx}" .
