@@ -168,6 +168,7 @@
 #error Only x86 and x86_64 platforms are supported.
 #endif
 
+#ifndef DETOURS_NOINLINE
 #if defined(_MSC_VER)
 #define DETOURS_NOINLINE __declspec(noinline)
 #elif defined(__GNUC__) || defined(__clang__)
@@ -175,6 +176,7 @@
 #else
 #define DETOURS_NOINLINE
 #endif
+#endif // !DETOURS_NOINLINE
 
 #if defined(_WIN32)
 #ifndef GDI_HANDLE_BUFFER_SIZE
