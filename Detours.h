@@ -132,24 +132,6 @@
 #define DISABLE_OPTIMIZATION_END(OPTION) \
 	ENABLE_OPTIMIZATION(OPTION)
 
-// Definitions
-
-#if defined(_M_X64) || defined(__x86_64__)
-#define DETOURS_ARCH_X64 1
-#elif defined(_M_IX86) || defined(__i386__)
-#define DETOURS_ARCH_X86 1
-#else
-#error Only x86 and x86_64 platforms are supported.
-#endif
-
-#if defined(_MSC_VER)
-#define DETOURS_NOINLINE __declspec(noinline)
-#elif defined(__GNUC__) || defined(__clang__)
-#define DETOURS_NOINLINE __attribute__((noinline))
-#else
-#define DETOURS_NOINLINE
-#endif
-
 #ifndef PROCESSOR_FEATURE_MAX
 #define PROCESSOR_FEATURE_MAX 64
 #define DETOURS_DEFINED_PROCESSOR_FEATURE_MAX
@@ -175,6 +157,24 @@
 #define DETOURS_DEFINED_GDI_BATCH_BUFFER_SIZE
 #endif // !GDI_BATCH_BUFFER_SIZE
 #endif // defined(_WIN32)
+
+// Definitions
+
+#if defined(_M_X64) || defined(__x86_64__)
+#define DETOURS_ARCH_X64 1
+#elif defined(_M_IX86) || defined(__i386__)
+#define DETOURS_ARCH_X86 1
+#else
+#error Only x86 and x86_64 platforms are supported.
+#endif
+
+#if defined(_MSC_VER)
+#define DETOURS_NOINLINE __declspec(noinline)
+#elif defined(__GNUC__) || defined(__clang__)
+#define DETOURS_NOINLINE __attribute__((noinline))
+#else
+#define DETOURS_NOINLINE
+#endif
 
 #if defined(_WIN32)
 #ifndef GDI_HANDLE_BUFFER_SIZE
