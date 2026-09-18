@@ -7694,12 +7694,12 @@ namespace {
 		return ::ptrace(PTRACE_POKEUSER, nThreadID, reinterpret_cast<void*>(unOffset), reinterpret_cast<void*>(static_cast<std::uintptr_t>(unValue))) == 0;
 	}
 
-	bool SetLinuxDebugRegister(const pid_t nThreadID, const unsigned char unRegister, void* const pAddress, const Detours::Hook::HARDWARE_HOOK_TYPE HardwareHookType, const unsigned char unSize, const bool bEnable, unsigned long* const pPreviousAddressInOut, unsigned long* const pPreviousDR7BitsInOut) noexcept {
+	bool SetLinuxDebugRegister(const pid_t nThreadID, const unsigned char unRegister, void* const pAddress, const Detours::Hook::HARDWARE_HOOK_TYPE HardwareHookType, const unsigned char unSize, const bool bEnable, std::uintptr_t* const pPreviousAddressInOut, unsigned long* const pPreviousDR7BitsInOut) noexcept {
 		if ((nThreadID <= 0) ||
 			(unRegister > kLinuxLastDebugRegisterIndex) ||
-			(!pPreviousAddressInOut) ||
-			(!pPreviousDR7BitsInOut) ||
-			(!IsLinuxThreadInCurrentProcess(nThreadID))) {
+			!pPreviousAddressInOut ||
+			!pPreviousDR7BitsInOut ||
+			!IsLinuxThreadInCurrentProcess(nThreadID)) {
 			return false;
 		}
 
@@ -7718,8 +7718,8 @@ namespace {
 		unsigned long unPreviousAddress = 0;
 		unsigned long unPreviousDR7 = 0;
 
-		if ((!ReadLinuxDebugRegister(nThreadID, unAddressOffset, &unPreviousAddress)) ||
-			(!ReadLinuxDebugRegister(nThreadID, kLinuxDebugControlRegisterOffset, &unPreviousDR7))) {
+		if (!ReadLinuxDebugRegister(nThreadID, unAddressOffset, &unPreviousAddress) ||
+			!ReadLinuxDebugRegister(nThreadID, kLinuxDebugControlRegisterOffset, &unPreviousDR7)) {
 			return false;
 		}
 
@@ -7737,7 +7737,7 @@ namespace {
 
 			const unsigned long unControlBits = GetDebugRegisterType(HardwareHookType) | (GetDebugRegisterLength(unSize) << kLinuxDebugRegisterLengthBitOffset);
 
-			*pPreviousAddressInOut = unPreviousAddress;
+			*pPreviousAddressInOut = static_cast<std::uintptr_t>(unPreviousAddress);
 			*pPreviousDR7BitsInOut = unPreviousDR7 & unSlotMask;
 			unNewDR7 &= ~unSlotMask;
 			unNewDR7 |= unLocalEnableBit;
@@ -7747,7 +7747,7 @@ namespace {
 			unNewDR7 |= *pPreviousDR7BitsInOut & unSlotMask;
 		}
 
-		const unsigned long unNewAddress = bEnable ? static_cast<unsigned long>(reinterpret_cast<std::uintptr_t>(pAddress)) : *pPreviousAddressInOut;
+		const unsigned long unNewAddress = bEnable ? static_cast<unsigned long>(reinterpret_cast<std::uintptr_t>(pAddress)) : static_cast<unsigned long>(*pPreviousAddressInOut);
 		bool bSuccess = WriteLinuxDebugRegister(nThreadID, unAddressOffset, unNewAddress);
 
 		if (bSuccess) {
