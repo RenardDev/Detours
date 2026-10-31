@@ -18071,7 +18071,7 @@ TEST_SUITE("Detours::Memory") {
 
 	TEST_CASE("fork seals SecurePage during the fault single-step window") {
 #if !defined(__x86_64__)
-		WARN("The deterministic protected syscall fixture requires Linux x86-64.");
+		MESSAGE("The deterministic protected syscall fixture requires Linux x86-64.");
 		return;
 #else
 		Detours::Memory::SecurePage SecurePage;
