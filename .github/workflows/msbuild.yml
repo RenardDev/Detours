@@ -79,7 +79,8 @@ jobs:
         timeout-minutes: 10
         run: |
           set -euo pipefail
-          "$BUILD_DIRECTORY/Detours" --no-colors 2>&1 | tee "$BUILD_DIRECTORY/test.log"
+          # A terminal keeps output line-buffered for both 32-bit and 64-bit binaries.
+          script --return --flush --quiet --command '"$BUILD_DIRECTORY/Detours" --no-colors --duration --success --order-by=file' /dev/null < /dev/null 2>&1 | tee "$BUILD_DIRECTORY/test.log"
 
       - name: Uploading Linux build and diagnostics
         if: ${{ !cancelled() && steps.build.outcome != 'skipped' }}

@@ -633,6 +633,33 @@ namespace {
 		LinuxMutexOwnershipState m_Ownership;
 	};
 
+	struct LinuxNamedMutexMapping {
+		LinuxNamedMutexMapping(const int nSharedMemoryFD, LinuxNamedMutexState* const pState, const dev_t unDevice, const ino_t unInode) noexcept;
+		~LinuxNamedMutexMapping() noexcept;
+		LinuxNamedMutexMapping(LinuxNamedMutexMapping const&) = delete;
+		LinuxNamedMutexMapping& operator=(LinuxNamedMutexMapping const&) = delete;
+
+		int m_nSharedMemoryFD;
+		LinuxNamedMutexState* m_pState;
+		dev_t m_unDevice;
+		ino_t m_unInode;
+	};
+
+	struct LinuxNamedMutexMappingReference {
+		explicit LinuxNamedMutexMappingReference(std::shared_ptr<LinuxNamedMutexMapping> pMapping) noexcept;
+
+		pid_t m_nProcessID;
+		std::shared_ptr<LinuxNamedMutexMapping> m_pMapping;
+	};
+
+	struct LinuxNamedMutexMappingCache {
+		LinuxNamedMutexMappingCache() noexcept;
+
+		pid_t m_nProcessID;
+		std::mutex m_Mutex;
+		std::vector<std::weak_ptr<LinuxNamedMutexMapping>> m_vecMappings;
+	};
+
 	struct LinuxPrivateMutexState {
 		LinuxPrivateMutexState() noexcept;
 
@@ -650,8 +677,7 @@ namespace {
 		bool m_bOwner;
 		pid_t m_nOwnerProcessID;
 		std::string m_strName;
-		int m_nSharedMemoryFD;
-		LinuxNamedMutexState* m_pNamedState;
+		std::atomic<LinuxNamedMutexMappingReference*> m_pNamedMappingReference;
 		std::atomic<LinuxPrivateMutexState*> m_pPrivateState;
 		LinuxMutexLocalOwnershipState m_LocalOwnership;
 	};
@@ -1105,6 +1131,16 @@ namespace {
 		m_unGeneration = 0;
 	}
 
+	LinuxNamedMutexMappingReference::LinuxNamedMutexMappingReference(std::shared_ptr<LinuxNamedMutexMapping> pMapping) noexcept :
+		m_pMapping(std::move(pMapping))
+	{
+		m_nProcessID = ::getpid();
+	}
+
+	LinuxNamedMutexMappingCache::LinuxNamedMutexMappingCache() noexcept {
+		m_nProcessID = ::getpid();
+	}
+
 	LinuxPrivateMutexState::LinuxPrivateMutexState() noexcept :
 		m_Mutex {},
 		m_Ownership {}
@@ -1118,8 +1154,7 @@ namespace {
 		m_bNamed = false;
 		m_bOwner = false;
 		m_nOwnerProcessID = 0;
-		m_nSharedMemoryFD = -1;
-		m_pNamedState = nullptr;
+		m_pNamedMappingReference = nullptr;
 		m_pPrivateState = nullptr;
 	}
 
@@ -1402,11 +1437,13 @@ namespace {
 
 	std::atomic<unsigned int> g_unPOSIXNameCounter = 0;
 	std::atomic<unsigned int> g_unTemporaryPathCounter = 0;
+	std::atomic<LinuxNamedMutexMappingCache*> g_pPublishedNamedMutexMappingCache = nullptr;
 	std::atomic<LinuxThreadSuspendProcessState*> g_pPublishedThreadSuspendProcessState = nullptr;
 	LinuxThreadStateSlot g_arrLinuxThreadStateSlots[kLinuxThreadStateStorageSlotCount];
 	std::atomic<unsigned int> g_unLinuxForkCoordinatorState = kLinuxForkCoordinatorFree;
 	std::atomic<pid_t> g_nLinuxForkCoordinatorOwnerProcessID = 0;
 	std::atomic<pid_t> g_nLinuxForkCoordinatorOwnerThreadID = 0;
+	std::atomic<pid_t> g_nLinuxForkRendezvousQuiescentThreadID = 0;
 	std::atomic<unsigned int> g_unLinuxForkCoordinatorSlot = kLinuxThreadStateInvalidSlot;
 	std::atomic<unsigned int> g_unLinuxForkCoordinatorGeneration = 0;
 	std::atomic<LinuxHookProcessState*> g_pPublishedLinuxHookProcessState = nullptr;
@@ -1419,6 +1456,22 @@ namespace {
 		// Linux releases the descriptor even when close reports EINTR. Retrying
 		// could close a descriptor that another thread has already reused.
 		::syscall(SYS_close, nFileDescriptor);
+	}
+
+	LinuxNamedMutexMapping::LinuxNamedMutexMapping(const int nSharedMemoryFD, LinuxNamedMutexState* const pState, const dev_t unDevice, const ino_t unInode) noexcept :
+		m_nSharedMemoryFD(nSharedMemoryFD),
+		m_pState(pState),
+		m_unDevice(unDevice),
+		m_unInode(unInode)
+	{
+	}
+
+	LinuxNamedMutexMapping::~LinuxNamedMutexMapping() noexcept {
+		if (m_pState) {
+			::munmap(m_pState, sizeof(LinuxNamedMutexState));
+		}
+
+		CloseLinuxFileDescriptorNoCancel(m_nSharedMemoryFD);
 	}
 
 	class LinuxCancellationDisableGuard {
@@ -2959,6 +3012,132 @@ namespace {
 		return true;
 	}
 
+	LinuxNamedMutexMappingCache* EnsureLinuxNamedMutexMappingCache() noexcept {
+		const pid_t nCurrentProcessID = ::getpid();
+		auto* pCache = g_pPublishedNamedMutexMappingCache.load(std::memory_order_acquire);
+		if (pCache && (pCache->m_nProcessID == nCurrentProcessID)) {
+			return pCache;
+		}
+
+		std::unique_ptr<LinuxNamedMutexMappingCache> pNewCache(new (std::nothrow) LinuxNamedMutexMappingCache());
+		if (!pNewCache) {
+			return nullptr;
+		}
+
+		for (;;) {
+			if (g_pPublishedNamedMutexMappingCache.compare_exchange_weak(pCache, pNewCache.get(), std::memory_order_acq_rel, std::memory_order_acquire)) {
+				// An inherited cache may contain a lock held by a vanished thread.
+				// Leave that generation untouched in the child process.
+				return pNewCache.release();
+			}
+
+			if (pCache && (pCache->m_nProcessID == nCurrentProcessID)) {
+				return pCache;
+			}
+		}
+	}
+
+	std::shared_ptr<LinuxNamedMutexMapping> AcquireLinuxNamedMutexMapping(std::shared_ptr<LinuxNamedMutexMapping> const& pCandidate) noexcept {
+		if (!pCandidate) {
+			return {};
+		}
+
+		auto* const pCache = EnsureLinuxNamedMutexMappingCache();
+		if (!pCache) {
+			return {};
+		}
+
+		try {
+			std::lock_guard<std::mutex> LockGuard(pCache->m_Mutex);
+			for (auto itMapping = pCache->m_vecMappings.begin(); itMapping != pCache->m_vecMappings.end();) {
+				std::shared_ptr<LinuxNamedMutexMapping> pMapping = itMapping->lock();
+				if (!pMapping) {
+					itMapping = pCache->m_vecMappings.erase(itMapping);
+					continue;
+				}
+
+				if ((pMapping->m_unDevice == pCandidate->m_unDevice) && (pMapping->m_unInode == pCandidate->m_unInode)) {
+					return pMapping;
+				}
+
+				++itMapping;
+			}
+
+			// Robust pthread mutex ownership must use one virtual address per process.
+			pCache->m_vecMappings.emplace_back(pCandidate);
+
+			return pCandidate;
+		} catch (...) {
+			return {};
+		}
+	}
+
+	bool AdoptLinuxNamedMutexMapping(LinuxMutexHandle* const pMutex, const int nSharedMemoryFD, LinuxNamedMutexState* const pState, struct stat const& SharedMemoryStatus) noexcept {
+		std::unique_ptr<LinuxNamedMutexMapping> pNewMapping(new (std::nothrow) LinuxNamedMutexMapping(nSharedMemoryFD, pState, SharedMemoryStatus.st_dev, SharedMemoryStatus.st_ino));
+		if (!pNewMapping) {
+			::munmap(pState, sizeof(LinuxNamedMutexState));
+			CloseLinuxFileDescriptorNoCancel(nSharedMemoryFD);
+			return false;
+		}
+
+		try {
+			std::shared_ptr<LinuxNamedMutexMapping> pCandidate(std::move(pNewMapping));
+			std::shared_ptr<LinuxNamedMutexMapping> pMapping = AcquireLinuxNamedMutexMapping(pCandidate);
+			if (!pMapping) {
+				return false;
+			}
+
+			std::unique_ptr<LinuxNamedMutexMappingReference> pReference(new (std::nothrow) LinuxNamedMutexMappingReference(std::move(pMapping)));
+			if (!pReference) {
+				return false;
+			}
+
+			pMutex->m_pNamedMappingReference.store(pReference.release(), std::memory_order_release);
+
+			return true;
+		} catch (...) {
+			return false;
+		}
+	}
+
+	LinuxNamedMutexState* GetLinuxNamedMutexState(LinuxMutexHandle* const pMutex) noexcept {
+		if (!pMutex || !pMutex->m_bNamed) {
+			return nullptr;
+		}
+
+		const pid_t nCurrentProcessID = ::getpid();
+		auto* pReference = pMutex->m_pNamedMappingReference.load(std::memory_order_acquire);
+		if (!pReference) {
+			return nullptr;
+		}
+
+		if (pReference->m_nProcessID == nCurrentProcessID) {
+			return pReference->m_pMapping->m_pState;
+		}
+
+		std::shared_ptr<LinuxNamedMutexMapping> pMapping = AcquireLinuxNamedMutexMapping(pReference->m_pMapping);
+		if (!pMapping) {
+			return nullptr;
+		}
+
+		std::unique_ptr<LinuxNamedMutexMappingReference> pNewReference(new (std::nothrow) LinuxNamedMutexMappingReference(std::move(pMapping)));
+		if (!pNewReference) {
+			return nullptr;
+		}
+
+		for (;;) {
+			if (pMutex->m_pNamedMappingReference.compare_exchange_weak(pReference, pNewReference.get(), std::memory_order_acq_rel, std::memory_order_acquire)) {
+				// Preserve the inherited reference while other child threads may still
+				// be adopting it, just like inherited private-mutex state.
+				return pNewReference.release()->m_pMapping->m_pState;
+			}
+
+			if (pReference && (pReference->m_nProcessID == nCurrentProcessID)) {
+				return pReference->m_pMapping->m_pState;
+			}
+		}
+	}
+
 	bool CreateNamedMutex(LinuxMutexHandle* const pMutex, std::string const& strName, const bool bInitialState) {
 		if (!pMutex || strName.empty()) {
 			return false;
@@ -2972,6 +3151,13 @@ namespace {
 		}
 
 		if (::ftruncate(nSharedMemoryFD, static_cast<off_t>(sizeof(LinuxNamedMutexState))) != 0) {
+			CloseLinuxFileDescriptorNoCancel(nSharedMemoryFD);
+			::shm_unlink(strName.c_str());
+			return false;
+		}
+
+		struct stat SharedMemoryStatus {};
+		if (::fstat(nSharedMemoryFD, &SharedMemoryStatus) != 0) {
 			CloseLinuxFileDescriptorNoCancel(nSharedMemoryFD);
 			::shm_unlink(strName.c_str());
 			return false;
@@ -2994,24 +3180,28 @@ namespace {
 
 		pState->m_unMagic = kLinuxNamedMutexMagic;
 
+		if (!AdoptLinuxNamedMutexMapping(pMutex, nSharedMemoryFD, pState, SharedMemoryStatus)) {
+			::shm_unlink(strName.c_str());
+			return false;
+		}
+
 		pMutex->m_bNamed = true;
 		pMutex->m_bOwner = true;
 		pMutex->m_nOwnerProcessID = ::getpid();
-		pMutex->m_nSharedMemoryFD = nSharedMemoryFD;
-		pMutex->m_pNamedState = pState;
 
 		if (bInitialState) {
-			if (!AcceptRobustMutexResult(&pState->m_Mutex, ::pthread_mutex_lock(&pState->m_Mutex))) {
+			auto* const pNamedState = GetLinuxNamedMutexState(pMutex);
+			if (!pNamedState || !AcceptRobustMutexResult(&pNamedState->m_Mutex, ::pthread_mutex_lock(&pNamedState->m_Mutex))) {
 				return false;
 			}
 
 			const pid_t nCurrentProcessID = ::getpid();
 			const pid_t nCurrentThreadID = static_cast<pid_t>(::syscall(SYS_gettid));
 
-			pState->m_Ownership.m_nProcessID.store(nCurrentProcessID, std::memory_order_relaxed);
-			pState->m_Ownership.m_nThreadID.store(nCurrentThreadID, std::memory_order_relaxed);
-			pState->m_Ownership.m_unLockDepth.store(1, std::memory_order_relaxed);
-			pState->m_Ownership.m_unGeneration.store(1, std::memory_order_release);
+			pNamedState->m_Ownership.m_nProcessID.store(nCurrentProcessID, std::memory_order_relaxed);
+			pNamedState->m_Ownership.m_nThreadID.store(nCurrentThreadID, std::memory_order_relaxed);
+			pNamedState->m_Ownership.m_unLockDepth.store(1, std::memory_order_relaxed);
+			pNamedState->m_Ownership.m_unGeneration.store(1, std::memory_order_release);
 
 			pMutex->m_LocalOwnership.m_nProcessID = nCurrentProcessID;
 			pMutex->m_LocalOwnership.m_nThreadID = nCurrentThreadID;
@@ -3053,16 +3243,18 @@ namespace {
 			return false;
 		}
 
+		if (!AdoptLinuxNamedMutexMapping(pMutex, nSharedMemoryFD, pState, SharedMemoryStatus)) {
+			return false;
+		}
+
 		pMutex->m_bNamed = true;
-		pMutex->m_nSharedMemoryFD = nSharedMemoryFD;
-		pMutex->m_pNamedState = pState;
 
 		return true;
 	}
 
 	bool MutexLock(LinuxMutexHandle* const pMutex, const unsigned int unMilliseconds) {
 		auto* const pPrivateState = (pMutex && !pMutex->m_bNamed) ? GetLinuxPrivateMutexState(pMutex) : nullptr;
-		auto* const pNamedState = (pMutex && pMutex->m_bNamed) ? pMutex->m_pNamedState : nullptr;
+		auto* const pNamedState = (pMutex && pMutex->m_bNamed) ? GetLinuxNamedMutexState(pMutex) : nullptr;
 		auto* const pOwnershipState = pNamedState ? &pNamedState->m_Ownership : (pPrivateState ? &pPrivateState->m_Ownership : nullptr);
 		auto* const pMutexHandle = pNamedState ? &pNamedState->m_Mutex : (pPrivateState ? &pPrivateState->m_Mutex : nullptr);
 		if (!pOwnershipState || !pMutexHandle) {
@@ -3138,7 +3330,7 @@ namespace {
 
 	bool MutexUnlock(LinuxMutexHandle* const pMutex) {
 		auto* const pPrivateState = (pMutex && !pMutex->m_bNamed) ? GetLinuxPrivateMutexState(pMutex) : nullptr;
-		auto* const pNamedState = (pMutex && pMutex->m_bNamed) ? pMutex->m_pNamedState : nullptr;
+		auto* const pNamedState = (pMutex && pMutex->m_bNamed) ? GetLinuxNamedMutexState(pMutex) : nullptr;
 		auto* const pOwnershipState = pNamedState ? &pNamedState->m_Ownership : (pPrivateState ? &pPrivateState->m_Ownership : nullptr);
 		auto* const pMutexHandle = pNamedState ? &pNamedState->m_Mutex : (pPrivateState ? &pPrivateState->m_Mutex : nullptr);
 		if (!pOwnershipState || !pMutexHandle) {
@@ -3185,7 +3377,7 @@ namespace {
 
 	bool IsLinuxMutexOwnedByCurrentThread(LinuxMutexHandle* const pMutex) noexcept {
 		auto* const pPrivateState = (pMutex && !pMutex->m_bNamed) ? GetLinuxPrivateMutexState(pMutex) : nullptr;
-		auto* const pNamedState = (pMutex && pMutex->m_bNamed) ? pMutex->m_pNamedState : nullptr;
+		auto* const pNamedState = (pMutex && pMutex->m_bNamed) ? GetLinuxNamedMutexState(pMutex) : nullptr;
 		auto* const pOwnershipState = pNamedState ? &pNamedState->m_Ownership : (pPrivateState ? &pPrivateState->m_Ownership : nullptr);
 		if (!pOwnershipState || !pOwnershipState->m_unLockDepth.load(std::memory_order_acquire)) {
 			return false;
@@ -3208,7 +3400,7 @@ namespace {
 		}
 
 		auto* const pPrivateState = pMutex->m_bNamed ? nullptr : GetLinuxPrivateMutexState(pMutex);
-		auto* const pNamedState = pMutex->m_bNamed ? pMutex->m_pNamedState : nullptr;
+		auto* const pNamedState = pMutex->m_bNamed ? GetLinuxNamedMutexState(pMutex) : nullptr;
 		auto* const pOwnershipState = pNamedState ? &pNamedState->m_Ownership : (pPrivateState ? &pPrivateState->m_Ownership : nullptr);
 		if (!pOwnershipState) {
 			return false;
@@ -3241,13 +3433,8 @@ namespace {
 		}
 
 		if (pMutex->m_bNamed) {
-			if (pMutex->m_pNamedState && (::munmap(pMutex->m_pNamedState, sizeof(LinuxNamedMutexState)) != 0)) {
-				return false;
-			}
-
-			if (pMutex->m_nSharedMemoryFD >= 0) {
-				CloseLinuxFileDescriptorNoCancel(pMutex->m_nSharedMemoryFD);
-			}
+			auto* const pReference = pMutex->m_pNamedMappingReference.exchange(nullptr, std::memory_order_acq_rel);
+			delete pReference;
 
 			if (pMutex->m_bOwner && (pMutex->m_nOwnerProcessID == ::getpid()) && !pMutex->m_strName.empty()) {
 				::shm_unlink(pMutex->m_strName.c_str());
@@ -3823,17 +4010,26 @@ namespace {
 			"ud2\n\t");
 	}
 #elif defined(DETOURS_ARCH_X86)
-	__attribute__((naked, noinline)) static void TrapLinuxMemoryHookDeferredExitFromContext() {
-		__asm__(
-			"nop\n\t"
-			"ud2\n\t");
-	}
+	// Restored registers and trap flags must reach the first instruction unchanged.
+	// GCC can prepend an EAX-clobbering PIC thunk even to naked i386 functions.
+	extern "C" void TrapLinuxMemoryHookDeferredExitFromContext() __asm__("DetoursTrapLinuxMemoryHookDeferredExitFromContext");
+	extern "C" void ExitLinuxMemoryHookThreadFromContext() __asm__("DetoursExitLinuxMemoryHookThreadFromContext");
 
-	__attribute__((naked, noinline)) static void ExitLinuxMemoryHookThreadFromContext() {
-		__asm__(
-			"int $0x80\n\t"
-			"ud2\n\t");
-	}
+	__asm__(
+		".pushsection .text\n\t"
+		".local DetoursTrapLinuxMemoryHookDeferredExitFromContext\n\t"
+		".type DetoursTrapLinuxMemoryHookDeferredExitFromContext, @function\n"
+		"DetoursTrapLinuxMemoryHookDeferredExitFromContext:\n\t"
+		"nop\n\t"
+		"ud2\n\t"
+		".size DetoursTrapLinuxMemoryHookDeferredExitFromContext, . - DetoursTrapLinuxMemoryHookDeferredExitFromContext\n\t"
+		".local DetoursExitLinuxMemoryHookThreadFromContext\n\t"
+		".type DetoursExitLinuxMemoryHookThreadFromContext, @function\n"
+		"DetoursExitLinuxMemoryHookThreadFromContext:\n\t"
+		"int $0x80\n\t"
+		"ud2\n\t"
+		".size DetoursExitLinuxMemoryHookThreadFromContext, . - DetoursExitLinuxMemoryHookThreadFromContext\n\t"
+		".popsection\n\t");
 #endif
 
 	void SetLinuxMemoryHookDeferredExitContext(ucontext_t* const pContext, const int nSystemCall, const int nExitCode) noexcept {
@@ -4572,6 +4768,69 @@ namespace {
 		}
 	}
 
+	bool IsLinuxMemoryHookForkRendezvousQuiescent(const pid_t nThreadID) noexcept {
+		return (g_nLinuxForkCoordinatorOwnerProcessID.load(std::memory_order_acquire) == ::getpid()) && (g_nLinuxForkRendezvousQuiescentThreadID.load(std::memory_order_seq_cst) == nThreadID);
+	}
+
+	bool SynchronizeLinuxMemoryHookSignalDelivery() noexcept {
+		LinuxCancellationDisableGuard CancellationGuard;
+		try {
+			if (!InstallThreadSuspendSignal()) {
+				return false;
+			}
+
+			auto* const pState = GetThreadSuspendProcessState();
+			if (!pState) {
+				return false;
+			}
+
+			std::unique_lock<std::mutex> RequestLock(pState->m_RequestMutex, std::try_to_lock);
+			if (!RequestLock.owns_lock()) {
+				return false;
+			}
+
+			const pid_t nCurrentThreadID = GetCurrentThreadID();
+			const LinuxThreadIDSnapshot Snapshot = EnumerateProcessThreadIDs();
+			if (!Snapshot.m_bSucceeded) {
+				return false;
+			}
+
+			for (std::size_t unIndex = 0; unIndex < Snapshot.m_unThreadCount; ++unIndex) {
+				const pid_t nThreadID = Snapshot.m_arrThreadIDs[unIndex];
+				if (nThreadID == nCurrentThreadID) {
+					continue;
+				}
+
+				if (IsLinuxMemoryHookForkRendezvousQuiescent(nThreadID)) {
+					continue;
+				}
+
+				if (!SuspendThreadByIDLocked(nThreadID, pState)) {
+					if (IsLinuxMemoryHookForkRendezvousQuiescent(nThreadID)) {
+						continue;
+					}
+
+					const long nResult = ::syscall(SYS_tgkill, ::getpid(), nThreadID, 0);
+					const int nError = errno;
+					if ((nResult != 0) && (nError == ESRCH)) {
+						continue;
+					}
+
+					return false;
+				}
+
+				// Resume only our own request before touching another thread or taking a new lock.
+				while (!ResumeThreadByIDLocked(nThreadID, pState)) {
+					std::this_thread::yield();
+				}
+			}
+
+			return true;
+		} catch (...) {
+			return false;
+		}
+	}
+
 	bool IsSuspendedThreadOwned(unsigned int const* const pSuspendedThreadIDs, const std::size_t unSuspendedThreadCount, const pid_t nThreadID) noexcept {
 		if (!pSuspendedThreadIDs || (nThreadID <= 0)) {
 			return false;
@@ -5036,9 +5295,8 @@ namespace {
 			return LinuxThreadIdentityState::UNKNOWN;
 		}
 
-#if defined(SYS_newfstatat)
-		struct stat FileStatus {};
-		const long nResult = ::syscall(SYS_newfstatat, nIdentityFileDescriptor, kLinuxThreadIdentityStatusPath, &FileStatus, 0);
+#if defined(SYS_faccessat)
+		const long nResult = ::syscall(SYS_faccessat, nIdentityFileDescriptor, kLinuxThreadIdentityStatusPath, F_OK);
 		const int nError = errno;
 
 		if (nResult == 0) {
@@ -5727,6 +5985,7 @@ namespace {
 			CoordinatorState.m_nOwnerProcessID = nProcessID;
 			CoordinatorState.m_nOwnerThreadID = nThreadID;
 			CoordinatorState.m_bChildReset = true;
+			g_nLinuxForkRendezvousQuiescentThreadID.store(0, std::memory_order_seq_cst);
 			g_nLinuxForkCoordinatorOwnerProcessID.store(nProcessID, std::memory_order_release);
 			g_nLinuxForkCoordinatorOwnerThreadID.store(nThreadID, std::memory_order_release);
 			pSlot->m_unState.store(kLinuxThreadStateReady, std::memory_order_release);
@@ -5798,6 +6057,11 @@ namespace {
 		g_unLinuxForkCoordinatorGeneration.store(unGeneration, std::memory_order_release);
 		g_unLinuxForkCoordinatorSlot.store(unSlot, std::memory_order_release);
 
+		// Kernel-blocked SIGUSR2 excludes a coordinator nested inside an older memory fault.
+		// Otherwise all signals stay blocked until coordinator release, including lock waits.
+		const bool bSignalQuiescent = ::sigismember(&OriginalSignalMask, kLinuxThreadSuspendSignal) == 0;
+		g_nLinuxForkRendezvousQuiescentThreadID.store(bSignalQuiescent ? nThreadID : 0, std::memory_order_seq_cst);
+
 		return pSlot;
 	}
 
@@ -5827,6 +6091,7 @@ namespace {
 		g_unLinuxForkCoordinatorSlot.store(kLinuxThreadStateInvalidSlot, std::memory_order_release);
 		g_unLinuxForkCoordinatorGeneration.store(0, std::memory_order_release);
 		ReleaseLinuxThreadStateSlotWithSignalsBlocked(pSlot);
+		g_nLinuxForkRendezvousQuiescentThreadID.store(0, std::memory_order_seq_cst);
 		g_nLinuxForkCoordinatorOwnerThreadID.store(0, std::memory_order_release);
 		g_nLinuxForkCoordinatorOwnerProcessID.store(0, std::memory_order_release);
 		g_unLinuxForkCoordinatorState.store(kLinuxForkCoordinatorFree, std::memory_order_release);
@@ -7970,6 +8235,12 @@ namespace {
 		}
 
 		if (bRetry) {
+			return LinuxMemoryHookGuardCleanupResult::RETRY;
+		}
+
+		// A fault raised before guard restoration may not have entered its handler yet.
+		// Keep the service-only record published until every existing thread has passed it.
+		if (!SynchronizeLinuxMemoryHookSignalDelivery()) {
 			return LinuxMemoryHookGuardCleanupResult::RETRY;
 		}
 
@@ -45117,6 +45388,13 @@ namespace Detours {
 				SignalAction.sa_sigaction = DispatchSignal;
 				if (::sigemptyset(&SignalAction.sa_mask) != 0) {
 					// Release ends any readiness wait when action construction fails.
+					pGeneration->m_bReady.store(true, std::memory_order_release);
+					return false;
+				}
+
+				// A cleanup rendezvous must not acknowledge a memory fault before dispatch starts.
+				if (((pSlot->m_nSignal == SIGSEGV) || (pSlot->m_nSignal == SIGBUS)) &&
+					(::sigaddset(&SignalAction.sa_mask, kLinuxThreadSuspendSignal) != 0)) {
 					pGeneration->m_bReady.store(true, std::memory_order_release);
 					return false;
 				}

@@ -13572,6 +13572,70 @@ TEST_SUITE("Detours::Sync") {
 		CHECK(RemovedClient.GetMutex() == nullptr);
 	}
 
+	TEST_CASE("Named mutex recursive ownership survives original handle destruction") {
+		constexpr char kTestCase[] = "Named mutex recursive ownership survives original handle destruction";
+
+		if (!IsLinuxIsolatedTestProcess(kTestCase)) {
+			REQUIRE(RunLinuxIsolatedTest(kTestCase) == true);
+			return;
+		}
+
+		std::unique_ptr<Detours::Sync::MutexServer> pServer = std::make_unique<Detours::Sync::MutexServer>();
+		char szMutexName[Detours::kNamedObjectNameCapacity] {};
+		REQUIRE(pServer->GetMutexName(szMutexName) == true);
+		Detours::Sync::MutexClient Client(szMutexName);
+		REQUIRE(Client.GetMutex() != nullptr);
+		REQUIRE(pServer->Lock() == true);
+		REQUIRE(Client.Lock(0) == true);
+
+		pServer.reset();
+
+		CHECK(Client.UnLock() == true);
+		CHECK(Client.Lock(0) == true);
+		CHECK(Client.UnLock() == true);
+	}
+
+	TEST_CASE("Named mutex aliases converge after fork") {
+		constexpr char kTestCase[] = "Named mutex aliases converge after fork";
+		constexpr std::size_t kScenarioCount = 2;
+
+		if (!IsLinuxIsolatedTestProcess(kTestCase)) {
+			REQUIRE(RunLinuxIsolatedTest(kTestCase) == true);
+			return;
+		}
+
+		for (std::size_t unScenario = 0; unScenario < kScenarioCount; ++unScenario) {
+			Detours::Sync::MutexServer Server;
+			char szMutexName[Detours::kNamedObjectNameCapacity] {};
+			REQUIRE(Server.GetMutexName(szMutexName) == true);
+			Detours::Sync::MutexClient InheritedClient(szMutexName);
+			REQUIRE(InheritedClient.GetMutex() != nullptr);
+
+			const pid_t nChildPID = ::fork();
+			REQUIRE(nChildPID >= 0);
+			if (nChildPID == 0) {
+				if (unScenario == 0) {
+					Detours::Sync::MutexClient FreshClient(szMutexName);
+					const bool bSucceeded = FreshClient.GetMutex() && InheritedClient.Lock(0) && FreshClient.UnLock() && FreshClient.Lock(0) && InheritedClient.UnLock();
+					::_exit(bSucceeded ? EXIT_SUCCESS : EXIT_FAILURE);
+				}
+
+				if (!InheritedClient.Lock(0)) {
+					::_exit(EXIT_FAILURE);
+				}
+
+				Detours::Sync::MutexClient FreshClient(szMutexName);
+				const bool bSucceeded = FreshClient.GetMutex() && FreshClient.Lock(0) && FreshClient.UnLock() && InheritedClient.UnLock();
+				::_exit(bSucceeded ? EXIT_SUCCESS : EXIT_FAILURE);
+			}
+
+			int nStatus = 0;
+			REQUIRE(WaitForChildProcess(nChildPID, &nStatus, kLinuxChildWaitMilliseconds) == true);
+			REQUIRE(WIFEXITED(nStatus));
+			CHECK(WEXITSTATUS(nStatus) == EXIT_SUCCESS);
+		}
+	}
+
 	TEST_CASE("Mutex serializes concurrent access on one handle") {
 		MutexStressResult const Result = RunMutexStress();
 		CHECK(Result.m_unFailures == 0);
@@ -16960,6 +17024,8 @@ TEST_SUITE("Detours::Memory") {
 	}
 
 	TEST_CASE("MemoryHook concurrent unhook waits for signal quiescence") {
+		constexpr std::size_t kIterationCount = 64;
+
 		std::size_t const unPageSize = GetTestPageSize();
 		REQUIRE(unPageSize != 0);
 		void* const pMapping = ::mmap(nullptr, unPageSize, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
@@ -16969,42 +17035,177 @@ TEST_SUITE("Detours::Memory") {
 		});
 
 		volatile unsigned int* const pValue = static_cast<volatile unsigned int*>(pMapping);
-		*pValue = 0;
-		ResetLinuxMemoryHookCounters();
-		REQUIRE(Detours::Hook::HookMemory(LinuxMemoryHookCallBack, pMapping, sizeof(*pValue), LinuxPostMemoryHookCallBack) == true);
-		auto HookCleanup = MakeScopeExit([pMapping]() {
-			Detours::Hook::UnHookMemory(LinuxMemoryHookCallBack, pMapping);
-		});
+		for (std::size_t unIteration = 0; unIteration < kIterationCount; ++unIteration) {
+			CAPTURE(unIteration);
+			*pValue = 0;
+			ResetLinuxMemoryHookCounters();
+			REQUIRE(Detours::Hook::HookMemory(LinuxMemoryHookCallBack, pMapping, sizeof(*pValue), LinuxPostMemoryHookCallBack) == true);
+			auto HookCleanup = MakeScopeExit([pMapping]() {
+				if (!RetryTestCleanup([pMapping]() {
+					return Detours::Hook::UnHookMemory(LinuxMemoryHookCallBack, pMapping);
+				})) {
+					std::abort();
+				}
+			});
 
-		std::atomic<bool> bStop = false;
-		std::thread AccessThread([pValue, &bStop]() {
-			while (!bStop.load(std::memory_order_acquire)) {
-				*pValue = *pValue + 1;
+			std::atomic<bool> bStop = false;
+			std::thread AccessThread([pValue, &bStop]() {
+				while (!bStop.load(std::memory_order_acquire)) {
+					*pValue = *pValue + 1;
+				}
+			});
+			auto ThreadCleanup = MakeScopeExit([&AccessThread, &bStop]() {
+				bStop.store(true, std::memory_order_release);
+				if (AccessThread.joinable()) {
+					AccessThread.join();
+				}
+			});
+
+			CHECK(WaitForLinuxMemoryHookCalls(kLinuxMemoryHookMinimumCalls, kLinuxMemoryHookWaitMilliseconds) == true);
+			bool const bUnHooked = Detours::Hook::UnHookMemory(LinuxMemoryHookCallBack, pMapping);
+			CHECK(bUnHooked == true);
+			if (bUnHooked) {
+				HookCleanup.Release();
 			}
-		});
-		auto ThreadCleanup = MakeScopeExit([&AccessThread, &bStop]() {
+
+			unsigned int const unCallsAfterUnHook = g_unLinuxMemoryReadCalls.load(std::memory_order_relaxed) + g_unLinuxMemoryWriteCalls.load(std::memory_order_relaxed);
 			bStop.store(true, std::memory_order_release);
-			if (AccessThread.joinable()) {
-				AccessThread.join();
-			}
-		});
-
-		CHECK(WaitForLinuxMemoryHookCalls(kLinuxMemoryHookMinimumCalls, kLinuxMemoryHookWaitMilliseconds) == true);
-		bool const bUnHooked = Detours::Hook::UnHookMemory(LinuxMemoryHookCallBack, pMapping);
-		CHECK(bUnHooked == true);
-		if (bUnHooked) {
-			HookCleanup.Release();
+			AccessThread.join();
+			ThreadCleanup.Release();
+			CHECK((g_unLinuxMemoryReadCalls.load(std::memory_order_relaxed) + g_unLinuxMemoryWriteCalls.load(std::memory_order_relaxed)) == unCallsAfterUnHook);
+			CHECK(g_unLinuxMemoryPostCalls.load(std::memory_order_relaxed) == unCallsAfterUnHook);
+			CHECK(g_unLinuxMemoryInvalidCalls.load(std::memory_order_relaxed) == 0);
 		}
-
-		unsigned int const unCallsAfterUnHook = g_unLinuxMemoryReadCalls.load(std::memory_order_relaxed) + g_unLinuxMemoryWriteCalls.load(std::memory_order_relaxed);
-		bStop.store(true, std::memory_order_release);
-		AccessThread.join();
-		ThreadCleanup.Release();
-		CHECK((g_unLinuxMemoryReadCalls.load(std::memory_order_relaxed) + g_unLinuxMemoryWriteCalls.load(std::memory_order_relaxed)) == unCallsAfterUnHook);
-		CHECK(g_unLinuxMemoryPostCalls.load(std::memory_order_relaxed) == unCallsAfterUnHook);
-		CHECK(g_unLinuxMemoryInvalidCalls.load(std::memory_order_relaxed) == 0);
 	}
 
+	TEST_CASE("MemoryHook retains service state when a thread blocks signal quiescence") {
+		constexpr char const* kTestCase = "MemoryHook retains service state when a thread blocks signal quiescence";
+		constexpr unsigned int kInitialValue = 7;
+		constexpr unsigned int kServiceValue = 11;
+		constexpr unsigned int kReleasedValue = 13;
+
+		if (!IsLinuxIsolatedTestProcess(kTestCase)) {
+			REQUIRE(RunLinuxIsolatedTest(kTestCase) == true);
+			return;
+		}
+
+		const pid_t nChildPID = ::fork();
+		REQUIRE(nChildPID >= 0);
+
+		if (nChildPID > 0) {
+			int nStatus = 0;
+			REQUIRE(WaitForChildProcess(nChildPID, &nStatus, kLinuxChildWaitMilliseconds) == true);
+			REQUIRE(WIFEXITED(nStatus));
+			CHECK(WEXITSTATUS(nStatus) == EXIT_SUCCESS);
+			return;
+		}
+
+		g_unLinuxConcurrentInstallCalls.store(0, std::memory_order_relaxed);
+		struct sigaction UserAction {};
+		UserAction.sa_sigaction = LinuxConcurrentInstallSignalHandler;
+		sigemptyset(&UserAction.sa_mask);
+		UserAction.sa_flags = SA_SIGINFO;
+		struct sigaction PreviousAction {};
+		REQUIRE(::sigaction(SIGUSR2, &UserAction, &PreviousAction) == 0);
+		auto SignalCleanup = MakeScopeExit([&PreviousAction]() {
+			::sigaction(SIGUSR2, &PreviousAction, nullptr);
+		});
+
+		const std::size_t unPageSize = GetTestPageSize();
+		REQUIRE(unPageSize != 0);
+		void* const pMapping = ::mmap(nullptr, unPageSize, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+		REQUIRE(pMapping != MAP_FAILED);
+		auto MappingCleanup = MakeScopeExit([pMapping, unPageSize]() {
+			::munmap(pMapping, unPageSize);
+		});
+
+		volatile unsigned int* const pValue = static_cast<volatile unsigned int*>(pMapping);
+		*pValue = kInitialValue;
+		ResetLinuxMemoryHookCounters();
+		REQUIRE(Detours::Hook::HookMemory(LinuxMemoryHookCallBack, pMapping, sizeof(*pValue), LinuxPostMemoryHookCallBack) == true);
+		bool bHookInstalled = true;
+		auto HookCleanup = MakeScopeExit([pMapping, &bHookInstalled]() {
+			if (bHookInstalled && !RetryTestCleanup([pMapping]() {
+				return Detours::Hook::UnHookMemory(LinuxMemoryHookCallBack, pMapping);
+			})) {
+				std::abort();
+			}
+		});
+		REQUIRE(*pValue == kInitialValue);
+		REQUIRE(g_unLinuxMemoryReadCalls.load(std::memory_order_relaxed) != 0);
+
+		std::atomic<bool> bWorkerReady = false;
+		std::atomic<bool> bUnblockWorker = false;
+		std::atomic<bool> bWorkerUnblocked = false;
+		std::atomic<bool> bStopWorker = false;
+		std::atomic<int> nSignalMaskResult = 0;
+		std::thread Worker([&bWorkerReady, &bUnblockWorker, &bWorkerUnblocked, &bStopWorker, &nSignalMaskResult]() {
+			sigset_t SignalSet {};
+			sigemptyset(&SignalSet);
+			sigaddset(&SignalSet, SIGUSR2);
+			sigset_t PreviousMask {};
+			const int nBlockResult = ::pthread_sigmask(SIG_BLOCK, &SignalSet, &PreviousMask);
+			nSignalMaskResult.store(nBlockResult, std::memory_order_relaxed);
+			bWorkerReady.store(true, std::memory_order_release);
+
+			if (nBlockResult != 0) {
+				return;
+			}
+
+			while (!bUnblockWorker.load(std::memory_order_acquire)) {
+				std::this_thread::yield();
+			}
+
+			nSignalMaskResult.store(::pthread_sigmask(SIG_SETMASK, &PreviousMask, nullptr), std::memory_order_relaxed);
+			bWorkerUnblocked.store(true, std::memory_order_release);
+
+			while (!bStopWorker.load(std::memory_order_acquire)) {
+				std::this_thread::yield();
+			}
+		});
+		auto ThreadCleanup = MakeScopeExit([&Worker, &bUnblockWorker, &bStopWorker]() {
+			bUnblockWorker.store(true, std::memory_order_release);
+			bStopWorker.store(true, std::memory_order_release);
+
+			if (Worker.joinable()) {
+				Worker.join();
+			}
+		});
+
+		REQUIRE(WaitForTestCondition([&bWorkerReady]() {
+			return bWorkerReady.load(std::memory_order_acquire);
+		}, kLinuxMemoryHookWaitMilliseconds) == true);
+		REQUIRE(nSignalMaskResult.load(std::memory_order_relaxed) == 0);
+		const bool bFirstUnHooked = Detours::Hook::UnHookMemory(LinuxMemoryHookCallBack, pMapping);
+		bHookInstalled = !bFirstUnHooked;
+		REQUIRE(bFirstUnHooked == false);
+
+		const unsigned int unCallsAfterFailedUnHook = g_unLinuxMemoryReadCalls.load(std::memory_order_relaxed) + g_unLinuxMemoryWriteCalls.load(std::memory_order_relaxed);
+		*pValue = kServiceValue;
+		CHECK(*pValue == kServiceValue);
+		CHECK((g_unLinuxMemoryReadCalls.load(std::memory_order_relaxed) + g_unLinuxMemoryWriteCalls.load(std::memory_order_relaxed)) == unCallsAfterFailedUnHook);
+		CHECK(g_unLinuxMemoryPostCalls.load(std::memory_order_relaxed) == unCallsAfterFailedUnHook);
+		REQUIRE(::raise(SIGUSR2) == 0);
+		CHECK(g_unLinuxConcurrentInstallCalls.load(std::memory_order_relaxed) == 1);
+
+		bUnblockWorker.store(true, std::memory_order_release);
+		REQUIRE(WaitForTestCondition([&bWorkerUnblocked]() {
+			return bWorkerUnblocked.load(std::memory_order_acquire);
+		}, kLinuxMemoryHookWaitMilliseconds) == true);
+		REQUIRE(nSignalMaskResult.load(std::memory_order_relaxed) == 0);
+		const bool bRetryUnHooked = Detours::Hook::UnHookMemory(LinuxMemoryHookCallBack, pMapping);
+		bHookInstalled = !bRetryUnHooked;
+		REQUIRE(bRetryUnHooked == true);
+		HookCleanup.Release();
+
+		*pValue = kReleasedValue;
+		CHECK(*pValue == kReleasedValue);
+		CHECK((g_unLinuxMemoryReadCalls.load(std::memory_order_relaxed) + g_unLinuxMemoryWriteCalls.load(std::memory_order_relaxed)) == unCallsAfterFailedUnHook);
+		CHECK(g_unLinuxMemoryPostCalls.load(std::memory_order_relaxed) == unCallsAfterFailedUnHook);
+		CHECK(g_unLinuxMemoryInvalidCalls.load(std::memory_order_relaxed) == 0);
+		REQUIRE(::raise(SIGUSR2) == 0);
+		CHECK(g_unLinuxConcurrentInstallCalls.load(std::memory_order_relaxed) == 2);
+	}
 
 	TEST_CASE("MemoryHook self-unhook completes the current event and suppresses future events") {
 		pid_t const nChildPID = ::fork();

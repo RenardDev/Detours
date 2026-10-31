@@ -7102,6 +7102,10 @@ namespace rddisasm {
 		// ----------------------------------------------------------------
 
 		bool HookMemory(fnMemoryHookCallBack const fnCallBack, void* const pAddress, const std::size_t unSize, fnMemoryHookCallBack const fnPostCallBack = nullptr, const bool bAllowVirtual = false);
+
+		// Linux removal uses SIGUSR2 rendezvous and can interrupt blocking system calls.
+		// Blocked signals or active thread-suspension requests can make cleanup return false;
+		// retain the mapping and retry after those conditions clear.
 		bool UnHookMemory(fnMemoryHookCallBack const fnCallBack, void* const pAddress);
 
 		// ----------------------------------------------------------------
