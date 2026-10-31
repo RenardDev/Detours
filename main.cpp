@@ -7687,6 +7687,10 @@ TEST_SUITE("Detours::Exception") {
 #endif
 
 	TEST_CASE("g_ExceptionListener") {
+		REQUIRE(Detours::Exception::g_ExceptionListener.EnableHandler() == true);
+		auto HandlerCleanup = MakeScopeExit([]() {
+			Detours::Exception::g_ExceptionListener.DisableHandler();
+		});
 		REQUIRE(Detours::Exception::g_ExceptionListener.AddCallBack(OnException) == true);
 		auto CallBackCleanup = MakeScopeExit([]() {
 			Detours::Exception::g_ExceptionListener.RemoveCallBack(OnException);

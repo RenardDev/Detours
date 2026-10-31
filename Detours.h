@@ -3011,7 +3011,7 @@ namespace Detours {
 			std::size_t m_unThreadCount;
 			Mutex m_Mutex;
 			std::size_t m_unSuspendDepth;
-			unsigned long long m_unThreadStateReaperPauseOwnerToken;
+			unsigned long long m_unThreadStateMaintenanceOwnerToken;
 			bool m_bCleanupPending;
 #elif defined(__linux__)
 			static constexpr std::size_t kLinuxSuspenderThreadCapacity = 256;

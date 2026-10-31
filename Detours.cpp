@@ -10429,13 +10429,7 @@ namespace Detours {
 	constexpr unsigned int kWindowsMemoryHookEntryTokenSlotBitCount = 9;
 	constexpr unsigned int kWindowsThreadStateSlotStatusMask = 7;
 	constexpr unsigned int kWindowsThreadStateSlotPinIncrement = 8;
-	constexpr std::size_t kWindowsThreadStateReaperControlProbeInterval = 1024;
-	constexpr std::size_t kWindowsThreadStateReaperControlStallSpinCount = 100'000'000;
-	constexpr std::size_t kWindowsThreadStateReaperPauseStallSpinCount = 100'000'000;
 	constexpr std::size_t kWindowsHardwareOperationStallSpinCount = 10'000'000;
-	constexpr LONG kWindowsNativeNoMoreEntries = static_cast<LONG>(0x8000001A);
-	constexpr DWORD kWindowsThreadStateReaperWaitMilliseconds = 1;
-	constexpr DWORD kWindowsThreadStateReaperStopWaitMilliseconds = 30'000;
 	constexpr ULONG kWindowsHardwareOperationSuspendCountUnknown = std::numeric_limits<ULONG>::max();
 	constexpr ULONG kWindowsSuspenderCountUnknown = std::numeric_limits<ULONG>::max();
 	constexpr std::size_t kInterruptHookSnapshotEpochCount = 2;
@@ -10902,13 +10896,6 @@ namespace Detours {
 		RECOVERING
 	};
 
-	enum class WindowsThreadStateReaperStatus : unsigned int {
-		STOPPED = 0,
-		STARTING,
-		RUNNING,
-		STOPPING
-	};
-
 	enum class WindowsThreadLiveness : unsigned int {
 		TERMINATED = 0,
 		LIVE,
@@ -11208,7 +11195,6 @@ namespace Detours {
 		std::atomic<unsigned int> m_unActiveLeases;
 		std::atomic<HANDLE> m_hThread;
 		std::atomic<bool> m_bRecoveryPending;
-		std::atomic<unsigned int> m_unThreadStateReaperPauseDepth;
 		std::size_t m_unHandlerDepth;
 		std::size_t m_unCallBackDepth;
 		std::size_t m_unOpenedCount;
@@ -11238,7 +11224,6 @@ namespace Detours {
 		m_unActiveLeases = 0;
 		m_hThread = nullptr;
 		m_bRecoveryPending = false;
-		m_unThreadStateReaperPauseDepth = 0;
 		m_unHandlerDepth = 0;
 		m_unCallBackDepth = 0;
 		m_unOpenedCount = 0;
@@ -11317,21 +11302,7 @@ namespace Detours {
 	constexpr std::uintptr_t kKUserSharedDataAddress = 0x7FFE'0000;
 
 	static std::atomic<WindowsHookProcessState*> g_pPublishedWindowsHookProcessState = nullptr;
-	static HANDLE g_hWindowsThreadStateReaper = nullptr;
-	static HANDLE g_hWindowsThreadStateReaperEvent = nullptr;
-	static LPTHREAD_START_ROUTINE g_fnWindowsThreadStateReaperStartAddress = nullptr;
-	static std::atomic<WindowsThreadStateReaperStatus> g_WindowsThreadStateReaperStatus = WindowsThreadStateReaperStatus::STOPPED;
-	static std::atomic<unsigned int> g_unWindowsThreadStateReaperPauseGeneration = 0;
-	static std::atomic<unsigned int> g_unWindowsThreadStateReaperPauseAcknowledgement = 0;
-	static std::atomic<unsigned int> g_unWindowsThreadStateReaperStartCount = 0;
-	static std::atomic<unsigned int> g_unWindowsThreadStateReaperAcknowledgementCount = 0;
-	static std::atomic<unsigned int> g_unWindowsThreadStateReaperProgressCount = 0;
-	static std::atomic<unsigned int> g_unWindowsThreadStateReaperRunGeneration = 0;
-	static std::atomic<unsigned int> g_unWindowsThreadStateReaperExitAcknowledgement = 0;
-	static std::atomic<DWORD> g_unWindowsThreadStateReaperThreadID = 0;
-	static std::atomic<unsigned long long> g_unWindowsThreadStateReaperControlOwnerToken = 0;
-	static std::atomic<bool> g_bWindowsThreadStateReaperConfigured = false;
-	static std::atomic<bool> g_bWindowsThreadStateReaperExitHandlerRegistered = false;
+	static SRWLOCK g_WindowsThreadStateMaintenanceLock = SRWLOCK_INIT;
 	static std::atomic<unsigned long long> g_unWindowsHardwareOperationOwner = 0;
 	static std::atomic<unsigned int> g_unWindowsHardwareHookRecordGeneration = 0;
 	KUSER_SHARED_DATA const volatile& g_KUserSharedData = *reinterpret_cast<PKUSER_SHARED_DATA>(kKUserSharedDataAddress);
@@ -11437,65 +11408,7 @@ namespace Detours {
 		}
 	}
 
-	static LONG EnumerateNextWindowsThread(HANDLE const hPreviousThread, HANDLE* const phThreadOut) noexcept {
-		constexpr ACCESS_MASK kDesiredAccess =
-			THREAD_QUERY_INFORMATION |
-			THREAD_QUERY_LIMITED_INFORMATION |
-			SYNCHRONIZE |
-			THREAD_SUSPEND_RESUME |
-			THREAD_GET_CONTEXT |
-			THREAD_SET_CONTEXT;
-		constexpr DWORD kThreadSnapshotFlags = TH32CS_SNAPTHREAD;
-
-		if (!phThreadOut) {
-			return kWindowsNativeCallNotAttempted;
-		}
-
-		*phThreadOut = nullptr;
-		DWORD unPreviousThreadID = 0;
-		if (hPreviousThread) {
-			unPreviousThreadID = GetThreadId(hPreviousThread);
-			if (!unPreviousThreadID) {
-				return kWindowsNativeCallNotAttempted;
-			}
-		}
-
-		HANDLE const hSnapshot = CreateToolhelp32Snapshot(kThreadSnapshotFlags, 0);
-		if (hSnapshot == INVALID_HANDLE_VALUE) {
-			return kWindowsNativeCallNotAttempted;
-		}
-
-		THREADENTRY32 ThreadEntry {};
-		ThreadEntry.dwSize = sizeof(ThreadEntry);
-		bool bAfterPreviousThread = !hPreviousThread;
-		if (Thread32First(hSnapshot, &ThreadEntry)) {
-			do {
-				if (ThreadEntry.th32OwnerProcessID != GetCurrentProcessId()) {
-					continue;
-				}
-
-				if (!bAfterPreviousThread) {
-					if (ThreadEntry.th32ThreadID == unPreviousThreadID) {
-						bAfterPreviousThread = true;
-					}
-
-					continue;
-				}
-
-				HANDLE const hThread = OpenThread(kDesiredAccess, FALSE, ThreadEntry.th32ThreadID);
-				if (hThread) {
-					CloseHandle(hSnapshot);
-					*phThreadOut = hThread;
-					return 0;
-				}
-			} while (Thread32Next(hSnapshot, &ThreadEntry));
-		}
-
-		CloseHandle(hSnapshot);
-		return kWindowsNativeNoMoreEntries;
-	}
-
-	static DWORD GetCurrentWindowsThreadStateReaperThreadID() noexcept {
+	static DWORD GetCurrentWindowsThreadID() noexcept {
 		PTEB const pTEB = GetTEB();
 		if (!pTEB || !pTEB->ClientId.UniqueThread) {
 			return 0;
@@ -11509,13 +11422,20 @@ namespace Detours {
 		return static_cast<DWORD>(unThreadID);
 	}
 
-	// These two declarations are the minimum recursive exception/reaper interface:
+	// These declarations are the minimum recursive maintenance interface:
 	// Windows state recovery invokes the Exception namespace before its recovery
-	// implementation, and the reaper implementation calls back into this state.
+	// implementation, and synchronous maintenance calls back into this state.
 	namespace Exception {
-		static bool EnsureWindowsThreadStateReaper() noexcept;
 		static bool RecoverWindowsMemoryHookThreadState(WindowsMemoryHookThreadState* pThreadState) noexcept;
+		static void RecoverWindowsMemoryHookThreadStates() noexcept;
+		static void RecoverWindowsExceptionThreadStates() noexcept;
+		static std::size_t ReclaimWindowsHardwareHookRecords(DWORD unTargetThreadID, HARDWARE_HOOK_REGISTER TargetRegister, bool* pbTargetRemovedOut) noexcept;
 	} // namespace Exception
+
+	static void RunWindowsThreadStateMaintenanceLocked() noexcept;
+	static bool AcquireWindowsThreadStateMaintenance(unsigned long long* pOwnerTokenOut) noexcept;
+	static bool ReleaseWindowsThreadStateMaintenance(unsigned long long unOwnerToken) noexcept;
+	static void RunWindowsThreadStateMaintenance() noexcept;
 
 	static WindowsHookProcessState* GetHookProcessState() noexcept {
 		return g_pPublishedWindowsHookProcessState.load(std::memory_order_acquire);
@@ -11824,7 +11744,7 @@ namespace Detours {
 
 		unsigned int unGeneration = 0;
 		auto* const pThreadState = GetWindowsThreadStateFromOwnerToken(unOwnerToken, &unGeneration);
-		const DWORD unCurrentThreadID = GetCurrentWindowsThreadStateReaperThreadID();
+		const DWORD unCurrentThreadID = GetCurrentWindowsThreadID();
 
 		auto IsThreadStateReservationValid = [pThreadState, unGeneration, unOwnerToken, unCurrentThreadID]() noexcept -> bool {
 			return (pThreadState != nullptr) &&
@@ -11832,8 +11752,7 @@ namespace Detours {
 				(GetWindowsThreadStateSlotStatus(pThreadState->m_unSlotState.load(std::memory_order_acquire)) == WindowsThreadStateSlotStatus::ACTIVE) &&
 				(pThreadState->m_unGeneration.load(std::memory_order_acquire) == unGeneration) &&
 				(GetWindowsThreadStateOwnerToken(pThreadState, unGeneration) == unOwnerToken) &&
-				(pThreadState->m_unThreadID.load(std::memory_order_acquire) == unCurrentThreadID) &&
-				(pThreadState->m_unThreadStateReaperPauseDepth.load(std::memory_order_acquire) != 0);
+				(pThreadState->m_unThreadID.load(std::memory_order_acquire) == unCurrentThreadID);
 		};
 
 		if (!IsThreadStateReservationValid()) {
@@ -12151,7 +12070,6 @@ namespace Detours {
 		pThreadState->m_unOpenedCount = 0;
 		pThreadState->m_unPostCount = 0;
 		pThreadState->m_unHandlerReferenceCount = 0;
-		pThreadState->m_unThreadStateReaperPauseDepth.store(0, std::memory_order_relaxed);
 
 		for (auto& pRecord : pThreadState->m_arrOpened) {
 			pRecord = nullptr;
@@ -12193,7 +12111,6 @@ namespace Detours {
 			(pThreadState->m_unOpenedCount != 0) ||
 			(pThreadState->m_unPostCount != 0) ||
 			(pThreadState->m_unHandlerReferenceCount != 0) ||
-			(pThreadState->m_unThreadStateReaperPauseDepth.load(std::memory_order_acquire) != 0) ||
 			(pThreadState->m_bRecoveryPending.load(std::memory_order_acquire)) ||
 			(pThreadState->m_HardwareOperationFrame.m_State.load(std::memory_order_acquire) != WindowsHardwareOperationState::FREE) ||
 			(pThreadState->m_ProtectedMemoryRegistryLockFrame.m_State.load(std::memory_order_acquire) != WindowsProtectedMemoryRegistryLockFrameState::FREE)) {
@@ -12237,14 +12154,6 @@ namespace Detours {
 	static void FreeWindowsMemoryHookThreadState(WindowsMemoryHookThreadState* const pThreadState) noexcept {
 		if (!pThreadState) {
 			return;
-		}
-
-		const unsigned int unGeneration = pThreadState->m_unGeneration.load(std::memory_order_acquire);
-		const unsigned long long unOwnerToken = GetWindowsThreadStateOwnerToken(pThreadState, unGeneration);
-		if (unOwnerToken) {
-			unsigned long long unExpectedOwnerToken = unOwnerToken;
-			// Clear the control owner only while this thread state still owns it.
-			g_unWindowsThreadStateReaperControlOwnerToken.compare_exchange_strong(unExpectedOwnerToken, 0, std::memory_order_acq_rel, std::memory_order_acquire);
 		}
 
 		ClearWindowsMemoryHookThreadStatePayload(pThreadState);
@@ -12405,7 +12314,7 @@ namespace Detours {
 		*pGenerationOut = 0;
 
 		auto* const pProcessState = bCreate ? EnsureHookProcessState() : GetHookProcessState();
-		const DWORD unThreadID = GetCurrentWindowsThreadStateReaperThreadID();
+		const DWORD unThreadID = GetCurrentWindowsThreadID();
 		if (!pProcessState || !unThreadID) {
 			return nullptr;
 		}
@@ -12483,507 +12392,6 @@ namespace Detours {
 		}
 
 		return nullptr;
-	}
-
-	static bool RecoverAbandonedWindowsThreadStateReaperControl(const unsigned long long unOwnerToken) noexcept {
-		if (!unOwnerToken) {
-			return true;
-		}
-
-		auto ReleaseControlOwner = [unOwnerToken]() noexcept -> bool {
-			unsigned long long unExpectedOwnerToken = unOwnerToken;
-			return g_unWindowsThreadStateReaperControlOwnerToken.compare_exchange_strong(unExpectedOwnerToken, 0, std::memory_order_acq_rel, std::memory_order_acquire) || (unExpectedOwnerToken == 0);
-		};
-
-		unsigned int unGeneration = 0;
-		auto* const pThreadState = GetWindowsThreadStateFromOwnerToken(unOwnerToken, &unGeneration);
-		if (!pThreadState) {
-			return ReleaseControlOwner();
-		}
-
-		WindowsThreadStateSlotStatus Status = GetWindowsThreadStateSlotStatus(pThreadState->m_unSlotState.load(std::memory_order_acquire));
-		if ((Status == WindowsThreadStateSlotStatus::FREE) || (pThreadState->m_unGeneration.load(std::memory_order_acquire) != unGeneration)) {
-			return ReleaseControlOwner();
-		}
-
-		if (!PinWindowsThreadStateSlotForRecovery(pThreadState->m_unSlotState, &Status)) {
-			return false;
-		}
-
-		HANDLE const hThread = pThreadState->m_hThread.load(std::memory_order_acquire);
-		const DWORD unThreadID = pThreadState->m_unThreadID.load(std::memory_order_acquire);
-		const WindowsThreadLiveness Liveness = GetWindowsThreadLiveness(hThread);
-		const bool bIdentityMatches =
-			(pThreadState->m_unGeneration.load(std::memory_order_acquire) == unGeneration) &&
-			(pThreadState->m_hThread.load(std::memory_order_acquire) == hThread) &&
-			(pThreadState->m_unThreadID.load(std::memory_order_acquire) == unThreadID) &&
-			(GetWindowsThreadStateSlotStatus(pThreadState->m_unSlotState.load(std::memory_order_acquire)) == Status);
-		const bool bRecoverable = bIdentityMatches && (Liveness == WindowsThreadLiveness::TERMINATED);
-		if (bRecoverable) {
-			pThreadState->m_bRecoveryPending.store(true, std::memory_order_release);
-		}
-
-		UnpinWindowsThreadStateSlot(pThreadState->m_unSlotState);
-
-		if (!bRecoverable) {
-			return false;
-		}
-
-		return ReleaseControlOwner();
-	}
-
-	class WindowsThreadStateReaperControlLease final {
-	public:
-		WindowsThreadStateReaperControlLease() noexcept;
-		~WindowsThreadStateReaperControlLease() noexcept;
-
-	public:
-		WindowsThreadStateReaperControlLease(WindowsThreadStateReaperControlLease const&) = delete;
-		WindowsThreadStateReaperControlLease& operator=(WindowsThreadStateReaperControlLease const&) = delete;
-		WindowsThreadStateReaperControlLease(WindowsThreadStateReaperControlLease&&) = delete;
-		WindowsThreadStateReaperControlLease& operator=(WindowsThreadStateReaperControlLease&&) = delete;
-
-	public:
-		void Release() noexcept;
-
-	public:
-		bool IsOwned() const noexcept;
-
-	private:
-		WindowsMemoryHookThreadState* m_pThreadState;
-		unsigned int m_unGeneration;
-		unsigned long long m_unOwnerToken;
-		bool m_bOwned;
-	};
-
-	void WindowsThreadStateReaperControlLease::Release() noexcept {
-		if (m_bOwned) {
-			unsigned long long unExpectedOwnerToken = m_unOwnerToken;
-			// Clear the global owner only while this lease still owns it.
-			g_unWindowsThreadStateReaperControlOwnerToken.compare_exchange_strong(unExpectedOwnerToken, 0, std::memory_order_release, std::memory_order_relaxed);
-			m_bOwned = false;
-		}
-
-		if (m_pThreadState) {
-			ReleaseWindowsMemoryHookThreadState(m_pThreadState, m_unGeneration);
-			m_pThreadState = nullptr;
-		}
-
-		m_unGeneration = 0;
-		m_unOwnerToken = 0;
-	}
-
-	WindowsThreadStateReaperControlLease::WindowsThreadStateReaperControlLease() noexcept {
-		m_pThreadState = nullptr;
-		m_unGeneration = 0;
-		m_unOwnerToken = 0;
-		m_bOwned = false;
-
-		m_pThreadState = AcquireCurrentWindowsMemoryHookThreadState(true, &m_unGeneration);
-		m_unOwnerToken = GetWindowsThreadStateOwnerToken(m_pThreadState, m_unGeneration);
-		if (!m_unOwnerToken) {
-			Release();
-			return;
-		}
-
-		unsigned long long unObservedOwnerToken = 0;
-		std::size_t unStallSpinCount = 0;
-		while (unStallSpinCount < kWindowsThreadStateReaperControlStallSpinCount) {
-			unsigned long long unExpectedOwnerToken = 0;
-			if (g_unWindowsThreadStateReaperControlOwnerToken.compare_exchange_strong(unExpectedOwnerToken, m_unOwnerToken, std::memory_order_acq_rel, std::memory_order_acquire)) {
-				m_bOwned = true;
-				return;
-			}
-
-			if (unExpectedOwnerToken == m_unOwnerToken) {
-				break;
-			}
-
-			if (unExpectedOwnerToken != unObservedOwnerToken) {
-				unObservedOwnerToken = unExpectedOwnerToken;
-				unStallSpinCount = 0;
-			}
-
-			if (((unStallSpinCount % kWindowsThreadStateReaperControlProbeInterval) == 0) && RecoverAbandonedWindowsThreadStateReaperControl(unExpectedOwnerToken)) {
-				unObservedOwnerToken = 0;
-				unStallSpinCount = 0;
-				continue;
-			}
-
-			++unStallSpinCount;
-			_mm_pause();
-		}
-
-		Release();
-	}
-
-	WindowsThreadStateReaperControlLease::~WindowsThreadStateReaperControlLease() noexcept {
-		Release();
-	}
-
-	bool WindowsThreadStateReaperControlLease::IsOwned() const noexcept {
-		return m_bOwned;
-	}
-
-	static bool HasWindowsThreadStateReaperPauseRequests() noexcept {
-		auto* const pProcessState = GetHookProcessState();
-		if (!pProcessState) {
-			return false;
-		}
-
-		const DWORD unCurrentThreadID = GetCurrentWindowsThreadStateReaperThreadID();
-		const DWORD unReaperThreadID = g_unWindowsThreadStateReaperThreadID.load(std::memory_order_acquire);
-		const WindowsThreadStateReaperStatus ReaperStatus = g_WindowsThreadStateReaperStatus.load(std::memory_order_acquire);
-		const bool bCanRecover = ((unCurrentThreadID != 0) && (unCurrentThreadID == unReaperThreadID)) || (ReaperStatus == WindowsThreadStateReaperStatus::STOPPED);
-
-		auto IsTerminatedThreadStateIdentityStable = [](WindowsMemoryHookThreadState& ThreadState, const WindowsThreadStateSlotStatus ExpectedStatus) noexcept -> bool {
-			HANDLE const hThread = ThreadState.m_hThread.load(std::memory_order_acquire);
-			const unsigned int unGeneration = ThreadState.m_unGeneration.load(std::memory_order_acquire);
-			const DWORD unThreadID = ThreadState.m_unThreadID.load(std::memory_order_acquire);
-			const WindowsThreadLiveness Liveness = GetWindowsThreadLiveness(hThread);
-
-			return (ThreadState.m_hThread.load(std::memory_order_acquire) == hThread) &&
-				(ThreadState.m_unGeneration.load(std::memory_order_acquire) == unGeneration) &&
-				(ThreadState.m_unThreadID.load(std::memory_order_acquire) == unThreadID) &&
-				(GetWindowsThreadStateSlotStatus(ThreadState.m_unSlotState.load(std::memory_order_acquire)) == ExpectedStatus) &&
-				(Liveness == WindowsThreadLiveness::TERMINATED);
-		};
-
-		bool bHasPauseRequests = false;
-		for (auto& ThreadState : pProcessState->m_arrMemoryHookThreadStates) {
-			if (ThreadState.m_unThreadStateReaperPauseDepth.load(std::memory_order_acquire) == 0) {
-				continue;
-			}
-
-			WindowsThreadStateSlotStatus Status = GetWindowsThreadStateSlotStatus(ThreadState.m_unSlotState.load(std::memory_order_acquire));
-			if (Status == WindowsThreadStateSlotStatus::RECOVERING) {
-				const bool bIdentityStable = IsTerminatedThreadStateIdentityStable(ThreadState, WindowsThreadStateSlotStatus::RECOVERING);
-				if ((!bIdentityStable) || (!bCanRecover) || (!Exception::RecoverWindowsMemoryHookThreadState(&ThreadState))) {
-					bHasPauseRequests = true;
-				}
-
-				continue;
-			}
-
-			if (!PinWindowsThreadStateSlotForRecovery(ThreadState.m_unSlotState, &Status)) {
-				bHasPauseRequests = true;
-				continue;
-			}
-
-			const bool bIdentityStable = IsTerminatedThreadStateIdentityStable(ThreadState, Status);
-			UnpinWindowsThreadStateSlot(ThreadState.m_unSlotState);
-
-			if ((!bIdentityStable) || (!bCanRecover) || (!Exception::RecoverWindowsMemoryHookThreadState(&ThreadState))) {
-				bHasPauseRequests = true;
-			}
-		}
-
-		return bHasPauseRequests;
-	}
-
-	static bool StartWindowsThreadStateReaper(LPTHREAD_START_ROUTINE const fnStartAddress) noexcept {
-		constexpr unsigned int kCounterIncrement = 1;
-
-		if (g_unWindowsThreadStateReaperThreadID.load(std::memory_order_acquire) == GetCurrentWindowsThreadStateReaperThreadID()) {
-			return g_WindowsThreadStateReaperStatus.load(std::memory_order_acquire) == WindowsThreadStateReaperStatus::RUNNING;
-		}
-
-		WindowsThreadStateReaperControlLease ControlLease;
-		if (!ControlLease.IsOwned()) {
-			return false;
-		}
-
-		if (fnStartAddress) {
-			g_fnWindowsThreadStateReaperStartAddress = fnStartAddress;
-			g_bWindowsThreadStateReaperConfigured.store(true, std::memory_order_release);
-		}
-
-		if (g_hWindowsThreadStateReaper) {
-			const WindowsThreadStateReaperStatus CurrentStatus = g_WindowsThreadStateReaperStatus.load(std::memory_order_acquire);
-			const unsigned int unRunGeneration = g_unWindowsThreadStateReaperRunGeneration.load(std::memory_order_acquire);
-			DWORD unWaitResult = WaitForSingleObject(g_hWindowsThreadStateReaper, 0);
-			if ((CurrentStatus == WindowsThreadStateReaperStatus::STOPPING) &&
-				(unWaitResult == WAIT_TIMEOUT)) {
-				if ((ResumeThread(g_hWindowsThreadStateReaper) == kWindowsInvalidThreadSuspendCount) ||
-					!SetEvent(g_hWindowsThreadStateReaperEvent)) {
-					return false;
-				}
-
-				unWaitResult = WaitForSingleObject(g_hWindowsThreadStateReaper, kWindowsThreadStateReaperStopWaitMilliseconds);
-			}
-
-			if ((CurrentStatus == WindowsThreadStateReaperStatus::STARTING) &&
-				(unWaitResult == WAIT_TIMEOUT) &&
-				(ResumeThread(g_hWindowsThreadStateReaper) == kWindowsInvalidThreadSuspendCount)) {
-				return false;
-			}
-
-			if (((CurrentStatus == WindowsThreadStateReaperStatus::STARTING) ||
-				(CurrentStatus == WindowsThreadStateReaperStatus::RUNNING)) &&
-				(unWaitResult == WAIT_TIMEOUT)) {
-				return true;
-			}
-
-			if (!unRunGeneration || (unWaitResult != WAIT_OBJECT_0)) {
-				return false;
-			}
-
-			g_unWindowsThreadStateReaperExitAcknowledgement.store(unRunGeneration, std::memory_order_release);
-
-			HANDLE const hRetiredThread = g_hWindowsThreadStateReaper;
-			g_unWindowsThreadStateReaperThreadID.store(0, std::memory_order_release);
-			g_WindowsThreadStateReaperStatus.store(WindowsThreadStateReaperStatus::STOPPED, std::memory_order_release);
-			if (!CloseHandle(hRetiredThread)) {
-				return false;
-			}
-
-			g_hWindowsThreadStateReaper = nullptr;
-			ControlLease.Release();
-
-			return StartWindowsThreadStateReaper(nullptr);
-		}
-
-		if (g_WindowsThreadStateReaperStatus.load(std::memory_order_acquire) == WindowsThreadStateReaperStatus::STOPPING) {
-			g_WindowsThreadStateReaperStatus.store(WindowsThreadStateReaperStatus::STOPPED, std::memory_order_release);
-		}
-
-		if (HasWindowsThreadStateReaperPauseRequests() || !g_fnWindowsThreadStateReaperStartAddress) {
-			return false;
-		}
-
-		g_WindowsThreadStateReaperStatus.store(WindowsThreadStateReaperStatus::STARTING, std::memory_order_release);
-
-		if (!g_hWindowsThreadStateReaperEvent) {
-			g_hWindowsThreadStateReaperEvent = CreateEventW(nullptr, FALSE, FALSE, nullptr);
-			if (!g_hWindowsThreadStateReaperEvent) {
-				g_WindowsThreadStateReaperStatus.store(WindowsThreadStateReaperStatus::STOPPED, std::memory_order_release);
-				return false;
-			}
-		}
-
-		unsigned int unRunGeneration = g_unWindowsThreadStateReaperRunGeneration.fetch_add(kCounterIncrement, std::memory_order_acq_rel) + kCounterIncrement;
-		if (!unRunGeneration) {
-			unRunGeneration = g_unWindowsThreadStateReaperRunGeneration.fetch_add(kCounterIncrement, std::memory_order_acq_rel) + kCounterIncrement;
-		}
-
-		g_unWindowsThreadStateReaperExitAcknowledgement.store(0, std::memory_order_release);
-		HANDLE const hThread = CreateThread(nullptr, 0, g_fnWindowsThreadStateReaperStartAddress, nullptr, CREATE_SUSPENDED, nullptr);
-		if (!hThread) {
-			g_WindowsThreadStateReaperStatus.store(WindowsThreadStateReaperStatus::STOPPED, std::memory_order_release);
-			return false;
-		}
-
-		g_hWindowsThreadStateReaper = hThread;
-		g_unWindowsThreadStateReaperStartCount.fetch_add(kCounterIncrement, std::memory_order_acq_rel);
-		if (ResumeThread(hThread) != kWindowsInvalidThreadSuspendCount) {
-			return true;
-		}
-
-		g_hWindowsThreadStateReaper = nullptr;
-		g_WindowsThreadStateReaperStatus.store(WindowsThreadStateReaperStatus::STOPPED, std::memory_order_release);
-		// The thread handle is no longer published; cleanup failure cannot make
-		// the failed reaper start usable.
-		CloseHandle(hThread);
-		return false;
-	}
-
-	static bool PrepareWindowsThreadStateReaperForSuspend() noexcept {
-		if (g_unWindowsThreadStateReaperThreadID.load(std::memory_order_acquire) == GetCurrentWindowsThreadStateReaperThreadID()) {
-			return false;
-		}
-
-		if (!Exception::EnsureWindowsThreadStateReaper()) {
-			return false;
-		}
-
-		const WindowsThreadStateReaperStatus Status = g_WindowsThreadStateReaperStatus.load(std::memory_order_acquire);
-		return (Status == WindowsThreadStateReaperStatus::STARTING) || (Status == WindowsThreadStateReaperStatus::RUNNING);
-	}
-
-	static bool ReleaseWindowsThreadStateReaperPause(const unsigned long long unRequestedOwnerToken) noexcept {
-		constexpr unsigned long long kCurrentThreadOwnerToken = 0;
-		constexpr unsigned int kReleasedPauseDepth = 1;
-
-		unsigned long long unOwnerToken = unRequestedOwnerToken;
-		WindowsMemoryHookThreadState* pLeaseThreadState = nullptr;
-		unsigned int unLeaseGeneration = 0;
-		if (unOwnerToken == kCurrentThreadOwnerToken) {
-			pLeaseThreadState = AcquireCurrentWindowsMemoryHookThreadState(false, &unLeaseGeneration);
-			unOwnerToken = GetWindowsThreadStateOwnerToken(pLeaseThreadState, unLeaseGeneration);
-			if (!unOwnerToken) {
-				if (pLeaseThreadState) {
-					ReleaseWindowsMemoryHookThreadState(pLeaseThreadState, unLeaseGeneration);
-				}
-
-				return false;
-			}
-		}
-
-		unsigned int unGeneration = 0;
-		auto* const pThreadState = GetWindowsThreadStateFromOwnerToken(unOwnerToken, &unGeneration);
-		if (!pThreadState || !PinWindowsThreadStateSlot(pThreadState->m_unSlotState)) {
-			if (pLeaseThreadState) {
-				ReleaseWindowsMemoryHookThreadState(pLeaseThreadState, unLeaseGeneration);
-			}
-
-			return false;
-		}
-
-		unsigned int unPauseDepth = pThreadState->m_unThreadStateReaperPauseDepth.load(std::memory_order_acquire);
-		bool bReleased = false;
-		while (unPauseDepth != 0) {
-			if (pThreadState->m_unThreadStateReaperPauseDepth.compare_exchange_weak(unPauseDepth, unPauseDepth - kReleasedPauseDepth, std::memory_order_acq_rel, std::memory_order_acquire)) {
-				bReleased = true;
-				break;
-			}
-		}
-
-		UnpinWindowsThreadStateSlot(pThreadState->m_unSlotState);
-
-		if (bReleased) {
-			AdvanceWindowsThreadStateGeneration(g_unWindowsThreadStateReaperPauseGeneration);
-		}
-
-		if (pLeaseThreadState) {
-			ReleaseWindowsMemoryHookThreadState(pLeaseThreadState, unLeaseGeneration);
-
-		} else if (bReleased) {
-			RetireIdleWindowsMemoryHookThreadState(pThreadState, unGeneration);
-		}
-
-		return bReleased;
-	}
-
-	static bool IsWindowsThreadStateReaperPauseAcknowledged(const unsigned long long unOwnerToken) noexcept {
-		auto* const pThreadState = GetWindowsThreadStateFromOwnerToken(unOwnerToken, nullptr);
-		if (!pThreadState || (pThreadState->m_unThreadStateReaperPauseDepth.load(std::memory_order_acquire) == 0)) {
-			return false;
-		}
-
-		const unsigned int unPauseGeneration = g_unWindowsThreadStateReaperPauseGeneration.load(std::memory_order_acquire);
-		return g_unWindowsThreadStateReaperPauseAcknowledgement.load(std::memory_order_acquire) == unPauseGeneration;
-	}
-
-	static bool RequestWindowsThreadStateReaperPause(unsigned long long* const pOwnerTokenOut) noexcept {
-		constexpr unsigned int kRequestedPauseDepth = 1;
-
-		if (pOwnerTokenOut) {
-			*pOwnerTokenOut = 0;
-		}
-
-		if (g_unWindowsThreadStateReaperThreadID.load(std::memory_order_acquire) == GetCurrentWindowsThreadStateReaperThreadID()) {
-			return false;
-		}
-
-		WindowsThreadStateReaperControlLease ControlLease;
-		if (!ControlLease.IsOwned()) {
-			return false;
-		}
-
-		unsigned int unGeneration = 0;
-		auto* const pThreadState = AcquireCurrentWindowsMemoryHookThreadState(true, &unGeneration);
-		const unsigned long long unOwnerToken = GetWindowsThreadStateOwnerToken(pThreadState, unGeneration);
-		if (!pThreadState || !unOwnerToken) {
-			if (pThreadState) {
-				ReleaseWindowsMemoryHookThreadState(pThreadState, unGeneration);
-			}
-
-			return false;
-		}
-
-		unsigned int unPauseDepth = pThreadState->m_unThreadStateReaperPauseDepth.load(std::memory_order_acquire);
-		for (;;) {
-			if (unPauseDepth == std::numeric_limits<unsigned int>::max()) {
-				ReleaseWindowsMemoryHookThreadState(pThreadState, unGeneration);
-				return false;
-			}
-
-			if (pThreadState->m_unThreadStateReaperPauseDepth.compare_exchange_weak(unPauseDepth, unPauseDepth + kRequestedPauseDepth, std::memory_order_acq_rel, std::memory_order_acquire)) {
-				break;
-			}
-		}
-
-		ReleaseWindowsMemoryHookThreadState(pThreadState, unGeneration);
-
-		AdvanceWindowsThreadStateGeneration(g_unWindowsThreadStateReaperPauseGeneration);
-
-		const WindowsThreadStateReaperStatus Status = g_WindowsThreadStateReaperStatus.load(std::memory_order_acquire);
-		if (Status == WindowsThreadStateReaperStatus::STOPPED) {
-			if (!g_bWindowsThreadStateReaperConfigured.load(std::memory_order_acquire)) {
-				if (pOwnerTokenOut) {
-					*pOwnerTokenOut = unOwnerToken;
-				}
-
-				return true;
-			}
-
-			ReleaseWindowsThreadStateReaperPause(unOwnerToken);
-			return false;
-		}
-
-		if (Status == WindowsThreadStateReaperStatus::STOPPING) {
-			ReleaseWindowsThreadStateReaperPause(unOwnerToken);
-			return false;
-		}
-
-		unsigned int unProgressCount = g_unWindowsThreadStateReaperProgressCount.load(std::memory_order_acquire);
-		std::size_t unStallSpinCount = 0;
-		while (unStallSpinCount < kWindowsThreadStateReaperPauseStallSpinCount) {
-			if (IsWindowsThreadStateReaperPauseAcknowledged(unOwnerToken)) {
-				if (pOwnerTokenOut) {
-					*pOwnerTokenOut = unOwnerToken;
-				}
-
-				return true;
-			}
-
-			const WindowsThreadStateReaperStatus CurrentStatus = g_WindowsThreadStateReaperStatus.load(std::memory_order_acquire);
-			if ((CurrentStatus == WindowsThreadStateReaperStatus::STOPPED) || (CurrentStatus == WindowsThreadStateReaperStatus::STOPPING)) {
-				break;
-			}
-
-			const unsigned int unCurrentProgressCount = g_unWindowsThreadStateReaperProgressCount.load(std::memory_order_acquire);
-			if (unCurrentProgressCount != unProgressCount) {
-				unProgressCount = unCurrentProgressCount;
-				unStallSpinCount = 0;
-
-			} else {
-				++unStallSpinCount;
-			}
-
-			_mm_pause();
-		}
-
-		if (IsWindowsThreadStateReaperPauseAcknowledged(unOwnerToken)) {
-			if (pOwnerTokenOut) {
-				*pOwnerTokenOut = unOwnerToken;
-			}
-
-			return true;
-		}
-
-		ReleaseWindowsThreadStateReaperPause(unOwnerToken);
-		return false;
-	}
-
-	static void ParkWindowsThreadStateReaper() noexcept {
-		constexpr unsigned int kAcknowledgementCountIncrement = 1;
-		constexpr unsigned int kNoAcknowledgedPauseGeneration = 0;
-
-		while (g_WindowsThreadStateReaperStatus.load(std::memory_order_acquire) != WindowsThreadStateReaperStatus::STOPPING) {
-			if (!HasWindowsThreadStateReaperPauseRequests()) {
-				g_unWindowsThreadStateReaperPauseAcknowledgement.store(kNoAcknowledgedPauseGeneration, std::memory_order_release);
-				return;
-			}
-
-			const unsigned int unPauseGeneration = g_unWindowsThreadStateReaperPauseGeneration.load(std::memory_order_acquire);
-			if (g_unWindowsThreadStateReaperPauseAcknowledgement.load(std::memory_order_relaxed) != unPauseGeneration) {
-				g_unWindowsThreadStateReaperPauseAcknowledgement.store(unPauseGeneration, std::memory_order_release);
-				g_unWindowsThreadStateReaperAcknowledgementCount.fetch_add(kAcknowledgementCountIncrement, std::memory_order_acq_rel);
-			}
-
-			_mm_pause();
-		}
 	}
 
 	static unsigned long long GetWindowsMemoryHookEntryToken(WindowsMemoryHookThreadState const* const pThreadState, const unsigned int unGeneration, const std::size_t unEntryIndex) noexcept {
@@ -13151,7 +12559,7 @@ namespace Detours {
 		pFrame->m_Type = Type;
 		pFrame->m_unOwnerToken = unOwnerToken;
 		pFrame->m_unThreadStateGeneration = unGeneration;
-		pFrame->m_unOwnerThreadID = GetCurrentWindowsThreadStateReaperThreadID();
+		pFrame->m_unOwnerThreadID = GetCurrentWindowsThreadID();
 		pFrame->m_unTargetThreadID = unTargetThreadID;
 		pFrame->m_unDRIndex = unDRIndex;
 		pFrame->m_bCurrentTarget = pFrame->m_unOwnerThreadID == unTargetThreadID;
@@ -13636,7 +13044,7 @@ namespace Detours {
 		auto* const pFrame = reinterpret_cast<WindowsHardwareOperationFrame*>(pWindowsContext->Eax);
 #endif
 		auto* const pProcessState = GetHookProcessState();
-		const DWORD unThreadID = GetCurrentWindowsThreadStateReaperThreadID();
+		const DWORD unThreadID = GetCurrentWindowsThreadID();
 		if (!pFrame || !pProcessState || !unThreadID) {
 			return false;
 		}
@@ -22909,7 +22317,17 @@ namespace Detours {
 		constexpr std::size_t kSuspendSnapshotFailure = std::numeric_limits<std::size_t>::max();
 #endif
 
+#if defined(_MSC_VER)
+#pragma warning(push)
+#pragma warning(disable: 4073)
+#pragma init_seg(lib)
 		Suspender g_Suspender;
+#pragma warning(pop)
+#elif defined(__GNUC__)
+		Suspender g_Suspender __attribute__((init_priority(101)));
+#else
+		Suspender g_Suspender;
+#endif
 
 #if defined(__linux__)
 		class SuspenderMutexUnlockGuard {
@@ -24028,7 +23446,7 @@ namespace Detours {
 			m_pThreads.reset(new (std::nothrow) SUSPENDER_DATA[kWindowsSuspenderThreadCapacity]);
 			m_unThreadCount = 0;
 			m_unSuspendDepth = 0;
-			m_unThreadStateReaperPauseOwnerToken = 0;
+			m_unThreadStateMaintenanceOwnerToken = 0;
 			m_bCleanupPending = false;
 		}
 
@@ -24043,7 +23461,7 @@ namespace Detours {
 		bool Suspender::ReconcileWindowsState() {
 			constexpr bool kDoNotCreateThreadState = false;
 
-			if (!m_unThreadStateReaperPauseOwnerToken) {
+			if (!m_unThreadStateMaintenanceOwnerToken) {
 				return m_unSuspendDepth == 0;
 			}
 
@@ -24054,17 +23472,16 @@ namespace Detours {
 				ReleaseWindowsMemoryHookThreadState(pCurrentThreadState, unCurrentGeneration);
 			}
 
-			if (unCurrentOwnerToken == m_unThreadStateReaperPauseOwnerToken) {
+			if (unCurrentOwnerToken == m_unThreadStateMaintenanceOwnerToken) {
 				return true;
 			}
 
-			auto* const pPreviousThreadState = GetWindowsThreadStateFromOwnerToken(m_unThreadStateReaperPauseOwnerToken, nullptr);
+			auto* const pPreviousThreadState = GetWindowsThreadStateFromOwnerToken(m_unThreadStateMaintenanceOwnerToken, nullptr);
 			if (pPreviousThreadState) {
 				const WindowsThreadStateSlotStatus PreviousStatus = GetWindowsThreadStateSlotStatus(pPreviousThreadState->m_unSlotState.load(std::memory_order_acquire));
 				if (PreviousStatus != WindowsThreadStateSlotStatus::FREE) {
 					const WindowsThreadLiveness PreviousThreadLiveness = GetWindowsThreadLiveness(pPreviousThreadState->m_hThread.load(std::memory_order_acquire));
 					if ((PreviousThreadLiveness != WindowsThreadLiveness::TERMINATED) ||
-						pPreviousThreadState->m_unThreadStateReaperPauseDepth.load(std::memory_order_acquire) ||
 						HasWindowsSuspenderPayload(pPreviousThreadState)) {
 						return false;
 					}
@@ -24081,7 +23498,7 @@ namespace Detours {
 
 			m_unThreadCount = 0;
 			m_unSuspendDepth = 0;
-			m_unThreadStateReaperPauseOwnerToken = 0;
+			m_unThreadStateMaintenanceOwnerToken = 0;
 			m_bCleanupPending = false;
 
 			return true;
@@ -24148,11 +23565,11 @@ namespace Detours {
 				return true;
 			}
 
-			if (!ResumeSuspendedThreads() || !ReleaseWindowsThreadStateReaperPause(m_unThreadStateReaperPauseOwnerToken)) {
+			if (!ResumeSuspendedThreads() || !ReleaseWindowsThreadStateMaintenance(m_unThreadStateMaintenanceOwnerToken)) {
 				return false;
 			}
 
-			m_unThreadStateReaperPauseOwnerToken = 0;
+			m_unThreadStateMaintenanceOwnerToken = 0;
 			m_bCleanupPending = false;
 
 			return true;
@@ -24171,7 +23588,7 @@ namespace Detours {
 
 			if (!unThreadID || !hThread || (hThread == INVALID_HANDLE_VALUE) ||
 				!m_pThreads ||
-				!m_unThreadStateReaperPauseOwnerToken ||
+				!m_unThreadStateMaintenanceOwnerToken ||
 				(m_unThreadCount >= kWindowsSuspenderThreadCapacity)) {
 				if (hThread && (hThread != INVALID_HANDLE_VALUE)) {
 					CloseHandle(hThread);
@@ -24181,7 +23598,7 @@ namespace Detours {
 			}
 
 			std::size_t unFrameIndex = 0;
-			auto* const pFrame = ReserveWindowsSuspenderFrame(m_unThreadStateReaperPauseOwnerToken, unThreadID, hThread, &unFrameIndex);
+			auto* const pFrame = ReserveWindowsSuspenderFrame(m_unThreadStateMaintenanceOwnerToken, unThreadID, hThread, &unFrameIndex);
 			if (!pFrame) {
 				if (hThread && (hThread != INVALID_HANDLE_VALUE)) {
 					CloseHandle(hThread);
@@ -24193,7 +23610,7 @@ namespace Detours {
 			SUSPENDER_DATA SuspendedThread {};
 			SuspendedThread.m_unThreadID = unThreadID;
 			SuspendedThread.m_hHandle = hThread;
-			SuspendedThread.m_unOwnerToken = m_unThreadStateReaperPauseOwnerToken;
+			SuspendedThread.m_unOwnerToken = m_unThreadStateMaintenanceOwnerToken;
 			SuspendedThread.m_unFrameIndex = unFrameIndex;
 			SuspendedThread.m_bContextCaptured = false;
 
@@ -24250,7 +23667,7 @@ namespace Detours {
 
 			CompactWindowsThreads();
 
-			if (!m_unThreadCount && m_unThreadStateReaperPauseOwnerToken && !ReleaseUnusedWindowsSuspenderFrames(m_unThreadStateReaperPauseOwnerToken)) {
+			if (!m_unThreadCount && m_unThreadStateMaintenanceOwnerToken && !ReleaseUnusedWindowsSuspenderFrames(m_unThreadStateMaintenanceOwnerToken)) {
 				return false;
 			}
 
@@ -24258,10 +23675,6 @@ namespace Detours {
 		}
 
 		bool Suspender::Suspend(const bool bSweepThreads) {
-			if (!PrepareWindowsThreadStateReaperForSuspend()) {
-				return false;
-			}
-
 			const bool bLocked = m_Mutex.Lock();
 
 			if (!bLocked) {
@@ -24299,15 +23712,15 @@ namespace Detours {
 				return false;
 			}
 
-			if (!RequestWindowsThreadStateReaperPause(&m_unThreadStateReaperPauseOwnerToken)) {
+			if (!AcquireWindowsThreadStateMaintenance(&m_unThreadStateMaintenanceOwnerToken)) {
 				m_Mutex.UnLock();
 				return false;
 			}
 
 			auto FailSuspension = [this]() noexcept -> bool {
 				const bool bResourcesReleased = ResumeSuspendedThreads();
-				if (bResourcesReleased && ReleaseWindowsThreadStateReaperPause(m_unThreadStateReaperPauseOwnerToken)) {
-					m_unThreadStateReaperPauseOwnerToken = 0;
+				if (bResourcesReleased && ReleaseWindowsThreadStateMaintenance(m_unThreadStateMaintenanceOwnerToken)) {
+					m_unThreadStateMaintenanceOwnerToken = 0;
 					m_bCleanupPending = false;
 
 				} else {
@@ -24380,13 +23793,13 @@ namespace Detours {
 				return false;
 			}
 
-			if (!ReleaseWindowsThreadStateReaperPause(m_unThreadStateReaperPauseOwnerToken)) {
+			if (!ReleaseWindowsThreadStateMaintenance(m_unThreadStateMaintenanceOwnerToken)) {
 				m_Mutex.UnLock();
 				return false;
 			}
 
 			m_unSuspendDepth = 0;
-			m_unThreadStateReaperPauseOwnerToken = 0;
+			m_unThreadStateMaintenanceOwnerToken = 0;
 			m_Mutex.UnLock();
 			m_Mutex.UnLock();
 
@@ -24542,101 +23955,91 @@ namespace Detours {
 
 		std::size_t Suspender::SuspendNewThreadsSnapshot() {
 			constexpr std::size_t kFirstPreparedThreadIndex = 0;
+			constexpr ACCESS_MASK kDesiredAccess =
+				THREAD_QUERY_INFORMATION |
+				THREAD_QUERY_LIMITED_INFORMATION |
+				SYNCHRONIZE |
+				THREAD_SUSPEND_RESUME |
+				THREAD_GET_CONTEXT |
+				THREAD_SET_CONTEXT;
+			constexpr DWORD kThreadSnapshotFlags = TH32CS_SNAPTHREAD;
 
-			if (!m_unThreadStateReaperPauseOwnerToken) {
+			if (!m_unThreadStateMaintenanceOwnerToken) {
 				return kSuspendSnapshotFailure;
 			}
 
 			std::size_t unAddedCount = 0;
-			HANDLE hPreviousThread = nullptr;
-			bool bPreviousThreadOwnedByFrame = false;
-			for (;;) {
-				HANDLE hThread = nullptr;
-				const LONG nStatus = EnumerateNextWindowsThread(hPreviousThread, &hThread);
-				if (hPreviousThread && !bPreviousThreadOwnedByFrame && !CloseHandle(hPreviousThread)) {
-					if (hThread && (hThread != INVALID_HANDLE_VALUE)) {
-#pragma warning(suppress: 6001) // EnumerateNextWindowsThread initializes the output handle before returning.
-						CloseHandle(hThread);
+			const DWORD unCurrentProcessID = GetCurrentProcessId();
+			const DWORD unCurrentThreadID = GetCurrentWindowsThreadID();
+			HANDLE const hSnapshot = CreateToolhelp32Snapshot(kThreadSnapshotFlags, 0);
+			if (hSnapshot == INVALID_HANDLE_VALUE) {
+				return kSuspendSnapshotFailure;
+			}
+
+			THREADENTRY32 ThreadEntry {};
+			ThreadEntry.dwSize = sizeof(ThreadEntry);
+			if (Thread32First(hSnapshot, &ThreadEntry)) {
+				do {
+					if (ThreadEntry.th32OwnerProcessID != unCurrentProcessID) {
+						continue;
 					}
 
-					return kSuspendSnapshotFailure;
-				}
+					HANDLE const hThread = OpenThread(kDesiredAccess, FALSE, ThreadEntry.th32ThreadID);
+					if (!hThread) {
+						continue;
+					}
 
-				hPreviousThread = nullptr;
-				bPreviousThreadOwnedByFrame = false;
-
-				if (nStatus == kWindowsNativeNoMoreEntries) {
-					if (hThread) {
+					const DWORD unThreadID = GetThreadId(hThread);
+					if (!unThreadID || (unThreadID == unCurrentThreadID)) {
 						CloseHandle(hThread);
+						if (!unThreadID) {
+							CloseHandle(hSnapshot);
+							return kSuspendSnapshotFailure;
+						}
+
+						continue;
+					}
+
+					const WindowsThreadLiveness ThreadLiveness = GetWindowsThreadLiveness(hThread);
+					if (ThreadLiveness == WindowsThreadLiveness::UNKNOWN) {
+						CloseHandle(hThread);
+						CloseHandle(hSnapshot);
 						return kSuspendSnapshotFailure;
 					}
 
-					break;
-				}
-
-				if ((nStatus < 0) || !hThread) {
-					if (hThread) {
+					if (ThreadLiveness == WindowsThreadLiveness::TERMINATED) {
 						CloseHandle(hThread);
+						continue;
 					}
 
-					return kSuspendSnapshotFailure;
-				}
+					bool bIdentityKnown = false;
+					const bool bPrepared = IsWindowsThreadPrepared(unThreadID, &bIdentityKnown);
+					if (!bIdentityKnown) {
+						CloseHandle(hThread);
+						CloseHandle(hSnapshot);
+						return kSuspendSnapshotFailure;
+					}
 
-				const DWORD unThreadID = GetThreadId(hThread);
-				if (!unThreadID) {
-					CloseHandle(hThread);
-					return kSuspendSnapshotFailure;
-				}
+					if (bPrepared) {
+						CloseHandle(hThread);
+						continue;
+					}
 
-				const DWORD unCurrentThreadID = GetCurrentWindowsThreadStateReaperThreadID();
-				const DWORD unReaperThreadID = g_unWindowsThreadStateReaperThreadID.load(std::memory_order_acquire);
-				if ((unThreadID == unCurrentThreadID) || (unThreadID == unReaperThreadID)) {
-					hPreviousThread = hThread;
-					bPreviousThreadOwnedByFrame = false;
-					continue;
-				}
+					bool bAdded = false;
+					if (!PrepareWindowsThread(unThreadID, hThread, &bAdded)) {
+						CloseHandle(hSnapshot);
+						return kSuspendSnapshotFailure;
+					}
 
-				const WindowsThreadLiveness ThreadLiveness = GetWindowsThreadLiveness(hThread);
-				if (ThreadLiveness == WindowsThreadLiveness::UNKNOWN) {
-					CloseHandle(hThread);
-					return kSuspendSnapshotFailure;
-				}
-
-				if (ThreadLiveness == WindowsThreadLiveness::TERMINATED) {
-					hPreviousThread = hThread;
-					bPreviousThreadOwnedByFrame = false;
-					continue;
-				}
-
-				bool bIdentityKnown = false;
-				const bool bPrepared = IsWindowsThreadPrepared(unThreadID, &bIdentityKnown);
-				if (!bIdentityKnown) {
-					CloseHandle(hThread);
-					return kSuspendSnapshotFailure;
-				}
-
-				if (bPrepared) {
-					hPreviousThread = hThread;
-					bPreviousThreadOwnedByFrame = false;
-					continue;
-				}
-
-				bool bAdded = false;
-				if (!PrepareWindowsThread(unThreadID, hThread, &bAdded)) {
-					return kSuspendSnapshotFailure;
-				}
-
-				if (bAdded) {
-					++unAddedCount;
-					hPreviousThread = hThread;
-					bPreviousThreadOwnedByFrame = true;
-				} else {
-					hPreviousThread = nullptr;
-					bPreviousThreadOwnedByFrame = false;
-				}
+					if (bAdded) {
+						++unAddedCount;
+					} else {
+						CloseHandle(hThread);
+					}
+				} while (Thread32Next(hSnapshot, &ThreadEntry));
 			}
 
-			if (hPreviousThread && !bPreviousThreadOwnedByFrame && !CloseHandle(hPreviousThread)) {
+			if (!CloseHandle(hSnapshot)) {
 				return kSuspendSnapshotFailure;
 			}
 
@@ -24653,7 +24056,7 @@ namespace Detours {
 			m_unBeginDepth = 0;
 			m_bActive = false;
 
-			if (!m_pSuspender || !PrepareWindowsThreadStateReaperForSuspend()) {
+			if (!m_pSuspender) {
 				return;
 			}
 
@@ -24667,10 +24070,6 @@ namespace Detours {
 
 		bool SuspendTransaction::Begin(const bool bSweepThreads) {
 			if (!m_pSuspender || m_bActive) {
-				return false;
-			}
-
-			if (!PrepareWindowsThreadStateReaperForSuspend()) {
 				return false;
 			}
 
@@ -25830,20 +25229,6 @@ namespace Detours {
 				std::this_thread::yield();
 #endif
 			}
-		}
-
-		static Suspender* GetHookSuspender() noexcept {
-			// The allocation intentionally has process lifetime to avoid teardown-order races.
-			auto CreateSuspender = []() noexcept -> Suspender* {
-				try {
-					return new Suspender();
-				} catch (...) {
-					return nullptr;
-				}
-			};
-			static Suspender* const s_pSuspender = CreateSuspender();
-
-			return s_pSuspender;
 		}
 
 	} // namespace Sync
@@ -32227,7 +31612,14 @@ namespace Detours {
 				}
 
 				try {
-					return pListener->EnableHandler();
+					if (!pListener->EnableHandler()) {
+						return false;
+					}
+
+#if defined(_WIN32)
+					RunWindowsThreadStateMaintenance();
+#endif
+					return true;
 				} catch (...) {
 					return false;
 				}
@@ -41081,7 +40473,7 @@ namespace Detours {
 				*punGenerationOut = 0;
 
 				WindowsExceptionState& State = GetWindowsExceptionState();
-				const DWORD unThreadID = GetCurrentWindowsThreadStateReaperThreadID();
+				const DWORD unThreadID = GetCurrentWindowsThreadID();
 				if (!unThreadID) {
 					return nullptr;
 				}
@@ -41838,7 +41230,7 @@ namespace Detours {
 				return false;
 			}
 
-			const DWORD unCurrentTID = GetCurrentWindowsThreadStateReaperThreadID();
+			const DWORD unCurrentTID = GetCurrentWindowsThreadID();
 			fnHardwareHookCallBack arrCallBacks[kHardwareDebugRegisterCount] {};
 			std::size_t unCallBackCount = 0;
 			bool bRestored = false;
@@ -43131,7 +42523,6 @@ namespace Detours {
 			const bool bLiveRecoveryReady = bOwnerLive &&
 				(CurrentStatus == WindowsThreadStateSlotStatus::ACTIVE) &&
 				pThreadState->m_bRecoveryPending.load(std::memory_order_acquire) &&
-				!pThreadState->m_unThreadStateReaperPauseDepth.load(std::memory_order_acquire) &&
 				!pThreadState->m_unActiveLeases.load(std::memory_order_acquire);
 			if (!bIdentityMatches ||
 				(OwnerLiveness == WindowsThreadLiveness::UNKNOWN) ||
@@ -43273,140 +42664,6 @@ namespace Detours {
 				std::lock_guard<std::mutex> Lock(pProcessState->m_InterruptHookMutex);
 				ReclaimInterruptHookSnapshots();
 			}
-		}
-
-		static DWORD WINAPI WindowsThreadStateReaper(void*) noexcept {
-			const unsigned int unRunGeneration = g_unWindowsThreadStateReaperRunGeneration.load(std::memory_order_acquire);
-			g_unWindowsThreadStateReaperThreadID.store(GetCurrentWindowsThreadStateReaperThreadID(), std::memory_order_release);
-			WindowsThreadStateReaperStatus ExpectedStatus = WindowsThreadStateReaperStatus::STARTING;
-			// A concurrent stop may win this transition; the loop condition handles that state.
-			g_WindowsThreadStateReaperStatus.compare_exchange_strong(ExpectedStatus, WindowsThreadStateReaperStatus::RUNNING, std::memory_order_acq_rel, std::memory_order_acquire);
-
-			while (g_WindowsThreadStateReaperStatus.load(std::memory_order_acquire) != WindowsThreadStateReaperStatus::STOPPING) {
-				g_unWindowsThreadStateReaperProgressCount.fetch_add(1, std::memory_order_acq_rel);
-
-				ParkWindowsThreadStateReaper();
-
-				if (g_WindowsThreadStateReaperStatus.load(std::memory_order_acquire) == WindowsThreadStateReaperStatus::STOPPING) {
-					break;
-				}
-
-				RecoverWindowsMemoryHookThreadStates();
-				RecoverWindowsExceptionThreadStates();
-				ReclaimWindowsHardwareHookRecords(0, HARDWARE_HOOK_REGISTER::REGISTER_DR0, nullptr);
-				g_unWindowsThreadStateReaperProgressCount.fetch_add(1, std::memory_order_acq_rel);
-
-				ParkWindowsThreadStateReaper();
-
-				if (g_WindowsThreadStateReaperStatus.load(std::memory_order_acquire) == WindowsThreadStateReaperStatus::STOPPING) {
-					break;
-				}
-
-				const HANDLE hEvent = g_hWindowsThreadStateReaperEvent;
-				const DWORD unWaitResult = WaitForSingleObject(hEvent, kWindowsThreadStateReaperWaitMilliseconds);
-				if ((unWaitResult != WAIT_OBJECT_0) &&
-					(unWaitResult != WAIT_TIMEOUT)) {
-					break;
-				}
-			}
-
-			g_unWindowsThreadStateReaperPauseAcknowledgement.store(0, std::memory_order_release);
-			g_unWindowsThreadStateReaperThreadID.store(0, std::memory_order_release);
-			g_WindowsThreadStateReaperStatus.store(WindowsThreadStateReaperStatus::STOPPED, std::memory_order_release);
-			g_unWindowsThreadStateReaperExitAcknowledgement.store(unRunGeneration, std::memory_order_release);
-
-			return 0;
-		}
-
-		static bool StopWindowsThreadStateReaper() noexcept {
-			if (g_unWindowsThreadStateReaperThreadID.load(std::memory_order_acquire) == GetCurrentWindowsThreadStateReaperThreadID()) {
-				return false;
-			}
-
-			WindowsThreadStateReaperControlLease ControlLease;
-			if (!ControlLease.IsOwned()) {
-				return false;
-			}
-
-			if (HasWindowsThreadStateReaperPauseRequests()) {
-				return false;
-			}
-
-			const HANDLE hThread = g_hWindowsThreadStateReaper;
-			const HANDLE hEvent = g_hWindowsThreadStateReaperEvent;
-			if (!hThread) {
-				if (hEvent && !CloseHandle(hEvent)) {
-					return false;
-				}
-
-				g_hWindowsThreadStateReaperEvent = nullptr;
-				g_WindowsThreadStateReaperStatus.store(WindowsThreadStateReaperStatus::STOPPED, std::memory_order_release);
-
-				return true;
-			}
-
-			g_WindowsThreadStateReaperStatus.store(WindowsThreadStateReaperStatus::STOPPING, std::memory_order_release);
-			const unsigned int unRunGeneration = g_unWindowsThreadStateReaperRunGeneration.load(std::memory_order_acquire);
-			if (!unRunGeneration) {
-				return false;
-			}
-
-			DWORD unWaitResult = WaitForSingleObject(hThread, 0);
-			if (unWaitResult == WAIT_TIMEOUT) {
-				if ((ResumeThread(hThread) == kWindowsInvalidThreadSuspendCount) ||
-					!SetEvent(hEvent)) {
-					return false;
-				}
-
-				unWaitResult = WaitForSingleObject(hThread, kWindowsThreadStateReaperStopWaitMilliseconds);
-			}
-
-			if (unWaitResult != WAIT_OBJECT_0) {
-				return false;
-			}
-
-			g_unWindowsThreadStateReaperExitAcknowledgement.store(unRunGeneration, std::memory_order_release);
-
-			if ((g_hWindowsThreadStateReaper != hThread) ||
-				(g_hWindowsThreadStateReaperEvent != hEvent)) {
-				return false;
-			}
-
-			if (!CloseHandle(hThread)) {
-				return false;
-			}
-
-			g_hWindowsThreadStateReaper = nullptr;
-
-			if (hEvent && !CloseHandle(hEvent)) {
-				return false;
-			}
-
-			g_hWindowsThreadStateReaperEvent = nullptr;
-			g_unWindowsThreadStateReaperPauseAcknowledgement.store(0, std::memory_order_release);
-			g_WindowsThreadStateReaperStatus.store(WindowsThreadStateReaperStatus::STOPPED, std::memory_order_release);
-
-			return true;
-		}
-
-		static void StopWindowsThreadStateReaperAtExit() noexcept {
-			// Process shutdown cannot surface or retry a reaper stop failure.
-			StopWindowsThreadStateReaper();
-		}
-
-		static bool EnsureWindowsThreadStateReaper() noexcept {
-			if (!StartWindowsThreadStateReaper(WindowsThreadStateReaper)) {
-				return false;
-			}
-
-			bool bExpected = false;
-			if (g_bWindowsThreadStateReaperExitHandlerRegistered.compare_exchange_strong(bExpected, true, std::memory_order_acq_rel, std::memory_order_acquire) &&
-				(std::atexit(StopWindowsThreadStateReaperAtExit) != 0)) {
-				g_bWindowsThreadStateReaperExitHandlerRegistered.store(false, std::memory_order_release);
-				return false;
-			}
-
-			return true;
 		}
 
 		static bool MemoryHookCallBack(EXCEPTION_RECORD const& Exception, PCONTEXT pContext) {
@@ -44154,10 +43411,6 @@ namespace Detours {
 				// Construction remains valid when registration or callback setup fails.
 			}
 
-			if (this == &g_ExceptionListener) {
-				// Global construction cannot surface handler-installation failure.
-				EnableHandler();
-			}
 		}
 
 		ExceptionListener::~ExceptionListener() noexcept {
@@ -44184,10 +43437,6 @@ namespace Detours {
 		}
 
 		bool ExceptionListener::EnableHandler() {
-			if (!EnsureWindowsThreadStateReaper()) {
-				return false;
-			}
-
 			WindowsExceptionState& State = GetWindowsExceptionState();
 			std::unique_lock<std::mutex> Lock(State.m_Mutex);
 			if (m_hVEH) {
@@ -46634,6 +45883,62 @@ namespace Detours {
 		}
 #endif
 	} // namespace Exception
+
+#if defined(_WIN32)
+	static void RunWindowsThreadStateMaintenanceLocked() noexcept {
+		Exception::RecoverWindowsMemoryHookThreadStates();
+		Exception::RecoverWindowsExceptionThreadStates();
+		Exception::ReclaimWindowsHardwareHookRecords(0, HARDWARE_HOOK_REGISTER::REGISTER_DR0, nullptr);
+	}
+
+	static bool AcquireWindowsThreadStateMaintenance(unsigned long long* const pOwnerTokenOut) noexcept {
+		if (pOwnerTokenOut) {
+			*pOwnerTokenOut = 0;
+		}
+
+		AcquireSRWLockExclusive(&g_WindowsThreadStateMaintenanceLock);
+
+		unsigned int unGeneration = 0;
+		auto* const pThreadState = AcquireCurrentWindowsMemoryHookThreadState(true, &unGeneration);
+		const unsigned long long unOwnerToken = GetWindowsThreadStateOwnerToken(pThreadState, unGeneration);
+		if (!pThreadState || !unOwnerToken) {
+			if (pThreadState) {
+				ReleaseWindowsMemoryHookThreadState(pThreadState, unGeneration);
+			}
+
+			ReleaseSRWLockExclusive(&g_WindowsThreadStateMaintenanceLock);
+			return false;
+		}
+
+		RunWindowsThreadStateMaintenanceLocked();
+		ReleaseSRWLockExclusive(&g_WindowsThreadStateMaintenanceLock);
+		if (pOwnerTokenOut) {
+			*pOwnerTokenOut = unOwnerToken;
+		}
+
+		return true;
+	}
+
+	static bool ReleaseWindowsThreadStateMaintenance(const unsigned long long unOwnerToken) noexcept {
+		unsigned int unGeneration = 0;
+		auto* const pThreadState = GetWindowsThreadStateFromOwnerToken(unOwnerToken, &unGeneration);
+		if (!pThreadState || !unGeneration) {
+			return false;
+		}
+
+		ReleaseWindowsMemoryHookThreadState(pThreadState, unGeneration);
+		return true;
+	}
+
+	static void RunWindowsThreadStateMaintenance() noexcept {
+		if (!TryAcquireSRWLockExclusive(&g_WindowsThreadStateMaintenanceLock)) {
+			return;
+		}
+
+		RunWindowsThreadStateMaintenanceLocked();
+		ReleaseSRWLockExclusive(&g_WindowsThreadStateMaintenanceLock);
+	}
+#endif
 
 	// ----------------------------------------------------------------
 	// rddisasm
@@ -76823,12 +76128,7 @@ namespace rddisasm {
 				return false;
 			}
 
-			ReclaimWindowsHardwareHookRecords(0, HARDWARE_HOOK_REGISTER::REGISTER_DR0, nullptr);
-
-			// Acquire observes the reaper identity published during state initialization.
-			if (unThreadID == g_unWindowsThreadStateReaperThreadID.load(std::memory_order_acquire)) {
-				return false;
-			}
+			RunWindowsThreadStateMaintenance();
 
 			if (Type == HARDWARE_HOOK_TYPE::TYPE_EXECUTE) {
 				if (unSize != kExecuteHardwareHookSize) {
@@ -77105,14 +76405,12 @@ namespace rddisasm {
 			}
 
 			bool bDeadTargetRemoved = false;
+			AcquireSRWLockExclusive(&g_WindowsThreadStateMaintenanceLock);
+			RunWindowsThreadStateMaintenanceLocked();
 			ReclaimWindowsHardwareHookRecords(unThreadID, Register, &bDeadTargetRemoved);
+			ReleaseSRWLockExclusive(&g_WindowsThreadStateMaintenanceLock);
 			if (bDeadTargetRemoved) {
 				return true;
-			}
-
-			// Acquire observes the reaper identity published during state initialization.
-			if (unThreadID == g_unWindowsThreadStateReaperThreadID.load(std::memory_order_acquire)) {
-				return false;
 			}
 
 			HardwareHookRecord* pTargetRecord = nullptr;
@@ -79084,17 +78382,12 @@ namespace rddisasm {
 
 			Storage* const pHookStorage = &pCodeState->m_HookStorage;
 
-			Sync::Suspender* const pSuspender = Sync::GetHookSuspender();
-			if (!pSuspender) {
-				return false;
-			}
-
-			Sync::SuspendTransaction SuspenderTransaction(*pSuspender);
+			Sync::SuspendTransaction SuspenderTransaction(Sync::g_Suspender);
 			if (!SuspenderTransaction) {
 				return false;
 			}
 
-			const bool bCanYieldThreads = pSuspender->GetSuspendDepth() <= kHookSuspenderYieldDepth;
+			const bool bCanYieldThreads = Sync::g_Suspender.GetSuspendDepth() <= kHookSuspenderYieldDepth;
 
 			const std::uintptr_t unJumpToHookOffset = IsRelative(pHookAddress, m_pAddress, kMaximumRelativeJumpDistance);
 			std::size_t unJumpToHookSize = 0;
@@ -79129,9 +78422,9 @@ namespace rddisasm {
 				return false;
 			}
 
-			auto IsTargetRegionIdle = [this, pSuspender, unCopyingSize]() -> bool {
-				return !pSuspender->IsRegionExecuting(m_pAddress, unCopyingSize) &&
-					!pSuspender->IsRegionInCallStacks(m_pAddress, unCopyingSize);
+			auto IsTargetRegionIdle = [this, unCopyingSize]() -> bool {
+				return !Sync::g_Suspender.IsRegionExecuting(m_pAddress, unCopyingSize) &&
+					!Sync::g_Suspender.IsRegionInCallStacks(m_pAddress, unCopyingSize);
 			};
 			if (bWaitForHook && !bCanYieldThreads && !IsTargetRegionIdle()) {
 				return false;
@@ -79518,23 +78811,18 @@ namespace rddisasm {
 
 			Storage* const pHookStorage = &pCodeState->m_HookStorage;
 
-			Sync::Suspender* const pSuspender = Sync::GetHookSuspender();
-			if (!pSuspender) {
-				return false;
-			}
-
-			Sync::SuspendTransaction SuspenderTransaction(*pSuspender);
+			Sync::SuspendTransaction SuspenderTransaction(Sync::g_Suspender);
 			if (!SuspenderTransaction) {
 				return false;
 			}
 
-			const bool bCanYieldThreads = pSuspender->GetSuspendDepth() <= kHookSuspenderYieldDepth;
-			auto AreHookRegionsIdle = [this, pSuspender]() -> bool {
-				return !pSuspender->IsRegionExecuting(m_pAddress, m_unOriginalBytes) &&
-					!pSuspender->IsRegionExecuting(m_pHookAddress, m_unHookSize) &&
-					!pSuspender->IsRegionExecuting(m_pTrampoline, HOOK_INLINE_TRAMPOLINE_SIZE) &&
-					!pSuspender->IsRegionInCallStacks(m_pHookAddress, m_unHookSize) &&
-					!pSuspender->IsRegionInCallStacks(m_pTrampoline, HOOK_INLINE_TRAMPOLINE_SIZE);
+			const bool bCanYieldThreads = Sync::g_Suspender.GetSuspendDepth() <= kHookSuspenderYieldDepth;
+			auto AreHookRegionsIdle = [this]() -> bool {
+				return !Sync::g_Suspender.IsRegionExecuting(m_pAddress, m_unOriginalBytes) &&
+					!Sync::g_Suspender.IsRegionExecuting(m_pHookAddress, m_unHookSize) &&
+					!Sync::g_Suspender.IsRegionExecuting(m_pTrampoline, HOOK_INLINE_TRAMPOLINE_SIZE) &&
+					!Sync::g_Suspender.IsRegionInCallStacks(m_pHookAddress, m_unHookSize) &&
+					!Sync::g_Suspender.IsRegionInCallStacks(m_pTrampoline, HOOK_INLINE_TRAMPOLINE_SIZE);
 			};
 
 			if (!bWaitForUnHook || !bCanYieldThreads) {
@@ -79747,17 +79035,12 @@ namespace rddisasm {
 
 			Storage* const pHookStorage = &pCodeState->m_HookStorage;
 
-			Sync::Suspender* const pSuspender = Sync::GetHookSuspender();
-			if (!pSuspender) {
-				return false;
-			}
-
-			Sync::SuspendTransaction SuspenderTransaction(*pSuspender);
+			Sync::SuspendTransaction SuspenderTransaction(Sync::g_Suspender);
 			if (!SuspenderTransaction) {
 				return false;
 			}
 
-			const bool bCanYieldThreads = pSuspender->GetSuspendDepth() <= kHookSuspenderYieldDepth;
+			const bool bCanYieldThreads = Sync::g_Suspender.GetSuspendDepth() <= kHookSuspenderYieldDepth;
 
 			// Wrapper
 
@@ -79854,9 +79137,9 @@ namespace rddisasm {
 				return false;
 			}
 
-			auto IsTargetRegionIdle = [this, pSuspender, unCopyingSize]() -> bool {
-				return !pSuspender->IsRegionExecuting(m_pAddress, unCopyingSize) &&
-					!pSuspender->IsRegionInCallStacks(m_pAddress, unCopyingSize);
+			auto IsTargetRegionIdle = [this, unCopyingSize]() -> bool {
+				return !Sync::g_Suspender.IsRegionExecuting(m_pAddress, unCopyingSize) &&
+					!Sync::g_Suspender.IsRegionInCallStacks(m_pAddress, unCopyingSize);
 			};
 			if (bWaitForHook && !bCanYieldThreads &&
 				!IsTargetRegionIdle()) {
@@ -80277,25 +79560,20 @@ namespace rddisasm {
 				return false;
 			}
 
-			Sync::Suspender* const pSuspender = Sync::GetHookSuspender();
-			if (!pSuspender) {
-				return false;
-			}
-
-			Sync::SuspendTransaction SuspenderTransaction(*pSuspender);
+			Sync::SuspendTransaction SuspenderTransaction(Sync::g_Suspender);
 			if (!SuspenderTransaction) {
 				return false;
 			}
 
-			const bool bCanYieldThreads = pSuspender->GetSuspendDepth() <= kHookSuspenderYieldDepth;
-			auto AreHookRegionsIdle = [this, pSuspender]() -> bool {
-				return !pSuspender->IsRegionExecuting(m_pAddress, m_unOriginalBytes) &&
-					!pSuspender->IsRegionExecuting(m_pHookAddress, m_unHookSize) &&
-					!pSuspender->IsRegionExecuting(m_pWrapper, HOOK_INLINE_WRAPPER_SIZE) &&
-					!pSuspender->IsRegionExecuting(m_pTrampoline, HOOK_INLINE_TRAMPOLINE_SIZE) &&
-					!pSuspender->IsRegionInCallStacks(m_pHookAddress, m_unHookSize) &&
-					!pSuspender->IsRegionInCallStacks(m_pWrapper, HOOK_INLINE_WRAPPER_SIZE) &&
-					!pSuspender->IsRegionInCallStacks(m_pTrampoline, HOOK_INLINE_TRAMPOLINE_SIZE);
+			const bool bCanYieldThreads = Sync::g_Suspender.GetSuspendDepth() <= kHookSuspenderYieldDepth;
+			auto AreHookRegionsIdle = [this]() -> bool {
+				return !Sync::g_Suspender.IsRegionExecuting(m_pAddress, m_unOriginalBytes) &&
+					!Sync::g_Suspender.IsRegionExecuting(m_pHookAddress, m_unHookSize) &&
+					!Sync::g_Suspender.IsRegionExecuting(m_pWrapper, HOOK_INLINE_WRAPPER_SIZE) &&
+					!Sync::g_Suspender.IsRegionExecuting(m_pTrampoline, HOOK_INLINE_TRAMPOLINE_SIZE) &&
+					!Sync::g_Suspender.IsRegionInCallStacks(m_pHookAddress, m_unHookSize) &&
+					!Sync::g_Suspender.IsRegionInCallStacks(m_pWrapper, HOOK_INLINE_WRAPPER_SIZE) &&
+					!Sync::g_Suspender.IsRegionInCallStacks(m_pTrampoline, HOOK_INLINE_TRAMPOLINE_SIZE);
 			};
 
 			if (!bWaitForUnHook || !bCanYieldThreads) {
@@ -81470,17 +80748,12 @@ namespace rddisasm {
 			const unsigned int unContextUpperBound = unContextSize;
 #endif
 
-			Sync::Suspender* const pSuspender = Sync::GetHookSuspender();
-			if (!pSuspender) {
-				return false;
-			}
-
-			Sync::SuspendTransaction SuspenderTransaction(*pSuspender);
+			Sync::SuspendTransaction SuspenderTransaction(Sync::g_Suspender);
 			if (!SuspenderTransaction) {
 				return false;
 			}
 
-			const bool bCanYieldThreads = pSuspender->GetSuspendDepth() <= kRawHookSuspenderYieldDepth;
+			const bool bCanYieldThreads = Sync::g_Suspender.GetSuspendDepth() <= kRawHookSuspenderYieldDepth;
 
 			// Wrapper
 
@@ -84637,8 +83910,8 @@ namespace rddisasm {
 				unCopyingSize += Instruction.Length;
 			}
 
-			auto const IsTargetRegionIdle = [this, pSuspender, unCopyingSize]() -> bool {
-				return !pSuspender->IsRegionExecuting(m_pAddress, unCopyingSize) && !pSuspender->IsRegionInCallStacks(m_pAddress, unCopyingSize);
+			auto const IsTargetRegionIdle = [this, unCopyingSize]() -> bool {
+				return !Sync::g_Suspender.IsRegionExecuting(m_pAddress, unCopyingSize) && !Sync::g_Suspender.IsRegionInCallStacks(m_pAddress, unCopyingSize);
 			};
 			if (bWaitForHook && !bCanYieldThreads && !IsTargetRegionIdle()) {
 				m_unFirstInstructionSize = 0;
@@ -90118,31 +89391,26 @@ namespace rddisasm {
 				return false;
 			}
 
-			Sync::Suspender* const pSuspender = Sync::GetHookSuspender();
-			if (!pSuspender) {
-				return false;
-			}
-
-			Sync::SuspendTransaction SuspenderTransaction(*pSuspender);
+			Sync::SuspendTransaction SuspenderTransaction(Sync::g_Suspender);
 			if (!SuspenderTransaction) {
 				return false;
 			}
 
-			const bool bCanYieldThreads = pSuspender->GetSuspendDepth() <= kRawHookSuspenderYieldDepth;
-			auto AreHookRegionsIdle = [this, pSuspender]() -> bool {
+			const bool bCanYieldThreads = Sync::g_Suspender.GetSuspendDepth() <= kRawHookSuspenderYieldDepth;
+			auto AreHookRegionsIdle = [this]() -> bool {
 				const bool bRestoreIdle =
 					!m_pRestore ||
-					(!pSuspender->IsRegionExecuting(m_pRestore, HOOK_RAW_RESTORE_SIZE) &&
-					!pSuspender->IsRegionInCallStacks(m_pRestore, HOOK_RAW_RESTORE_SIZE));
+					(!Sync::g_Suspender.IsRegionExecuting(m_pRestore, HOOK_RAW_RESTORE_SIZE) &&
+					!Sync::g_Suspender.IsRegionInCallStacks(m_pRestore, HOOK_RAW_RESTORE_SIZE));
 				const bool bCallTrampolineIdle =
-					!pSuspender->IsRegionExecuting(m_pCallTrampoline, HOOK_RAW_CALL_SIZE) &&
-					!pSuspender->IsRegionInCallStacks(m_pCallTrampoline, HOOK_RAW_CALL_SIZE);
+					!Sync::g_Suspender.IsRegionExecuting(m_pCallTrampoline, HOOK_RAW_CALL_SIZE) &&
+					!Sync::g_Suspender.IsRegionInCallStacks(m_pCallTrampoline, HOOK_RAW_CALL_SIZE);
 
-				return !pSuspender->IsRegionExecuting(m_pAddress, m_unOriginalBytes) &&
-					!pSuspender->IsRegionExecuting(m_pWrapper, HOOK_RAW_WRAPPER_SIZE) &&
-					!pSuspender->IsRegionExecuting(m_pTrampoline, HOOK_RAW_TRAMPOLINE_SIZE) &&
-					!pSuspender->IsRegionInCallStacks(m_pWrapper, HOOK_RAW_WRAPPER_SIZE) &&
-					!pSuspender->IsRegionInCallStacks(m_pTrampoline, HOOK_RAW_TRAMPOLINE_SIZE) &&
+				return !Sync::g_Suspender.IsRegionExecuting(m_pAddress, m_unOriginalBytes) &&
+					!Sync::g_Suspender.IsRegionExecuting(m_pWrapper, HOOK_RAW_WRAPPER_SIZE) &&
+					!Sync::g_Suspender.IsRegionExecuting(m_pTrampoline, HOOK_RAW_TRAMPOLINE_SIZE) &&
+					!Sync::g_Suspender.IsRegionInCallStacks(m_pWrapper, HOOK_RAW_WRAPPER_SIZE) &&
+					!Sync::g_Suspender.IsRegionInCallStacks(m_pTrampoline, HOOK_RAW_TRAMPOLINE_SIZE) &&
 					bRestoreIdle &&
 					bCallTrampolineIdle;
 			};

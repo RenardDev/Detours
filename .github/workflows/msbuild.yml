@@ -1,6 +1,7 @@
 name: Build and test
 
 on:
+  workflow_dispatch:
   push:
     branches: [ "main" ]
     paths-ignore:
@@ -9,23 +10,31 @@ on:
   pull_request:
     branches: [ "main" ]
 
-env:
-  SOLUTION_FILE_PATH: .
-
 permissions:
   contents: read
+
+concurrency:
+  # Keep manual runs independent while replacing outdated push and PR runs.
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.event_name == 'workflow_dispatch' && github.run_id || github.ref }}
+  cancel-in-progress: true
 
 jobs:
   source-policy:
     name: Verifying source policy
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+
+    defaults:
+      run:
+        shell: bash
 
     steps:
-      - uses: actions/checkout@v6
+      - name: Checking out sources
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       - name: Rejecting thread-local storage
-        shell: bash
-        working-directory: ${{ github.workspace }}
         run: |
           set -euo pipefail
           pattern='\b(thread_local|_Thread_local|__thread)\b|__declspec\s*\(\s*thread\s*\)|\b(TlsAlloc|TlsFree|TlsGetValue|TlsSetValue|FlsAlloc|FlsFree|FlsGetValue|FlsSetValue|pthread_key_create|pthread_key_delete|pthread_getspecific|pthread_setspecific)\b'
@@ -54,10 +63,8 @@ jobs:
           fi
 
       - name: Verifying Protected and Secure source invariants
-        shell: bash
-        working-directory: ${{ github.workspace }}
         run: |
-          python - <<'PY'
+          python3 - <<'PY'
           import pathlib
           import re
 
@@ -113,22 +120,32 @@ jobs:
 
   building-and-testing-linux:
     name: Building and testing Linux (${{ matrix.configuration }})
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     needs: source-policy
+    timeout-minutes: 25
 
     strategy:
       fail-fast: false
       matrix:
         configuration: [ Debug, Release ]
 
+    defaults:
+      run:
+        shell: bash
+
+    env:
+      CONFIGURATION: ${{ matrix.configuration }}
+      BUILD_DIRECTORY: build/linux/x86_64/${{ matrix.configuration }}
+
     steps:
-      - uses: actions/checkout@v6
+      - name: Checking out sources
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       - name: Building Linux (${{ matrix.configuration }})
-        env:
-          CONFIGURATION: ${{ matrix.configuration }}
-        shell: bash
-        working-directory: ${{ github.workspace }}
+        id: build
+        timeout-minutes: 10
         run: |
           set -euo pipefail
           flags=(-std=c++17 -Wall -Wextra -Wpedantic -Werror -pthread -I. -DDETOURS_ARCH_X64=1 -DDETOURS_NOINLINE=)
@@ -137,192 +154,99 @@ jobs:
           else
             flags+=(-O2 -DNDEBUG)
           fi
-          output="build/linux/x86_64/$CONFIGURATION"
-          mkdir -p "$output"
-          g++ "${flags[@]}" -c Detours.cpp -o "$output/Detours.o"
-          g++ "${flags[@]}" -c main.cpp -o "$output/main.o"
-          g++ "$output/Detours.o" "$output/main.o" -ldl -pthread -o "$output/Detours"
+          mkdir -p "$BUILD_DIRECTORY"
+          g++ --version | tee "$BUILD_DIRECTORY/build.log"
+          g++ "${flags[@]}" -c Detours.cpp -o "$BUILD_DIRECTORY/Detours.o" 2>&1 | tee -a "$BUILD_DIRECTORY/build.log"
+          g++ "${flags[@]}" -c main.cpp -o "$BUILD_DIRECTORY/main.o" 2>&1 | tee -a "$BUILD_DIRECTORY/build.log"
+          g++ "$BUILD_DIRECTORY/Detours.o" "$BUILD_DIRECTORY/main.o" -ldl -pthread -o "$BUILD_DIRECTORY/Detours" 2>&1 | tee -a "$BUILD_DIRECTORY/build.log"
+          # Preserve executable permissions when the artifact is downloaded.
+          tar -czf "$BUILD_DIRECTORY/Detours.tar.gz" -C "$BUILD_DIRECTORY" Detours
 
       - name: Testing Linux (${{ matrix.configuration }})
         timeout-minutes: 10
-        env:
-          CONFIGURATION: ${{ matrix.configuration }}
-        shell: bash
-        working-directory: ${{ github.workspace }}
-        run: build/linux/x86_64/$CONFIGURATION/Detours
+        run: |
+          set -euo pipefail
+          "$BUILD_DIRECTORY/Detours" --no-colors 2>&1 | tee "$BUILD_DIRECTORY/test.log"
 
-  building-debug-x86:
-    name: Building Debug (x86)
-    runs-on: windows-latest
+      - name: Uploading Linux build and diagnostics
+        if: ${{ !cancelled() && steps.build.outcome != 'skipped' }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: Detours-linux-x86_64-${{ matrix.configuration }}
+          path: |
+            ${{ env.BUILD_DIRECTORY }}/Detours.tar.gz
+            ${{ env.BUILD_DIRECTORY }}/*.log
+          if-no-files-found: error
+          retention-days: 7
+          overwrite: true
+
+  building-and-testing-windows:
+    name: Building and testing Windows (${{ matrix.configuration }}, ${{ matrix.platform }})
+    runs-on: windows-2022
     needs: source-policy
+    timeout-minutes: 30
+
+    strategy:
+      fail-fast: false
+      matrix:
+        configuration: [ Debug, Release ]
+        platform: [ x86, x64 ]
+        include:
+          - platform: x86
+            architecture: x86
+          - platform: x64
+            architecture: x86_64
+
+    defaults:
+      run:
+        shell: pwsh
+
+    env:
+      CONFIGURATION: ${{ matrix.configuration }}
+      PLATFORM: ${{ matrix.platform }}
+      BUILD_DIRECTORY: build/${{ matrix.architecture }}/${{ matrix.configuration }}
 
     steps:
-      - uses: actions/checkout@v6
+      - name: Checking out sources
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       - name: Add MSBuild to PATH
-        uses: microsoft/setup-msbuild@v3
+        uses: microsoft/setup-msbuild@30375c66a4eea26614e0d39710365f22f8b0af57 # v3
         with:
           msbuild-architecture: x64
 
-      - name: Building Debug (x86)
-        working-directory: ${{ github.workspace }}
-        run: msbuild /m /p:Configuration=Debug /p:Platform=x86 ${{env.SOLUTION_FILE_PATH}}
+      - name: Building Windows (${{ matrix.configuration }}, ${{ matrix.platform }})
+        id: build
+        timeout-minutes: 15
+        run: |
+          New-Item -ItemType Directory -Path $env:BUILD_DIRECTORY -Force | Out-Null
+          msbuild Detours.sln /m /nr:false /nologo /verbosity:minimal "/p:Configuration=$env:CONFIGURATION" "/p:Platform=$env:PLATFORM" "/bl:$env:BUILD_DIRECTORY/build.binlog" 2>&1 | Tee-Object -FilePath "$env:BUILD_DIRECTORY/build.log"
 
-      - name: Uploading build
-        uses: actions/upload-artifact@v7
-        with:
-          name: BuildDebug32
-          path: |
-            ${{env.SOLUTION_FILE_PATH}}\build\**\*.exe
-            ${{env.SOLUTION_FILE_PATH}}\build\**\*.pdb
-          if-no-files-found: error
+          if ($LASTEXITCODE -ne 0) {
+            exit $LASTEXITCODE
+          }
 
-  building-debug-x86-64:
-    name: Building Debug (x86_64)
-    runs-on: windows-latest
-    needs: source-policy
-
-    steps:
-      - uses: actions/checkout@v6
-
-      - name: Add MSBuild to PATH
-        uses: microsoft/setup-msbuild@v3
-        with:
-          msbuild-architecture: x64
-
-      - name: Building Debug (x86_64)
-        working-directory: ${{ github.workspace }}
-        run: msbuild /m /p:Configuration=Debug /p:Platform=x64 ${{env.SOLUTION_FILE_PATH}}
-
-      - name: Uploading build
-        uses: actions/upload-artifact@v7
-        with:
-          name: BuildDebug64
-          path: |
-            ${{env.SOLUTION_FILE_PATH}}\build\**\*.exe
-            ${{env.SOLUTION_FILE_PATH}}\build\**\*.pdb
-          if-no-files-found: error
-
-  building-release-x86:
-    name: Building Release (x86)
-    runs-on: windows-latest
-    needs: source-policy
-
-    steps:
-      - uses: actions/checkout@v6
-
-      - name: Add MSBuild to PATH
-        uses: microsoft/setup-msbuild@v3
-        with:
-          msbuild-architecture: x64
-
-      - name: Building Release (x86)
-        working-directory: ${{ github.workspace }}
-        run: msbuild /m /p:Configuration=Release /p:Platform=x86 ${{env.SOLUTION_FILE_PATH}}
-
-      - name: Uploading build
-        uses: actions/upload-artifact@v7
-        with:
-          name: BuildRelease32
-          path: |
-            ${{env.SOLUTION_FILE_PATH}}\build\**\*.exe
-            ${{env.SOLUTION_FILE_PATH}}\build\**\*.pdb
-          if-no-files-found: error
-
-  building-release-x86-64:
-    name: Building Release (x86_64)
-    runs-on: windows-latest
-    needs: source-policy
-
-    steps:
-      - uses: actions/checkout@v6
-
-      - name: Add MSBuild to PATH
-        uses: microsoft/setup-msbuild@v3
-        with:
-          msbuild-architecture: x64
-
-      - name: Building Release (x86_64)
-        working-directory: ${{ github.workspace }}
-        run: msbuild /m /p:Configuration=Release /p:Platform=x64 ${{env.SOLUTION_FILE_PATH}}
-
-      - name: Uploading build
-        uses: actions/upload-artifact@v7
-        with:
-          name: BuildRelease64
-          path: |
-            ${{env.SOLUTION_FILE_PATH}}\build\**\*.exe
-            ${{env.SOLUTION_FILE_PATH}}\build\**\*.pdb
-          if-no-files-found: error
-
-  testing-debug-x86:
-    name: Testing Debug (x86)
-    runs-on: windows-latest
-    needs: building-debug-x86
-
-    steps:
-      - name: Downloading Debug (x86)
-        uses: actions/download-artifact@v8
-        with:
-          name: BuildDebug32
-          path: |
-            ${{env.SOLUTION_FILE_PATH}}\build
-
-      - name: Testing Debug (x86)
+      - name: Testing Windows (${{ matrix.configuration }}, ${{ matrix.platform }})
         timeout-minutes: 10
-        working-directory: ${{ github.workspace }}
-        run: ${{env.SOLUTION_FILE_PATH}}\build\x86\Debug\Detours.exe
+        run: |
+          & "$env:BUILD_DIRECTORY/Detours.exe" --no-colors 2>&1 | Tee-Object -FilePath "$env:BUILD_DIRECTORY/test.log"
 
-  testing-debug-x86-64:
-    name: Testing Debug (x86_64)
-    runs-on: windows-latest
-    needs: building-debug-x86-64
+          if ($LASTEXITCODE -ne 0) {
+            exit $LASTEXITCODE
+          }
 
-    steps:
-      - name: Downloading Debug (x86_64)
-        uses: actions/download-artifact@v8
+      - name: Uploading Windows build and diagnostics
+        if: ${{ !cancelled() && steps.build.outcome != 'skipped' }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: BuildDebug64
+          name: Detours-windows-${{ matrix.architecture }}-${{ matrix.configuration }}
           path: |
-            ${{env.SOLUTION_FILE_PATH}}\build
-
-      - name: Testing Debug (x86_64)
-        timeout-minutes: 10
-        working-directory: ${{ github.workspace }}
-        run: ${{env.SOLUTION_FILE_PATH}}\build\x86_64\Debug\Detours.exe
-
-  testing-release-x86:
-    name: Testing Release (x86)
-    runs-on: windows-latest
-    needs: building-release-x86
-
-    steps:
-      - name: Downloading Release (x86)
-        uses: actions/download-artifact@v8
-        with:
-          name: BuildRelease32
-          path: |
-            ${{env.SOLUTION_FILE_PATH}}\build
-
-      - name: Testing Release (x86)
-        timeout-minutes: 10
-        working-directory: ${{ github.workspace }}
-        run: ${{env.SOLUTION_FILE_PATH}}\build\x86\Release\Detours.exe
-
-  testing-release-x86-64:
-    name: Testing Release (x86_64)
-    runs-on: windows-latest
-    needs: building-release-x86-64
-
-    steps:
-      - name: Downloading Release (x86_64)
-        uses: actions/download-artifact@v8
-        with:
-          name: BuildRelease64
-          path: |
-            ${{env.SOLUTION_FILE_PATH}}\build
-
-      - name: Testing Release (x86_64)
-        timeout-minutes: 10
-        working-directory: ${{ github.workspace }}
-        run: ${{env.SOLUTION_FILE_PATH}}\build\x86_64\Release\Detours.exe
+            ${{ env.BUILD_DIRECTORY }}/*.exe
+            ${{ env.BUILD_DIRECTORY }}/*.pdb
+            ${{ env.BUILD_DIRECTORY }}/*.log
+            ${{ env.BUILD_DIRECTORY }}/*.binlog
+          if-no-files-found: error
+          retention-days: 7
+          overwrite: true
