@@ -10883,10 +10883,12 @@ constexpr unsigned char kLinuxMoveImmediateOpcode = 0xB8;
 constexpr unsigned char kLinuxMoveImmediateEDIImmediateOpcode = 0xBF;
 constexpr unsigned char kLinuxMoveImmediateEBXImmediateOpcode = 0xBB;
 constexpr unsigned char kLinuxReturnOpcode = 0xC3;
+#if defined(__x86_64__)
 constexpr unsigned char kLinuxMoveStackSegmentOpcode = 0x8E;
 constexpr unsigned char kLinuxMoveStackSegmentAXModRM = 0xD0;
 constexpr unsigned char kLinuxSystemCallFirstOpcode = 0x0F;
 constexpr unsigned char kLinuxSystemCallSecondOpcode = 0x05;
+#endif
 constexpr unsigned int kLinuxBitsPerByte = 8;
 constexpr unsigned long kLinuxContextTrapFlagMask = 1UL << 8;
 constexpr std::size_t kLinuxImmediateOffset = 1;
@@ -10899,7 +10901,9 @@ constexpr std::size_t kLinuxRedZoneHookOffset = 8;
 constexpr std::size_t kLinuxRedZoneReturnOffset = 32;
 constexpr std::size_t kLinuxAbsoluteJumpAddressOffset = 6;
 constexpr std::size_t kLinuxMaximumRelativeJumpDistance = 0x7FFFFFFB;
+#if defined(__x86_64__) && defined(MAP_32BIT)
 constexpr std::uintptr_t kLinuxHighCodeAddressHint = 0x700000000000;
+#endif
 constexpr std::size_t kLinuxSelfUnHookEventCapacity = 3;
 constexpr std::size_t kLinuxPipeFileDescriptorCount = 2;
 constexpr std::size_t kLinuxProtectedRegistryThreadCount = 4;
@@ -10919,11 +10923,13 @@ static_assert(sizeof(unsigned int) == 4, "Linux hook fixture requires a 32-bit u
 using fnLinuxHookTarget = int (*)();
 using fnLinuxPendingCancellationOperation = bool (*)(void*);
 
+#if defined(__x86_64__)
 enum class LinuxProtectedUnsafeInstructionFixture : unsigned char {
 	SIGNAL_MASK_SYSTEM_CALL = 0,
 	FORK_SYSTEM_CALL,
 	MOVE_STACK_SEGMENT
 };
+#endif
 
 typedef struct _LINUX_WAIT_CANCELLATION_DATA {
 	_LINUX_WAIT_CANCELLATION_DATA() noexcept;
@@ -11216,8 +11222,10 @@ std::atomic<bool> g_bLinuxMemoryHookProtectedLifecycleSucceeded = false;
 std::atomic<int> g_nLinuxProtectedSignalForkChildPID = 0;
 std::atomic<bool> g_bLinuxProtectedSignalForkParentMayExit = false;
 std::atomic<int> g_nLinuxProtectedSignalTargetThreadID = 0;
+#if defined(__x86_64__)
 void const* g_pLinuxProtectedSignalProbeAddress = nullptr;
 int g_nLinuxProtectedSignalProbeFileDescriptor = -1;
+#endif
 volatile std::sig_atomic_t g_nLinuxProtectedSignalExpectedSignal = SIGUSR1;
 volatile std::sig_atomic_t g_nLinuxProtectedSignalExpectedCode = SI_TKILL;
 volatile std::sig_atomic_t g_nLinuxDeferredSignal = 0;
@@ -11617,12 +11625,12 @@ static bool RunLinuxNoCancelDestructorScenario() {
 
 
 
+#if defined(__x86_64__)
 static long CallProtectedReadSystemCall(void* pCode, int nFileDescriptor, void* pBuffer, std::size_t unSize) noexcept {
 	if (!pCode || (nFileDescriptor < 0) || !pBuffer || !unSize) {
 		return -1;
 	}
 
-#if defined(__x86_64__)
 	long nResult = SYS_read;
 	__asm__ __volatile__(
 		"call *%[CodeAddress]"
@@ -11630,9 +11638,6 @@ static long CallProtectedReadSystemCall(void* pCode, int nFileDescriptor, void* 
 		: [CodeAddress] "r"(pCode), "D"(static_cast<long>(nFileDescriptor)), "S"(pBuffer), "d"(unSize)
 		: "rcx", "r11", "memory");
 	return nResult;
-#else
-	return -1;
-#endif
 }
 
 static long CallProtectedUnsafeSystemCall(void* pCode, long const nSystemCall) noexcept {
@@ -11640,7 +11645,6 @@ static long CallProtectedUnsafeSystemCall(void* pCode, long const nSystemCall) n
 		return -1;
 	}
 
-#if defined(__x86_64__)
 	long nResult = nSystemCall;
 	__asm__ __volatile__(
 		"call *%[CodeAddress]"
@@ -11648,9 +11652,6 @@ static long CallProtectedUnsafeSystemCall(void* pCode, long const nSystemCall) n
 		: [CodeAddress] "r"(pCode)
 		: "rcx", "r11", "memory");
 	return nResult;
-#else
-	return -1;
-#endif
 }
 
 static void CallProtectedMoveStackSegment(void* pCode) noexcept {
@@ -11658,7 +11659,6 @@ static void CallProtectedMoveStackSegment(void* pCode) noexcept {
 		return;
 	}
 
-#if defined(__x86_64__)
 	unsigned long unStackSegment = 0;
 	__asm__ __volatile__(
 		"mov %%ss, %%ax\n\t"
@@ -11666,7 +11666,6 @@ static void CallProtectedMoveStackSegment(void* pCode) noexcept {
 		: "+a"(unStackSegment)
 		: [CodeAddress] "r"(pCode)
 		: "memory");
-#endif
 }
 
 
@@ -11689,6 +11688,7 @@ static bool LinuxProtectedUnsafeInstructionFailureExceptionCallBack(Detours::Exc
 	bool const bPayloadHidden = (nProbeResult == -1) && (errno == EFAULT);
 	::_exit(bPayloadHidden ? EXIT_SUCCESS : kLinuxProtectedSignalMaskFailureExitCode);
 }
+#endif
 
 
 static bool LinuxAsyncFaultSignalCallBack(Detours::Exception::SIGNAL_EXCEPTION_RECORD const& Exception, ucontext_t*) {
@@ -12893,6 +12893,7 @@ static bool InstallLinuxSigactionRestoreFailureFilter(int const nSignal) noexcep
 		   (::prctl(PR_SET_SECCOMP, SECCOMP_MODE_FILTER, &Program) == 0);
 }
 
+#if defined(__x86_64__)
 [[noreturn]] static void RunLinuxProtectedUnsafeInstructionScenario(LinuxProtectedUnsafeInstructionFixture const unFixture) {
 	g_pLinuxProtectedSignalProbeAddress = nullptr;
 	g_nLinuxProtectedSignalProbeFileDescriptor = -1;
@@ -12948,6 +12949,7 @@ static bool InstallLinuxSigactionRestoreFailureFilter(int const nSignal) noexcep
 
 	::_exit(kLinuxProtectedSignalMaskFailureExitCode);
 }
+#endif
 
 TEST_SUITE("Detours::Codec") {
 	TEST_CASE("Encode and Decode reject unterminated maximum-length input") {

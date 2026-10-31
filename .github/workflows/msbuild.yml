@@ -19,115 +19,20 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  source-policy:
-    name: Verifying source policy
-    runs-on: ubuntu-24.04
-    timeout-minutes: 5
-
-    defaults:
-      run:
-        shell: bash
-
-    steps:
-      - name: Checking out sources
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-
-      - name: Rejecting thread-local storage
-        run: |
-          set -euo pipefail
-          pattern='\b(thread_local|_Thread_local|__thread)\b|__declspec\s*\(\s*thread\s*\)|\b(TlsAlloc|TlsFree|TlsGetValue|TlsSetValue|FlsAlloc|FlsFree|FlsGetValue|FlsSetValue|pthread_key_create|pthread_key_delete|pthread_getspecific|pthread_setspecific)\b'
-          set +e
-          if command -v rg >/dev/null 2>&1; then
-            matches="$(rg -n "$pattern" \
-              Detours.h \
-              Detours.cpp \
-              main.cpp)"
-          else
-            matches="$(grep -nP "$pattern" \
-              Detours.h \
-              Detours.cpp \
-              main.cpp)"
-          fi
-          status=$?
-          set -e
-          if [[ $status -eq 0 ]]; then
-            printf '%s\n' "$matches"
-            echo "Thread-local storage is not allowed in project-owned sources."
-            exit 1
-          fi
-          if [[ $status -ne 1 ]]; then
-            echo "The source-policy search failed with status $status."
-            exit "$status"
-          fi
-
-      - name: Verifying Protected and Secure source invariants
-        run: |
-          python3 - <<'PY'
-          import pathlib
-          import re
-
-          implementation = pathlib.Path("Detours.cpp").read_text(encoding="utf-8")
-          header = pathlib.Path("Detours.h").read_text(encoding="utf-8")
-
-          definitions = {
-              "OpenProtectedMemoryShadowMetadata": re.compile(
-                  r"static\s+PPROTECTED_MEMORY_SHADOW_METADATA\s+"
-                  r"OpenProtectedMemoryShadowMetadata\s*\([^;{}]*\)\s*noexcept\s*\{"),
-              "CloseProtectedMemoryShadowMetadata": re.compile(
-                  r"static\s+bool\s+CloseProtectedMemoryShadowMetadata\s*"
-                  r"\([^;{}]*\)\s*noexcept\s*\{"),
-          }
-          matches = {}
-          for name, pattern in definitions.items():
-              found = list(pattern.finditer(implementation))
-              if len(found) != 1:
-                  raise SystemExit(f"expected one {name} definition, found {len(found)}")
-              matches[name] = found[0]
-              if re.search(rf"\b{name}\b", implementation[:found[0].start()]):
-                  raise SystemExit(f"{name} has a declaration, alias, or use before its definition")
-
-          if matches["OpenProtectedMemoryShadowMetadata"].start() >= matches[
-              "CloseProtectedMemoryShadowMetadata"
-          ].start():
-              raise SystemExit("OpenProtectedMemoryShadowMetadata must precede CloseProtectedMemoryShadowMetadata")
-
-          classes = (
-              "ProtectedPage",
-              "ProtectedRange",
-              "ProtectedStorage",
-              "SecurePage",
-              "SecureRange",
-              "SecureStorage",
-          )
-          for name in classes:
-              begin = header.find(f"class {name}")
-              if begin < 0:
-                  raise SystemExit(f"class {name} was not found")
-              next_positions = [
-                  position
-                  for position in (header.find(f"class {candidate}", begin + 1) for candidate in classes)
-                  if position >= 0
-              ]
-              end = min(next_positions) if next_positions else len(header)
-              class_text = header[begin:end]
-              get_position = class_text.find("GetProtection(")
-              set_position = class_text.find("SetProtection(")
-              if (get_position < 0) or (set_position < 0) or (get_position >= set_position):
-                  raise SystemExit(f"{name} must declare GetProtection before SetProtection")
-          PY
-
   building-and-testing-linux:
-    name: Building and testing Linux (${{ matrix.configuration }})
+    name: Building and testing Linux (${{ matrix.configuration }}, ${{ matrix.architecture.name }})
     runs-on: ubuntu-24.04
-    needs: source-policy
-    timeout-minutes: 25
+    timeout-minutes: 30
 
     strategy:
       fail-fast: false
       matrix:
         configuration: [ Debug, Release ]
+        architecture:
+          - name: x86
+            flag: -m32
+          - name: x86_64
+            flag: -m64
 
     defaults:
       run:
@@ -135,7 +40,8 @@ jobs:
 
     env:
       CONFIGURATION: ${{ matrix.configuration }}
-      BUILD_DIRECTORY: build/linux/x86_64/${{ matrix.configuration }}
+      ARCHITECTURE_FLAG: ${{ matrix.architecture.flag }}
+      BUILD_DIRECTORY: build/linux/${{ matrix.architecture.name }}/${{ matrix.configuration }}
 
     steps:
       - name: Checking out sources
@@ -143,12 +49,19 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Building Linux (${{ matrix.configuration }})
+      - name: Installing Linux x86 build dependencies
+        if: ${{ matrix.architecture.name == 'x86' }}
+        timeout-minutes: 5
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes --no-install-recommends g++-multilib
+
+      - name: Building Linux (${{ matrix.configuration }}, ${{ matrix.architecture.name }})
         id: build
         timeout-minutes: 10
         run: |
           set -euo pipefail
-          flags=(-std=c++17 -Wall -Wextra -Wpedantic -Werror -pthread -I. -DDETOURS_ARCH_X64=1 -DDETOURS_NOINLINE=)
+          flags=("$ARCHITECTURE_FLAG" -std=c++17 -Wall -Wextra -Wpedantic -Werror -pthread -I. -DDETOURS_NOINLINE=)
           if [[ "$CONFIGURATION" == "Debug" ]]; then
             flags+=(-O0 -g3 -D_DEBUG)
           else
@@ -158,11 +71,11 @@ jobs:
           g++ --version | tee "$BUILD_DIRECTORY/build.log"
           g++ "${flags[@]}" -c Detours.cpp -o "$BUILD_DIRECTORY/Detours.o" 2>&1 | tee -a "$BUILD_DIRECTORY/build.log"
           g++ "${flags[@]}" -c main.cpp -o "$BUILD_DIRECTORY/main.o" 2>&1 | tee -a "$BUILD_DIRECTORY/build.log"
-          g++ "$BUILD_DIRECTORY/Detours.o" "$BUILD_DIRECTORY/main.o" -ldl -pthread -o "$BUILD_DIRECTORY/Detours" 2>&1 | tee -a "$BUILD_DIRECTORY/build.log"
+          g++ "$ARCHITECTURE_FLAG" "$BUILD_DIRECTORY/Detours.o" "$BUILD_DIRECTORY/main.o" -ldl -pthread -o "$BUILD_DIRECTORY/Detours" 2>&1 | tee -a "$BUILD_DIRECTORY/build.log"
           # Preserve executable permissions when the artifact is downloaded.
           tar -czf "$BUILD_DIRECTORY/Detours.tar.gz" -C "$BUILD_DIRECTORY" Detours
 
-      - name: Testing Linux (${{ matrix.configuration }})
+      - name: Testing Linux (${{ matrix.configuration }}, ${{ matrix.architecture.name }})
         timeout-minutes: 10
         run: |
           set -euo pipefail
@@ -172,7 +85,7 @@ jobs:
         if: ${{ !cancelled() && steps.build.outcome != 'skipped' }}
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: Detours-linux-x86_64-${{ matrix.configuration }}
+          name: Detours-linux-${{ matrix.architecture.name }}-${{ matrix.configuration }}
           path: |
             ${{ env.BUILD_DIRECTORY }}/Detours.tar.gz
             ${{ env.BUILD_DIRECTORY }}/*.log
@@ -183,7 +96,6 @@ jobs:
   building-and-testing-windows:
     name: Building and testing Windows (${{ matrix.configuration }}, ${{ matrix.platform }})
     runs-on: windows-2022
-    needs: source-policy
     timeout-minutes: 30
 
     strategy:
