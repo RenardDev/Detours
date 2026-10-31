@@ -9566,8 +9566,8 @@ namespace {
 		}
 
 		const bool bInterruptSystemCall = (unFirstOpcode == kInterruptOpcode) && (unSecondOpcode == kInterruptSystemCallVector);
-		const bool bNativeSystemCall = (unFirstOpcode == kTwoByteOpcodeEscape) && (unSecondOpcode == kNativeSystemCallOpcode);
 #if defined(DETOURS_ARCH_X64)
+		const bool bNativeSystemCall = (unFirstOpcode == kTwoByteOpcodeEscape) && (unSecondOpcode == kNativeSystemCallOpcode);
 		if (bNativeExit && bNativeSystemCall) {
 			int nDeferredSystemCall = (unNativeSystemCall == static_cast<std::uint64_t>(SYS_exit)) ? SYS_exit : SYS_exit_group;
 
@@ -77440,7 +77440,9 @@ namespace rddisasm {
 			constexpr std::size_t kLinuxInlineWrapperHookInstructionBytes = 7;
 			constexpr std::size_t kLinuxInlineWrapperHookNearJumpBytes = 5;
 			constexpr std::size_t kLinuxInlineWrapperHookShortJumpBytes = 2;
+#if defined(DETOURS_ARCH_X64)
 			constexpr std::size_t kLinuxInlineWrapperHookIndirectJumpBytes = 6;
+#endif
 
 			if (!pHookAddress) {
 				return nullptr;
